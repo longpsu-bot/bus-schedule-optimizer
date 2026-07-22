@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from .demand_resolution import (
     DemandBlockPolicyV1,
+    DemandResolutionContractV1,
     DemandResolutionError,
     DemandResolutionResultV1,
     InterpolationMethod,
@@ -20,6 +21,7 @@ from .evaluation import (
 )
 from .models import (
     ContractDirection,
+    DemandObservation,
     DemandResolutionType,
     NormalizedInputBundleV1,
     ObservedDemandInput,
@@ -47,7 +49,10 @@ def _validate_authoritative_demand_source(
             "Regular-interval demand requires one explicit common source resolution"
         )
 
-    observations_by_direction: dict[ContractDirection, list[object]] = {}
+    observations_by_direction: dict[
+        ContractDirection,
+        list[DemandObservation],
+    ] = {}
     for observation in demand.observations:
         if observation.source_resolution_type == DemandResolutionType.DAILY_TOTAL:
             continue
@@ -74,7 +79,7 @@ def _validate_authoritative_demand_source(
 def detect_demand_resolution_v1(
     demand: ObservedDemandInput,
     policy: DemandBlockPolicyV1 | None = None,
-):
+) -> DemandResolutionContractV1:
     effective_policy = policy or DemandBlockPolicyV1()
     _validate_authoritative_demand_source(demand, effective_policy)
     return _detect_demand_resolution_v1(demand, effective_policy)
