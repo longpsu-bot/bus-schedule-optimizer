@@ -8,7 +8,11 @@ from .demand_resolution import (
     DemandResolutionError,
     DemandResolutionResultV1,
     InterpolationMethod,
+)
+from .demand_resolution import (
     build_demand_analysis_blocks_v1 as _build_demand_analysis_blocks_v1,
+)
+from .demand_resolution import (
     detect_demand_resolution_v1 as _detect_demand_resolution_v1,
 )
 from .evaluation import (
@@ -17,6 +21,8 @@ from .evaluation import (
     EvaluationIssueSeverity,
     ScenarioBEvaluationBundleV1,
     ScenarioBEvaluationPolicyV1,
+)
+from .evaluation import (
     evaluate_scenario_b_v1 as _evaluate_scenario_b_v1,
 )
 from .models import (
@@ -42,9 +48,7 @@ def _validate_authoritative_demand_source(
         for observation in demand.observations
         if observation.source_resolution_type == DemandResolutionType.REGULAR_INTERVAL
     }
-    if regular_resolutions and (
-        None in regular_resolutions or len(regular_resolutions) != 1
-    ):
+    if regular_resolutions and (None in regular_resolutions or len(regular_resolutions) != 1):
         raise DemandResolutionError(
             "Regular-interval demand requires one explicit common source resolution"
         )
@@ -116,8 +120,7 @@ def evaluate_scenario_b_v1(
         for issue in demand_dimension.issues
     )
     if not (
-        has_blocking_demand_issue
-        and demand_dimension.status == DimensionStatus.INSUFFICIENT_DATA
+        has_blocking_demand_issue and demand_dimension.status == DimensionStatus.INSUFFICIENT_DATA
     ):
         return result
 

@@ -124,7 +124,4 @@ def test_blocking_demand_failure_is_not_erased_by_insufficient_blocks(
     assert result.b_block_supply[0].status == BlockSupplyStatus.NO_SERVICE_WITH_DEMAND
     assert result.b_block_supply[1].status == BlockSupplyStatus.INSUFFICIENT_DATA
     assert result.evaluation.demand_suitability.status == DimensionStatus.FAIL
-    assert (
-        result.evaluation.disposition
-        == BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE
-    )
+    assert result.evaluation.disposition == BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE
