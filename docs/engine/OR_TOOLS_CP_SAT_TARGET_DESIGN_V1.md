@@ -1,6 +1,6 @@
 # OR-Tools CP-SAT Target Design V1
 
-This is a future implementation design, not solver code. Hard rules and objective priority come from [Engine Contract V1 §§3–4 and §§8–12](ENGINE_CONTRACT_V1.md).
+This is a future implementation design, not solver code. Hard rules and objective priority come from [Engine Contract V1 §§3–4 and §§8–12](ENGINE_CONTRACT_V1.md), with top-level result behavior defined by [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md).
 
 ## Why CP-SAT
 
@@ -12,14 +12,14 @@ The target problem combines integer departure minutes, integer block allocations
 ScheduleSolver.solve(problem: ScheduleProblemV1) -> ScheduleSolutionCandidate
 ```
 
-`OrToolsCpSatScheduleSolver` will translate only normalized solver-neutral values. It returns raw variable values, solver status, stage objectives, timings, counts, and logs. `DomainSolutionValidator` separately reconstructs trips/fleet chains and decides conformance.
+`OrToolsCpSatScheduleSolver` will translate only normalized solver-neutral values. It returns raw variable values, native solver status, stage objectives, timings, counts, and logs. `DomainSolutionValidator` separately reconstructs trips/fleet chains and decides conformance. The application then wraps the result in `ScheduleGenerationOutcomeV1`; an accepted `ScheduleSolutionV1` is created only after domain validation succeeds.
 
 ## Proposed decision layers
 
 1. **Block allocation:** integer `trips_in_block[direction, block]` obeying total/directional locks and minimum service.
 2. **Exact times:** ordered integer `departure_time[direction, sequence]` within locked windows, with first/last equality.
 3. **Regularity:** integer headways plus Boolean change/transition/exception indicators and regime membership.
-4. **Fleet/terminal feasibility:** terminal balance/reservoir or connection-graph representation proving continuous vehicle availability and turnaround, with solver-determined, fixed, or bounded initial terminal stock.
+4. **Fleet/terminal feasibility:** terminal balance or interval/circuit representation proving vehicle availability and turnaround.
 
 Do not begin with a `vehicle × trip × minute` Boolean grid. Prefer O(trips + blocks + candidate connections) variables and use a time-indexed assignment model only if benchmarks show that more compact flow/circuit alternatives cannot express future requirements.
 
@@ -34,8 +34,8 @@ Do not begin with a `vehicle × trip × minute` Boolean grid. Prefer O(trips + b
 - `overload_85[d,b]`, `overload_90[d,b]`, `backlog[d,b]` — non-negative one-sided shortage variables.
 - `no_service[d,b]`, `large_gap[d,i]` — Boolean/positive gap variables.
 - `actual_trips_in_block[d,b]` — derived count from exact times for reconciliation.
-- `initial_fleet_terminal_1`, `initial_fleet_terminal_2` — non-negative integer initial terminal stocks; solver variables by default and fixed/bounded only when the selected positioning mode says so.
-- terminal arrival/ready events and continuous stock variables, or feasible connection-arc/path-start variables from which the same stock proof can be reconstructed.
+- `initial_fleet_terminal_1`, `initial_fleet_terminal_2` — solver-determined or constrained starting positions.
+- terminal arrival/ready events and vehicle-balance variables, or feasible connection-arc variables.
 
 Multiplication/division involving LF should be converted to scaled integer capacity inequalities. Passenger counts/rates require a declared rounding scale and tolerance.
 
@@ -43,10 +43,9 @@ Multiplication/division involving LF should be converted to scaled integer capac
 
 - total C trips equal B; direction totals equal B in `fixed_by_direction`;
 - `total_only` only when authorization/confidence preconditions are already validated;
-- `minimum_required_fleet <= available_fleet_limit`; in explicitly authorized `exact_scheduled_fleet` mode the roster/reserve value additionally satisfies `minimum_required_fleet <= approved_active_fleet <= available_fleet_limit`, without requiring every approved vehicle to move;
-- initial fleet positioning consistent with `solver_determined`, `fixed`, or `bounded` mode, with `initial_fleet_terminal_1 + initial_fleet_terminal_2 = minimum_required_fleet <= available_fleet_limit`;
-- continuous terminal stock at every event time, where a vehicle is added only at `arrival + turnaround`, departures consume stock, and stock never becomes negative;
-- demand-block boundaries never initialize, reset, or otherwise alter terminal stock;
+- `minimum_required_fleet <= available_fleet_limit` and any explicit fleet/positioning mode;
+- initial terminal counts satisfy fixed/bounded rules when configured;
+- terminal stock remains non-negative on the continuous event timeline;
 - departure windows and exact first/last departures;
 - strict chronological order and preserved B sequence unless an approved rule allows reorder;
 - runtime, arrival terminal, and minimum turnaround;
@@ -60,12 +59,10 @@ Multiplication/division involving LF should be converted to scaled integer capac
 
 Evaluate two formulations in Stage 4:
 
-1. **Connection graph/path cover:** a candidate arc exists only when terminal and ready time permit. Selected paths represent continuous vehicle chains; path starts determine both `minimum_required_fleet` and the initial terminal allocation. A domain replay must reconstruct a non-negative terminal stock profile from the selected paths.
-2. **Terminal event balance/reservoir:** initial terminal stock is a variable or a mode-controlled value. At each ordered event time, vehicles whose `arrival + turnaround` is reached are credited before departures at that same time, departures debit stock, and the resulting stock must remain non-negative. The equations are continuous across demand-block boundaries.
+1. **Connection graph/path cover:** candidate arc exists only when terminal and ready time permit; selected paths represent vehicle chains, with fleet bounded by path starts.
+2. **Terminal event balance/reservoir:** arrivals become availability events after turnaround; cumulative departures cannot exceed solver-determined initial stock plus ready arrivals at each terminal.
 
-Both formulations must derive the minimum required fleet and recommended initial allocation rather than merely check a supplied split. In default `available_upper_bound` mode they enforce only `minimum_required_fleet <= available_fleet_limit`; optional `approved_active_fleet` is metadata and does not force vehicles to move. `exact_scheduled_fleet` is an explicit authorization mode, not a default and not a reason to invent trips or repositioning.
-
-The implementation must not use a `vehicle × trip × minute` grid merely to encode fleet stock. Benchmark both accepted formulations for proof strength, model size, and fidelity of their independently replayed stock profiles before selecting the production formulation.
+The chosen formulation must independently report minimum required fleet and recommended initial positioning. If approved or available fleet exceeds the minimum, idle/reserve vehicles remain permitted; no formulation may distort service merely to make every vehicle move.
 
 ## Lexicographic solve stages
 
@@ -81,7 +78,7 @@ Run staged solves or a mathematically safe lexicographic encoding:
 8. minimize regime changes/transitions;
 9. preserve stable B sections;
 10. minimize shifted trips, total shift, then maximum shift;
-11. minimize `minimum_required_fleet` only as a late tie-breaker after all approved service-quality and schedule-preservation objectives.
+11. use minimum fleet only as a late tie-breaker after service-quality objectives are fixed.
 
 Each stage fixes the best proven prior-stage value before proceeding, or uses bounds that cannot trade away a higher priority. There is no symmetric distance-to-85 objective.
 
@@ -89,22 +86,29 @@ Each stage fixes the best proven prior-stage value before proceeding, or uses bo
 
 B is a natural exact-time hint. The reviewed heuristic may provide an additional feasible hint through the same adapter interface. A practical first implementation may solve block allocation, then exact times/fleet, then regularity while iterating only when exact-time reconciliation fails. Decomposition must not present a Level 1 plan as feasible until Level 2 validates it.
 
-## Status mapping
+## Status and outcome mapping
 
-Return native meanings as `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`, `MODEL_INVALID`, or `UNKNOWN`. Record time limit, worker count, random seed, deterministic-time settings, best bound, and objective values. `FEASIBLE` is never relabeled optimal. A domain validator independently replays both terminal stock profiles, verifies the fleet upper bound and initial-allocation reconciliation, and rejects any negative-stock or discontinuous candidate even when the solver reports success.
+CP-SAT native statuses remain `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`, `MODEL_INVALID`, and `UNKNOWN`. Record time limit, worker count, random seed, deterministic-time settings, best bound, and stage objective values. `FEASIBLE` is never relabeled optimal.
+
+The engine-level `execution_status` belongs to `ScheduleGenerationOutcomeV1`:
+
+- `NOT_RUN` means no solver was invoked and therefore native `solver_status` is null;
+- `COMPLETED` means a solver invocation returned a native status.
+
+Only a native `OPTIMAL` or `FEASIBLE` candidate that passes independent domain validation may populate `ScheduleSolutionV1`. `INFEASIBLE` produces no solution. `UNKNOWN` does not prove infeasibility. A candidate rejected by the domain validator remains non-authoritative and may appear only as diagnostic metadata in the outcome envelope.
 
 ## Performance and benchmark targets
 
 Targets are measured on the approved reference machine and are gates, not guarantees:
 
 | Daily trips | First feasible | Total staged solve | Peak memory | Intended gate |
-|---:|---:|---:|---:|---|
+|---:|---:|---:|---|
 | 40–80 | ≤ 1 s | ≤ 5 s | ≤ 512 MB | interactive baseline |
 | 150 | ≤ 5 s | ≤ 30 s | ≤ 1 GB | normal large route |
 | 300 | ≤ 15 s | ≤ 120 s | ≤ 2 GB | large-case acceptance |
 | 400–500 | ≤ 60 s | ≤ 300 s | ≤ 4 GB | stress, feasible result acceptable |
 
-Collect model build time, variables by type, constraints by family, first-feasible time, total time, status, per-stage objective/bound, memory, branches/conflicts, solution fingerprint, derived minimum fleet, initial allocation, and stock-profile replay result. Benchmark both accepted fleet formulations under the same cases and solver controls. Model build SHOULD stay below 20% of the tier's total budget.
+Collect model build time, variables by type, constraints by family, first-feasible time, total time, native status, outcome status, per-stage objective/bound, memory, branches/conflicts, and solution/outcome fingerprints. Model build SHOULD stay below 20% of the tier's total budget.
 
 ## Determinism
 
