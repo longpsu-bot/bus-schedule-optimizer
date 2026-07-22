@@ -27,27 +27,6 @@ jobs:
       - name: Install
         run: python -m pip install -e '.[dev]'
 
-      - name: Prepare Ruff-formatted PR files
-        run: |
-          targets=(
-            src/bus_schedule_engine/contracts_v1/heuristic_solver.py
-            src/bus_schedule_engine/contracts_v1/solver_orchestration.py
-            src/bus_schedule_engine/contracts_v1/solver_problem.py
-            src/bus_schedule_engine/contracts_v1/solver_serialization.py
-            src/bus_schedule_engine/contracts_v1/solver_validation.py
-            tests/test_contract_v1_solver.py
-          )
-          python -m ruff check --fix "${targets[@]}"
-          python -m ruff format "${targets[@]}"
-          mkdir -p ruff-formatted
-          cp --parents "${targets[@]}" ruff-formatted/
-
-      - name: Upload Ruff-formatted PR files
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr8-ruff-formatted-files
-          path: ruff-formatted
-
       - name: Tests
         id: tests
         continue-on-error: true
