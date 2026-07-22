@@ -26,7 +26,7 @@ jobs:
           python-version: '3.11'
           cache: pip
 
-      - name: Apply additive legacy compatibility fields
+      - name: Apply additive legacy compatibility fields and fixture correction
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -70,6 +70,51 @@ jobs:
           if old not in importer:
               raise SystemExit('Importer constructor insertion point not found')
           importer_path.write_text(importer.replace(old, new, 1), encoding='utf-8')
+
+          test_path = Path('tests/test_contract_v1_normalization.py')
+          test = test_path.read_text(encoding='utf-8')
+          helper_anchor = '''def _imported_b_only(parameters, trips, demand=None) -> ImportedWorkbook:
+              return ImportedWorkbook(
+                  parameters_a=None,
+                  trips_a=[],
+                  parameters_b=parameters,
+                  trips_b=trips,
+                  demand=list(demand or []),
+                  configuration={},
+              )
+          '''.replace('              ', '')
+          helper_replacement = helper_anchor + '''
+
+          def _imported_a_b(parameters, trips, demand=None) -> ImportedWorkbook:
+              trips_a = [replace(item, scenario="A") for item in trips]
+              return ImportedWorkbook(
+                  parameters_a=parameters,
+                  trips_a=trips_a,
+                  parameters_b=parameters,
+                  trips_b=trips,
+                  demand=list(demand or []),
+                  configuration={},
+              )
+          '''.replace('          ', '')
+          if helper_anchor not in test:
+              raise SystemExit('Test helper insertion point not found')
+          test = test.replace(helper_anchor, helper_replacement, 1)
+          old = '''    bundle = normalize_imported_workbook_v1(
+                  _imported_b_only(parameters, make_valid_trips(parameters), demand),
+                  _options(),
+              )
+          '''.replace('              ', '')
+          new = '''    bundle = normalize_imported_workbook_v1(
+                  _imported_a_b(parameters, make_valid_trips(parameters), demand),
+                  _options(
+                      operating_day_type_a=OperatingDayType.WEEKDAY,
+                      available_fleet_limit_a=3,
+                  ),
+              )
+          '''.replace('              ', '')
+          if old not in test:
+              raise SystemExit('Combined demand test replacement point not found')
+          test_path.write_text(test.replace(old, new, 1), encoding='utf-8')
           PY
 
       - name: Install
@@ -84,22 +129,7 @@ jobs:
             tests/test_contract_v1_normalization.py
 
       - name: Test
-        id: tests
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python -m pytest -vv --tb=short 2>&1 | tee pr01-test.log
-
-      - name: Upload test log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pr01-test-log
-          path: pr01-test.log
-
-      - name: Fail after log upload
-        if: steps.tests.outcome == 'failure'
-        run: exit 1
+        run: python -m pytest
 
       - name: Lint
         run: python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
