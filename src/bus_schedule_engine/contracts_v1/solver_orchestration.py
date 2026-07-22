@@ -31,9 +31,7 @@ def _finalize_outcome(
 ) -> ScheduleGenerationOutcomeV1:
     return replace(
         outcome,
-        outcome_fingerprint=canonical_sha256(
-            _outcome_fingerprint_payload(outcome)
-        ),
+        outcome_fingerprint=canonical_sha256(_outcome_fingerprint_payload(outcome)),
     )
 
 
@@ -155,9 +153,7 @@ def run_schedule_solver_v1(
             solver_status=NativeSolverStatus.MODEL_INVALID,
             solver_adapter=run.solver_adapter,
             solve_duration_seconds=run.solve_duration_seconds,
-            explanations=(
-                "Solver status and candidate payload are inconsistent.",
-            ),
+            explanations=("Solver status and candidate payload are inconsistent.",),
             limitations=run.limitations,
         )
 
@@ -170,17 +166,13 @@ def run_schedule_solver_v1(
         )
         return _finalize_outcome(
             ScheduleGenerationOutcomeV1(
-                result_status=(
-                    GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR
-                ),
+                result_status=(GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR),
                 execution_status=run.execution_status,
                 solver_status=run.solver_status,
                 solver_adapter=run.solver_adapter,
                 solve_duration_seconds=run.solve_duration_seconds,
                 outcome_fingerprint="",
-                source_b_fingerprint=(
-                    problem.normalized_inputs.scenario_b_fingerprint
-                ),
+                source_b_fingerprint=(problem.normalized_inputs.scenario_b_fingerprint),
                 solution=None,
                 diagnostic_candidate=diagnostic,
                 explanations=run.explanations,
