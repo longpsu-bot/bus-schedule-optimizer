@@ -21,8 +21,8 @@ from bus_schedule_engine.contracts_v1 import (
     NormalizationOptions,
     OperatingDayType,
     RawScheduleCandidateV1,
-    ScheduleProblemError,
     ScenarioBEvaluationPolicyV1,
+    ScheduleProblemError,
     SolverExecutionStatus,
     SolverRunResultV1,
     build_schedule_problem_v1,
@@ -289,12 +289,9 @@ def test_heuristic_candidate_crosses_boundary_and_matches_legacy_behavior() -> N
     assert len(outcome.solution.solution_fingerprint) == 64
     assert tuple(trips) == baseline
     assert timetable_fingerprint(trips) == baseline_fingerprint
-    direct_times = {
-        trip.source_b_trip_id: trip.departure_seconds for trip in direct.trips
-    }
+    direct_times = {trip.source_b_trip_id: trip.departure_seconds for trip in direct.trips}
     adapter_times = {
-        trip.source_b_trip_id: trip.c_departure_time
-        for trip in outcome.solution.c_exact_timetable
+        trip.source_b_trip_id: trip.c_departure_time for trip in outcome.solution.c_exact_timetable
     }
     assert adapter_times == direct_times
     assert (
@@ -353,10 +350,7 @@ def test_tampered_runtime_is_rejected_as_diagnostic_only() -> None:
 
     assert validation.status == CandidateValidationStatus.REJECTED
     assert "SOURCE_RUNTIME_LOCK_VIOLATION" in validation.rejection_codes
-    assert (
-        outcome.result_status
-        == GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR
-    )
+    assert outcome.result_status == GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR
     assert outcome.solution is None
     assert outcome.diagnostic_candidate is not None
 
@@ -389,7 +383,10 @@ def test_accepted_solution_and_outcome_match_json_schemas() -> None:
     outcome_payload = schedule_outcome_to_contract_dict(outcome)
 
     assert _schema_errors(solution_payload, "schedule_solution.schema.json") == []
-    assert _schema_errors(
-        outcome_payload,
-        "schedule_generation_outcome.schema.json",
-    ) == []
+    assert (
+        _schema_errors(
+            outcome_payload,
+            "schedule_generation_outcome.schema.json",
+        )
+        == []
+    )
