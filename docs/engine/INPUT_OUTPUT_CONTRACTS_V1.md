@@ -1,6 +1,6 @@
 # Input and Output Contracts V1
 
-The normative rules are [Engine Contract V1 §§2–5 and §§11–16](ENGINE_CONTRACT_V1.md). JSON files in `contracts/v1/` are draft validation artifacts; the Markdown contract remains authoritative until schemas are formally approved.
+The normative rules are [Engine Contract V1 §§2–5 and §§11–16](ENGINE_CONTRACT_V1.md), together with the normative [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md). JSON files in `contracts/v1/` are draft validation artifacts; the Markdown contracts remain authoritative until schemas are formally approved.
 
 ## Contract envelope
 
@@ -12,7 +12,7 @@ Every top-level object contains `contract_version: "1.0.0"`. IDs are non-empty s
 
 | Schema | Domain object | Required semantic checks beyond JSON type validation |
 |---|---|---|
-| `scenario_a_input.schema.json` | `ScenarioAInput` | timetable/declared totals, terminal-direction match, first/last reconciliation, active ≤ available |
+| `scenario_a_input.schema.json` | `ScenarioAInput` | timetable/declared totals, terminal-direction match, first/last reconciliation, approved metadata ≤ available limit when present |
 | `scenario_b_input.schema.json` | `ScenarioBInput` | same checks; capacity and all proposed values blocking |
 | `observed_demand_input.schema.json` | `ObservedDemandInput` | date order, non-overlap policy, average-day normalization, no fabricated directions |
 | `demand_resolution.schema.json` | `DemandResolutionContract` | mode-specific grain and manual-boundary checks |
@@ -38,13 +38,25 @@ Normalized contract directions are `outbound`, `inbound`, and demand-only `combi
 
 The schema mirrors Contract V1 §11.1. Each evaluation dimension has a controlled status, issue list, evidence strings or entity references, and explanation. The top-level B disposition is not inferred by the UI.
 
+### `ScheduleGenerationOutcomeV1`
+
+This is the top-level result of the Scenario C generation decision. It distinguishes:
+
+- engine-level `execution_status`: `NOT_RUN` or `COMPLETED`;
+- nullable native solver proof status;
+- accepted solution, no-run, proven infeasible, and rejected-candidate outcomes.
+
+`NOT_RUN` is not a CP-SAT status. When B is already suitable or demand is insufficient, the solver fields are null, duration is zero, and `solution` is null. A no-feasible or rejected outcome also has no authoritative Scenario C.
+
 ### `ScheduleSolutionV1`
 
-The schema mirrors Contract V1 §11.2. `solver_status` describes solver proof; `status` describes domain acceptance/disposition. A `FEASIBLE` solver result can become a conforming solution only after independent validation; it remains labeled feasible, not optimal.
+This schema represents only `SOLUTION_ACCEPTED`. It contains the complete independently validated C timetable, block plan, regimes, fleet assignment, terminal stock profiles, traceability, evaluation, and solution fingerprint. A `FEASIBLE` native solver result may become a conforming solution only after independent validation; it remains labeled feasible, not optimal.
+
+Rejected raw candidates, when retained, belong only in the limited diagnostic field of `ScheduleGenerationOutcomeV1`. They must not populate authoritative C fields or be rendered/exported as C.
 
 ## Boundary convention
 
-Block membership uses half-open intervals `[start, end)`. A departure at a shared boundary belongs to the later block. A final locked departure may be represented by a terminal sentinel block or a documented inclusive final endpoint, but it must be counted exactly once. The chosen convention is included in `ScheduleProblemV1` and solution explanations. This analytical boundary convention never resets terminal stock; fleet validation replays one continuous ordered event stream.
+Block membership uses half-open intervals `[start, end)`. A departure at a shared boundary belongs to the later block. A final locked departure may be represented by a terminal sentinel block or a documented inclusive final endpoint, but it must be counted exactly once. The chosen convention is included in `ScheduleProblemV1` and outcome/solution explanations. This analytical boundary convention never resets terminal stock; fleet validation replays one continuous ordered event stream.
 
 ## Compatibility and unknown fields
 
