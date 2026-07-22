@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/solver-interface-heuristic-adapter-v1
+  workflow_dispatch:
 
 permissions:
   contents: write
