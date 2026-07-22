@@ -348,3 +348,36 @@ def test_rejected_candidate_is_diagnostic_not_authoritative_c() -> None:
     invalid = deepcopy(outcome)
     invalid["diagnostic_candidate"] = None
     assert _schema_errors(invalid, "schedule_generation_outcome.schema.json")
+
+
+@pytest.mark.parametrize(
+    ("result_status", "solver_status"),
+    [
+        ("C_NOT_FOUND_WITHIN_SOLVE_LIMIT", "UNKNOWN"),
+        ("C_NOT_GENERATED_MODEL_INVALID", "MODEL_INVALID"),
+    ],
+)
+def test_unknown_and_model_invalid_have_explicit_non_solution_outcomes(
+    result_status: str,
+    solver_status: str,
+) -> None:
+    outcome = _load(EXAMPLE_DIR / "schedule_generation_outcome.example.json")
+    outcome.update(
+        {
+            "result_status": result_status,
+            "execution_status": "COMPLETED",
+            "solver_status": solver_status,
+            "solver_adapter": "ortools_cp_sat_target_example",
+            "solve_duration_seconds": 2.0,
+            "solution": None,
+            "diagnostic_candidate": None,
+        }
+    )
+    assert _schema_errors(outcome, "schedule_generation_outcome.schema.json") == []
+
+    wrong_status = deepcopy(outcome)
+    wrong_status["result_status"] = "NO_FEASIBLE_C_WITH_B_PARAMETERS"
+    assert _schema_errors(
+        wrong_status,
+        "schedule_generation_outcome.schema.json",
+    )

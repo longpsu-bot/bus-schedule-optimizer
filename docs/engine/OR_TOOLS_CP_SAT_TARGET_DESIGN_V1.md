@@ -95,7 +95,7 @@ The engine-level `execution_status` belongs to `ScheduleGenerationOutcomeV1`:
 - `NOT_RUN` means no solver was invoked and therefore native `solver_status` is null;
 - `COMPLETED` means a solver invocation returned a native status.
 
-Only a native `OPTIMAL` or `FEASIBLE` candidate that passes independent domain validation may populate `ScheduleSolutionV1`. `INFEASIBLE` produces no solution. `UNKNOWN` does not prove infeasibility. A candidate rejected by the domain validator remains non-authoritative and may appear only as diagnostic metadata in the outcome envelope.
+Only a native `OPTIMAL` or `FEASIBLE` candidate that passes independent domain validation may populate `ScheduleSolutionV1`. Native `INFEASIBLE` maps to `NO_FEASIBLE_C_WITH_B_PARAMETERS` only for the reviewed encoded problem. Native `UNKNOWN` maps to `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` and does not prove infeasibility. Native `MODEL_INVALID` maps to `C_NOT_GENERATED_MODEL_INVALID` and indicates a model/configuration defect. A candidate rejected by the domain validator remains non-authoritative and may appear only as diagnostic metadata in the outcome envelope.
 
 ## Performance and benchmark targets
 

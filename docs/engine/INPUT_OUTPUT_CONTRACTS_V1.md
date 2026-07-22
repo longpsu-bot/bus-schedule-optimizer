@@ -48,6 +48,8 @@ This is the top-level result of the Scenario C generation decision. It distingui
 
 `NOT_RUN` is not a CP-SAT status. When B is already suitable or demand is insufficient, the solver fields are null, duration is zero, and `solution` is null. A no-feasible or rejected outcome also has no authoritative Scenario C.
 
+Native `UNKNOWN` maps only to `C_NOT_FOUND_WITHIN_SOLVE_LIMIT`; it is not proof of infeasibility. Native `MODEL_INVALID` maps only to `C_NOT_GENERATED_MODEL_INVALID`; it is not a route or timetable conclusion.
+
 ### `ScheduleSolutionV1`
 
 This schema represents only `SOLUTION_ACCEPTED`. It contains the complete independently validated C timetable, block plan, regimes, fleet assignment, terminal stock profiles, traceability, evaluation, and solution fingerprint. A `FEASIBLE` native solver result may become a conforming solution only after independent validation; it remains labeled feasible, not optimal.

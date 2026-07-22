@@ -335,6 +335,8 @@ This is the top-level result of the C-generation decision. It MUST contain contr
 
 - `SOLUTION_ACCEPTED`;
 - `NO_FEASIBLE_C_WITH_B_PARAMETERS`;
+- `C_NOT_FOUND_WITHIN_SOLVE_LIMIT`;
+- `C_NOT_GENERATED_MODEL_INVALID`;
 - `C_NOT_GENERATED_INSUFFICIENT_DATA`;
 - `C_NOT_REQUIRED_B_SUITABLE`;
 - `CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR`.
@@ -355,7 +357,9 @@ For the Contract V1 two-terminal no-deadhead model:
 
 This value is calculated independently for A, B, and C; it is never copied from Scenario B. Each stock-profile record identifies event time/type, trip ID when applicable, stock before/after, ready arrivals, and departures.
 
-Native solver statuses are `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`, `MODEL_INVALID`, and `UNKNOWN`. User-facing output MUST NOT label `FEASIBLE` as proven optimal. Only native `OPTIMAL` or `FEASIBLE` candidates that pass independent validation may produce `ScheduleSolutionV1`. `UNKNOWN` does not prove infeasibility.
+Native solver statuses are `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`, `MODEL_INVALID`, and `UNKNOWN`. User-facing output MUST NOT label `FEASIBLE` as proven optimal. Only native `OPTIMAL` or `FEASIBLE` candidates that pass independent validation may produce `ScheduleSolutionV1`.
+
+`INFEASIBLE` maps to `NO_FEASIBLE_C_WITH_B_PARAMETERS` only when the encoded locked problem is the reviewed problem identified by the returned fingerprint. `UNKNOWN` maps to `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` and does not prove infeasibility. `MODEL_INVALID` maps to `C_NOT_GENERATED_MODEL_INVALID` and is an implementation/configuration defect, not a business conclusion.
 
 ## 12. Solver-independent architecture boundary
 
