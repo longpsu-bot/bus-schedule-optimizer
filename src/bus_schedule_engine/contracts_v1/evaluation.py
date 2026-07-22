@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from statistics import mean, pstdev
 
 from .demand_resolution import (
+    BlockBoundaryReason,
     BlockMode,
     DemandAnalysisBlockV1,
     DemandBlockPolicyV1,
@@ -18,7 +19,6 @@ from .models import (
     CONTRACT_VERSION,
     ContractDirection,
     DemandConfidence,
-    ExactTimetableTrip,
     NormalizedInputBundleV1,
     ScenarioAInput,
     ScenarioBInput,
@@ -28,7 +28,7 @@ from .models import (
 from .validation import validate_normalized_bundle
 
 
-class ScenarioEvaluationError(ValueError):
+class ScenarioBEvaluationError(ValueError):
     """Raised when Scenario B cannot be evaluated from a valid normalized bundle."""
 
 
@@ -226,10 +226,7 @@ def _dimension(
     )
 
 
-def _trip_count(
-    scenario: ScenarioInputV1,
-    block: DemandAnalysisBlockV1,
-) -> int:
+def _trip_count(scenario: ScenarioInputV1, block: DemandAnalysisBlockV1) -> int:
     return sum(
         block.start_time <= trip.departure_time < block.end_time
         and (
@@ -242,7 +239,9 @@ def _trip_count(
 
 def _required_trips(demand: float, capacity: int, ceiling: float) -> int:
     if capacity <= 0 or ceiling <= 0:
-        raise ScenarioEvaluationError("Capacity and load-factor ceiling must be positive")
+        raise ScenarioBEvaluationError(
+            "Capacity and load-factor ceiling must be positive"
+        )
     return math.ceil(demand / (capacity * ceiling)) if demand > 0 else 0
 
 
@@ -257,12 +256,12 @@ def _block_status(
 ) -> BlockSupplyStatus:
     if interpolation_status == InterpolationStatus.UNSUPPORTED:
         return BlockSupplyStatus.INSUFFICIENT_DATA
+    if demand > 0 and trip_count == 0:
+        return BlockSupplyStatus.NO_SERVICE_WITH_DEMAND
     if not _confidence_at_least(
         confidence, policy.minimum_authoritative_demand_confidence
     ):
         return BlockSupplyStatus.INSUFFICIENT_DATA
-    if demand > 0 and trip_count == 0:
-        return BlockSupplyStatus.NO_SERVICE_WITH_DEMAND
     if load_factor is None:
         return BlockSupplyStatus.WITHIN_PLANNING_CEILING
     if load_factor > policy.critical_load_factor_ceiling:
@@ -313,13 +312,27 @@ def _block_plan(
         policy=policy,
     )
     reason = {
-        BlockSupplyStatus.WITHIN_PLANNING_CEILING: "Demand is within the one-sided 85% planning ceiling.",
-        BlockSupplyStatus.WARNING_ABOVE_85: "Load factor is above 85% but not above 90%.",
-        BlockSupplyStatus.CRITICAL_ABOVE_90: "Load factor is above the 90% critical ceiling.",
-        BlockSupplyStatus.NO_SERVICE_WITH_DEMAND: "Observed demand exists but no departure serves the interval.",
-        BlockSupplyStatus.LOW_LOAD_REVIEW_ONLY: "Low load is reported for review only; it is not a trip-reduction instruction.",
-        BlockSupplyStatus.ELIGIBLE_DONOR_PERIOD: "Donor eligibility requires separate minimum-service and feasibility proof.",
-        BlockSupplyStatus.INSUFFICIENT_DATA: "Demand confidence or interpolation support is insufficient for an authoritative conclusion.",
+        BlockSupplyStatus.WITHIN_PLANNING_CEILING: (
+            "Demand is within the one-sided 85% planning ceiling."
+        ),
+        BlockSupplyStatus.WARNING_ABOVE_85: (
+            "Load factor is above 85% but not above 90%."
+        ),
+        BlockSupplyStatus.CRITICAL_ABOVE_90: (
+            "Load factor is above the 90% critical ceiling."
+        ),
+        BlockSupplyStatus.NO_SERVICE_WITH_DEMAND: (
+            "Observed demand exists but no departure serves the interval."
+        ),
+        BlockSupplyStatus.LOW_LOAD_REVIEW_ONLY: (
+            "Low load is reported for review only; it is not a trip-reduction instruction."
+        ),
+        BlockSupplyStatus.ELIGIBLE_DONOR_PERIOD: (
+            "Donor eligibility requires separate minimum-service and feasibility proof."
+        ),
+        BlockSupplyStatus.INSUFFICIENT_DATA: (
+            "Demand confidence or interpolation support is insufficient for an authoritative conclusion."
+        ),
     }[status]
     return BlockSupplyPlanV1(
         scenario=scenario_id,
@@ -402,7 +415,9 @@ def _terminal_events(
             else scenario.terminal_1_name
         )
         if departure_terminal == terminal:
-            events.append((trip.departure_time, 1, -1, "DEPARTURE", trip.trip_id))
+            events.append(
+                (trip.departure_time, 1, -1, "DEPARTURE", trip.trip_id)
+            )
         if arrival_terminal == terminal:
             turnaround = (
                 scenario.turnaround_minutes.terminal_1
@@ -414,9 +429,7 @@ def _terminal_events(
     return sorted(events, key=lambda item: (item[0], item[1], item[4]))
 
 
-def _minimum_initial_stock(
-    events: list[tuple[int, int, int, str, str]],
-) -> int:
+def _minimum_initial_stock(events: list[tuple[int, int, int, str, str]]) -> int:
     balance = 0
     minimum = 0
     for _, _, delta, _, _ in events:
@@ -503,17 +516,26 @@ def _headway_dimension(
                 EvaluationIssueV1(
                     code="HEADWAY_VARIATION_WARNING",
                     severity=EvaluationIssueSeverity.WARNING,
-                    message=f"Headway CV for {direction.value} exceeds the configured threshold.",
+                    message=(
+                        f"Headway CV for {direction.value} exceeds the configured threshold."
+                    ),
                     references=(direction.value,),
-                    suggestion="Review continuous headway regimes rather than resetting at demand blocks.",
+                    suggestion=(
+                        "Review continuous headway regimes rather than resetting at demand blocks."
+                    ),
                 )
             )
-        if average > 0 and maximum_gap > average * policy.maximum_gap_to_mean_warning_ratio:
+        if (
+            average > 0
+            and maximum_gap > average * policy.maximum_gap_to_mean_warning_ratio
+        ):
             issues.append(
                 EvaluationIssueV1(
                     code="EXCESSIVE_SERVICE_GAP",
                     severity=EvaluationIssueSeverity.WARNING,
-                    message=f"Maximum gap for {direction.value} materially exceeds its mean headway.",
+                    message=(
+                        f"Maximum gap for {direction.value} materially exceeds its mean headway."
+                    ),
                     references=(direction.value,),
                 )
             )
@@ -523,6 +545,95 @@ def _headway_dimension(
         issues=tuple(issues),
         evidence=tuple(evidence),
         confidence=DemandConfidence.HIGH,
+    )
+
+
+def _protect_adaptive_critical_conditions(
+    bundle: NormalizedInputBundleV1,
+    resolution: DemandResolutionResultV1,
+    policy: ScenarioBEvaluationPolicyV1,
+) -> DemandResolutionResultV1:
+    if (
+        policy.demand_blocks.block_mode != BlockMode.ADAPTIVE
+        or bundle.observed_demand is None
+        or not resolution.blocks
+    ):
+        return resolution
+    native_policy = replace(
+        policy.demand_blocks,
+        block_mode=BlockMode.NATIVE,
+        manual_boundaries=(),
+    )
+    native_resolution = build_demand_analysis_blocks_v1(
+        bundle.observed_demand,
+        native_policy,
+    )
+    _, native_b_supply = build_block_supply_plans_v1(
+        bundle,
+        native_resolution,
+        policy,
+    )
+    protected_source_ids: set[str] = set()
+    native_by_source: dict[str, DemandAnalysisBlockV1] = {}
+    for block, plan in zip(native_resolution.blocks, native_b_supply, strict=True):
+        for source_id in block.source_interval_ids:
+            native_by_source[source_id] = block
+        if plan.status in {
+            BlockSupplyStatus.NO_SERVICE_WITH_DEMAND,
+            BlockSupplyStatus.CRITICAL_ABOVE_90,
+        }:
+            protected_source_ids.update(block.source_interval_ids)
+    if not protected_source_ids:
+        return resolution
+
+    expanded: list[DemandAnalysisBlockV1] = []
+    split_applied = False
+    for block in resolution.blocks:
+        if (
+            len(block.source_interval_ids) > 1
+            and protected_source_ids.intersection(block.source_interval_ids)
+        ):
+            split_applied = True
+            for source_id in block.source_interval_ids:
+                native = native_by_source[source_id]
+                expanded.append(
+                    replace(
+                        native,
+                        block_mode=BlockMode.ADAPTIVE,
+                        block_boundary_reason=(
+                            BlockBoundaryReason.CRITICAL_CONDITION_PROTECTION
+                        ),
+                    )
+                )
+        else:
+            expanded.append(block)
+    if not split_applied:
+        return resolution
+
+    counters: dict[ContractDirection, int] = {}
+    renumbered: list[DemandAnalysisBlockV1] = []
+    for block in sorted(
+        expanded,
+        key=lambda item: (item.direction.value, item.start_time, item.end_time),
+    ):
+        counters[block.direction] = counters.get(block.direction, 0) + 1
+        renumbered.append(
+            replace(
+                block,
+                block_id=(
+                    f"DB-{block.direction.value.upper()}-"
+                    f"{counters[block.direction]:04d}"
+                ),
+            )
+        )
+    return DemandResolutionResultV1(
+        contract=resolution.contract,
+        blocks=tuple(renumbered),
+        warnings=resolution.warnings
+        + (
+            "Adaptive merging was split to preserve native critical/no-service evidence.",
+        ),
+        limitations=resolution.limitations,
     )
 
 
@@ -548,7 +659,9 @@ def _demand_dimension(
             EvaluationIssueV1(
                 code="NO_SERVICE_WITH_DEMAND",
                 severity=EvaluationIssueSeverity.ERROR,
-                message="At least one authoritative demand block has demand but no service.",
+                message=(
+                    "At least one authoritative demand block has demand but no service."
+                ),
                 references=tuple(
                     item.block_id
                     for item in plans
@@ -561,7 +674,9 @@ def _demand_dimension(
             EvaluationIssueV1(
                 code="CRITICAL_LOAD_FACTOR_ABOVE_90",
                 severity=EvaluationIssueSeverity.ERROR,
-                message="At least one authoritative demand block exceeds the 90% critical ceiling.",
+                message=(
+                    "At least one authoritative demand block exceeds the 90% critical ceiling."
+                ),
                 references=tuple(
                     item.block_id
                     for item in plans
@@ -574,7 +689,9 @@ def _demand_dimension(
             EvaluationIssueV1(
                 code="LOAD_FACTOR_ABOVE_85",
                 severity=EvaluationIssueSeverity.WARNING,
-                message="At least one authoritative demand block exceeds the 85% planning ceiling.",
+                message=(
+                    "At least one authoritative demand block exceeds the 85% planning ceiling."
+                ),
                 references=tuple(
                     item.block_id
                     for item in plans
@@ -582,8 +699,7 @@ def _demand_dimension(
                 ),
             )
         )
-    insufficient = BlockSupplyStatus.INSUFFICIENT_DATA in statuses
-    if insufficient:
+    if BlockSupplyStatus.INSUFFICIENT_DATA in statuses:
         status = DimensionStatus.INSUFFICIENT_DATA
     elif any(item.severity == EvaluationIssueSeverity.ERROR for item in issues):
         status = DimensionStatus.FAIL
@@ -594,7 +710,8 @@ def _demand_dimension(
     evidence = tuple(
         f"{item.block_id}/{item.direction.value}: trips={item.b_trip_count}, "
         f"demand={item.passenger_demand:.6f}, lf={item.load_factor}, "
-        f"required_85={item.required_trips_85}, required_90={item.required_trips_90}, "
+        f"required_85={item.required_trips_85}, "
+        f"required_90={item.required_trips_90}, "
         f"shortage={item.shortage:.6f}, status={item.status.value}"
         for item in plans
     )
@@ -612,27 +729,32 @@ def evaluate_scenario_b_v1(
     policy: ScenarioBEvaluationPolicyV1 | None = None,
 ) -> ScenarioBEvaluationBundleV1:
     policy = policy or ScenarioBEvaluationPolicyV1()
-    if not 0 < policy.planning_load_factor_ceiling <= policy.critical_load_factor_ceiling <= 1:
-        raise ScenarioEvaluationError(
+    if not (
+        0
+        < policy.planning_load_factor_ceiling
+        <= policy.critical_load_factor_ceiling
+        <= 1
+    ):
+        raise ScenarioBEvaluationError(
             "Load-factor ceilings must satisfy 0 < planning <= critical <= 1"
         )
     validation = validate_normalized_bundle(bundle)
     if not validation.passed:
         codes = ", ".join(validation.error_codes)
-        raise ScenarioEvaluationError(
+        raise ScenarioBEvaluationError(
             f"Scenario B evaluator requires a valid normalized bundle; errors: {codes}"
         )
 
     input_validity = _dimension(
         DimensionStatus.PASS,
         "Normalized Contract V1 input is valid.",
-        evidence=(
-            f"scenario_b_fingerprint={bundle.scenario_b_fingerprint}",
-        ),
+        evidence=(f"scenario_b_fingerprint={bundle.scenario_b_fingerprint}",),
     )
     parameter_consistency = _dimension(
         DimensionStatus.PASS,
-        "Declared B totals, directional counts, endpoints, windows and exact timetable reconcile.",
+        (
+            "Declared B totals, directional counts, endpoints, windows and exact timetable reconcile."
+        ),
         evidence=(
             f"declared_total={bundle.scenario_b.total_daily_trips}",
             f"outbound={bundle.scenario_b.trips_by_direction.outbound}",
@@ -645,9 +767,13 @@ def evaluate_scenario_b_v1(
         EvaluationIssueV1(
             code="AVAILABLE_FLEET_LIMIT_EXCEEDED",
             severity=EvaluationIssueSeverity.ERROR,
-            message="The submitted B timetable requires more vehicles than the available upper bound.",
+            message=(
+                "The submitted B timetable requires more vehicles than the available upper bound."
+            ),
             references=("scenario_b.available_fleet_limit",),
-            suggestion="Search for a redistributed timetable under the same locked parameters.",
+            suggestion=(
+                "Search for a redistributed timetable under the same locked parameters."
+            ),
         ),
     ) if not fleet.feasible else ()
     fleet_status = DimensionStatus.PASS if fleet.feasible else DimensionStatus.FAIL
@@ -660,16 +786,21 @@ def evaluate_scenario_b_v1(
     )
     fleet_feasibility = _dimension(
         fleet_status,
-        "Fleet need is derived from continuous two-terminal event balances; ready events precede departures at the same time.",
+        (
+            "Fleet need is derived from continuous two-terminal event balances; "
+            "ready events precede departures at the same time."
+        ),
         issues=fleet_issue,
         evidence=fleet_evidence,
     )
     technical_feasibility = _dimension(
         fleet_status,
         (
-            "The submitted B exact timetable is technically feasible under solver-determined initial positioning."
+            "The submitted B exact timetable is technically feasible under "
+            "solver-determined initial positioning."
             if fleet.feasible
-            else "The submitted B exact timetable is technically infeasible under the available fleet limit; this does not prove B's locked parameters infeasible."
+            else "The submitted B exact timetable is technically infeasible under "
+            "the available fleet limit; this does not prove B's locked parameters infeasible."
         ),
         issues=fleet_issue,
         evidence=fleet_evidence,
@@ -684,7 +815,16 @@ def evaluate_scenario_b_v1(
             bundle.observed_demand,
             policy.demand_blocks,
         )
-        a_supply, b_supply = build_block_supply_plans_v1(bundle, resolution, policy)
+        resolution = _protect_adaptive_critical_conditions(
+            bundle,
+            resolution,
+            policy,
+        )
+        a_supply, b_supply = build_block_supply_plans_v1(
+            bundle,
+            resolution,
+            policy,
+        )
     demand_suitability = _demand_dimension(b_supply, resolution)
 
     if not fleet.feasible:
@@ -693,7 +833,10 @@ def evaluate_scenario_b_v1(
         )
     elif demand_suitability.status == DimensionStatus.INSUFFICIENT_DATA:
         disposition = BDisposition.INSUFFICIENT_DATA
-    elif demand_suitability.status in {DimensionStatus.FAIL, DimensionStatus.WARNING}:
+    elif demand_suitability.status in {
+        DimensionStatus.FAIL,
+        DimensionStatus.WARNING,
+    }:
         disposition = BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE
     else:
         disposition = BDisposition.TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE
@@ -711,24 +854,36 @@ def evaluate_scenario_b_v1(
     )
     warnings = tuple(
         issue.message
-        for dimension in (demand_suitability, headway_quality, fleet_feasibility)
+        for dimension in (
+            demand_suitability,
+            headway_quality,
+            fleet_feasibility,
+        )
         for issue in dimension.issues
-        if issue.severity in {EvaluationIssueSeverity.WARNING, EvaluationIssueSeverity.ERROR}
+        if issue.severity
+        in {
+            EvaluationIssueSeverity.WARNING,
+            EvaluationIssueSeverity.ERROR,
+        }
     )
     limitations = [
         "Demand is evaluated in static mode; this is not a ridership-response forecast.",
-        "PR-02 evaluates the submitted B timetable but does not prove global infeasibility of B's locked parameters.",
+        (
+            "PR-02 evaluates the submitted B timetable but does not prove global "
+            "infeasibility of B's locked parameters."
+        ),
     ]
     if resolution is not None:
         limitations.extend(resolution.limitations)
     if resolution is not None and any(
-        block.direction == ContractDirection.COMBINED for block in resolution.blocks
+        block.direction == ContractDirection.COMBINED
+        for block in resolution.blocks
     ):
         limitations.append(
-            "Combined demand supports aggregate conclusions only and is not apportioned into observed directional demand."
+            "Combined demand supports aggregate conclusions only and is not "
+            "apportioned into observed directional demand."
         )
 
-    confidence = demand_suitability.confidence
     evaluation = ScheduleEvaluationResultV1(
         disposition=disposition,
         input_validity=input_validity,
@@ -740,7 +895,7 @@ def evaluate_scenario_b_v1(
         block_evaluations=block_evaluations,
         warnings=warnings,
         limitations=tuple(limitations),
-        confidence=confidence,
+        confidence=demand_suitability.confidence,
     )
     return ScenarioBEvaluationBundleV1(
         demand_resolution=resolution,
