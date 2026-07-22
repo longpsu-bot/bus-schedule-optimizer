@@ -84,15 +84,10 @@ def schedule_solution_to_contract_dict(
             _lock_to_dict(item) for item in solution.operating_parameter_locks
         ],
         "c_block_supply_plan": [
-            block_supply_plan_to_contract_dict(item)
-            for item in solution.c_block_supply_plan
+            block_supply_plan_to_contract_dict(item) for item in solution.c_block_supply_plan
         ],
-        "c_headway_regimes": [
-            _regime_to_dict(item) for item in solution.c_headway_regimes
-        ],
-        "c_exact_timetable": [
-            _trip_to_dict(item) for item in solution.c_exact_timetable
-        ],
+        "c_headway_regimes": [_regime_to_dict(item) for item in solution.c_headway_regimes],
+        "c_exact_timetable": [_trip_to_dict(item) for item in solution.c_exact_timetable],
         "fleet_assignment": [
             {
                 "vehicle_id": item.vehicle_id,
@@ -108,26 +103,16 @@ def schedule_solution_to_contract_dict(
         "available_fleet_limit": solution.available_fleet_limit,
         "approved_active_fleet": solution.approved_active_fleet,
         "minimum_required_fleet": solution.minimum_required_fleet,
-        "recommended_initial_fleet_terminal_1": (
-            solution.recommended_initial_fleet_terminal_1
-        ),
-        "recommended_initial_fleet_terminal_2": (
-            solution.recommended_initial_fleet_terminal_2
-        ),
-        "initial_fleet_positioning_mode": (
-            solution.initial_fleet_positioning_mode.value
-        ),
+        "recommended_initial_fleet_terminal_1": (solution.recommended_initial_fleet_terminal_1),
+        "recommended_initial_fleet_terminal_2": (solution.recommended_initial_fleet_terminal_2),
+        "initial_fleet_positioning_mode": (solution.initial_fleet_positioning_mode.value),
         "fleet_margin": solution.fleet_margin,
-        "maximum_simultaneous_vehicle_use": (
-            solution.maximum_simultaneous_vehicle_use
-        ),
+        "maximum_simultaneous_vehicle_use": (solution.maximum_simultaneous_vehicle_use),
         "vehicle_stock_profile_terminal_1": [
-            _stock_event_to_dict(item)
-            for item in solution.vehicle_stock_profile_terminal_1
+            _stock_event_to_dict(item) for item in solution.vehicle_stock_profile_terminal_1
         ],
         "vehicle_stock_profile_terminal_2": [
-            _stock_event_to_dict(item)
-            for item in solution.vehicle_stock_profile_terminal_2
+            _stock_event_to_dict(item) for item in solution.vehicle_stock_profile_terminal_2
         ],
         "fleet_feasibility_status": solution.fleet_feasibility_status,
         "block_evaluation": [
