@@ -6,7 +6,7 @@ The normative rules are [Engine Contract V1 §§5–6 and §11](ENGINE_CONTRACT_
 
 1. Validate input shape and required data.
 2. Validate declared parameters against the exact timetable.
-3. Calculate independent fleet need and technical feasibility.
+3. Calculate independent fleet need, recommended initial terminal positioning, continuous stock balance, and technical feasibility.
 4. Evaluate timetable quality.
 5. If demand evidence is sufficient, evaluate demand suitability.
 6. Derive the B disposition from the separate dimensions.
@@ -28,7 +28,7 @@ Each dimension returns `status`, `issues`, `evidence`, `explanation`, and `confi
 | fixed parameters infeasible | infeasible | any | `B_PARAMETERS_INFEASIBLE` | return `NO_FEASIBLE_C_WITH_B_PARAMETERS` |
 | demand evidence insufficient | feasible or not evaluable | insufficient | `B_INSUFFICIENT_DATA` | no demand-optimized C |
 
-Parameter infeasibility requires evidence about the locked parameter set, not merely failure of the submitted exact timetable. Examples include impossible trip/endpoint requirements or a proven fleet/turnaround contradiction within the operating span.
+Parameter infeasibility requires evidence about the locked parameter set, not merely failure of the submitted exact timetable. Examples include impossible trip/endpoint requirements or a proven fleet/turnaround/terminal-stock contradiction within the operating span and available fleet limit.
 
 ## Timetable quality evidence
 
@@ -40,7 +40,7 @@ For every authoritative block, return demand, capacity, LF, required trips at 85
 
 ## C validation
 
-C is validated with the same B parameters and independent rules. In addition, compare B/C locked values, total/directional counts, first/last trips, source mapping, planned/actual block counts, fleet mode, and fingerprints. A solver result rejected by this validator is not exposed as `ScheduleSolutionV1`.
+C is validated with the same B parameters and independent rules. In addition, compare B/C locked values, total/directional counts, first/last trips, source mapping, planned/actual block counts, fleet constraint and positioning modes, `minimum_required_fleet <= available_fleet_limit`, initial-terminal sum reconciliation, event-level non-negative stock, fleet margin, and fingerprints. An otherwise demand-improved timetable is rejected when fleet-infeasible. A solver result rejected by this validator is not exposed as `ScheduleSolutionV1`.
 
 ## Explanations
 

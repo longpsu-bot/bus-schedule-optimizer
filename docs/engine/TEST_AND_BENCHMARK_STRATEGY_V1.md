@@ -16,7 +16,7 @@ The acceptance rules come from [Engine Contract V1](ENGINE_CONTRACT_V1.md). This
 
 ### Input and normalization
 
-Missing A/B fields, blocking missing capacity, invalid times/directions, duplicate IDs, multi-day totals, average-day data, combined vs directional demand, source-resolution detection, irregular/timestamp/trip-level data, and unsupported finer-than-source splitting.
+Missing A/B fields, blocking missing capacity, required positive available fleet limit, optional/nullable approved fleet metadata, invalid times/directions, duplicate IDs, multi-day totals, average-day data, combined vs directional demand, source-resolution detection, irregular/timestamp/trip-level data, and unsupported finer-than-source splitting.
 
 ### B evaluation
 
@@ -24,7 +24,11 @@ Declared total mismatch, directional mismatch, first/last mismatch, turnaround/l
 
 ### C invariants
 
-Property tests assert all locked parameters equal B; total trips equal B; default directional totals equal B; fleet mode; first/last locks; one-to-one trace; exact timetable/block-plan reconciliation; and independent validation rejection of a deliberately corrupted solver candidate.
+Property tests assert all locked parameters equal B; total trips equal B; default directional totals equal B; default `available_upper_bound`; default solver-determined initial positioning; fixed/bounded configuration validity; first/last locks; one-to-one trace; exact timetable/block-plan reconciliation; and independent validation rejection of a deliberately corrupted solver candidate.
+
+### Fleet and terminal stock
+
+Test `minimum_required_fleet` below, equal to, and above the available limit; correct fleet margin; initial terminal counts summing to the calculated minimum; fixed mode requiring both values; bounded mode honoring both terminal ranges; ready-before-departure ordering at equal timestamps; negative-stock rejection; and continuity across demand-block boundaries. Verify unused available/approved vehicles need not perform trips and fleet minimization is only a late tie-breaker.
 
 ### Load factor
 
@@ -44,7 +48,7 @@ Required sheet names/order, Vietnamese headings, frozen/filterable headers, time
 
 ## Tiny solver proofs
 
-Maintain hand-solvable cases with 4–12 trips for: one feasible chain; unavoidable second vehicle; terminal imbalance; exact first/last locks; no-service priority; overload tradeoff; regularity tie; and infeasible locked parameters. Compare CP-SAT status/objective to exhaustive enumeration where practical.
+Maintain hand-solvable cases with 4–12 trips for: one feasible chain; unavoidable second vehicle; solver-determined initial split; fixed/bounded split; terminal imbalance; exact first/last locks; no-service priority; overload tradeoff; regularity tie; and infeasible available fleet limit. Compare CP-SAT status/objective to exhaustive enumeration where practical.
 
 ## Regression and differential validation
 

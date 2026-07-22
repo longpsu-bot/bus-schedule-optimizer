@@ -8,7 +8,10 @@
   "required": [
     "contract_version", "solver_status", "solver_adapter", "solve_duration_seconds", "solution_fingerprint",
     "source_b_fingerprint", "operating_parameter_locks", "c_block_supply_plan", "c_headway_regimes",
-    "c_exact_timetable", "fleet_assignment", "minimum_required_fleet", "approved_active_fleet",
+    "c_exact_timetable", "fleet_assignment", "available_fleet_limit", "approved_active_fleet",
+    "minimum_required_fleet", "recommended_initial_fleet_terminal_1", "recommended_initial_fleet_terminal_2",
+    "initial_fleet_positioning_mode", "fleet_margin", "maximum_simultaneous_vehicle_use",
+    "vehicle_stock_profile_terminal_1", "vehicle_stock_profile_terminal_2", "fleet_feasibility_status",
     "block_evaluation", "residual_overload", "shifted_trip_count", "total_shift_minutes", "maximum_shift_minutes",
     "status", "explanations", "limitations"
   ],
@@ -24,8 +27,17 @@
     "c_headway_regimes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/regime"}},
     "c_exact_timetable": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/cTrip"}},
     "fleet_assignment": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/fleetAssignment"}},
-    "minimum_required_fleet": {"type": "integer", "minimum": 1},
-    "approved_active_fleet": {"type": "integer", "minimum": 1},
+    "available_fleet_limit": {"type": "integer", "minimum": 1},
+    "approved_active_fleet": {"type": ["integer", "null"], "minimum": 1},
+    "minimum_required_fleet": {"type": "integer", "minimum": 1, "description": "Derived from the timetable and vehicle-balance model, never copied from Scenario B."},
+    "recommended_initial_fleet_terminal_1": {"type": "integer", "minimum": 0},
+    "recommended_initial_fleet_terminal_2": {"type": "integer", "minimum": 0},
+    "initial_fleet_positioning_mode": {"enum": ["solver_determined", "fixed", "bounded"]},
+    "fleet_margin": {"type": "integer", "minimum": 0},
+    "maximum_simultaneous_vehicle_use": {"type": "integer", "minimum": 0},
+    "vehicle_stock_profile_terminal_1": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stockEvent"}},
+    "vehicle_stock_profile_terminal_2": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stockEvent"}},
+    "fleet_feasibility_status": {"enum": ["FLEET_FEASIBLE", "FLEET_INFEASIBLE", "INSUFFICIENT_DATA"]},
     "block_evaluation": {"type": "array", "items": {"$ref": "#/$defs/blockEvaluation"}},
     "residual_overload": {"type": "number", "minimum": 0},
     "shifted_trip_count": {"type": "integer", "minimum": 0},
@@ -73,6 +85,21 @@
       "type": "object", "additionalProperties": false,
       "required": ["vehicle_id", "c_trip_id", "departure_terminal", "arrival_terminal", "departure_time", "arrival_time", "ready_time"],
       "properties": {"vehicle_id": {"type": "string", "minLength": 1}, "c_trip_id": {"type": "string", "minLength": 1}, "departure_terminal": {"enum": ["terminal_1", "terminal_2"]}, "arrival_terminal": {"enum": ["terminal_1", "terminal_2"]}, "departure_time": {"$ref": "#/$defs/time"}, "arrival_time": {"$ref": "#/$defs/time"}, "ready_time": {"$ref": "#/$defs/time"}}
+    },
+    "stockEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_time", "event_type", "trip_id", "stock_before", "stock_after", "arriving_or_ready_vehicle_count", "departure_count"],
+      "properties": {
+        "event_time": {"$ref": "#/$defs/time"},
+        "event_type": {"enum": ["VEHICLE_READY", "DEPARTURE", "READY_AND_DEPARTURE"]},
+        "trip_id": {"type": ["string", "null"]},
+        "stock_before": {"type": "integer", "minimum": 0},
+        "stock_after": {"type": "integer", "minimum": 0},
+        "arriving_or_ready_vehicle_count": {"type": "integer", "minimum": 0},
+        "departure_count": {"type": "integer", "minimum": 0}
+      },
+      "description": "The domain validator, not JSON Schema, proves stock_after = stock_before + ready - departures and continuity between records."
     },
     "blockEvaluation": {
       "type": "object", "additionalProperties": false,

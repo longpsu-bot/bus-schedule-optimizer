@@ -21,7 +21,7 @@ The exporter serializes one accepted evaluation/solution object. It must not reg
 | `BIEU_DO_GIO_B` | exact B timetable | normalized B |
 | `BIEU_DO_GIO_C` | exact C timetable and B trace | accepted solution |
 | `CHE_DO_GIAN_CACH_C` | regimes and sequences | C regimes |
-| `PHAN_CONG_XE_C` | fleet chains/readiness | C fleet assignment |
+| `PHAN_CONG_XE_C` | available/minimum/margin, initial terminal allocation, stock events, and fleet chains/readiness | C fleet result |
 | `SO_SANH_B_C` | per-trip shifts and block movements | trace + plans |
 | `CANH_BAO` | warnings, residual overload, limitations | evaluation + solution |
 | `NHAT_KY_SOLVER` | adapter, status, timings, stages/objectives | solver diagnostics |
@@ -43,7 +43,7 @@ The exporter serializes one accepted evaluation/solution object. It must not reg
 
 ## Reconciliation before save
 
-The exporter fails closed if Contract V1 §14 checks fail. It also verifies required sheets, exact B→C trace coverage, C fleet mode, no duplicate trip IDs, and that workbook metadata fingerprint equals the accepted solution. Save to a temporary output path and atomically finalize where supported.
+The exporter fails closed if Contract V1 §14 checks fail. It also verifies required sheets, exact B→C trace coverage, C fleet constraint/positioning modes, minimum-versus-limit and fleet-margin arithmetic, initial-terminal reconciliation, non-negative continuous stock, no duplicate trip IDs, and that workbook metadata fingerprint equals the accepted solution. Save to a temporary output path and atomically finalize where supported.
 
 ## Charts in workbook
 

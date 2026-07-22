@@ -28,7 +28,9 @@ Normalized contract directions are `outbound`, `inbound`, and demand-only `combi
 
 ## Fleet fields
 
-`approved_active_fleet` is the authorized fleet used in `exact_active`. `available_fleet_limit` is the upper bound used in `maximum_available`. `minimum_required_fleet` is calculated output. These fields must never be collapsed into a single vehicle count.
+`available_fleet_limit` is the required hard upper bound. `approved_active_fleet` is optional governance metadata. `minimum_required_fleet` is calculated independently from the timetable and continuous terminal-stock model; `fleet_margin` is the available limit minus that minimum. These fields must never be collapsed into a single vehicle count.
+
+`fleet_constraint_mode` defaults to `available_upper_bound`; `exact_scheduled_fleet` requires explicit authorization and an approved scheduled value, but does not force every vehicle to move. `initial_fleet_positioning_mode` defaults to `solver_determined`; `fixed` requires both terminal counts, and `bounded` requires valid terminal bounds. Cross-field sums, inequalities, stock continuity, and fleet-margin arithmetic are domain-validator responsibilities where JSON Schema cannot prove them.
 
 ## Output catalogue
 
@@ -42,7 +44,7 @@ The schema mirrors Contract V1 §11.2. `solver_status` describes solver proof; `
 
 ## Boundary convention
 
-Block membership uses half-open intervals `[start, end)`. A departure at a shared boundary belongs to the later block. A final locked departure may be represented by a terminal sentinel block or a documented inclusive final endpoint, but it must be counted exactly once. The chosen convention is included in `ScheduleProblemV1` and solution explanations.
+Block membership uses half-open intervals `[start, end)`. A departure at a shared boundary belongs to the later block. A final locked departure may be represented by a terminal sentinel block or a documented inclusive final endpoint, but it must be counted exactly once. The chosen convention is included in `ScheduleProblemV1` and solution explanations. This analytical boundary convention never resets terminal stock; fleet validation replays one continuous ordered event stream.
 
 ## Compatibility and unknown fields
 

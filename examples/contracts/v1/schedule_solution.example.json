@@ -8,7 +8,7 @@
   "operating_parameter_locks": [
     {"field": "total_daily_trips", "value": 4, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null},
     {"field": "trips_by_direction", "value": {"outbound": 2, "inbound": 2}, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null},
-    {"field": "approved_active_fleet", "value": 2, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null}
+    {"field": "available_fleet_limit", "value": 3, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null}
   ],
   "c_block_supply_plan": [
     {
@@ -57,8 +57,27 @@
     {"vehicle_id": "BUS-02", "c_trip_id": "C-O-002", "departure_terminal": "terminal_1", "arrival_terminal": "terminal_2", "departure_time": "07:00", "arrival_time": "07:30", "ready_time": "07:35"},
     {"vehicle_id": "BUS-01", "c_trip_id": "C-I-002", "departure_terminal": "terminal_2", "arrival_terminal": "terminal_1", "departure_time": "07:15", "arrival_time": "07:45", "ready_time": "07:50"}
   ],
+  "available_fleet_limit": 3,
+  "approved_active_fleet": null,
   "minimum_required_fleet": 2,
-  "approved_active_fleet": 2,
+  "recommended_initial_fleet_terminal_1": 1,
+  "recommended_initial_fleet_terminal_2": 1,
+  "initial_fleet_positioning_mode": "solver_determined",
+  "fleet_margin": 1,
+  "maximum_simultaneous_vehicle_use": 2,
+  "vehicle_stock_profile_terminal_1": [
+    {"event_time": "06:00", "event_type": "DEPARTURE", "trip_id": "C-O-001", "stock_before": 1, "stock_after": 0, "arriving_or_ready_vehicle_count": 0, "departure_count": 1},
+    {"event_time": "06:50", "event_type": "VEHICLE_READY", "trip_id": "C-I-001", "stock_before": 0, "stock_after": 1, "arriving_or_ready_vehicle_count": 1, "departure_count": 0},
+    {"event_time": "07:00", "event_type": "DEPARTURE", "trip_id": "C-O-002", "stock_before": 1, "stock_after": 0, "arriving_or_ready_vehicle_count": 0, "departure_count": 1},
+    {"event_time": "07:50", "event_type": "VEHICLE_READY", "trip_id": "C-I-002", "stock_before": 0, "stock_after": 1, "arriving_or_ready_vehicle_count": 1, "departure_count": 0}
+  ],
+  "vehicle_stock_profile_terminal_2": [
+    {"event_time": "06:15", "event_type": "DEPARTURE", "trip_id": "C-I-001", "stock_before": 1, "stock_after": 0, "arriving_or_ready_vehicle_count": 0, "departure_count": 1},
+    {"event_time": "06:35", "event_type": "VEHICLE_READY", "trip_id": "C-O-001", "stock_before": 0, "stock_after": 1, "arriving_or_ready_vehicle_count": 1, "departure_count": 0},
+    {"event_time": "07:15", "event_type": "DEPARTURE", "trip_id": "C-I-002", "stock_before": 1, "stock_after": 0, "arriving_or_ready_vehicle_count": 0, "departure_count": 1},
+    {"event_time": "07:35", "event_type": "VEHICLE_READY", "trip_id": "C-O-002", "stock_before": 0, "stock_after": 1, "arriving_or_ready_vehicle_count": 1, "departure_count": 0}
+  ],
+  "fleet_feasibility_status": "FLEET_FEASIBLE",
   "block_evaluation": [{"block_id": "BLK-O-0600", "direction": "outbound", "load_factor": 1.166667, "shortage": 16, "status": "CRITICAL_ABOVE_90"}],
   "residual_overload": 16,
   "shifted_trip_count": 0,

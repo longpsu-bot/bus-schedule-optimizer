@@ -19,7 +19,6 @@
     "first_departures": {"terminal_1": "06:00", "terminal_2": "06:40"},
     "last_departures": {"terminal_1": "06:00", "terminal_2": "06:40"},
     "vehicle_capacity": 60,
-    "approved_active_fleet": 1,
     "available_fleet_limit": 2,
     "operating_day_type": "weekday",
     "exact_timetable": [
@@ -99,11 +98,12 @@
     {"field": "total_daily_trips", "value": 2, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null},
     {"field": "trips_by_direction", "value": {"outbound": 1, "inbound": 1}, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null},
     {"field": "vehicle_capacity", "value": 60, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null},
-    {"field": "approved_active_fleet", "value": 1, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null}
+    {"field": "available_fleet_limit", "value": 2, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null}
   ],
   "direction_trip_lock_mode": "fixed_by_direction",
   "direction_redistribution_authorization": null,
-  "fleet_lock_mode": "exact_active",
+  "fleet_constraint_mode": "available_upper_bound",
+  "initial_fleet_positioning_mode": "solver_determined",
   "planning_load_factor_ceiling": 0.85,
   "critical_load_factor_ceiling": 0.9,
   "block_requirements": [

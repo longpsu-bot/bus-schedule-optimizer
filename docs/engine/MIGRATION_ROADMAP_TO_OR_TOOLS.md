@@ -10,7 +10,7 @@ Approve the canonical contract, draft schemas, terminology, unresolved decisions
 
 ## Stage 1 — Domain normalization
 
-Introduce normalized A/B/demand inputs, distinct fleet fields, source metadata, operating-day semantics, adapters, and business validators. Keep current Excel/UI behavior through compatibility adapters.
+Introduce normalized A/B/demand inputs, required available fleet limit, optional approved fleet metadata, fleet constraint/initial-positioning modes, source metadata, operating-day semantics, adapters, and business validators. Keep current Excel/UI behavior through compatibility adapters.
 
 **Exit gate:** legacy fixtures normalize deterministically; no source workbook mutation; A/B exact timetables and fingerprints reconcile.
 
@@ -28,9 +28,9 @@ Add `ScheduleProblemV1`, `ScheduleSolver`, raw candidate, independent validator,
 
 ## Stage 4 — OR-Tools feasibility solver
 
-Implement only hard constraints: counts, direction mode, endpoints/windows, order, runtime/turnaround, terminal balance, fleet mode, minimum service, and block reconciliation. Report any feasible C or prove infeasibility for the encoded problem.
+Implement only hard constraints: counts, direction mode, endpoints/windows, order, runtime/turnaround, solver-determined or explicit initial terminal positioning, continuous event-level terminal stock, available fleet upper bound, minimum service, and block reconciliation. Report any feasible C or prove infeasibility for the encoded problem.
 
-**Exit gate:** tiny proof cases and fleet/turnaround invariants pass; V1 solver statuses are accurately surfaced.
+**Exit gate:** tiny proof cases, initial-position reconciliation, non-negative stock, fleet-margin, and turnaround invariants pass; V1 solver statuses are accurately surfaced.
 
 ## Stage 5 — OR-Tools demand allocation
 
@@ -76,6 +76,6 @@ Stages 1–3 are additive and keep legacy adapters. Stages 4–7 run side by sid
 3. Build normalization and independent validation fixtures.
 4. Implement authoritative demand blocks and B disposition.
 5. Introduce solver interface/heuristic adapter.
-6. Benchmark fleet formulations on tiny and 40–80 trip cases.
+6. Benchmark event-balance/reservoir and connection-graph fleet formulations on tiny and 40–80 trip cases.
 7. Implement CP-SAT feasibility, then demand allocation, then regularity.
 8. Complete visualization/export cutover only after solution reconciliation is stable.

@@ -62,14 +62,15 @@ Source metadata MUST identify at least source type, source ID or file fingerprin
 - total daily trips and trips by direction;
 - first and last departure at each terminal;
 - vehicle capacity;
-- approved/active fleet and available fleet limit as distinct values;
+- required `available_fleet_limit` as the maximum assignable route fleet;
+- optional `approved_active_fleet` governance metadata;
 - exact departure timetable;
 - optional existing vehicle assignment on each trip;
 - operating-day type and source metadata.
 
 ### 2.3 `ScenarioBInput`
 
-`ScenarioBInput` contains the same operating concepts as A but represents the proposed plan. Proposed total trips, directional totals, approved/active fleet, available fleet limit, vehicle capacity, first/last departures, runtime, turnaround, and exact timetable MUST be explicit.
+`ScenarioBInput` contains the same operating concepts as A but represents the proposed plan. Proposed total trips, directional totals, `available_fleet_limit`, vehicle capacity, first/last departures, runtime, turnaround, and exact timetable MUST be explicit. `approved_active_fleet` MAY record an approved, contracted, or currently scheduled fleet value, but it is optional governance metadata and is not the default technical equality constraint.
 
 Vehicle capacity is REQUIRED and blocking. No adapter or engine component may infer it.
 
@@ -106,7 +107,9 @@ The enum reserves `elasticity_scenario` and `calibrated`. They are non-authorita
 - total daily trips;
 - trips by direction;
 - first and last departure at both terminals;
-- approved/active fleet count and available fleet limit;
+- available fleet limit;
+- fleet constraint mode and any explicitly authorized exact scheduled fleet value;
+- initial fleet positioning mode and any explicit fixed/bounded positioning constraints;
 - operating-day type.
 
 Mandatory invariant: `C.total_daily_trips == B.total_daily_trips`.
@@ -118,12 +121,32 @@ Default invariant: `C.trips_by_direction == B.trips_by_direction`.
 - `fixed_by_direction` — Contract V1 default; each directional total is locked.
 - `total_only` — MAY be enabled only when reliable directional demand exists and the user explicitly authorizes redistribution between directions. The authorization and confidence evidence MUST be returned.
 
-`fleet_lock_mode` values are:
+`fleet_constraint_mode` values are:
 
-- `exact_active` — Contract V1 default for C. C uses B's approved active fleet; no additional vehicle may be introduced. The engine also reports the independently calculated minimum required fleet.
-- `maximum_available` — C's calculated minimum required fleet MUST be less than or equal to B's available fleet limit.
+- `available_upper_bound` — Contract V1 default. The timetable is feasible only when its independently calculated `minimum_required_fleet` is less than or equal to B's `available_fleet_limit`.
+- `exact_scheduled_fleet` — optional and explicitly authorized. `approved_active_fleet` records the exact fleet scheduled or reserved for the route and MUST be present. This fixes the governance/roster value, not the number of vehicles that must move; idle time and reserve vehicles remain permissible, and the solver MUST NOT distort service merely to make every scheduled vehicle perform a trip.
 
-The contract MUST distinguish `approved_active_fleet`, `available_fleet_limit`, and `minimum_required_fleet`. The ambiguous standalone field `number_of_vehicles` is prohibited in normalized contracts.
+In `exact_scheduled_fleet` mode, `minimum_required_fleet <= approved_active_fleet <= available_fleet_limit`; the minimum is still derived from the timetable rather than forced to equal the scheduled/reserved roster.
+
+The mandatory C fleet invariant is:
+
+`minimum_required_fleet_C <= available_fleet_limit_B`.
+
+The engine MUST NOT silently add vehicles and MUST NOT require every approved or available vehicle to perform a trip. Unused capacity is fleet margin or reserve:
+
+`fleet_margin = available_fleet_limit - minimum_required_fleet`.
+
+The contract MUST distinguish required `available_fleet_limit`, optional `approved_active_fleet`, and calculated `minimum_required_fleet`. The ambiguous standalone field `number_of_vehicles` is prohibited in normalized contracts.
+
+### 3.1 Initial fleet positioning
+
+`initial_fleet_positioning_mode` values are:
+
+- `solver_determined` — Contract V1 default. The solver calculates non-negative `recommended_initial_fleet_terminal_1` and `recommended_initial_fleet_terminal_2`, whose sum equals `minimum_required_fleet`.
+- `fixed` — only when the operator explicitly requires exact starting counts at both terminals. Both values are required inputs.
+- `bounded` — when terminal/depot conditions impose explicit minimum and/or maximum starting counts at each terminal. The solver selects values inside both validated ranges.
+
+Initial terminal allocation MUST NOT be treated as fixed unless `fixed` is explicitly selected. Fixed/bounded positioning constraints participate in the constrained timetable's fleet calculation but do not require every vehicle to perform a trip.
 
 ## 4. Hard technical constraints
 
@@ -135,9 +158,17 @@ A vehicle may operate the next trip only at or after:
 
 and only from the terminal where that vehicle is then located.
 
+For every operational event time `t`, the two-terminal stock balance is:
+
+`stock_terminal_1(t) = recommended_initial_fleet_terminal_1 - departures_from_terminal_1_up_to_t + vehicles_ready_from_terminal_2_up_to_t`.
+
+`stock_terminal_2(t) = recommended_initial_fleet_terminal_2 - departures_from_terminal_2_up_to_t + vehicles_ready_from_terminal_1_up_to_t`.
+
+A vehicle enters the ready stock at the opposite terminal only after departure time plus runtime plus minimum turnaround at that arrival terminal. Ready events at an identical timestamp are applied before departures that may use those vehicles. Both terminal stocks MUST remain non-negative at every event. Demand-analysis block boundaries do not reset vehicle stock or chronology.
+
 Unless a future contract explicitly adds them, a solver MUST NOT assume deadhead, empty repositioning, shortened runtime, shortened turnaround, teleportation, or simultaneous departures by one vehicle. Exact timetable chronology, operating windows, first/last locks, trip order, minimum service, fleet mode, and terminal balance are hard constraints.
 
-Every solver-generated candidate MUST be checked by an independent domain validator after solving. Solver feasibility alone is not conformance.
+Every solver-generated candidate MUST be checked by an independent domain validator after solving. An otherwise demand-improved candidate is rejected if either terminal stock becomes negative or `minimum_required_fleet` exceeds `available_fleet_limit`. Solver feasibility alone is not conformance.
 
 ## 5. Evaluation of Scenario B
 
@@ -153,7 +184,7 @@ Validate exact-timetable total against declared total, directional timetable tot
 
 ### 5.3 Technical and fleet feasibility
 
-Validate turnaround, vehicle availability and location, trip chronology, operating span, first/last locks, minimum service, and fleet mode. Report calculated minimum required fleet separately from approved/available values.
+Validate turnaround, vehicle availability and location, continuous terminal stock, trip chronology, operating span, first/last locks, minimum service, fleet constraint mode, and initial-positioning mode. Report the independently calculated minimum required fleet and fleet margin separately from the required available limit and optional approved metadata.
 
 ### 5.4 Timetable quality
 
@@ -274,7 +305,7 @@ Subject to all hard constraints, lexicographic optimization priorities are:
 8. preserve stable B sections;
 9. minimize shifted-trip count, total shift minutes, and maximum shift.
 
-Low load is absent from the reduction objectives. Stable B portions SHOULD remain unchanged unless a higher-priority objective requires movement.
+Low load is absent from the reduction objectives. Stable B portions SHOULD remain unchanged unless a higher-priority objective requires movement. Fleet minimization MAY be used only as a later tie-breaker after feasibility, critical demand coverage, service continuity, and headway regularity have been preserved.
 
 ## 11. Evaluation and solution outputs
 
@@ -284,7 +315,13 @@ The result MUST contain scenario ID; separate input-validity, parameter-consiste
 
 ### 11.2 `ScheduleSolutionV1`
 
-The solution MUST contain contract version, solver status/adapter, solve duration, solution and source-B fingerprints, operating locks, C block plan, headway regimes, exact timetable, fleet assignment, calculated minimum fleet, approved active fleet, block evaluation, residual overload, shift metrics, overall status, explanations, and limitations.
+The solution MUST contain contract version, solver status/adapter, solve duration, solution and source-B fingerprints, operating locks, C block plan, headway regimes, exact timetable, and fleet assignment. Fleet output MUST include `available_fleet_limit`, nullable/optional `approved_active_fleet`, independently calculated `minimum_required_fleet`, both recommended initial terminal counts, `initial_fleet_positioning_mode`, `fleet_margin`, `maximum_simultaneous_vehicle_use`, event-level stock profiles for both terminals, and `fleet_feasibility_status`. It also contains block evaluation, residual overload, shift metrics, overall status, explanations, and limitations.
+
+For the Contract V1 two-terminal no-deadhead model:
+
+`minimum_required_fleet = recommended_initial_fleet_terminal_1 + recommended_initial_fleet_terminal_2`.
+
+This value is calculated independently for A, B, and C; it is never copied from Scenario B. Each stock-profile record identifies event time/type, trip ID when applicable, stock before/after, ready arrivals, and departures.
 
 Solver statuses are `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`, `MODEL_INVALID`, and `UNKNOWN`. User-facing output MUST NOT label `FEASIBLE` as proven optimal. `INFEASIBLE` applies only to the encoded model and locked inputs described by the returned fingerprint and limitations.
 

@@ -9,7 +9,7 @@
     "contract_version", "scenario_id", "route_id", "route_name", "route_type",
     "terminal_1_name", "terminal_2_name", "trip_runtime_minutes", "turnaround_minutes",
     "total_daily_trips", "trips_by_direction", "first_departures", "last_departures",
-    "vehicle_capacity", "approved_active_fleet", "available_fleet_limit", "operating_day_type",
+    "vehicle_capacity", "available_fleet_limit", "operating_day_type",
     "exact_timetable", "source_metadata"
   ],
   "properties": {
@@ -35,8 +35,8 @@
     "first_departures": {"$ref": "#/$defs/terminalTimes"},
     "last_departures": {"$ref": "#/$defs/terminalTimes"},
     "vehicle_capacity": {"type": "integer", "minimum": 1, "description": "Blocking required proposed capacity; never inferred."},
-    "approved_active_fleet": {"type": "integer", "minimum": 1},
-    "available_fleet_limit": {"type": "integer", "minimum": 1},
+    "approved_active_fleet": {"type": ["integer", "null"], "minimum": 1, "description": "Optional governance metadata; not the default technical equality constraint."},
+    "available_fleet_limit": {"type": "integer", "minimum": 1, "description": "Required hard upper bound on vehicles assigned to the route."},
     "operating_day_type": {"enum": ["weekday", "saturday", "sunday", "holiday", "special"]},
     "exact_timetable": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/trip"}},
     "source_metadata": {"$ref": "#/$defs/sourceMetadata"}

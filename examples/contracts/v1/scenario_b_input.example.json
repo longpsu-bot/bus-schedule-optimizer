@@ -13,7 +13,6 @@
   "first_departures": {"terminal_1": "06:00", "terminal_2": "06:15"},
   "last_departures": {"terminal_1": "07:00", "terminal_2": "07:15"},
   "vehicle_capacity": 60,
-  "approved_active_fleet": 2,
   "available_fleet_limit": 3,
   "operating_day_type": "weekday",
   "exact_timetable": [

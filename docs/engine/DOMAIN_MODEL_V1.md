@@ -39,7 +39,9 @@ The authoritative accepted solution. A raw solver candidate is never a solution 
 | `RouteIdentity` | route ID | route name/type and terminal identities |
 | `OperatingWindow` | scenario + terminal | first/last departure and service-day semantics |
 | `TurnaroundRule` | scenario + terminal | configured and regulatory minimum |
-| `FleetDeclaration` | scenario | approved active, available limit, and lock mode |
+| `FleetDeclaration` | scenario | required available upper bound, optional approved metadata, and constraint mode |
+| `InitialFleetPositioning` | scenario | solver-determined, fixed, or bounded starting stock policy |
+| `TerminalStockEvent` | scenario + terminal + event order | event-level stock before/after and trip/ready evidence |
 | `TimetableTrip` | scenario + trip ID | exact directional departure and optional assignment |
 | `ObservedDemandRecord` | observation ID | source-grain passenger observation |
 | `DemandResolutionContract` | demand dataset ID | source grain and block-construction policy |
@@ -78,7 +80,7 @@ flowchart LR
 
 ## Invariants
 
-The complete normative set is in Contract V1 §§3, 4, 8–10, and 14. The aggregate boundary must enforce, at minimum: B parameter locks, total/directional counts, first/last departures, vehicle location/readiness, planned-versus-actual block counts, and one-to-one traceability.
+The complete normative set is in Contract V1 §§3, 4, 8–10, and 14. The aggregate boundary must enforce, at minimum: B parameter locks, total/directional counts, first/last departures, vehicle location/readiness, continuous non-negative terminal stock, `minimum_required_fleet <= available_fleet_limit`, initial-position reconciliation, planned-versus-actual block counts, and one-to-one traceability. Demand-block boundaries never reset fleet inventory.
 
 ## Domain services
 
@@ -88,7 +90,7 @@ The complete normative set is in Contract V1 §§3, 4, 8–10, and 14. The aggre
 - `ScheduleEvaluator`: exact timetable + blocks → dimensioned evaluation.
 - `ProblemBuilder`: validated inputs → `ScheduleProblemV1`.
 - `ScheduleSolver`: problem → raw candidate.
-- `DomainSolutionValidator`: raw candidate → accepted/rejected result.
+- `DomainSolutionValidator`: raw candidate → accepted/rejected result, including independent terminal-stock replay.
 - `SolutionFingerprintService`: canonical serialization → fingerprint.
 
 All services above are framework-neutral. Adapters translate their outputs for UI and export.
