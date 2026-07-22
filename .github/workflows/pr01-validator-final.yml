@@ -32,55 +32,61 @@ jobs:
           from pathlib import Path
 
           validation_path = Path('src/bus_schedule_engine/contracts_v1/validation.py')
-          validation = validation_path.read_text(encoding='utf-8')
-          start_marker = '''    if (
-              scenario.approved_active_fleet is not None
-              and scenario.approved_active_fleet > scenario.available_fleet_limit
-          ):
-          '''.replace('          ', '')
-          start = validation.find(start_marker)
-          if start < 0:
-              raise SystemExit('Approved fleet validation block start not found')
-          end = validation.find('\n\n    first_times =', start)
-          if end < 0:
-              raise SystemExit('Approved fleet validation block end not found')
-          replacement = '''    if scenario.approved_active_fleet is not None:
-              if scenario.approved_active_fleet <= 0:
-                  issues.append(
-                      _issue(
-                          "INVALID_APPROVED_ACTIVE_FLEET",
-                          f"{prefix}.approved_active_fleet",
-                          "approved_active_fleet must be positive when provided",
-                      )
-                  )
-              elif scenario.approved_active_fleet > scenario.available_fleet_limit:
-                  issues.append(
-                      _issue(
-                          "APPROVED_FLEET_EXCEEDS_AVAILABLE_LIMIT",
-                          f"{prefix}.approved_active_fleet",
-                          "approved_active_fleet must not exceed available_fleet_limit",
-                      )
-                  )
-          '''.replace('          ', '')
+          lines = validation_path.read_text(encoding='utf-8').splitlines()
+          start = next(
+              index
+              for index, line in enumerate(lines)
+              if line == '    if ('
+              and index + 1 < len(lines)
+              and 'scenario.approved_active_fleet is not None' in lines[index + 1]
+          )
+          end = next(
+              index
+              for index in range(start + 1, len(lines))
+              if lines[index] == '    first_times = ('
+          )
+          replacement = [
+              '    if scenario.approved_active_fleet is not None:',
+              '        if scenario.approved_active_fleet <= 0:',
+              '            issues.append(',
+              '                _issue(',
+              '                    "INVALID_APPROVED_ACTIVE_FLEET",',
+              '                    f"{prefix}.approved_active_fleet",',
+              '                    "approved_active_fleet must be positive when provided",',
+              '                )',
+              '            )',
+              '        elif scenario.approved_active_fleet > scenario.available_fleet_limit:',
+              '            issues.append(',
+              '                _issue(',
+              '                    "APPROVED_FLEET_EXCEEDS_AVAILABLE_LIMIT",',
+              '                    f"{prefix}.approved_active_fleet",',
+              '                    "approved_active_fleet must not exceed available_fleet_limit",',
+              '                )',
+              '            )',
+              '',
+          ]
           validation_path.write_text(
-              validation[:start] + replacement.rstrip() + validation[end:],
+              '\n'.join(lines[:start] + replacement + lines[end:]) + '\n',
               encoding='utf-8',
           )
 
           test_path = Path('tests/test_contract_v1_normalization.py')
-          test = test_path.read_text(encoding='utf-8')
-          anchor = '    assert "APPROVED_FLEET_EXCEEDS_AVAILABLE_LIMIT" in result.error_codes\n'
-          addition = '''
-
-              zero_fleet = replace(bundle.scenario_b, approved_active_fleet=0)
-              zero_result = validate_scenario_input(zero_fleet)
-              assert "INVALID_APPROVED_ACTIVE_FLEET" in zero_result.error_codes
-          '''.replace('          ', '')
-          if 'INVALID_APPROVED_ACTIVE_FLEET' not in test:
-              if anchor not in test:
-                  raise SystemExit('Approved fleet test anchor not found')
-              test = test.replace(anchor, anchor + addition, 1)
-              test_path.write_text(test, encoding='utf-8')
+          test_lines = test_path.read_text(encoding='utf-8').splitlines()
+          if not any('INVALID_APPROVED_ACTIVE_FLEET' in line for line in test_lines):
+              anchor = next(
+                  index
+                  for index, line in enumerate(test_lines)
+                  if line.strip()
+                  == 'assert "APPROVED_FLEET_EXCEEDS_AVAILABLE_LIMIT" in result.error_codes'
+              )
+              addition = [
+                  '',
+                  '    zero_fleet = replace(bundle.scenario_b, approved_active_fleet=0)',
+                  '    zero_result = validate_scenario_input(zero_fleet)',
+                  '    assert "INVALID_APPROVED_ACTIVE_FLEET" in zero_result.error_codes',
+              ]
+              test_lines[anchor + 1:anchor + 1] = addition
+              test_path.write_text('\n'.join(test_lines) + '\n', encoding='utf-8')
           PY
 
       - name: Install
