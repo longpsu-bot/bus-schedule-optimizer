@@ -41,11 +41,38 @@ jobs:
 
           test_path = Path('tests/test_contract_v1_normalization.py')
           test = test_path.read_text(encoding='utf-8')
-          old = '''    assert imported.parameters_b.available_fleet_limit == 8
+          old_setup = '''    sheet = workbook["THONG_SO_B"]
+              additions = {
+                  "available_fleet_limit": 8,
+                  "approved_active_fleet": 7,
+                  "operating_day_type": "saturday",
+              }
+              next_row = sheet.max_row + 1
+              for offset, (key, value) in enumerate(additions.items()):
+                  sheet.cell(next_row + offset, 1).value = key
+                  sheet.cell(next_row + offset, 2).value = value
+          '''.replace('              ', '')
+          new_setup = '''    additions = {
+                  "available_fleet_limit": 8,
+                  "approved_active_fleet": 7,
+                  "operating_day_type": "saturday",
+              }
+              for sheet_name in ("THONG_SO_A", "THONG_SO_B"):
+                  sheet = workbook[sheet_name]
+                  next_row = sheet.max_row + 1
+                  for offset, (key, value) in enumerate(additions.items()):
+                      sheet.cell(next_row + offset, 1).value = key
+                      sheet.cell(next_row + offset, 2).value = value
+          '''.replace('              ', '')
+          if old_setup not in test:
+              raise SystemExit('Workbook metadata setup point not found')
+          test = test.replace(old_setup, new_setup, 1)
+
+          old_assertions = '''    assert imported.parameters_b.available_fleet_limit == 8
               assert imported.parameters_b.approved_active_fleet == 7
               assert imported.parameters_b.operating_day_type == "saturday"
           '''.replace('              ', '')
-          new = old + '''
+          new_assertions = old_assertions + '''
               bundle = normalize_imported_workbook_v1(
                   imported,
                   NormalizationOptions(
@@ -53,13 +80,16 @@ jobs:
                       imported_at=datetime(2026, 7, 22, 8, 0, tzinfo=UTC),
                   ),
               )
+              assert bundle.scenario_a is not None
+              assert bundle.scenario_a.available_fleet_limit == 8
+              assert bundle.scenario_a.operating_day_type == OperatingDayType.SATURDAY
               assert bundle.scenario_b.available_fleet_limit == 8
               assert bundle.scenario_b.approved_active_fleet == 7
               assert bundle.scenario_b.operating_day_type == OperatingDayType.SATURDAY
           '''.replace('              ', '')
-          if old not in test:
-              raise SystemExit('Workbook metadata test insertion point not found')
-          test_path.write_text(test.replace(old, new, 1), encoding='utf-8')
+          if old_assertions not in test:
+              raise SystemExit('Workbook metadata assertion point not found')
+          test_path.write_text(test.replace(old_assertions, new_assertions, 1), encoding='utf-8')
           PY
 
       - name: Install
