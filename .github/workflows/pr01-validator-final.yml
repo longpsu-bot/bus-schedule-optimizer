@@ -1,0 +1,110 @@
+name: Validate final PR-01 fleet invariant
+
+on:
+  push:
+    branches:
+      - feat/normalized-domain-inputs-v1
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/normalized-domain-inputs-v1
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Add positive approved fleet invariant
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          validation_path = Path('src/bus_schedule_engine/contracts_v1/validation.py')
+          validation = validation_path.read_text(encoding='utf-8')
+          old = '''    if (
+                  scenario.approved_active_fleet is not None
+                  and scenario.approved_active_fleet > scenario.available_fleet_limit
+              ):
+                  issues.append(
+                      _issue(
+                          "APPROVED_FLEET_EXCEEDS_AVAILABLE_LIMIT",
+                          f"{prefix}.approved_active_fleet",
+                          "approved_active_fleet must not exceed available_fleet_limit",
+                      )
+                  )
+          '''.replace('              ', '')
+          new = '''    if scenario.approved_active_fleet is not None:
+                  if scenario.approved_active_fleet <= 0:
+                      issues.append(
+                          _issue(
+                              "INVALID_APPROVED_ACTIVE_FLEET",
+                              f"{prefix}.approved_active_fleet",
+                              "approved_active_fleet must be positive when provided",
+                          )
+                      )
+                  elif scenario.approved_active_fleet > scenario.available_fleet_limit:
+                      issues.append(
+                          _issue(
+                              "APPROVED_FLEET_EXCEEDS_AVAILABLE_LIMIT",
+                              f"{prefix}.approved_active_fleet",
+                              "approved_active_fleet must not exceed available_fleet_limit",
+                          )
+                      )
+          '''.replace('              ', '')
+          if old not in validation:
+              raise SystemExit('Approved fleet validation block not found')
+          validation_path.write_text(validation.replace(old, new, 1), encoding='utf-8')
+
+          test_path = Path('tests/test_contract_v1_normalization.py')
+          test = test_path.read_text(encoding='utf-8')
+          old = '''    result = validate_scenario_input(invalid)
+
+              assert "APPROVED_FLEET_EXCEEDS_AVAILABLE_LIMIT" in result.error_codes
+          '''.replace('              ', '')
+          new = '''    result = validate_scenario_input(invalid)
+
+              assert "APPROVED_FLEET_EXCEEDS_AVAILABLE_LIMIT" in result.error_codes
+
+              zero_fleet = replace(bundle.scenario_b, approved_active_fleet=0)
+              zero_result = validate_scenario_input(zero_fleet)
+              assert "INVALID_APPROVED_ACTIVE_FLEET" in zero_result.error_codes
+          '''.replace('              ', '')
+          if old not in test:
+              raise SystemExit('Approved fleet test block not found')
+          test_path.write_text(test.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Install
+        run: python -m pip install -e '.[dev]'
+
+      - name: Format
+        run: python -m ruff format src/bus_schedule_engine/contracts_v1/validation.py tests/test_contract_v1_normalization.py
+
+      - name: Test
+        run: python -m pytest
+
+      - name: Lint
+        run: python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
+
+      - name: Commit clean result
+        run: |
+          rm .github/workflows/pr01-validator-final.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/bus_schedule_engine/contracts_v1/validation.py \
+            tests/test_contract_v1_normalization.py \
+            .github/workflows/pr01-validator-final.yml
+          git commit -m 'Enforce positive approved fleet metadata'
+          git push origin HEAD:feat/normalized-domain-inputs-v1
