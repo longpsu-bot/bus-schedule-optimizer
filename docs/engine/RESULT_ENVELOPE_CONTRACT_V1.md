@@ -2,7 +2,7 @@
 
 **Status:** Normative Contract V1 clarification
 
-This document is incorporated into Bus Schedule Engine Contract V1 and clarifies the distinction between an engine generation outcome and an accepted Scenario C solution. It governs any interpretation of `ScheduleSolutionV1` for no-run, infeasible, or rejected states.
+This document is incorporated into Bus Schedule Engine Contract V1 and clarifies the distinction between an engine generation outcome and an accepted Scenario C solution. It governs any interpretation of `ScheduleSolutionV1` for no-run, infeasible, unresolved, model-invalid, or rejected states.
 
 ## 1. Two distinct domain objects
 
@@ -51,11 +51,15 @@ When a solver was invoked, `solver_status` retains its native meaning: `OPTIMAL`
 |---|---|---|---|
 | `SOLUTION_ACCEPTED` | `COMPLETED`; solver `OPTIMAL` or `FEASIBLE` | Required | Candidate passed independent domain validation and is authoritative C. |
 | `NO_FEASIBLE_C_WITH_B_PARAMETERS` | `COMPLETED/INFEASIBLE` or `NOT_RUN` after pre-solve proof | `null` | No C is fabricated. Evidence must identify the locked parameters and proof boundary. |
+| `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | `COMPLETED`; solver `UNKNOWN` | `null` | No accepted C was found within the recorded solve limit. This is not proof of infeasibility. |
+| `C_NOT_GENERATED_MODEL_INVALID` | `COMPLETED`; solver `MODEL_INVALID` | `null` | The encoded solver model was invalid. This is an implementation/configuration defect, not a business conclusion. |
 | `C_NOT_GENERATED_INSUFFICIENT_DATA` | `NOT_RUN` | `null` | Demand-optimized C is not produced. |
 | `C_NOT_REQUIRED_B_SUITABLE` | `NOT_RUN` | `null` | B remains the accepted proposal; no duplicate C is created. |
 | `CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR` | `COMPLETED`; solver `OPTIMAL` or `FEASIBLE` | `null` | Raw candidate is non-authoritative and may appear only as diagnostic metadata. |
 
-`UNKNOWN` does not prove infeasibility. A time-limited search returning `UNKNOWN` must use an outcome/status that accurately states no accepted solution was found within the recorded limit; it MUST NOT be mislabeled `NO_FEASIBLE_C_WITH_B_PARAMETERS` unless infeasibility was independently proven.
+`UNKNOWN` does not prove infeasibility and MUST map to `C_NOT_FOUND_WITHIN_SOLVE_LIMIT`. It MUST NOT be mislabeled `NO_FEASIBLE_C_WITH_B_PARAMETERS` unless infeasibility was independently proven.
+
+`MODEL_INVALID` MUST map to `C_NOT_GENERATED_MODEL_INVALID`. It MUST NOT be presented as route or timetable infeasibility.
 
 ## 4. Rejected candidate diagnostics
 
@@ -74,7 +78,7 @@ For non-accepted outcomes:
 - the Scenario C diagram panel shows an explicit status/empty state;
 - no C trip line or exact timetable is fabricated;
 - XLSX records the outcome, evidence, and limitations but does not create fake C rows;
-- UI text distinguishes “solver not run”, “infeasible”, “candidate rejected”, and “B already suitable”.
+- UI text distinguishes solver not run, proven infeasible, solve-limit exhaustion, invalid model, candidate rejection, and B already suitable.
 
 For an accepted outcome, all UI, diagrams, and XLSX consume the embedded `ScheduleSolutionV1` and its solution fingerprint.
 
