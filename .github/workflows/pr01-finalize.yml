@@ -1,0 +1,83 @@
+name: Finalize PR-01 workbook metadata adapter
+
+on:
+  push:
+    branches:
+      - feat/normalized-domain-inputs-v1
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/normalized-domain-inputs-v1
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Make workbook metadata overrides optional
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          adapter_path = Path('src/bus_schedule_engine/contracts_v1/adapters.py')
+          adapter = adapter_path.read_text(encoding='utf-8')
+          old = '    operating_day_type_b: OperatingDayType\n'
+          new = '    operating_day_type_b: OperatingDayType | None = None\n'
+          if old not in adapter:
+              raise SystemExit('NormalizationOptions operating-day field not found')
+          adapter_path.write_text(adapter.replace(old, new, 1), encoding='utf-8')
+
+          test_path = Path('tests/test_contract_v1_normalization.py')
+          test = test_path.read_text(encoding='utf-8')
+          old = '''    assert imported.parameters_b.available_fleet_limit == 8
+              assert imported.parameters_b.approved_active_fleet == 7
+              assert imported.parameters_b.operating_day_type == "saturday"
+          '''.replace('              ', '')
+          new = old + '''
+              bundle = normalize_imported_workbook_v1(
+                  imported,
+                  NormalizationOptions(
+                      source_id="workbook-contract-metadata",
+                      imported_at=datetime(2026, 7, 22, 8, 0, tzinfo=UTC),
+                  ),
+              )
+              assert bundle.scenario_b.available_fleet_limit == 8
+              assert bundle.scenario_b.approved_active_fleet == 7
+              assert bundle.scenario_b.operating_day_type == OperatingDayType.SATURDAY
+          '''.replace('              ', '')
+          if old not in test:
+              raise SystemExit('Workbook metadata test insertion point not found')
+          test_path.write_text(test.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Install
+        run: python -m pip install -e '.[dev]'
+
+      - name: Format
+        run: python -m ruff format src/bus_schedule_engine/contracts_v1/adapters.py tests/test_contract_v1_normalization.py
+
+      - name: Test
+        run: python -m pytest
+
+      - name: Lint
+        run: python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
+
+      - name: Commit clean result
+        run: |
+          rm .github/workflows/pr01-finalize.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/bus_schedule_engine/contracts_v1/adapters.py \
+            tests/test_contract_v1_normalization.py \
+            .github/workflows/pr01-finalize.yml
+          git commit -m 'Allow Contract V1 metadata from workbook input'
+          git push origin HEAD:feat/normalized-domain-inputs-v1
