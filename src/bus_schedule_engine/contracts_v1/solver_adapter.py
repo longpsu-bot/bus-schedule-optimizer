@@ -1,4 +1,4 @@
-"""Public façade for the Contract V1 solver boundary."""
+"""Public additive façade for the Contract V1 solver boundary; no runtime cutover."""
 
 from .heuristic_solver import HeuristicScheduleSolverAdapter
 from .solver_orchestration import run_schedule_solver_v1
