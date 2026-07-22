@@ -1,0 +1,142 @@
+name: Fix and validate PR 8
+
+on:
+  push:
+    branches:
+      - feat/solver-interface-heuristic-adapter-v1
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/solver-interface-heuristic-adapter-v1
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Apply domain fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/bus_schedule_engine/contracts_v1/solver_adapter.py')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('    HeadwayType,\n', '', 1)
+          text = text.replace('    DimensionStatus,\n', '', 1)
+          text = text.replace(
+              'from bus_schedule_engine.c_generator import generate_scenario_c\n',
+              'from bus_schedule_engine.c_config import ScenarioCConfig\n'
+              'from bus_schedule_engine.c_generator import generate_scenario_c\n',
+              1,
+          )
+          text = text.replace(
+              '    heuristic_config,\n',
+              '    heuristic_config: ScenarioCConfig,\n',
+              1,
+          )
+
+          anchor = '''    if set(source_ids) != set(expected_source_ids):
+              rejection_codes.append("SOURCE_B_MAPPING_NOT_ONE_TO_ONE")
+          '''.replace('          ', '')
+          addition = anchor + '''    source_by_id = {
+              trip.trip_id: trip for trip in b.exact_timetable
+          }
+          for trip in candidate.exact_timetable:
+              source = source_by_id.get(trip.source_b_trip_id)
+              if source is None:
+                  continue
+              if trip.direction != source.direction:
+                  rejection_codes.append("SOURCE_DIRECTION_LOCK_VIOLATION")
+              if trip.departure_terminal != source.departure_terminal:
+                  rejection_codes.append("SOURCE_TERMINAL_LOCK_VIOLATION")
+              if trip.b_departure_time != source.departure_time:
+                  rejection_codes.append("SOURCE_B_DEPARTURE_TRACE_MISMATCH")
+              if trip.runtime_minutes != source.runtime_minutes:
+                  rejection_codes.append("SOURCE_RUNTIME_LOCK_VIOLATION")
+          '''.replace('          ', '')
+          if anchor not in text:
+              raise SystemExit('Source mapping validation anchor not found')
+          text = text.replace(anchor, addition, 1)
+
+          old = '''def _solution_fingerprint_payload(solution: ScheduleSolutionV1) -> dict[str, object]:
+              payload = _jsonable(asdict(solution))
+              payload.pop("solution_fingerprint", None)
+              return payload
+          '''.replace('          ', '')
+          new = '''def _solution_fingerprint_payload(solution: ScheduleSolutionV1) -> dict[str, object]:
+              payload = _jsonable(asdict(solution))
+              payload.pop("solution_fingerprint", None)
+              payload.pop("solve_duration_seconds", None)
+              return payload
+          '''.replace('          ', '')
+          if old not in text:
+              raise SystemExit('Solution fingerprint anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''def _outcome_fingerprint_payload(
+              outcome: ScheduleGenerationOutcomeV1,
+          ) -> dict[str, object]:
+              payload = _jsonable(asdict(outcome))
+              payload.pop("outcome_fingerprint", None)
+              return payload
+          '''.replace('          ', '')
+          new = '''def _outcome_fingerprint_payload(
+              outcome: ScheduleGenerationOutcomeV1,
+          ) -> dict[str, object]:
+              payload = _jsonable(asdict(outcome))
+              payload.pop("outcome_fingerprint", None)
+              payload.pop("solve_duration_seconds", None)
+              return payload
+          '''.replace('          ', '')
+          if old not in text:
+              raise SystemExit('Outcome fingerprint anchor not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Install
+        run: python -m pip install -e '.[dev]'
+
+      - name: Ruff fix and format
+        run: |
+          python -m ruff check --fix \
+            src/bus_schedule_engine/contracts_v1/solver_models.py \
+            src/bus_schedule_engine/contracts_v1/solver_adapter.py \
+            src/bus_schedule_engine/contracts_v1/solver_serialization.py \
+            src/bus_schedule_engine/contracts_v1/__init__.py \
+            src/bus_schedule_engine/contracts_v1/models.py \
+            tests/test_contract_v1_solver.py
+          python -m ruff format \
+            src/bus_schedule_engine/contracts_v1/solver_models.py \
+            src/bus_schedule_engine/contracts_v1/solver_adapter.py \
+            src/bus_schedule_engine/contracts_v1/solver_serialization.py \
+            src/bus_schedule_engine/contracts_v1/__init__.py \
+            src/bus_schedule_engine/contracts_v1/models.py \
+            tests/test_contract_v1_solver.py
+
+      - name: Validate
+        run: |
+          python -m pytest
+          python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
+          python -m ruff format --check \
+            src/bus_schedule_engine/contracts_v1 \
+            tests/test_contract*.py
+
+      - name: Commit clean result
+        run: |
+          rm .github/workflows/pr8-fix.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/bus_schedule_engine/contracts_v1 \
+            tests/test_contract_v1_solver.py \
+            .github/workflows/pr8-fix.yml
+          git commit -m 'Complete solver boundary validation and fingerprints'
+          git push origin HEAD:feat/solver-interface-heuristic-adapter-v1
