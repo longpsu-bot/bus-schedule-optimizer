@@ -1,3 +1,5 @@
+"""Public Contract V1 normalization, demand-resolution, and evaluation API."""
+
 from .adapters import (
     NormalizationError,
     NormalizationOptions,
