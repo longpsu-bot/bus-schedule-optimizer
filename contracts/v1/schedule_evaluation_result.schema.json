@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bus-schedule.example/contracts/v1/schedule_evaluation_result.schema.json",
+  "title": "ScheduleEvaluationResult",
+  "description": "Dimensioned evaluation result for Scenario B.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version", "scenario_id", "disposition", "input_validity", "parameter_consistency",
+    "technical_feasibility", "demand_suitability", "fleet_feasibility", "headway_quality",
+    "block_evaluations", "warnings", "limitations", "confidence"
+  ],
+  "properties": {
+    "contract_version": {"const": "1.0.0"},
+    "scenario_id": {"const": "B"},
+    "disposition": {"enum": ["B_TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE", "B_TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE", "B_TECHNICALLY_INFEASIBLE_BUT_PARAMETERS_MAY_ALLOW_REDISTRIBUTION", "B_PARAMETERS_INFEASIBLE", "B_INSUFFICIENT_DATA"]},
+    "input_validity": {"$ref": "#/$defs/dimension"},
+    "parameter_consistency": {"$ref": "#/$defs/dimension"},
+    "technical_feasibility": {"$ref": "#/$defs/dimension"},
+    "demand_suitability": {"$ref": "#/$defs/dimension"},
+    "fleet_feasibility": {"$ref": "#/$defs/dimension"},
+    "headway_quality": {"$ref": "#/$defs/dimension"},
+    "block_evaluations": {"type": "array", "items": {"$ref": "#/$defs/blockEvaluation"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "confidence": {"enum": ["high", "medium", "low", "unknown"]}
+  },
+  "$defs": {
+    "dimension": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "issues", "evidence", "explanation", "confidence"],
+      "properties": {
+        "status": {"enum": ["PASS", "FAIL", "WARNING", "INSUFFICIENT_DATA", "NOT_EVALUATED"]},
+        "issues": {"type": "array", "items": {"$ref": "#/$defs/issue"}},
+        "evidence": {"type": "array", "items": {"type": "string"}},
+        "explanation": {"type": "string"},
+        "confidence": {"enum": ["high", "medium", "low", "unknown"]}
+      }
+    },
+    "issue": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "severity", "message", "references"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[A-Z0-9_]+$"},
+        "severity": {"enum": ["BLOCKING", "ERROR", "WARNING", "INFO"]},
+        "message": {"type": "string", "minLength": 1},
+        "references": {"type": "array", "items": {"type": "string"}},
+        "suggestion": {"type": "string"}
+      }
+    },
+    "blockEvaluation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["block_id", "direction", "load_factor", "shortage", "status", "confidence"],
+      "properties": {
+        "block_id": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["outbound", "inbound", "combined"]},
+        "load_factor": {"type": ["number", "null"], "minimum": 0},
+        "shortage": {"type": "number", "minimum": 0},
+        "status": {"enum": ["WITHIN_PLANNING_CEILING", "WARNING_ABOVE_85", "CRITICAL_ABOVE_90", "NO_SERVICE_WITH_DEMAND", "LOW_LOAD_REVIEW_ONLY", "ELIGIBLE_DONOR_PERIOD", "INSUFFICIENT_DATA"]},
+        "confidence": {"enum": ["high", "medium", "low", "unknown"]}
+      }
+    }
+  }
+}
