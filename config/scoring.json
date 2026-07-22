@@ -1,0 +1,23 @@
+{
+  "weights": {
+    "demand_fit": 40,
+    "headway_regularity": 25,
+    "fleet_efficiency": 20,
+    "service_coverage": 15
+  },
+  "penalties": {
+    "block_over_maximum": 15,
+    "no_service_with_demand": 30,
+    "abnormal_service_gap": 8,
+    "final_trip_too_early": 10,
+    "layover_violation": 100,
+    "trip_count_mismatch": 100,
+    "infeasible_schedule": 100
+  },
+  "thresholds": {
+    "abnormal_gap_multiplier": 2.5,
+    "final_trip_tolerance_minutes": 15,
+    "good_headway_cv": 0.10,
+    "poor_headway_cv": 0.50
+  }
+}
