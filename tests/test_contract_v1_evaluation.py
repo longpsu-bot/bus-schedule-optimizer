@@ -70,10 +70,9 @@ def _bundle(
     fleet_limit: int = 4,
     confidence: DemandConfidence = DemandConfidence.HIGH,
 ):
-    trips_a = [replace(item, scenario="A") for item in trips]
     imported = ImportedWorkbook(
         parameters_a=parameters,
-        trips_a=trips_a,
+        trips_a=[replace(item, scenario="A") for item in trips],
         parameters_b=parameters,
         trips_b=trips,
         demand=demand,
@@ -160,7 +159,10 @@ def test_adaptive_blocks_merge_small_changes_and_keep_sustained_boundary(
         ("D-0001", "D-0002"),
         ("D-0003", "D-0004"),
     ]
-    assert resolution.blocks[1].block_boundary_reason == BlockBoundaryReason.SUSTAINED_CHANGE
+    assert (
+        resolution.blocks[1].block_boundary_reason
+        == BlockBoundaryReason.SUSTAINED_CHANGE
+    )
 
 
 def test_manual_boundary_cannot_split_source_interval(
@@ -202,41 +204,48 @@ def test_combined_demand_remains_combined(
     assert resolution.blocks[0].direction.value == "combined"
 
 
-def test_exact_85_percent_is_within_planning_ceiling(
+@pytest.mark.parametrize(
+    ("passengers", "expected_status", "expected_disposition"),
+    [
+        (
+            170,
+            BlockSupplyStatus.WITHIN_PLANNING_CEILING,
+            BDisposition.TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE,
+        ),
+        (
+            171,
+            BlockSupplyStatus.WARNING_ABOVE_85,
+            BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE,
+        ),
+        (
+            181,
+            BlockSupplyStatus.CRITICAL_ABOVE_90,
+            BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE,
+        ),
+    ],
+)
+def test_one_sided_load_factor_thresholds(
     make_parameters,
     make_valid_trips,
+    passengers: float,
+    expected_status: BlockSupplyStatus,
+    expected_disposition: BDisposition,
 ) -> None:
     parameters = make_parameters(vehicle_capacity_passengers=100)
-    trips = make_valid_trips(parameters)
-    bundle = _bundle(parameters, trips, [_record(6, 7, 170)])
+    bundle = _bundle(
+        parameters,
+        make_valid_trips(parameters),
+        [_record(6, 7, passengers)],
+    )
 
     result = evaluate_scenario_b_v1(bundle)
     plan = result.b_block_supply[0]
 
     assert plan.b_trip_count == 2
-    assert plan.load_factor == pytest.approx(0.85)
-    assert plan.status == BlockSupplyStatus.WITHIN_PLANNING_CEILING
-    assert (
-        result.evaluation.disposition
-        == BDisposition.TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE
-    )
-
-
-def test_above_85_is_warning_and_demand_unsuitable(
-    make_parameters,
-    make_valid_trips,
-) -> None:
-    parameters = make_parameters(vehicle_capacity_passengers=100)
-    bundle = _bundle(parameters, make_valid_trips(parameters), [_record(6, 7, 171)])
-
-    result = evaluate_scenario_b_v1(bundle)
-
-    assert result.b_block_supply[0].status == BlockSupplyStatus.WARNING_ABOVE_85
-    assert result.evaluation.demand_suitability.status == DimensionStatus.WARNING
-    assert (
-        result.evaluation.disposition
-        == BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE
-    )
+    assert plan.status == expected_status
+    assert result.evaluation.disposition == expected_disposition
+    if passengers == 170:
+        assert plan.load_factor == pytest.approx(0.85)
 
 
 def test_low_load_is_review_only_not_donor_or_reduction_signal(
@@ -244,7 +253,11 @@ def test_low_load_is_review_only_not_donor_or_reduction_signal(
     make_valid_trips,
 ) -> None:
     parameters = make_parameters(vehicle_capacity_passengers=100)
-    bundle = _bundle(parameters, make_valid_trips(parameters), [_record(6, 7, 10)])
+    bundle = _bundle(
+        parameters,
+        make_valid_trips(parameters),
+        [_record(6, 7, 10)],
+    )
 
     result = evaluate_scenario_b_v1(bundle)
     plan = result.b_block_supply[0]
@@ -284,7 +297,7 @@ def test_no_service_with_demand_is_preserved_even_in_adaptive_mode(
     bundle = _bundle(
         parameters,
         make_valid_trips(parameters),
-        [_record(6, 7, 50), _record(7, 8, 50)],
+        [_record(5, 6, 50), _record(6, 7, 50)],
     )
     policy = ScenarioBEvaluationPolicyV1(
         demand_blocks=DemandBlockPolicyV1(
@@ -297,7 +310,11 @@ def test_no_service_with_demand_is_preserved_even_in_adaptive_mode(
     result = evaluate_scenario_b_v1(bundle, policy)
 
     assert len(result.demand_resolution.blocks) == 2
-    assert result.b_block_supply[1].status == BlockSupplyStatus.NO_SERVICE_WITH_DEMAND
+    assert result.b_block_supply[0].status == BlockSupplyStatus.NO_SERVICE_WITH_DEMAND
+    assert (
+        result.demand_resolution.blocks[0].block_boundary_reason
+        == BlockBoundaryReason.CRITICAL_CONDITION_PROTECTION
+    )
     assert result.evaluation.demand_suitability.status == DimensionStatus.FAIL
 
 
@@ -310,10 +327,30 @@ def test_submitted_b_fleet_infeasibility_does_not_claim_parameter_infeasibility(
         vehicle_capacity_passengers=60,
     )
     definitions = [
-        ("B-01", parameters.terminal_1_name, Direction.TERMINAL_1_TO_2, 6 * 3600),
-        ("B-02", parameters.terminal_2_name, Direction.TERMINAL_2_TO_1, 6 * 3600 + 10 * 60),
-        ("B-03", parameters.terminal_1_name, Direction.TERMINAL_1_TO_2, 7 * 3600),
-        ("B-04", parameters.terminal_2_name, Direction.TERMINAL_2_TO_1, 7 * 3600 + 10 * 60),
+        (
+            "B-01",
+            parameters.terminal_1_name,
+            Direction.TERMINAL_1_TO_2,
+            6 * 3600,
+        ),
+        (
+            "B-02",
+            parameters.terminal_2_name,
+            Direction.TERMINAL_2_TO_1,
+            6 * 3600 + 10 * 60,
+        ),
+        (
+            "B-03",
+            parameters.terminal_1_name,
+            Direction.TERMINAL_1_TO_2,
+            7 * 3600,
+        ),
+        (
+            "B-04",
+            parameters.terminal_2_name,
+            Direction.TERMINAL_2_TO_1,
+            7 * 3600 + 10 * 60,
+        ),
     ]
     trips = [
         Trip(
@@ -326,7 +363,12 @@ def test_submitted_b_fleet_infeasibility_does_not_claim_parameter_infeasibility(
         )
         for trip_id, terminal, direction, departure in definitions
     ]
-    bundle = _bundle(parameters, trips, [_record(6, 7, 20)], fleet_limit=2)
+    bundle = _bundle(
+        parameters,
+        trips,
+        [_record(6, 7, 20)],
+        fleet_limit=2,
+    )
 
     result = evaluate_scenario_b_v1(bundle)
 
@@ -344,7 +386,11 @@ def test_evaluation_and_supply_serialization_match_contract_schemas(
     make_valid_trips,
 ) -> None:
     parameters = make_parameters(vehicle_capacity_passengers=100)
-    bundle = _bundle(parameters, make_valid_trips(parameters), [_record(6, 7, 171)])
+    bundle = _bundle(
+        parameters,
+        make_valid_trips(parameters),
+        [_record(6, 7, 171)],
+    )
 
     result = evaluate_scenario_b_v1(bundle)
 
