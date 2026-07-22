@@ -4,12 +4,13 @@
 
 **Contract version:** `1.0.0`
 
-**Normative source of truth:** this file
-**Scope:** business rules, normalized domain contracts, scenario evaluation, Scenario C generation, output reconciliation, and solver boundaries
+**Normative source of truth:** this file, together with the incorporated [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md)
+
+**Scope:** business rules, normalized domain contracts, scenario evaluation, Scenario C generation, fleet feasibility, output reconciliation, and solver boundaries
 
 ## 0. Conformance and interpretation
 
-The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, **SHOULD NOT**, and **MAY** are normative. Contract V1 governs the future rebuilt engine even where the current MVP differs. A conflict with this document is a migration gap, not permission to reinterpret the rule.
+The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, **SHOULD NOT**, and **MAY** are normative. Contract V1 governs the future rebuilt engine even where the current MVP differs. A conflict with this contract is a migration gap, not permission to reinterpret the rule.
 
 Contract V1 is solver-independent. It defines what a conforming engine accepts, proves, returns, explains, visualizes, and exports. It does not define a concrete OR-Tools implementation.
 
@@ -19,7 +20,7 @@ All timestamps belong to one declared operating day and use local service time. 
 
 The authoritative flow is:
 
-> Current operating parameters and exact timetable A + proposed operating parameters and exact timetable B + passenger demand observed under A → normalize and validate → evaluate B technical feasibility → evaluate B demand suitability → if appropriate, redistribute B into C → validate C under B's locked parameters → produce reconciled comparisons, diagrams, and XLSX → expose status, limitations, confidence, and explanation.
+> Current operating parameters and exact timetable A + proposed operating parameters and exact timetable B + passenger demand observed under A → normalize and validate → evaluate B technical feasibility → evaluate B demand suitability → decide whether C is required → if appropriate, redistribute B into C → validate C under B's locked parameters → return `ScheduleGenerationOutcomeV1` → produce reconciled comparisons, diagrams, and XLSX → expose status, limitations, confidence, and explanation.
 
 ### 1.1 Scenario A — Biểu đồ giờ hiện tại
 
@@ -38,6 +39,8 @@ Display name: **B — Biểu đồ giờ đề xuất**.
 C is derived from B. It preserves B's locked operating parameters and changes only departure distribution. It is not an independent schedule and MUST NOT silently add or remove trips, add vehicles, shorten runtime or turnaround, change first/last departures, optimize demand blocks independently, or reduce service merely because load factor is low.
 
 Display name: **C — Biểu đồ giờ tái phân bổ theo nhu cầu**.
+
+C exists as an authoritative scenario only when a candidate has passed independent domain validation and the outcome status is `SOLUTION_ACCEPTED`.
 
 ## 2. Authoritative normalized inputs
 
@@ -121,6 +124,8 @@ Default invariant: `C.trips_by_direction == B.trips_by_direction`.
 - `fixed_by_direction` — Contract V1 default; each directional total is locked.
 - `total_only` — MAY be enabled only when reliable directional demand exists and the user explicitly authorizes redistribution between directions. The authorization and confidence evidence MUST be returned.
 
+### 3.1 Fleet constraint mode
+
 `fleet_constraint_mode` values are:
 
 - `available_upper_bound` — Contract V1 default. The timetable is feasible only when its independently calculated `minimum_required_fleet` is less than or equal to B's `available_fleet_limit`.
@@ -138,7 +143,7 @@ The engine MUST NOT silently add vehicles and MUST NOT require every approved or
 
 The contract MUST distinguish required `available_fleet_limit`, optional `approved_active_fleet`, and calculated `minimum_required_fleet`. The ambiguous standalone field `number_of_vehicles` is prohibited in normalized contracts.
 
-### 3.1 Initial fleet positioning
+### 3.2 Initial fleet positioning
 
 `initial_fleet_positioning_mode` values are:
 
@@ -204,7 +209,7 @@ Exactly one top-level disposition MUST be returned:
 - `B_PARAMETERS_INFEASIBLE`;
 - `B_INSUFFICIENT_DATA`.
 
-C generation MAY proceed for a technically feasible but demand-unsuitable B, or for a technically infeasible B whose locked parameters may admit another distribution. If the fixed B parameters are infeasible, return `NO_FEASIBLE_C_WITH_B_PARAMETERS`; do not fabricate C. `B_INSUFFICIENT_DATA` MUST NOT produce a demand-optimized C, although a clearly labeled copy/no-op diagnostic result MAY be returned by a compatibility adapter.
+C generation MAY proceed for a technically feasible but demand-unsuitable B, or for a technically infeasible B whose locked parameters may admit another distribution. If the fixed B parameters are infeasible, return a generation outcome with `NO_FEASIBLE_C_WITH_B_PARAMETERS`; do not fabricate C. `B_INSUFFICIENT_DATA` MUST return `C_NOT_GENERATED_INSUFFICIENT_DATA` and MUST NOT produce a demand-optimized C. If B is already suitable, return `C_NOT_REQUIRED_B_SUITABLE` rather than duplicating B as C.
 
 ## 6. Load-factor and capacity contract
 
@@ -241,7 +246,7 @@ Supported `block_mode` values are `native`, `adaptive`, and `manual`.
 
 ### 7.2 Native mode
 
-Native mode preserves the actual source resolution (for example 15, 30, or 60 minutes). Daily-total-only data MUST remain daily total; the engine MUST NOT fabricate intraday demand.
+Native mode preserves the actual source resolution. Daily-total-only data MUST remain daily total; the engine MUST NOT fabricate intraday demand.
 
 ### 7.3 Adaptive mode
 
@@ -277,6 +282,8 @@ Level 1 decides the desired distribution across the day before individual times 
 
 After allocation, the engine creates continuous headway regimes, generates exact departures, validates fleet/turnaround/location, and reconciles actual departures with planned block allocation. An implementation MUST NOT optimize individual departures first and infer the supply plan afterward.
 
+A Level 1 plan is not an accepted Scenario C until Level 2 and independent domain validation succeed.
+
 ## 9. Headway regimes
 
 A demand-analysis block and a headway regime are distinct. A regime is a continuous variable-length period with stable or nearly stable consecutive directional headways. It MAY cross analysis blocks and begin/end at any operationally meaningful minute. Analysis boundaries MUST NOT automatically reset headway, create a regime, create an anchor, or force a frequency change.
@@ -289,7 +296,7 @@ A redistributed trip MUST trigger coordinated local re-spacing; it MUST NOT be m
 
 ## 10. Scenario C generation
 
-Each C trip MUST retain C trip ID, source B trip ID, direction, departure terminal, B and C departure times, shift minutes, previous B and C headways, regime ID, change reason, and vehicle assignment. The B→C mapping MUST be one-to-one in `fixed_by_direction` mode.
+Each accepted C trip MUST retain C trip ID, source B trip ID, direction, departure terminal, B and C departure times, shift minutes, previous B and C headways, regime ID, change reason, and vehicle assignment. The B→C mapping MUST be one-to-one in `fixed_by_direction` mode.
 
 Hard-priority order is: preserve B parameters; preserve total and default directional trip counts; preserve fleet contract; preserve first/last departures; satisfy runtime, turnaround, vehicle location, chronology, and minimum service.
 
@@ -307,15 +314,40 @@ Subject to all hard constraints, lexicographic optimization priorities are:
 
 Low load is absent from the reduction objectives. Stable B portions SHOULD remain unchanged unless a higher-priority objective requires movement. Fleet minimization MAY be used only as a later tie-breaker after feasibility, critical demand coverage, service continuity, and headway regularity have been preserved.
 
-## 11. Evaluation and solution outputs
+## 11. Evaluation, generation outcomes, and accepted solutions
 
 ### 11.1 `ScheduleEvaluationResult`
 
 The result MUST contain scenario ID; separate input-validity, parameter-consistency, technical-feasibility, demand-suitability, fleet-feasibility, and headway-quality results; block evaluations; warnings; limitations; and confidence. Each dimension MUST expose status, issue codes, evidence/references, and explanation.
 
-### 11.2 `ScheduleSolutionV1`
+### 11.2 `ScheduleGenerationOutcomeV1`
 
-The solution MUST contain contract version, solver status/adapter, solve duration, solution and source-B fingerprints, operating locks, C block plan, headway regimes, exact timetable, and fleet assignment. Fleet output MUST include `available_fleet_limit`, nullable/optional `approved_active_fleet`, independently calculated `minimum_required_fleet`, both recommended initial terminal counts, `initial_fleet_positioning_mode`, `fleet_margin`, `maximum_simultaneous_vehicle_use`, event-level stock profiles for both terminals, and `fleet_feasibility_status`. It also contains block evaluation, residual overload, shift metrics, overall status, explanations, and limitations.
+This is the top-level result of the C-generation decision. It MUST contain contract version, `result_status`, engine-level `execution_status`, nullable native `solver_status`, nullable solver adapter, solve duration, outcome/source-B fingerprints, nullable accepted solution, nullable rejected-candidate diagnostics, explanations, and limitations.
+
+`execution_status` values are:
+
+- `NOT_RUN` — no solver was invoked; `solver_status` and adapter are null and duration is zero.
+- `COMPLETED` — a solver invocation returned a native status.
+
+`NOT_RUN` is not a CP-SAT status.
+
+`result_status` values are:
+
+- `SOLUTION_ACCEPTED`;
+- `NO_FEASIBLE_C_WITH_B_PARAMETERS`;
+- `C_NOT_GENERATED_INSUFFICIENT_DATA`;
+- `C_NOT_REQUIRED_B_SUITABLE`;
+- `CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR`.
+
+A non-accepted outcome MUST have no authoritative C solution. It MUST NOT populate C block plans, timetable, regimes, assignments, or fleet outputs with placeholders, a copy of B, or a rejected raw candidate.
+
+A rejected candidate MAY retain only limited non-authoritative diagnostic metadata such as candidate fingerprint, rejection codes, and summary. It MUST NOT be rendered or exported as C.
+
+### 11.3 `ScheduleSolutionV1`
+
+`ScheduleSolutionV1` exists only when `result_status = SOLUTION_ACCEPTED`. It MUST contain contract version, native solver status/adapter, solve duration, solution and source-B fingerprints, operating locks, C block plan, headway regimes, exact timetable, fleet assignment, block evaluation, shift metrics, explanations, and limitations.
+
+Fleet output MUST include `available_fleet_limit`, nullable/optional `approved_active_fleet`, independently calculated `minimum_required_fleet`, both recommended initial terminal counts, `initial_fleet_positioning_mode`, `fleet_margin`, `maximum_simultaneous_vehicle_use`, event-level stock profiles for both terminals, and `fleet_feasibility_status = FLEET_FEASIBLE`.
 
 For the Contract V1 two-terminal no-deadhead model:
 
@@ -323,13 +355,13 @@ For the Contract V1 two-terminal no-deadhead model:
 
 This value is calculated independently for A, B, and C; it is never copied from Scenario B. Each stock-profile record identifies event time/type, trip ID when applicable, stock before/after, ready arrivals, and departures.
 
-Solver statuses are `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`, `MODEL_INVALID`, and `UNKNOWN`. User-facing output MUST NOT label `FEASIBLE` as proven optimal. `INFEASIBLE` applies only to the encoded model and locked inputs described by the returned fingerprint and limitations.
+Native solver statuses are `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`, `MODEL_INVALID`, and `UNKNOWN`. User-facing output MUST NOT label `FEASIBLE` as proven optimal. Only native `OPTIMAL` or `FEASIBLE` candidates that pass independent validation may produce `ScheduleSolutionV1`. `UNKNOWN` does not prove infeasibility.
 
 ## 12. Solver-independent architecture boundary
 
 The target dependency flow is:
 
-> Excel/UI input → import adapter → normalized contracts → business validator → `ScheduleProblemV1` → `ScheduleSolver` interface → solver adapter → raw candidate → independent domain validator → `ScheduleSolutionV1` → evaluation/diagrams/XLSX.
+> Excel/UI input → import adapter → normalized contracts → business validator → `ScheduleProblemV1` → `ScheduleSolver` interface → solver adapter → raw candidate → independent domain validator → `ScheduleGenerationOutcomeV1` with optional accepted `ScheduleSolutionV1` → evaluation/diagrams/XLSX.
 
 The interface is conceptually:
 
@@ -341,7 +373,7 @@ The domain layer MUST NOT import Plotly, Streamlit, or openpyxl. Solver adapters
 
 ## 13. Visualization contract
 
-Visualization modules consume authoritative block plans, evaluations, timetable rows, and fingerprints. They MUST NOT recalculate demand blocks, trip counts, load factors, required trips, or scenario totals.
+Visualization modules consume authoritative block plans, evaluations, timetable rows, generation outcomes, and fingerprints. They MUST NOT recalculate demand blocks, trip counts, load factors, required trips, or scenario totals.
 
 ### 13.1 Diagram 1 — Nhu cầu và số chuyến theo thời gian
 
@@ -355,6 +387,8 @@ Use dual Y-axes. Left is passengers per interval/hour; right is trips per interv
 
 Hover MUST include interval bounds/duration, source resolution, demand mode/confidence, total and available directional demand, B/C directional and total trips, requirements at 85%/90%, B/C load factors, shortage, status, and interpolation/aggregation method.
 
+A non-accepted C outcome appears as an explicit empty/status state. The visualization MUST NOT duplicate B or render a rejected candidate as C.
+
 ### 13.2 Diagram 2 — Phân bổ chuyến theo thời gian của từng biểu đồ giờ
 
 Use aligned small multiples for A, B, and C on the same authoritative analysis intervals. Each panel supports outbound, inbound, and total trip/service-rate lines. Default to rates when block durations differ. The diagram MUST reveal B vs A changes, C vs B redistribution, total/directional locks, and donor/recipient movements.
@@ -363,7 +397,7 @@ The exact-departure diagnostic uses continuous time, scenario/direction lanes, a
 
 ## 14. Visualization, UI, and XLSX reconciliation
 
-The following MUST hold for the same solution fingerprint:
+For an accepted solution, the following MUST hold for the same solution fingerprint:
 
 - sum of A block trips equals A declared trips;
 - sum of B block trips equals B declared trips;
@@ -372,17 +406,23 @@ The following MUST hold for the same solution fingerprint:
 - C planned trips per block equal C exact departures counted using the declared boundary convention;
 - directional demand components reconcile with total when directional demand exists.
 
-The UI, both diagrams, and XLSX MUST identify the same solution fingerprint. A departure exactly on a boundary belongs to the later block, except the final inclusive operating endpoint, which MUST use one explicit non-duplicating convention documented in the solution.
+The UI, both diagrams, and XLSX MUST identify the same outcome fingerprint and, when accepted, the same solution fingerprint. A departure exactly on a boundary belongs to the later block, except the final inclusive operating endpoint, which MUST use one explicit non-duplicating convention documented in the solution.
+
+For a non-accepted outcome, authoritative C outputs are absent/null and all presentation/export layers MUST show the recorded status rather than synthetic C data.
 
 ## 15. XLSX result contract
 
 The target workbook contains: `TONG_QUAN`, `DANH_GIA_B`, `PHAN_KHUNG_NHU_CAU`, `NHU_CAU_VA_CUNG_UNG`, `PHAN_BO_CHUYEN_A`, `PHAN_BO_CHUYEN_B`, `PHAN_BO_CHUYEN_C`, `BIEU_DO_GIO_A`, `BIEU_DO_GIO_B`, `BIEU_DO_GIO_C`, `CHE_DO_GIAN_CACH_C`, `PHAN_CONG_XE_C`, `SO_SANH_B_C`, `CANH_BAO`, `NHAT_KY_SOLVER`, `CAU_HINH_DA_DUNG`, and `GIOI_HAN_DU_LIEU`.
 
-Headings are Vietnamese; table headers are frozen and filterable; time is `HH:mm`; load factors are percentages. Source and solution fingerprints MUST be visible in summary/configuration/solver-log contexts. Exports MUST create a new workbook and MUST NOT overwrite the source workbook. Workbook cells consume authoritative outputs rather than re-running optimization.
+Headings are Vietnamese; table headers are frozen and filterable; time is `HH:mm`; load factors are percentages. Source, outcome, and applicable solution fingerprints MUST be visible in summary/configuration/solver-log contexts. Exports MUST create a new workbook and MUST NOT overwrite the source workbook. Workbook cells consume authoritative outputs rather than re-running optimization.
+
+No-run, infeasible, and rejected outcomes record status/evidence but MUST NOT create fake C rows.
 
 ## 16. Fingerprints, provenance, confidence, and limitations
 
-A source-B fingerprint identifies normalized B parameters plus ordered exact timetable. A solution fingerprint identifies contract version, source fingerprint, locks, authoritative block plan, exact C timetable, fleet assignment, solver status/adapter, and relevant configuration. Canonical serialization and hash algorithm MUST be documented; SHA-256 is RECOMMENDED.
+A source-B fingerprint identifies normalized B parameters plus ordered exact timetable. An outcome fingerprint identifies contract version, source-B fingerprint, decision/execution status, native solver status when applicable, accepted solution fingerprint when applicable, configuration, explanations, and limitations.
+
+A solution fingerprint identifies contract version, source fingerprint, locks, authoritative block plan, exact C timetable, fleet assignment, native solver status/adapter, and relevant configuration. Canonical serialization and hash algorithm MUST be documented; SHA-256 is RECOMMENDED.
 
 Demand confidence and direction availability propagate from source observations to blocks, evaluations, diagrams, explanations, and XLSX. Aggregation, interpolation, and assumptions MUST be explicit. A fingerprint proves identity, not correctness.
 
@@ -394,12 +434,12 @@ The following remain deliberate review decisions rather than hidden defaults:
 
 1. controlled vocabulary for `operating_day_type` beyond a small portable core;
 2. service-day encoding for cross-midnight schedules;
-3. confidence scale calibration and the threshold for “reliable” directional demand;
+3. confidence scale calibration and the threshold for reliable directional demand;
 4. minimum-service policy and donor-period protection by route class;
 5. whether `total_only` is enabled in the first production cutover;
 6. canonical fingerprint serialization and hash algorithm approval;
 7. time limits and acceptable optimality gaps by benchmark tier;
-8. policy for returning a no-op copy when B is already suitable or demand is insufficient.
+8. policy details for pre-solve versus solver-proven infeasibility evidence.
 
 Until approved, implementations MUST expose these as limitations/configuration and MUST NOT imply a stronger conclusion.
 
@@ -407,6 +447,7 @@ Until approved, implementations MUST expose these as limitations/configuration a
 
 - [Domain model](DOMAIN_MODEL_V1.md)
 - [Input/output contracts](INPUT_OUTPUT_CONTRACTS_V1.md)
+- [Schedule generation outcome contract](RESULT_ENVELOPE_CONTRACT_V1.md)
 - [Demand resolution](DEMAND_RESOLUTION_CONTRACT_V1.md)
 - [Scenario evaluation](SCENARIO_EVALUATION_CONTRACT_V1.md)
 - [Visualization contract](VISUALIZATION_CONTRACT_V1.md)
