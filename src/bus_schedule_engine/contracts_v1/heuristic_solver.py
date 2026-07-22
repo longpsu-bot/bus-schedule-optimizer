@@ -31,10 +31,7 @@ def _raw_candidate_from_generated(
     adapter_id: str,
 ) -> RawScheduleCandidateV1:
     traces = {trace.c_trip_id: trace for trace in generated.trip_traces}
-    source_b = {
-        trip.trip_id: trip
-        for trip in problem.normalized_inputs.scenario_b.exact_timetable
-    }
+    source_b = {trip.trip_id: trip for trip in problem.normalized_inputs.scenario_b.exact_timetable}
     trips: list[RawCandidateTripV1] = []
     for trip in sorted(
         generated.trips,
@@ -42,24 +39,18 @@ def _raw_candidate_from_generated(
     ):
         trace = traces.get(trip.trip_id)
         source_id = (
-            trace.source_b_trip_id
-            if trace is not None
-            else trip.source_b_trip_id or trip.trip_id
+            trace.source_b_trip_id if trace is not None else trip.source_b_trip_id or trip.trip_id
         )
         source = source_b.get(source_id)
         if source is None:
-            raise ValueError(
-                f"Heuristic candidate trip {trip.trip_id} has unknown source B trip"
-            )
+            raise ValueError(f"Heuristic candidate trip {trip.trip_id} has unknown source B trip")
         direction = contract_direction(trip.direction)
         arrival = trip.resolved_arrival_seconds(
             problem.normalized_inputs.scenario_b.trip_runtime_minutes
         )
         runtime_seconds = arrival - trip.departure_seconds
         if runtime_seconds <= 0 or runtime_seconds % 60:
-            raise ValueError(
-                f"Heuristic candidate trip {trip.trip_id} has invalid runtime"
-            )
+            raise ValueError(f"Heuristic candidate trip {trip.trip_id} has invalid runtime")
         trips.append(
             RawCandidateTripV1(
                 c_trip_id=trip.trip_id,
@@ -71,20 +62,12 @@ def _raw_candidate_from_generated(
                 arrival_time=arrival,
                 runtime_minutes=runtime_seconds // 60,
                 shift_minutes=(trip.departure_seconds - source.departure_time) / 60,
-                previous_b_headway=(
-                    trace.original_previous_headway if trace is not None else None
-                ),
-                previous_c_headway=(
-                    trace.new_previous_headway if trace is not None else None
-                ),
+                previous_b_headway=(trace.original_previous_headway if trace is not None else None),
+                previous_c_headway=(trace.new_previous_headway if trace is not None else None),
                 headway_regime_id=(
-                    trace.headway_regime_id
-                    if trace is not None
-                    else "REGIME_UNSPECIFIED"
+                    trace.headway_regime_id if trace is not None else "REGIME_UNSPECIFIED"
                 ),
-                change_reason=(
-                    trace.change_reason if trace is not None else generated.reason
-                ),
+                change_reason=(trace.change_reason if trace is not None else generated.reason),
             )
         )
     regimes = tuple(
