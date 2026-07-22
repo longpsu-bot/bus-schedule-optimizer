@@ -84,7 +84,22 @@ jobs:
             tests/test_contract_v1_normalization.py
 
       - name: Test
-        run: python -m pytest
+        id: tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m pytest -vv --tb=short 2>&1 | tee pr01-test.log
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr01-test-log
+          path: pr01-test.log
+
+      - name: Fail after log upload
+        if: steps.tests.outcome == 'failure'
+        run: exit 1
 
       - name: Lint
         run: python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
