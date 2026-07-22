@@ -229,16 +229,17 @@ def test_validator_rejects_naive_source_timestamp(make_parameters, make_valid_tr
 def test_optional_contract_fields_are_read_from_parameter_sheet(tmp_path) -> None:
     source = create_input_template(tmp_path / "contract-input.xlsx")
     workbook = load_workbook(source)
-    sheet = workbook["THONG_SO_B"]
     additions = {
         "available_fleet_limit": 8,
         "approved_active_fleet": 7,
         "operating_day_type": "saturday",
     }
-    next_row = sheet.max_row + 1
-    for offset, (key, value) in enumerate(additions.items()):
-        sheet.cell(next_row + offset, 1).value = key
-        sheet.cell(next_row + offset, 2).value = value
+    for sheet_name in ("THONG_SO_A", "THONG_SO_B"):
+        sheet = workbook[sheet_name]
+        next_row = sheet.max_row + 1
+        for offset, (key, value) in enumerate(additions.items()):
+            sheet.cell(next_row + offset, 1).value = key
+            sheet.cell(next_row + offset, 2).value = value
     workbook.save(source)
     workbook.close()
 
@@ -247,6 +248,20 @@ def test_optional_contract_fields_are_read_from_parameter_sheet(tmp_path) -> Non
     assert imported.parameters_b.available_fleet_limit == 8
     assert imported.parameters_b.approved_active_fleet == 7
     assert imported.parameters_b.operating_day_type == "saturday"
+
+    bundle = normalize_imported_workbook_v1(
+        imported,
+        NormalizationOptions(
+            source_id="workbook-contract-metadata",
+            imported_at=datetime(2026, 7, 22, 8, 0, tzinfo=UTC),
+        ),
+    )
+    assert bundle.scenario_a is not None
+    assert bundle.scenario_a.available_fleet_limit == 8
+    assert bundle.scenario_a.operating_day_type == OperatingDayType.SATURDAY
+    assert bundle.scenario_b.available_fleet_limit == 8
+    assert bundle.scenario_b.approved_active_fleet == 7
+    assert bundle.scenario_b.operating_day_type == OperatingDayType.SATURDAY
 
 
 def test_normalization_does_not_mutate_legacy_trips(make_parameters, make_valid_trips) -> None:

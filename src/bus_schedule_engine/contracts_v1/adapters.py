@@ -42,7 +42,7 @@ class NormalizationError(ValueError):
 class NormalizationOptions:
     source_id: str
     imported_at: datetime
-    operating_day_type_b: OperatingDayType
+    operating_day_type_b: OperatingDayType | None = None
     available_fleet_limit_b: int | None = None
     approved_active_fleet_b: int | None = None
     operating_day_type_a: OperatingDayType | None = None
