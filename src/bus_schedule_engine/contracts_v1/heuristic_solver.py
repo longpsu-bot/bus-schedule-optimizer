@@ -5,7 +5,7 @@ import time
 from bus_schedule_engine.c_generator import generate_scenario_c
 from bus_schedule_engine.models import GeneratedScenario, ScenarioCStatus
 
-from .serialization import canonical_sha256
+from .solver_fingerprints import candidate_fingerprint
 from .solver_models import (
     NativeSolverStatus,
     RawCandidateTripV1,
@@ -84,28 +84,16 @@ def _raw_candidate_from_generated(
         )
         for regime in generated.headway_regimes
     )
-    candidate_payload = {
-        "source_b_fingerprint": problem.normalized_inputs.scenario_b_fingerprint,
-        "solver_adapter": adapter_id,
-        "trips": [
-            {
-                "c_trip_id": item.c_trip_id,
-                "source_b_trip_id": item.source_b_trip_id,
-                "direction": item.direction.value,
-                "departure_terminal": item.departure_terminal.value,
-                "b_departure_time": item.b_departure_time,
-                "c_departure_time": item.c_departure_time,
-                "arrival_time": item.arrival_time,
-                "runtime_minutes": item.runtime_minutes,
-            }
-            for item in trips
-        ],
-    }
     return RawScheduleCandidateV1(
         solver_status=NativeSolverStatus.FEASIBLE,
         solver_adapter=adapter_id,
         solve_duration_seconds=solve_duration_seconds,
-        candidate_fingerprint=canonical_sha256(candidate_payload),
+        candidate_fingerprint=candidate_fingerprint(
+            source_b_fingerprint=problem.normalized_inputs.scenario_b_fingerprint,
+            solver_adapter=adapter_id,
+            exact_timetable=tuple(trips),
+            headway_regimes=regimes,
+        ),
         exact_timetable=tuple(trips),
         headway_regimes=regimes,
         explanation=generated.reason,
