@@ -1,0 +1,20 @@
+Metadata-Version: 2.4
+Name: bus-schedule-engine
+Version: 0.1.0
+Summary: Bus Schedule Engine MVP deterministic, rule-based
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: openpyxl<4,>=3.1
+Requires-Dist: pandas<3,>=2.2
+Requires-Dist: plotly<7,>=6.0
+Requires-Dist: streamlit<2,>=1.57
+Provides-Extra: dev
+Requires-Dist: kaleido==0.2.1; extra == "dev"
+Requires-Dist: pytest<10,>=8.0; extra == "dev"
+Requires-Dist: ruff<1,>=0.9; extra == "dev"
+
+# Bus Schedule Engine MVP
+
+Ứng dụng local, deterministic và rule-based để kiểm tra, đánh giá và đề xuất biểu đồ giờ xe buýt.
+
+Hướng dẫn đầy đủ sẽ được hoàn thiện cùng bộ artifact mẫu sau khi pipeline kiểm thử chạy qua.

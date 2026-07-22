@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bus-schedule.example/contracts/v1/demand_analysis_block.schema.json",
+  "title": "DemandAnalysisBlock",
+  "description": "Authoritative variable-duration demand-analysis interval with source lineage.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version", "block_id", "start_time", "end_time", "duration_minutes", "direction",
+    "observed_passengers", "demand_rate_per_hour", "source_interval_ids", "source_resolution_type",
+    "source_resolution_minutes", "block_mode", "aggregation_method", "confidence", "interpolation_status",
+    "observation_days", "sample_count", "block_boundary_reason"
+  ],
+  "properties": {
+    "contract_version": {"const": "1.0.0"},
+    "block_id": {"type": "string", "minLength": 1},
+    "start_time": {"$ref": "#/$defs/time"},
+    "end_time": {"$ref": "#/$defs/time"},
+    "duration_minutes": {"type": "integer", "minimum": 1},
+    "direction": {"enum": ["outbound", "inbound", "combined"]},
+    "observed_passengers": {"type": "number", "minimum": 0},
+    "demand_rate_per_hour": {"type": "number", "minimum": 0},
+    "source_interval_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "source_resolution_type": {"enum": ["regular_interval", "timestamp", "trip", "irregular_interval", "daily_total"]},
+    "source_resolution_minutes": {"type": ["integer", "null"], "minimum": 1},
+    "block_mode": {"enum": ["native", "adaptive", "manual"]},
+    "aggregation_method": {"enum": ["none", "sum", "weighted_sum", "approved_custom"]},
+    "confidence": {"enum": ["high", "medium", "low", "unknown"]},
+    "interpolation_status": {"enum": ["none", "aggregated", "interpolated_supported", "unsupported"]},
+    "observation_days": {"type": "integer", "minimum": 1},
+    "sample_count": {"type": "integer", "minimum": 0},
+    "block_boundary_reason": {"enum": ["source_boundary", "sustained_change", "manual", "operating_window", "critical_condition_protection", "direction_change_protection"]}
+  },
+  "$defs": {"time": {"type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"}}
+}

@@ -1,0 +1,14 @@
+{
+  "contract_version": "1.0.0",
+  "demand_dataset_id": "DEMAND-ANON-01",
+  "scenario_observed_under": "A",
+  "observation_period_start": "2026-06-01",
+  "observation_period_end": "2026-06-05",
+  "observation_days": 5,
+  "demand_response_mode": "static",
+  "observations": [
+    {"observation_id": "OBS-O-0600", "direction": "outbound", "interval_start": "06:00", "interval_end": "07:00", "passenger_count": 350, "source_resolution_type": "regular_interval", "source_resolution_minutes": 60, "source_type": "ticketing", "volume_classification": "total_observation_period", "demand_confidence": "high", "sample_count": 5, "notes": "Normalizes to 70 passengers per operating day."},
+    {"observation_id": "OBS-I-0600", "direction": "inbound", "interval_start": "06:00", "interval_end": "07:00", "passenger_count": 200, "source_resolution_type": "regular_interval", "source_resolution_minutes": 60, "source_type": "ticketing", "volume_classification": "total_observation_period", "demand_confidence": "high", "sample_count": 5, "notes": "Normalizes to 40 passengers per operating day."}
+  ],
+  "source_metadata": {"source_type": "xlsx", "source_id": "anon-demand-june.xlsx", "imported_at": "2026-07-22T08:10:00+07:00", "notes": "Fictional values; not a forecast."}
+}

@@ -1,0 +1,70 @@
+{
+  "contract_version": "1.0.0",
+  "solver_status": "FEASIBLE",
+  "solver_adapter": "ortools_cp_sat_target_example",
+  "solve_duration_seconds": 0.42,
+  "solution_fingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "source_b_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "operating_parameter_locks": [
+    {"field": "total_daily_trips", "value": 4, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null},
+    {"field": "trips_by_direction", "value": {"outbound": 2, "inbound": 2}, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null},
+    {"field": "approved_active_fleet", "value": 2, "locked": true, "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "authorized_exception": null}
+  ],
+  "c_block_supply_plan": [
+    {
+      "contract_version": "1.0.0",
+      "scenario": "C",
+      "direction": "outbound",
+      "block_id": "BLK-O-0600",
+      "block_start": "06:00",
+      "block_end": "07:00",
+      "duration_minutes": 60,
+      "passenger_demand": 70,
+      "demand_rate_per_hour": 70,
+      "vehicle_capacity": 60,
+      "a_trip_count": 1,
+      "b_trip_count": 1,
+      "c_planned_trip_count": 1,
+      "c_actual_trip_count": 1,
+      "trip_rate_per_hour": 1,
+      "required_trips_85": 2,
+      "required_trips_90": 2,
+      "required_trip_rate_85": 2,
+      "required_trip_rate_90": 2,
+      "nominal_capacity": 60,
+      "capacity_at_85": 51,
+      "capacity_at_90": 54,
+      "load_factor": 1.166667,
+      "shortage": 16,
+      "status": "CRITICAL_ABOVE_90",
+      "allocation_reason": "Residual overload remains because all trips and endpoints are locked in this tiny example.",
+      "confidence": "high"
+    }
+  ],
+  "c_headway_regimes": [
+    {"regime_id": "REG-O-01", "direction": "outbound", "start_time": "06:00", "end_time": "07:00", "covered_analysis_blocks": ["BLK-O-0600"], "trip_count": 2, "target_service_rate": 2, "target_headway": 60, "actual_headway_sequence": [60], "transition_headways": [], "exceptional_headways": [], "boundary_reason": "FIRST_SERVICE_CONSTRAINT", "regularity_status": "REGULAR"},
+    {"regime_id": "REG-I-01", "direction": "inbound", "start_time": "06:15", "end_time": "07:15", "covered_analysis_blocks": ["BLK-I-0600"], "trip_count": 2, "target_service_rate": 2, "target_headway": 60, "actual_headway_sequence": [60], "transition_headways": [], "exceptional_headways": [], "boundary_reason": "FIRST_SERVICE_CONSTRAINT", "regularity_status": "REGULAR"}
+  ],
+  "c_exact_timetable": [
+    {"c_trip_id": "C-O-001", "source_b_trip_id": "B-O-001", "direction": "outbound", "departure_terminal": "terminal_1", "b_departure_time": "06:00", "c_departure_time": "06:00", "shift_minutes": 0, "previous_b_headway": null, "previous_c_headway": null, "headway_regime_id": "REG-O-01", "change_reason": "Locked first departure retained.", "vehicle_assignment": "BUS-01"},
+    {"c_trip_id": "C-I-001", "source_b_trip_id": "B-I-001", "direction": "inbound", "departure_terminal": "terminal_2", "b_departure_time": "06:15", "c_departure_time": "06:15", "shift_minutes": 0, "previous_b_headway": null, "previous_c_headway": null, "headway_regime_id": "REG-I-01", "change_reason": "Locked first departure retained.", "vehicle_assignment": "BUS-02"},
+    {"c_trip_id": "C-O-002", "source_b_trip_id": "B-O-002", "direction": "outbound", "departure_terminal": "terminal_1", "b_departure_time": "07:00", "c_departure_time": "07:00", "shift_minutes": 0, "previous_b_headway": 60, "previous_c_headway": 60, "headway_regime_id": "REG-O-01", "change_reason": "Locked final departure retained.", "vehicle_assignment": "BUS-02"},
+    {"c_trip_id": "C-I-002", "source_b_trip_id": "B-I-002", "direction": "inbound", "departure_terminal": "terminal_2", "b_departure_time": "07:15", "c_departure_time": "07:15", "shift_minutes": 0, "previous_b_headway": 60, "previous_c_headway": 60, "headway_regime_id": "REG-I-01", "change_reason": "Locked final departure retained.", "vehicle_assignment": "BUS-01"}
+  ],
+  "fleet_assignment": [
+    {"vehicle_id": "BUS-01", "c_trip_id": "C-O-001", "departure_terminal": "terminal_1", "arrival_terminal": "terminal_2", "departure_time": "06:00", "arrival_time": "06:30", "ready_time": "06:35"},
+    {"vehicle_id": "BUS-02", "c_trip_id": "C-I-001", "departure_terminal": "terminal_2", "arrival_terminal": "terminal_1", "departure_time": "06:15", "arrival_time": "06:45", "ready_time": "06:50"},
+    {"vehicle_id": "BUS-02", "c_trip_id": "C-O-002", "departure_terminal": "terminal_1", "arrival_terminal": "terminal_2", "departure_time": "07:00", "arrival_time": "07:30", "ready_time": "07:35"},
+    {"vehicle_id": "BUS-01", "c_trip_id": "C-I-002", "departure_terminal": "terminal_2", "arrival_terminal": "terminal_1", "departure_time": "07:15", "arrival_time": "07:45", "ready_time": "07:50"}
+  ],
+  "minimum_required_fleet": 2,
+  "approved_active_fleet": 2,
+  "block_evaluation": [{"block_id": "BLK-O-0600", "direction": "outbound", "load_factor": 1.166667, "shortage": 16, "status": "CRITICAL_ABOVE_90"}],
+  "residual_overload": 16,
+  "shifted_trip_count": 0,
+  "total_shift_minutes": 0,
+  "maximum_shift_minutes": 0,
+  "status": "SOLUTION_ACCEPTED",
+  "explanations": ["A feasible C candidate was independently validated; the solver status is feasible, not proven optimal."],
+  "limitations": ["The tiny example cannot remove the critical block without violating its locked trip and endpoint values."]
+}

@@ -1,0 +1,19 @@
+{
+  "contract_version": "1.0.0",
+  "source_resolution_type": "regular_interval",
+  "source_resolution_minutes": 60,
+  "source_is_timestamp_level": false,
+  "source_is_trip_level": false,
+  "source_is_irregular": false,
+  "block_mode": "native",
+  "manual_boundaries": [],
+  "minimum_block_duration": 60,
+  "maximum_block_duration": 120,
+  "minimum_sustained_intervals": 2,
+  "material_change_ratio": 0.2,
+  "smoothing_method": "none",
+  "interpolation_method": "none",
+  "confidence_level": "high",
+  "observation_days": 5,
+  "sample_count": 10
+}

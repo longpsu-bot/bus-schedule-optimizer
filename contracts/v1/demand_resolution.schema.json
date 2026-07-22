@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bus-schedule.example/contracts/v1/demand_resolution.schema.json",
+  "title": "DemandResolutionContract",
+  "description": "Source-granularity evidence and policy for constructing demand-analysis blocks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version", "source_resolution_type", "source_resolution_minutes", "source_is_timestamp_level",
+    "source_is_trip_level", "source_is_irregular", "block_mode", "manual_boundaries",
+    "minimum_block_duration", "maximum_block_duration", "minimum_sustained_intervals",
+    "material_change_ratio", "smoothing_method", "interpolation_method", "confidence_level",
+    "observation_days", "sample_count"
+  ],
+  "properties": {
+    "contract_version": {"const": "1.0.0"},
+    "source_resolution_type": {"enum": ["regular_interval", "timestamp", "trip", "irregular_interval", "daily_total"]},
+    "source_resolution_minutes": {"type": ["integer", "null"], "minimum": 1},
+    "source_is_timestamp_level": {"type": "boolean"},
+    "source_is_trip_level": {"type": "boolean"},
+    "source_is_irregular": {"type": "boolean"},
+    "block_mode": {"enum": ["native", "adaptive", "manual"]},
+    "manual_boundaries": {
+      "type": "array", "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"}
+    },
+    "minimum_block_duration": {"type": "integer", "minimum": 1},
+    "maximum_block_duration": {"type": "integer", "minimum": 1},
+    "minimum_sustained_intervals": {"type": "integer", "minimum": 1},
+    "material_change_ratio": {"type": "number", "minimum": 0},
+    "smoothing_method": {"enum": ["none", "moving_average", "median", "approved_custom"]},
+    "interpolation_method": {"enum": ["none", "step", "proportional", "approved_custom"]},
+    "confidence_level": {"enum": ["high", "medium", "low", "unknown"]},
+    "observation_days": {"type": "integer", "minimum": 1},
+    "sample_count": {"type": "integer", "minimum": 0}
+  }
+}
