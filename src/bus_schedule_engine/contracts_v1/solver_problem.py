@@ -107,8 +107,7 @@ def _validate_legacy_parameters(
     ]
     if mismatches:
         raise ScheduleProblemError(
-            "Legacy parameters do not reconcile with Scenario B: "
-            + ", ".join(mismatches)
+            "Legacy parameters do not reconcile with Scenario B: " + ", ".join(mismatches)
         )
     if not (
         legacy.effective_layover_minutes
@@ -124,9 +123,7 @@ def _validate_legacy_timetable(
     normalized: NormalizedInputBundleV1,
     legacy_trips_b: tuple[Trip, ...],
 ) -> None:
-    normalized_by_id = {
-        trip.trip_id: trip for trip in normalized.scenario_b.exact_timetable
-    }
+    normalized_by_id = {trip.trip_id: trip for trip in normalized.scenario_b.exact_timetable}
     legacy_by_id = {trip.trip_id: trip for trip in legacy_trips_b}
     if len(legacy_by_id) != len(legacy_trips_b):
         raise ScheduleProblemError("Legacy Scenario B contains duplicate trip IDs")
@@ -138,9 +135,7 @@ def _validate_legacy_timetable(
         legacy_trip = legacy_by_id[trip_id]
         expected_direction = contract_direction(legacy_trip.direction)
         expected_terminal = departure_terminal(expected_direction)
-        arrival = legacy_trip.resolved_arrival_seconds(
-            normalized.scenario_b.trip_runtime_minutes
-        )
+        arrival = legacy_trip.resolved_arrival_seconds(normalized.scenario_b.trip_runtime_minutes)
         if (
             expected_direction != normalized_trip.direction
             or expected_terminal != normalized_trip.departure_terminal
@@ -164,9 +159,7 @@ def _validate_legacy_demand(
             )
         return
     if len(observed.observations) != len(legacy_demand):
-        raise ScheduleProblemError(
-            "Legacy and normalized demand row counts do not reconcile"
-        )
+        raise ScheduleProblemError("Legacy and normalized demand row counts do not reconcile")
     normalized_rows = sorted(
         (
             observation.direction.value,
@@ -188,9 +181,7 @@ def _validate_legacy_demand(
         for record in legacy_demand
     )
     if normalized_rows != legacy_rows:
-        raise ScheduleProblemError(
-            "Legacy and normalized demand observations do not reconcile"
-        )
+        raise ScheduleProblemError("Legacy and normalized demand observations do not reconcile")
 
 
 def build_schedule_problem_v1(
@@ -212,9 +203,7 @@ def build_schedule_problem_v1(
     payload = {
         "contract_version": normalized_inputs.scenario_b.contract_version,
         "source_b_fingerprint": normalized_inputs.scenario_b_fingerprint,
-        "observed_demand_fingerprint": (
-            normalized_inputs.observed_demand_fingerprint
-        ),
+        "observed_demand_fingerprint": (normalized_inputs.observed_demand_fingerprint),
         "b_disposition": b_evaluation.evaluation.disposition.value,
         "evaluation_policy": jsonable(asdict(effective_policy)),
         "heuristic_config": jsonable(asdict(heuristic_config)),
