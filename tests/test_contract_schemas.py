@@ -144,9 +144,7 @@ def test_available_fleet_limit_is_required_and_positive(schema_name: str) -> Non
         ("scenario_b_input.schema.json", "scenario_b_input.example.json"),
     ],
 )
-def test_approved_active_fleet_may_be_omitted_or_null(
-    schema_name: str, example_name: str
-) -> None:
+def test_approved_active_fleet_may_be_omitted_or_null(schema_name: str, example_name: str) -> None:
     scenario = _load(EXAMPLE_DIR / example_name)
     scenario.pop("approved_active_fleet", None)
     assert _schema_errors(scenario, schema_name) == []
@@ -185,9 +183,7 @@ def test_bounded_positioning_validates_shape_and_domain_bounds() -> None:
 
     problem["bounded_initial_fleet"]["terminal_1"] = {"minimum": 2, "maximum": 1}
     assert _schema_errors(problem, "schedule_problem.schema.json") == []
-    assert _problem_domain_errors(problem) == [
-        "terminal_1 minimum initial fleet exceeds maximum"
-    ]
+    assert _problem_domain_errors(problem) == ["terminal_1 minimum initial fleet exceeds maximum"]
 
 
 def test_exact_scheduled_fleet_requires_approved_value() -> None:
