@@ -1,3 +1,5 @@
+"""Authoritative public guards for PR-02 demand resolution and B evaluation."""
+
 from __future__ import annotations
 
 from dataclasses import replace
