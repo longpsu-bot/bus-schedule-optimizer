@@ -161,17 +161,23 @@ def validate_scenario_input(scenario: ScenarioInputV1) -> ContractValidationResu
                 "available fleet limit must be positive",
             )
         )
-    if (
-        scenario.approved_active_fleet is not None
-        and scenario.approved_active_fleet > scenario.available_fleet_limit
-    ):
-        issues.append(
-            _issue(
-                "APPROVED_FLEET_EXCEEDS_AVAILABLE_LIMIT",
-                f"{prefix}.approved_active_fleet",
-                "approved_active_fleet must not exceed available_fleet_limit",
+    if scenario.approved_active_fleet is not None:
+        if scenario.approved_active_fleet <= 0:
+            issues.append(
+                _issue(
+                    "INVALID_APPROVED_ACTIVE_FLEET",
+                    f"{prefix}.approved_active_fleet",
+                    "approved_active_fleet must be positive when provided",
+                )
             )
-        )
+        elif scenario.approved_active_fleet > scenario.available_fleet_limit:
+            issues.append(
+                _issue(
+                    "APPROVED_FLEET_EXCEEDS_AVAILABLE_LIMIT",
+                    f"{prefix}.approved_active_fleet",
+                    "approved_active_fleet must not exceed available_fleet_limit",
+                )
+            )
 
     first_times = (
         scenario.first_departures.terminal_1,

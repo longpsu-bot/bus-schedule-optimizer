@@ -214,6 +214,10 @@ def test_validator_separates_approved_and_available_fleet(
 
     assert "APPROVED_FLEET_EXCEEDS_AVAILABLE_LIMIT" in result.error_codes
 
+    zero_fleet = replace(bundle.scenario_b, approved_active_fleet=0)
+    zero_result = validate_scenario_input(zero_fleet)
+    assert "INVALID_APPROVED_ACTIVE_FLEET" in zero_result.error_codes
+
 
 def test_validator_rejects_naive_source_timestamp(make_parameters, make_valid_trips) -> None:
     parameters = make_parameters()
