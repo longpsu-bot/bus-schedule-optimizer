@@ -1,0 +1,100 @@
+name: Apply and validate PR-01
+
+on:
+  push:
+    branches:
+      - feat/normalized-domain-inputs-v1
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/normalized-domain-inputs-v1
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Apply additive legacy compatibility fields
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          models_path = Path('src/bus_schedule_engine/models.py')
+          models = models_path.read_text(encoding='utf-8')
+          old = '    allowed_trip_runtime_minutes: tuple[int, ...] = ()\n'
+          new = '''    allowed_trip_runtime_minutes: tuple[int, ...] = ()
+              available_fleet_limit: int | None = None
+              approved_active_fleet: int | None = None
+              operating_day_type: str | None = None
+          '''.replace('              ', '    ')
+          if old not in models:
+              raise SystemExit('ScenarioParameters insertion point not found')
+          models_path.write_text(models.replace(old, new, 1), encoding='utf-8')
+
+          importer_path = Path('src/bus_schedule_engine/importer.py')
+          importer = importer_path.read_text(encoding='utf-8')
+          old = '    legacy_runtime_raw = values.get("trip_runtime_minutes")\n'
+          new = '''    legacy_runtime_raw = values.get("trip_runtime_minutes")
+              available_fleet_raw = values.get("available_fleet_limit")
+              approved_active_fleet_raw = values.get("approved_active_fleet")
+              operating_day_type_raw = values.get("operating_day_type")
+          '''.replace('              ', '    ')
+          if old not in importer:
+              raise SystemExit('Importer raw-field insertion point not found')
+          importer = importer.replace(old, new, 1)
+          old = '        allowed_trip_runtime_minutes=runtime_options,\n    )\n'
+          new = '''        allowed_trip_runtime_minutes=runtime_options,
+                  available_fleet_limit=(
+                      None if available_fleet_raw is None else int(available_fleet_raw)
+                  ),
+                  approved_active_fleet=(
+                      None if approved_active_fleet_raw is None else int(approved_active_fleet_raw)
+                  ),
+                  operating_day_type=(
+                      None if operating_day_type_raw is None else str(operating_day_type_raw).strip()
+                  ),
+              )
+          '''.replace('              ', '    ')
+          if old not in importer:
+              raise SystemExit('Importer constructor insertion point not found')
+          importer_path.write_text(importer.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Install
+        run: python -m pip install -e '.[dev]'
+
+      - name: Format changed Python
+        run: |
+          python -m ruff format \
+            src/bus_schedule_engine/models.py \
+            src/bus_schedule_engine/importer.py \
+            src/bus_schedule_engine/contracts_v1 \
+            tests/test_contract_v1_normalization.py
+
+      - name: Test
+        run: python -m pytest
+
+      - name: Lint
+        run: python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
+
+      - name: Remove temporary workflow and commit
+        run: |
+          rm .github/workflows/pr01-apply.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/bus_schedule_engine/models.py \
+            src/bus_schedule_engine/importer.py \
+            src/bus_schedule_engine/contracts_v1 \
+            tests/test_contract_v1_normalization.py \
+            .github/workflows/pr01-apply.yml
+          git commit -m 'Implement normalized Contract V1 input boundary'
+          git push origin HEAD:feat/normalized-domain-inputs-v1
