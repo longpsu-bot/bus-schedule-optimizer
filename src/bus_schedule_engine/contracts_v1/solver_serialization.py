@@ -23,9 +23,7 @@ def _lock_to_dict(lock: OperatingParameterLockV1) -> dict[str, object]:
     }
 
 
-def _regime_to_dict(
-    regime: SolutionHeadwayRegimeV1,
-) -> dict[str, object]:
+def _regime_to_dict(regime: SolutionHeadwayRegimeV1) -> dict[str, object]:
     return {
         "regime_id": regime.regime_id,
         "direction": regime.direction.value,
@@ -60,9 +58,7 @@ def _trip_to_dict(trip: SolutionTripV1) -> dict[str, object]:
     }
 
 
-def _stock_event_to_dict(
-    event: StockProfileEventV1,
-) -> dict[str, object]:
+def _stock_event_to_dict(event: StockProfileEventV1) -> dict[str, object]:
     return {
         "event_time": format_hhmm(event.event_time),
         "event_type": event.event_type,
@@ -157,6 +153,7 @@ def schedule_solution_to_contract_dict(
 def schedule_outcome_to_contract_dict(
     outcome: ScheduleGenerationOutcomeV1,
 ) -> dict[str, object]:
+    diagnostic = outcome.diagnostic_candidate
     return {
         "contract_version": outcome.contract_version,
         "result_status": outcome.result_status.value,
@@ -175,15 +172,11 @@ def schedule_outcome_to_contract_dict(
         ),
         "diagnostic_candidate": (
             {
-                "candidate_fingerprint": (
-                    outcome.diagnostic_candidate.candidate_fingerprint
-                ),
-                "rejection_codes": list(
-                    outcome.diagnostic_candidate.rejection_codes
-                ),
-                "summary": outcome.diagnostic_candidate.summary,
+                "candidate_fingerprint": diagnostic.candidate_fingerprint,
+                "rejection_codes": list(diagnostic.rejection_codes),
+                "summary": diagnostic.summary,
             }
-            if outcome.diagnostic_candidate is not None
+            if diagnostic is not None
             else None
         ),
         "explanations": list(outcome.explanations),
