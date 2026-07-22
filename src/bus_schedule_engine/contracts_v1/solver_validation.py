@@ -104,10 +104,7 @@ def _block_trip_count(
 ) -> int:
     return sum(
         block.start_time <= trip.c_departure_time < block.end_time
-        and (
-            block.direction == ContractDirection.COMBINED
-            or trip.direction == block.direction
-        )
+        and (block.direction == ContractDirection.COMBINED or trip.direction == block.direction)
         for trip in candidate.exact_timetable
     )
 
@@ -181,14 +178,10 @@ def _candidate_block_supply(
                 demand_rate_per_hour=block.demand_rate_per_hour,
                 vehicle_capacity=capacity,
                 a_trip_count=(
-                    a_by_id[block.block_id].a_trip_count
-                    if block.block_id in a_by_id
-                    else None
+                    a_by_id[block.block_id].a_trip_count if block.block_id in a_by_id else None
                 ),
                 b_trip_count=(
-                    b_by_id[block.block_id].b_trip_count
-                    if block.block_id in b_by_id
-                    else None
+                    b_by_id[block.block_id].b_trip_count if block.block_id in b_by_id else None
                 ),
                 c_planned_trip_count=count,
                 c_actual_trip_count=count,
@@ -231,8 +224,7 @@ def _solution_regimes(
             if block.start_time < regime.end_time
             and block.end_time > regime.start_time
             and (
-                block.direction == ContractDirection.COMBINED
-                or block.direction == regime.direction
+                block.direction == ContractDirection.COMBINED or block.direction == regime.direction
             )
         ) or ("OUTSIDE_DEMAND_COVERAGE",)
         actual = tuple(max(1, int(round(item))) for item in regime.actual_headway_sequence)
@@ -257,9 +249,7 @@ def _solution_regimes(
                 target_headway=regime.target_headway,
                 actual_headway_sequence=actual,
                 transition_headways=(),
-                exceptional_headways=(
-                    actual if regularity_status == "EXCEPTIONAL" else ()
-                ),
+                exceptional_headways=(actual if regularity_status == "EXCEPTIONAL" else ()),
                 boundary_reason=regime.boundary_reason,
                 regularity_status=regularity_status,
             )
@@ -271,15 +261,11 @@ def _stock_events(events) -> tuple[StockProfileEventV1, ...]:
     return tuple(
         StockProfileEventV1(
             event_time=event.event_time,
-            event_type=(
-                "VEHICLE_READY" if event.event_type == "READY" else "DEPARTURE"
-            ),
+            event_type=("VEHICLE_READY" if event.event_type == "READY" else "DEPARTURE"),
             trip_id=event.trip_id,
             stock_before=event.stock_before,
             stock_after=event.stock_after,
-            arriving_or_ready_vehicle_count=(
-                1 if event.event_type == "READY" else 0
-            ),
+            arriving_or_ready_vehicle_count=(1 if event.event_type == "READY" else 0),
             departure_count=(1 if event.event_type == "DEPARTURE" else 0),
         )
         for event in events
@@ -339,8 +325,7 @@ def _source_lock_errors(
     candidate: RawScheduleCandidateV1,
 ) -> list[str]:
     source_by_id = {
-        trip.trip_id: trip
-        for trip in problem.normalized_inputs.scenario_b.exact_timetable
+        trip.trip_id: trip for trip in problem.normalized_inputs.scenario_b.exact_timetable
     }
     errors: list[str] = []
     for trip in candidate.exact_timetable:
@@ -395,10 +380,7 @@ def validate_and_build_solution_v1(
     regime_ids = {regime.regime_id for regime in candidate.headway_regimes}
     if not regime_ids:
         rejection_codes.append("MISSING_HEADWAY_REGIMES")
-    if any(
-        trip.headway_regime_id not in regime_ids
-        for trip in candidate.exact_timetable
-    ):
+    if any(trip.headway_regime_id not in regime_ids for trip in candidate.exact_timetable):
         rejection_codes.append("UNKNOWN_HEADWAY_REGIME_REFERENCE")
 
     if rejection_codes:
@@ -411,9 +393,7 @@ def validate_and_build_solution_v1(
             solution=None,
         )
 
-    assignment_by_trip = {
-        item.trip_id: item for item in assignments.assignments
-    }
+    assignment_by_trip = {item.trip_id: item for item in assignments.assignments}
     solution_trips = tuple(
         SolutionTripV1(
             c_trip_id=trip.c_trip_id,
@@ -478,15 +458,9 @@ def validate_and_build_solution_v1(
         available_fleet_limit=b.available_fleet_limit,
         approved_active_fleet=b.approved_active_fleet,
         minimum_required_fleet=fleet.minimum_required_fleet,
-        recommended_initial_fleet_terminal_1=(
-            fleet.recommended_initial_fleet_terminal_1
-        ),
-        recommended_initial_fleet_terminal_2=(
-            fleet.recommended_initial_fleet_terminal_2
-        ),
-        initial_fleet_positioning_mode=(
-            InitialFleetPositioningMode.SOLVER_DETERMINED
-        ),
+        recommended_initial_fleet_terminal_1=(fleet.recommended_initial_fleet_terminal_1),
+        recommended_initial_fleet_terminal_2=(fleet.recommended_initial_fleet_terminal_2),
+        initial_fleet_positioning_mode=(InitialFleetPositioningMode.SOLVER_DETERMINED),
         fleet_margin=fleet.fleet_margin,
         maximum_simultaneous_vehicle_use=fleet.minimum_required_fleet,
         vehicle_stock_profile_terminal_1=_stock_events(fleet.terminal_1_events),
@@ -508,9 +482,7 @@ def validate_and_build_solution_v1(
     )
     solution = replace(
         provisional,
-        solution_fingerprint=canonical_sha256(
-            _solution_fingerprint_payload(provisional)
-        ),
+        solution_fingerprint=canonical_sha256(_solution_fingerprint_payload(provisional)),
     )
     return CandidateValidationResultV1(
         status=CandidateValidationStatus.ACCEPTED,
