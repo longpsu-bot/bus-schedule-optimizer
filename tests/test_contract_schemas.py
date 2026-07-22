@@ -81,6 +81,23 @@ def _problem_domain_errors(problem: dict[str, Any]) -> list[str]:
     return errors
 
 
+def _accepted_outcome() -> dict[str, Any]:
+    outcome = _load(EXAMPLE_DIR / "schedule_generation_outcome.example.json")
+    outcome.update(
+        {
+            "result_status": "SOLUTION_ACCEPTED",
+            "execution_status": "COMPLETED",
+            "solver_status": "FEASIBLE",
+            "solver_adapter": "ortools_cp_sat_target_example",
+            "solve_duration_seconds": 0.42,
+            "solution": _load(EXAMPLE_DIR / "schedule_solution.example.json"),
+            "diagnostic_candidate": None,
+            "explanations": ["An accepted candidate passed independent domain validation."],
+        }
+    )
+    return outcome
+
+
 @pytest.mark.parametrize(
     ("schema_name", "example_name"),
     [
@@ -96,6 +113,10 @@ def _problem_domain_errors(problem: dict[str, Any]) -> list[str]:
         ),
         ("schedule_problem.schema.json", "schedule_problem.example.json"),
         ("schedule_solution.schema.json", "schedule_solution.example.json"),
+        (
+            "schedule_generation_outcome.schema.json",
+            "schedule_generation_outcome.example.json",
+        ),
     ],
 )
 def test_all_contract_examples_validate(schema_name: str, example_name: str) -> None:
@@ -123,7 +144,9 @@ def test_available_fleet_limit_is_required_and_positive(schema_name: str) -> Non
         ("scenario_b_input.schema.json", "scenario_b_input.example.json"),
     ],
 )
-def test_approved_active_fleet_may_be_omitted_or_null(schema_name: str, example_name: str) -> None:
+def test_approved_active_fleet_may_be_omitted_or_null(
+    schema_name: str, example_name: str
+) -> None:
     scenario = _load(EXAMPLE_DIR / example_name)
     scenario.pop("approved_active_fleet", None)
     assert _schema_errors(scenario, schema_name) == []
@@ -162,7 +185,9 @@ def test_bounded_positioning_validates_shape_and_domain_bounds() -> None:
 
     problem["bounded_initial_fleet"]["terminal_1"] = {"minimum": 2, "maximum": 1}
     assert _schema_errors(problem, "schedule_problem.schema.json") == []
-    assert _problem_domain_errors(problem) == ["terminal_1 minimum initial fleet exceeds maximum"]
+    assert _problem_domain_errors(problem) == [
+        "terminal_1 minimum initial fleet exceeds maximum"
+    ]
 
 
 def test_exact_scheduled_fleet_requires_approved_value() -> None:
@@ -188,8 +213,8 @@ def test_solution_exceeding_available_limit_is_domain_invalid() -> None:
     solution = _load(EXAMPLE_DIR / "schedule_solution.example.json")
     solution["minimum_required_fleet"] = solution["available_fleet_limit"] + 1
     assert _schema_errors(solution, "schedule_solution.schema.json") == []
-    assert "minimum_required_fleet exceeds available_fleet_limit" in _solution_domain_errors(
-        solution
+    assert "minimum_required_fleet exceeds available_fleet_limit" in (
+        _solution_domain_errors(solution)
     )
 
 
@@ -230,3 +255,100 @@ def test_demand_block_boundary_does_not_reset_terminal_stock() -> None:
         "READY_AND_DEPARTURE",
     }
     assert _solution_domain_errors(solution) == []
+
+
+def test_schedule_solution_schema_is_accepted_only() -> None:
+    solution = _load(EXAMPLE_DIR / "schedule_solution.example.json")
+    assert _schema_errors(solution, "schedule_solution.schema.json") == []
+
+    invalid_status = deepcopy(solution)
+    invalid_status["status"] = "NO_FEASIBLE_C_WITH_B_PARAMETERS"
+    assert _schema_errors(invalid_status, "schedule_solution.schema.json")
+
+    invalid_solver_status = deepcopy(solution)
+    invalid_solver_status["solver_status"] = "INFEASIBLE"
+    assert _schema_errors(invalid_solver_status, "schedule_solution.schema.json")
+
+
+def test_accepted_outcome_requires_complete_c_and_fleet_artifacts() -> None:
+    outcome = _accepted_outcome()
+    assert _schema_errors(outcome, "schedule_generation_outcome.schema.json") == []
+
+    missing_solution = deepcopy(outcome)
+    missing_solution["solution"] = None
+    assert _schema_errors(missing_solution, "schedule_generation_outcome.schema.json")
+
+    missing_timetable = deepcopy(outcome)
+    missing_timetable["solution"].pop("c_exact_timetable")
+    assert _schema_errors(missing_timetable, "schedule_generation_outcome.schema.json")
+
+    missing_fleet = deepcopy(outcome)
+    missing_fleet["solution"].pop("fleet_assignment")
+    assert _schema_errors(missing_fleet, "schedule_generation_outcome.schema.json")
+
+
+def test_no_feasible_outcome_validates_without_fabricated_c() -> None:
+    outcome = _load(EXAMPLE_DIR / "schedule_generation_outcome.example.json")
+    outcome.update(
+        {
+            "result_status": "NO_FEASIBLE_C_WITH_B_PARAMETERS",
+            "execution_status": "COMPLETED",
+            "solver_status": "INFEASIBLE",
+            "solver_adapter": "ortools_cp_sat_target_example",
+            "solve_duration_seconds": 1.5,
+            "solution": None,
+            "diagnostic_candidate": None,
+            "explanations": ["No feasible C exists under the recorded locked parameters."],
+        }
+    )
+    assert _schema_errors(outcome, "schedule_generation_outcome.schema.json") == []
+
+
+@pytest.mark.parametrize(
+    "result_status",
+    ["C_NOT_GENERATED_INSUFFICIENT_DATA", "C_NOT_REQUIRED_B_SUITABLE"],
+)
+def test_not_run_outcomes_use_engine_not_run_without_native_status(
+    result_status: str,
+) -> None:
+    outcome = _load(EXAMPLE_DIR / "schedule_generation_outcome.example.json")
+    outcome.update(
+        {
+            "result_status": result_status,
+            "execution_status": "NOT_RUN",
+            "solver_status": None,
+            "solver_adapter": None,
+            "solve_duration_seconds": 0,
+            "solution": None,
+            "diagnostic_candidate": None,
+        }
+    )
+    assert _schema_errors(outcome, "schedule_generation_outcome.schema.json") == []
+
+    invalid = deepcopy(outcome)
+    invalid["solver_status"] = "FEASIBLE"
+    assert _schema_errors(invalid, "schedule_generation_outcome.schema.json")
+
+
+def test_rejected_candidate_is_diagnostic_not_authoritative_c() -> None:
+    outcome = _load(EXAMPLE_DIR / "schedule_generation_outcome.example.json")
+    outcome.update(
+        {
+            "result_status": "CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR",
+            "execution_status": "COMPLETED",
+            "solver_status": "FEASIBLE",
+            "solver_adapter": "ortools_cp_sat_target_example",
+            "solve_duration_seconds": 0.8,
+            "solution": None,
+            "diagnostic_candidate": {
+                "candidate_fingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                "rejection_codes": ["NEGATIVE_TERMINAL_STOCK"],
+                "summary": "The raw candidate violated continuous terminal stock feasibility.",
+            },
+        }
+    )
+    assert _schema_errors(outcome, "schedule_generation_outcome.schema.json") == []
+
+    invalid = deepcopy(outcome)
+    invalid["diagnostic_candidate"] = None
+    assert _schema_errors(invalid, "schedule_generation_outcome.schema.json")
