@@ -132,7 +132,22 @@ jobs:
         run: python -m pytest
 
       - name: Lint
-        run: python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
+        id: lint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv 2>&1 | tee pr01-lint.log
+
+      - name: Upload lint log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr01-lint-log
+          path: pr01-lint.log
+
+      - name: Fail after lint upload
+        if: steps.lint.outcome == 'failure'
+        run: exit 1
 
       - name: Remove temporary workflow and commit
         run: |
