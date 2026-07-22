@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bus-schedule.example/contracts/v1/schedule_generation_outcome.schema.json",
+  "title": "ScheduleGenerationOutcomeV1",
+  "description": "Top-level engine outcome for a Scenario C generation decision. A validated ScheduleSolutionV1 exists only when result_status is SOLUTION_ACCEPTED.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "result_status",
+    "execution_status",
+    "solver_status",
+    "solver_adapter",
+    "solve_duration_seconds",
+    "outcome_fingerprint",
+    "source_b_fingerprint",
+    "solution",
+    "diagnostic_candidate",
+    "explanations",
+    "limitations"
+  ],
+  "properties": {
+    "contract_version": {"const": "1.0.0"},
+    "result_status": {
+      "enum": [
+        "SOLUTION_ACCEPTED",
+        "NO_FEASIBLE_C_WITH_B_PARAMETERS",
+        "C_NOT_GENERATED_INSUFFICIENT_DATA",
+        "C_NOT_REQUIRED_B_SUITABLE",
+        "CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR"
+      ]
+    },
+    "execution_status": {
+      "enum": ["NOT_RUN", "COMPLETED"],
+      "description": "Engine-level execution state. NOT_RUN is not a native CP-SAT status."
+    },
+    "solver_status": {
+      "anyOf": [
+        {"enum": ["OPTIMAL", "FEASIBLE", "INFEASIBLE", "MODEL_INVALID", "UNKNOWN"]},
+        {"type": "null"}
+      ]
+    },
+    "solver_adapter": {"type": ["string", "null"], "minLength": 1},
+    "solve_duration_seconds": {"type": "number", "minimum": 0},
+    "outcome_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "source_b_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "solution": {
+      "anyOf": [
+        {"$ref": "schedule_solution.schema.json"},
+        {"type": "null"}
+      ]
+    },
+    "diagnostic_candidate": {
+      "anyOf": [
+        {"$ref": "#/$defs/diagnosticCandidate"},
+        {"type": "null"}
+      ]
+    },
+    "explanations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"result_status": {"const": "SOLUTION_ACCEPTED"}}, "required": ["result_status"]},
+      "then": {
+        "properties": {
+          "execution_status": {"const": "COMPLETED"},
+          "solver_status": {"enum": ["OPTIMAL", "FEASIBLE"]},
+          "solver_adapter": {"type": "string", "minLength": 1},
+          "solution": {"$ref": "schedule_solution.schema.json"},
+          "diagnostic_candidate": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "result_status": {
+            "enum": ["C_NOT_GENERATED_INSUFFICIENT_DATA", "C_NOT_REQUIRED_B_SUITABLE"]
+          }
+        },
+        "required": ["result_status"]
+      },
+      "then": {
+        "properties": {
+          "execution_status": {"const": "NOT_RUN"},
+          "solver_status": {"type": "null"},
+          "solver_adapter": {"type": "null"},
+          "solve_duration_seconds": {"const": 0},
+          "solution": {"type": "null"},
+          "diagnostic_candidate": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"result_status": {"const": "NO_FEASIBLE_C_WITH_B_PARAMETERS"}}, "required": ["result_status"]},
+      "then": {
+        "properties": {
+          "solution": {"type": "null"},
+          "diagnostic_candidate": {"type": "null"}
+        },
+        "anyOf": [
+          {
+            "properties": {
+              "execution_status": {"const": "COMPLETED"},
+              "solver_status": {"const": "INFEASIBLE"},
+              "solver_adapter": {"type": "string", "minLength": 1}
+            }
+          },
+          {
+            "properties": {
+              "execution_status": {"const": "NOT_RUN"},
+              "solver_status": {"type": "null"},
+              "solver_adapter": {"type": "null"},
+              "solve_duration_seconds": {"const": 0}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"result_status": {"const": "CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR"}}, "required": ["result_status"]},
+      "then": {
+        "properties": {
+          "execution_status": {"const": "COMPLETED"},
+          "solver_status": {"enum": ["OPTIMAL", "FEASIBLE"]},
+          "solver_adapter": {"type": "string", "minLength": 1},
+          "solution": {"type": "null"},
+          "diagnostic_candidate": {"$ref": "#/$defs/diagnosticCandidate"}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "diagnosticCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_fingerprint", "rejection_codes", "summary"],
+      "properties": {
+        "candidate_fingerprint": {"$ref": "#/$defs/fingerprint"},
+        "rejection_codes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "summary": {"type": "string", "minLength": 1}
+      },
+      "description": "Non-authoritative diagnostic metadata for a rejected raw candidate. It must not be rendered or exported as Scenario C."
+    }
+  }
+}
