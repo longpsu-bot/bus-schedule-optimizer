@@ -1,0 +1,25 @@
+{
+  "contract_version": "1.0.0",
+  "scenario_id": "B",
+  "route_id": "ROUTE-ANON-01",
+  "route_name": "Tuyến minh họa 01",
+  "route_type": "intra_provincial",
+  "terminal_1_name": "Bến Bắc",
+  "terminal_2_name": "Bến Nam",
+  "trip_runtime_minutes": 30,
+  "turnaround_minutes": {"terminal_1": 5, "terminal_2": 5},
+  "total_daily_trips": 4,
+  "trips_by_direction": {"outbound": 2, "inbound": 2},
+  "first_departures": {"terminal_1": "06:00", "terminal_2": "06:15"},
+  "last_departures": {"terminal_1": "07:00", "terminal_2": "07:15"},
+  "vehicle_capacity": 60,
+  "available_fleet_limit": 3,
+  "operating_day_type": "weekday",
+  "exact_timetable": [
+    {"trip_id": "B-O-001", "direction": "outbound", "departure_terminal": "terminal_1", "departure_time": "06:00", "arrival_time": "06:30", "runtime_minutes": 30, "vehicle_assignment": null},
+    {"trip_id": "B-I-001", "direction": "inbound", "departure_terminal": "terminal_2", "departure_time": "06:15", "arrival_time": "06:45", "runtime_minutes": 30, "vehicle_assignment": null},
+    {"trip_id": "B-O-002", "direction": "outbound", "departure_terminal": "terminal_1", "departure_time": "07:00", "arrival_time": "07:30", "runtime_minutes": 30, "vehicle_assignment": null},
+    {"trip_id": "B-I-002", "direction": "inbound", "departure_terminal": "terminal_2", "departure_time": "07:15", "arrival_time": "07:45", "runtime_minutes": 30, "vehicle_assignment": null}
+  ],
+  "source_metadata": {"source_type": "ui", "source_id": "proposal-anon-01", "imported_at": "2026-07-22T08:05:00+07:00", "notes": "Fictional contract example."}
+}

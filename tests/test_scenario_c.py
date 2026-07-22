@@ -125,6 +125,8 @@ def test_c_is_independent_traceable_and_preserves_all_resource_locks() -> None:
     )
     assert {trip.source_b_trip_id for trip in scenario.trips} == {trip.trip_id for trip in trips_b}
     assert len({trip.source_b_trip_id for trip in scenario.trips}) == len(trips_b)
+    # Current heuristic compatibility: it still echoes B's inferred active-fleet value.
+    # Contract V1 instead defaults to an available upper bound and solver-determined split.
     assert scenario.active_vehicle_count == active_fleet
     assert assign_fleet(scenario.trips, parameters).minimum_vehicles <= active_fleet
     for direction in (Direction.TERMINAL_1_TO_2, Direction.TERMINAL_2_TO_1):

@@ -1,0 +1,18 @@
+{
+  "contract_version": "1.0.0",
+  "result_status": "C_NOT_REQUIRED_B_SUITABLE",
+  "execution_status": "NOT_RUN",
+  "solver_status": null,
+  "solver_adapter": null,
+  "solve_duration_seconds": 0,
+  "outcome_fingerprint": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "source_b_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "solution": null,
+  "diagnostic_candidate": null,
+  "explanations": [
+    "Scenario B is technically feasible and demand-suitable, so Scenario C generation was not required."
+  ],
+  "limitations": [
+    "The static-demand comparison does not forecast ridership response to a future service change."
+  ]
+}

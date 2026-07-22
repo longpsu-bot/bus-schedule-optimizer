@@ -13,8 +13,9 @@ Pipeline chạy theo thứ tự:
 2. `validator.py` chặn hard constraint trước khi chấm điểm.
 3. `demand.py` đánh giá block/chiều/toàn tuyến, load factor và headway.
 4. `c_generator.py` sinh `C — Tái phân bổ ổn định theo nhu cầu` từ bản sao độc lập của B.
-   C giữ tổng chuyến, chuyến theo chiều, chuyến đầu/cuối và số xe hoạt động; các cụm chuyến
-   được tái giãn cách theo một số ít regime có balanced rounding. `generator.py` vẫn điều phối C2.
+   MVP hiện tại giữ tổng chuyến, chuyến theo chiều, chuyến đầu/cuối và khóa một giá trị đội xe suy ra
+   từ B; các cụm chuyến được tái giãn cách theo một số ít regime có balanced rounding. Đây là hành vi
+   hiện tại, không phải quy tắc đội xe đích của Contract V1. `generator.py` vẫn điều phối C2.
 5. `fleet.py` gán xe greedy theo bến và thời điểm sẵn sàng.
 6. `comparator.py` chấm điểm scenario hợp lệ theo `config/scoring.json`.
 7. `diagram.py` dựng biểu đồ Plotly kiểu combination chart: cột nhu cầu trên trục Y trái và
@@ -116,7 +117,9 @@ Giờ dùng `HH:mm`, ngày dùng `dd/mm/yyyy`. Với sản lượng tổng nhi�
 - Không kết luận một chiều từ dữ liệu `combined`.
 - Không chấm điểm scenario vi phạm hard constraint.
 - C có mã `fixed_resource_redistribution`; B được hash trước/sau và không dùng chung object với C.
-- C giữ tổng chuyến, tổng chuyến từng chiều, tham số khai thác, chuyến đầu/cuối và số xe hoạt động B.
+- MVP hiện tại còn khóa giá trị đội xe suy ra từ B. Theo Contract V1 đích, C không được vượt giới hạn
+  đội xe khả dụng của B; số xe tối thiểu và cách bố trí xe đầu ngày tại hai bến được tính từ biểu đồ C.
+  Quy tắc đích này chưa được triển khai trong heuristic hiện tại.
 - Headway được tính theo các chuyến liên tiếp cùng chiều trên timeline liên tục; ranh giới block
   nhu cầu 30/60 phút không reset chuỗi headway.
 - Regime được tạo từ thay đổi nhu cầu kéo dài, không từ từng block; trong regime, headway bằng nhau

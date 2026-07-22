@@ -202,6 +202,8 @@ def test_infeasible_fallback_preserves_b_arrivals_and_does_not_expand_fleet(
     result_c = bundle.get("C")
 
     assert result_c.generation_status == ScenarioCStatus.INSUFFICIENT_DATA
+    # Current MVP fallback intentionally preserves B unchanged. This is not the amended
+    # Contract V1 default, where C derives its own minimum under B's available limit.
     assert result_c.fleet.minimum_vehicles == result_b.fleet.minimum_vehicles == 1
     assert [trip.arrival_seconds for trip in result_c.trips] == [
         trip.arrival_seconds for trip in result_b.trips

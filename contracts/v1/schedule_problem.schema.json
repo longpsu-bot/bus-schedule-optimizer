@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bus-schedule.example/contracts/v1/schedule_problem.schema.json",
+  "title": "ScheduleProblemV1",
+  "description": "Solver-independent, validated problem for generating Scenario C from B.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version", "problem_id", "source_a_fingerprint", "source_b_fingerprint",
+    "observed_demand_fingerprint", "scenario_a", "scenario_b", "demand_response_mode",
+    "demand_resolution", "analysis_blocks", "operating_parameter_locks", "direction_trip_lock_mode",
+    "fleet_constraint_mode", "initial_fleet_positioning_mode", "planning_load_factor_ceiling", "critical_load_factor_ceiling",
+    "block_requirements", "boundary_convention", "solver_policy"
+  ],
+  "properties": {
+    "contract_version": {"const": "1.0.0"},
+    "problem_id": {"type": "string", "minLength": 1},
+    "source_a_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "source_b_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "observed_demand_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "scenario_a": {"$ref": "scenario_a_input.schema.json"},
+    "scenario_b": {"$ref": "scenario_b_input.schema.json"},
+    "demand_response_mode": {"enum": ["static", "elasticity_scenario", "calibrated"]},
+    "demand_resolution": {"$ref": "demand_resolution.schema.json"},
+    "analysis_blocks": {"type": "array", "minItems": 1, "items": {"$ref": "demand_analysis_block.schema.json"}},
+    "operating_parameter_locks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/lock"}},
+    "direction_trip_lock_mode": {"enum": ["fixed_by_direction", "total_only"], "default": "fixed_by_direction"},
+    "direction_redistribution_authorization": {"type": ["object", "null"], "additionalProperties": false, "required": ["enabled", "authorized_by", "directional_demand_confidence"], "properties": {"enabled": {"type": "boolean"}, "authorized_by": {"type": "string", "minLength": 1}, "directional_demand_confidence": {"enum": ["high", "medium", "low", "unknown"]}}},
+    "fleet_constraint_mode": {
+      "enum": ["available_upper_bound", "exact_scheduled_fleet"],
+      "default": "available_upper_bound",
+      "description": "The upper-bound mode is the Contract V1 default. Exact scheduled fleet requires explicit authorization and does not require every vehicle to move."
+    },
+    "initial_fleet_positioning_mode": {
+      "enum": ["solver_determined", "fixed", "bounded"],
+      "default": "solver_determined"
+    },
+    "fixed_initial_fleet": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["terminal_1", "terminal_2"],
+      "properties": {
+        "terminal_1": {"type": "integer", "minimum": 0},
+        "terminal_2": {"type": "integer", "minimum": 0}
+      }
+    },
+    "bounded_initial_fleet": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["terminal_1", "terminal_2"],
+      "properties": {
+        "terminal_1": {"$ref": "#/$defs/initialFleetBounds"},
+        "terminal_2": {"$ref": "#/$defs/initialFleetBounds"}
+      }
+    },
+    "planning_load_factor_ceiling": {"type": "number", "const": 0.85},
+    "critical_load_factor_ceiling": {"type": "number", "const": 0.9},
+    "block_requirements": {"type": "array", "minItems": 1, "items": {"$ref": "block_supply_plan.schema.json"}},
+    "boundary_convention": {"enum": ["half_open_with_final_sentinel", "half_open_with_documented_final_inclusive"]},
+    "solver_policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["time_limit_seconds", "worker_count", "random_seed", "require_independent_validation"],
+      "properties": {
+        "time_limit_seconds": {"type": "number", "exclusiveMinimum": 0},
+        "worker_count": {"type": "integer", "minimum": 1},
+        "random_seed": {"type": "integer", "minimum": 0},
+        "require_independent_validation": {"const": true}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"fleet_constraint_mode": {"const": "exact_scheduled_fleet"}}, "required": ["fleet_constraint_mode"]},
+      "then": {
+        "properties": {
+          "scenario_b": {
+            "allOf": [
+              {"$ref": "scenario_b_input.schema.json"},
+              {"required": ["approved_active_fleet"], "properties": {"approved_active_fleet": {"type": "integer", "minimum": 1}}}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"initial_fleet_positioning_mode": {"const": "fixed"}}, "required": ["initial_fleet_positioning_mode"]},
+      "then": {"required": ["fixed_initial_fleet"], "properties": {"fixed_initial_fleet": {"type": "object"}}}
+    },
+    {
+      "if": {"properties": {"initial_fleet_positioning_mode": {"const": "bounded"}}, "required": ["initial_fleet_positioning_mode"]},
+      "then": {"required": ["bounded_initial_fleet"], "properties": {"bounded_initial_fleet": {"type": "object"}}}
+    }
+  ],
+  "$defs": {
+    "fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "initialFleetBounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum", "maximum"],
+      "properties": {
+        "minimum": {"type": "integer", "minimum": 0},
+        "maximum": {"type": "integer", "minimum": 0}
+      },
+      "description": "The domain validator additionally enforces minimum <= maximum; JSON Schema does not prove that cross-field arithmetic."
+    },
+    "lock": {
+      "type": "object", "additionalProperties": false,
+      "required": ["field", "value", "locked", "source_fingerprint"],
+      "properties": {
+        "field": {"type": "string", "minLength": 1},
+        "value": {},
+        "locked": {"const": true},
+        "source_fingerprint": {"$ref": "#/$defs/fingerprint"},
+        "authorized_exception": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

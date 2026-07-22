@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bus-schedule.example/contracts/v1/observed_demand_input.schema.json",
+  "title": "ObservedDemandInput",
+  "description": "Passenger production observed under Scenario A, with provenance and normalization semantics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version", "demand_dataset_id", "scenario_observed_under", "observation_period_start",
+    "observation_period_end", "observation_days", "demand_response_mode", "observations", "source_metadata"
+  ],
+  "properties": {
+    "contract_version": {"const": "1.0.0"},
+    "demand_dataset_id": {"type": "string", "minLength": 1},
+    "scenario_observed_under": {"const": "A"},
+    "observation_period_start": {"type": "string", "format": "date"},
+    "observation_period_end": {"type": "string", "format": "date"},
+    "observation_days": {"type": "integer", "minimum": 1},
+    "demand_response_mode": {"enum": ["static", "elasticity_scenario", "calibrated"], "default": "static"},
+    "observations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/observation"}},
+    "source_metadata": {"$ref": "#/$defs/sourceMetadata"}
+  },
+  "$defs": {
+    "time": {"type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"},
+    "observation": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "observation_id", "direction", "interval_start", "interval_end", "passenger_count",
+        "source_resolution_type", "source_type", "volume_classification", "demand_confidence"
+      ],
+      "properties": {
+        "observation_id": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["outbound", "inbound", "combined"]},
+        "interval_start": {"$ref": "#/$defs/time"},
+        "interval_end": {"$ref": "#/$defs/time"},
+        "passenger_count": {"type": "number", "minimum": 0},
+        "source_resolution_type": {"enum": ["regular_interval", "timestamp", "trip", "irregular_interval", "daily_total"]},
+        "source_resolution_minutes": {"type": ["integer", "null"], "minimum": 1},
+        "source_type": {"enum": ["ticketing", "manual_count", "apc", "survey", "aggregate_report", "other"]},
+        "volume_classification": {"enum": ["total_observation_period", "average_day"]},
+        "demand_confidence": {"enum": ["high", "medium", "low", "unknown"]},
+        "sample_count": {"type": ["integer", "null"], "minimum": 0},
+        "notes": {"type": "string"}
+      }
+    },
+    "sourceMetadata": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_type", "source_id", "imported_at"],
+      "properties": {
+        "source_type": {"enum": ["xlsx", "ui", "api", "manual", "other"]},
+        "source_id": {"type": "string", "minLength": 1},
+        "imported_at": {"type": "string", "format": "date-time"},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

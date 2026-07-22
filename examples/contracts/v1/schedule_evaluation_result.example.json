@@ -1,0 +1,15 @@
+{
+  "contract_version": "1.0.0",
+  "scenario_id": "B",
+  "disposition": "B_TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE",
+  "input_validity": {"status": "PASS", "issues": [], "evidence": ["All required normalized fields are present."], "explanation": "Input shape and values passed validation.", "confidence": "high"},
+  "parameter_consistency": {"status": "PASS", "issues": [], "evidence": ["Declared total and directional totals reconcile."], "explanation": "Exact timetable matches declared parameters.", "confidence": "high"},
+  "technical_feasibility": {"status": "PASS", "issues": [], "evidence": ["One valid terminal-aware vehicle chain exists."], "explanation": "Runtime and turnaround are feasible.", "confidence": "high"},
+  "demand_suitability": {"status": "FAIL", "issues": [{"code": "CRITICAL_OVERLOAD", "severity": "ERROR", "message": "Outbound block exceeds the 90% capacity ceiling.", "references": ["BLK-O-0600"], "suggestion": "Evaluate redistribution under the locked B parameters."}], "evidence": ["LF=1.166667 in BLK-O-0600."], "explanation": "B is technically feasible but demand-unsuitable.", "confidence": "high"},
+  "fleet_feasibility": {"status": "PASS", "issues": [], "evidence": ["minimum_required_fleet=1 <= available_fleet_limit=2; fleet_margin=1"], "explanation": "The required fleet stays within the hard upper bound.", "confidence": "high"},
+  "headway_quality": {"status": "NOT_EVALUATED", "issues": [], "evidence": [], "explanation": "The anonymized example has too few trips for a meaningful regularity conclusion.", "confidence": "low"},
+  "block_evaluations": [{"block_id": "BLK-O-0600", "direction": "outbound", "load_factor": 1.166667, "shortage": 16, "status": "CRITICAL_ABOVE_90", "confidence": "high"}],
+  "warnings": ["Static demand mode is a comparison assumption, not a ridership forecast."],
+  "limitations": ["Only one illustrative demand block is included."],
+  "confidence": "high"
+}
