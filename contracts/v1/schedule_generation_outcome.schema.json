@@ -25,6 +25,8 @@
       "enum": [
         "SOLUTION_ACCEPTED",
         "NO_FEASIBLE_C_WITH_B_PARAMETERS",
+        "C_NOT_FOUND_WITHIN_SOLVE_LIMIT",
+        "C_NOT_GENERATED_MODEL_INVALID",
         "C_NOT_GENERATED_INSUFFICIENT_DATA",
         "C_NOT_REQUIRED_B_SUITABLE",
         "CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR"
@@ -116,6 +118,30 @@
             }
           }
         ]
+      }
+    },
+    {
+      "if": {"properties": {"result_status": {"const": "C_NOT_FOUND_WITHIN_SOLVE_LIMIT"}}, "required": ["result_status"]},
+      "then": {
+        "properties": {
+          "execution_status": {"const": "COMPLETED"},
+          "solver_status": {"const": "UNKNOWN"},
+          "solver_adapter": {"type": "string", "minLength": 1},
+          "solution": {"type": "null"},
+          "diagnostic_candidate": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"result_status": {"const": "C_NOT_GENERATED_MODEL_INVALID"}}, "required": ["result_status"]},
+      "then": {
+        "properties": {
+          "execution_status": {"const": "COMPLETED"},
+          "solver_status": {"const": "MODEL_INVALID"},
+          "solver_adapter": {"type": "string", "minLength": 1},
+          "solution": {"type": "null"},
+          "diagnostic_candidate": {"type": "null"}
+        }
       }
     },
     {
