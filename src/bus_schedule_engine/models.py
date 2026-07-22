@@ -82,6 +82,9 @@ class ScenarioParameters:
     time_block_minutes: int = 60
     minimum_layover_minutes: int | None = None
     allowed_trip_runtime_minutes: tuple[int, ...] = ()
+    available_fleet_limit: int | None = None
+    approved_active_fleet: int | None = None
+    operating_day_type: str | None = None
 
     @property
     def regulatory_minimum_layover_minutes(self) -> int:

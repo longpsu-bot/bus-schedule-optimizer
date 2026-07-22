@@ -70,7 +70,9 @@ def _departure_terminal(parameters: ScenarioParameters, terminal: str) -> Depart
         return DepartureTerminal.TERMINAL_1
     if terminal == parameters.terminal_2_name:
         return DepartureTerminal.TERMINAL_2
-    raise NormalizationError(f"Unknown departure terminal for route {parameters.route_id}: {terminal}")
+    raise NormalizationError(
+        f"Unknown departure terminal for route {parameters.route_id}: {terminal}"
+    )
 
 
 def _available_fleet_limit(
@@ -207,9 +209,7 @@ def _observed_demand(
     source_metadata: SourceMetadata,
     options: NormalizationOptions,
 ) -> ObservedDemandInput:
-    period_keys = {
-        (item.period_start, item.period_end, item.observation_days) for item in records
-    }
+    period_keys = {(item.period_start, item.period_end, item.observation_days) for item in records}
     if len(period_keys) != 1:
         raise NormalizationError(
             "Legacy demand rows contain multiple observation periods; split them into separate "

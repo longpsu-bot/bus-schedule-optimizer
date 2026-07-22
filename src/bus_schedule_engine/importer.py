@@ -112,6 +112,9 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
     layover_raw = values.get("minimum_layover_minutes")
     allowed_runtime_raw = values.get("allowed_trip_runtime_minutes")
     legacy_runtime_raw = values.get("trip_runtime_minutes")
+    available_fleet_raw = values.get("available_fleet_limit")
+    approved_active_fleet_raw = values.get("approved_active_fleet")
+    operating_day_type_raw = values.get("operating_day_type")
     try:
         runtime_options = parse_runtime_options(
             allowed_runtime_raw
@@ -151,6 +154,13 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
         time_block_minutes=int(values.get("time_block_minutes") or 60),
         minimum_layover_minutes=None if layover_raw is None else int(layover_raw),
         allowed_trip_runtime_minutes=runtime_options,
+        available_fleet_limit=(None if available_fleet_raw is None else int(available_fleet_raw)),
+        approved_active_fleet=(
+            None if approved_active_fleet_raw is None else int(approved_active_fleet_raw)
+        ),
+        operating_day_type=(
+            None if operating_day_type_raw is None else str(operating_day_type_raw).strip()
+        ),
     )
 
 

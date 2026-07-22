@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -38,7 +38,7 @@ def _schema_errors(payload: dict[str, object], schema_name: str) -> list[str]:
 def _options(**overrides) -> NormalizationOptions:
     values = {
         "source_id": "fixture-workbook-sha256",
-        "imported_at": datetime(2026, 7, 22, 8, 0, tzinfo=timezone.utc),
+        "imported_at": datetime(2026, 7, 22, 8, 0, tzinfo=UTC),
         "operating_day_type_b": OperatingDayType.WEEKDAY,
         "available_fleet_limit_b": 3,
         "demand_confidence": DemandConfidence.MEDIUM,
@@ -51,6 +51,18 @@ def _imported_b_only(parameters, trips, demand=None) -> ImportedWorkbook:
     return ImportedWorkbook(
         parameters_a=None,
         trips_a=[],
+        parameters_b=parameters,
+        trips_b=trips,
+        demand=list(demand or []),
+        configuration={},
+    )
+
+
+def _imported_a_b(parameters, trips, demand=None) -> ImportedWorkbook:
+    trips_a = [replace(item, scenario="A") for item in trips]
+    return ImportedWorkbook(
+        parameters_a=parameters,
+        trips_a=trips_a,
         parameters_b=parameters,
         trips_b=trips,
         demand=list(demand or []),
@@ -74,10 +86,13 @@ def test_legacy_scenario_b_normalizes_and_matches_schema(make_parameters, make_v
         "T4",
     ]
     assert len(bundle.scenario_b_fingerprint) == 64
-    assert _schema_errors(
-        scenario_to_contract_dict(bundle.scenario_b),
-        "scenario_b_input.schema.json",
-    ) == []
+    assert (
+        _schema_errors(
+            scenario_to_contract_dict(bundle.scenario_b),
+            "scenario_b_input.schema.json",
+        )
+        == []
+    )
 
 
 def test_normalization_refuses_to_infer_required_fleet(make_parameters, make_valid_trips) -> None:
@@ -132,18 +147,24 @@ def test_combined_demand_is_preserved_and_average_day_is_exposed(
         )
     ]
     bundle = normalize_imported_workbook_v1(
-        _imported_b_only(parameters, make_valid_trips(parameters), demand),
-        _options(),
+        _imported_a_b(parameters, make_valid_trips(parameters), demand),
+        _options(
+            operating_day_type_a=OperatingDayType.WEEKDAY,
+            available_fleet_limit_a=3,
+        ),
     )
 
     assert bundle.observed_demand is not None
     observation = bundle.observed_demand.observations[0]
     assert observation.direction == ContractDirection.COMBINED
     assert observation.average_daily_passenger_count(15) == 10
-    assert _schema_errors(
-        demand_to_contract_dict(bundle.observed_demand),
-        "observed_demand_input.schema.json",
-    ) == []
+    assert (
+        _schema_errors(
+            demand_to_contract_dict(bundle.observed_demand),
+            "observed_demand_input.schema.json",
+        )
+        == []
+    )
 
 
 def test_mixed_demand_periods_require_separate_datasets(make_parameters, make_valid_trips) -> None:

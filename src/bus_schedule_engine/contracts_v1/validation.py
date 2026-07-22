@@ -35,13 +35,15 @@ class ContractValidationResult:
 
     @property
     def passed(self) -> bool:
-        return not any(
-            issue.severity == ContractValidationSeverity.ERROR for issue in self.issues
-        )
+        return not any(issue.severity == ContractValidationSeverity.ERROR for issue in self.issues)
 
     @property
     def error_codes(self) -> tuple[str, ...]:
-        return tuple(issue.code for issue in self.issues if issue.severity == ContractValidationSeverity.ERROR)
+        return tuple(
+            issue.code
+            for issue in self.issues
+            if issue.severity == ContractValidationSeverity.ERROR
+        )
 
 
 class ContractValidationError(ValueError):
@@ -315,7 +317,9 @@ def validate_scenario_input(scenario: ScenarioInputV1) -> ContractValidationResu
             )
 
     issues.extend(
-        _validate_imported_at(scenario.source_metadata.imported_at, f"{prefix}.source_metadata.imported_at")
+        _validate_imported_at(
+            scenario.source_metadata.imported_at, f"{prefix}.source_metadata.imported_at"
+        )
     )
     if not scenario.source_metadata.source_id.strip():
         issues.append(
@@ -379,7 +383,9 @@ def validate_observed_demand(demand: ObservedDemandInput) -> ContractValidationR
         path = f"{prefix}.observations[{index}]"
         if not observation.observation_id.strip():
             issues.append(
-                _issue("EMPTY_OBSERVATION_ID", f"{path}.observation_id", "observation_id is required")
+                _issue(
+                    "EMPTY_OBSERVATION_ID", f"{path}.observation_id", "observation_id is required"
+                )
             )
         if observation.passenger_count < 0:
             issues.append(
@@ -446,7 +452,9 @@ def validate_observed_demand(demand: ObservedDemandInput) -> ContractValidationR
             )
 
     issues.extend(
-        _validate_imported_at(demand.source_metadata.imported_at, f"{prefix}.source_metadata.imported_at")
+        _validate_imported_at(
+            demand.source_metadata.imported_at, f"{prefix}.source_metadata.imported_at"
+        )
     )
     return ContractValidationResult(tuple(issues))
 
