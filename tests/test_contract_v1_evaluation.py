@@ -121,14 +121,20 @@ def test_native_resolution_normalizes_multiday_totals_and_matches_schemas(
     assert [item.observed_passengers for item in resolution.blocks] == [10, 20]
     assert [item.demand_rate_per_hour for item in resolution.blocks] == [10, 20]
     assert resolution.blocks[0].source_interval_ids == ("D-0001",)
-    assert _schema_errors(
-        demand_resolution_to_contract_dict(resolution.contract),
-        "demand_resolution.schema.json",
-    ) == []
-    assert _schema_errors(
-        demand_analysis_block_to_contract_dict(resolution.blocks[0]),
-        "demand_analysis_block.schema.json",
-    ) == []
+    assert (
+        _schema_errors(
+            demand_resolution_to_contract_dict(resolution.contract),
+            "demand_resolution.schema.json",
+        )
+        == []
+    )
+    assert (
+        _schema_errors(
+            demand_analysis_block_to_contract_dict(resolution.blocks[0]),
+            "demand_analysis_block.schema.json",
+        )
+        == []
+    )
 
 
 def test_adaptive_blocks_merge_small_changes_and_keep_sustained_boundary(
@@ -159,10 +165,7 @@ def test_adaptive_blocks_merge_small_changes_and_keep_sustained_boundary(
         ("D-0001", "D-0002"),
         ("D-0003", "D-0004"),
     ]
-    assert (
-        resolution.blocks[1].block_boundary_reason
-        == BlockBoundaryReason.SUSTAINED_CHANGE
-    )
+    assert resolution.blocks[1].block_boundary_reason == BlockBoundaryReason.SUSTAINED_CHANGE
 
 
 def test_manual_boundary_cannot_split_source_interval(
@@ -265,10 +268,7 @@ def test_low_load_is_review_only_not_donor_or_reduction_signal(
     assert plan.status == BlockSupplyStatus.LOW_LOAD_REVIEW_ONLY
     assert plan.status != BlockSupplyStatus.ELIGIBLE_DONOR_PERIOD
     assert "not a trip-reduction instruction" in plan.allocation_reason
-    assert (
-        result.evaluation.disposition
-        == BDisposition.TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE
-    )
+    assert result.evaluation.disposition == BDisposition.TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE
 
 
 def test_low_confidence_demand_is_insufficient_for_authoritative_disposition(
@@ -394,14 +394,20 @@ def test_evaluation_and_supply_serialization_match_contract_schemas(
 
     result = evaluate_scenario_b_v1(bundle)
 
-    assert _schema_errors(
-        schedule_evaluation_to_contract_dict(result.evaluation),
-        "schedule_evaluation_result.schema.json",
-    ) == []
-    assert _schema_errors(
-        block_supply_plan_to_contract_dict(result.b_block_supply[0]),
-        "block_supply_plan.schema.json",
-    ) == []
+    assert (
+        _schema_errors(
+            schedule_evaluation_to_contract_dict(result.evaluation),
+            "schedule_evaluation_result.schema.json",
+        )
+        == []
+    )
+    assert (
+        _schema_errors(
+            block_supply_plan_to_contract_dict(result.b_block_supply[0]),
+            "block_supply_plan.schema.json",
+        )
+        == []
+    )
 
 
 def test_no_demand_returns_insufficient_data_without_fabricated_blocks(

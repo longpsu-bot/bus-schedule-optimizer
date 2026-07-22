@@ -122,12 +122,8 @@ def schedule_evaluation_to_contract_dict(
         "scenario_id": evaluation.scenario_id.value,
         "disposition": evaluation.disposition.value,
         "input_validity": _dimension_to_dict(evaluation.input_validity),
-        "parameter_consistency": _dimension_to_dict(
-            evaluation.parameter_consistency
-        ),
-        "technical_feasibility": _dimension_to_dict(
-            evaluation.technical_feasibility
-        ),
+        "parameter_consistency": _dimension_to_dict(evaluation.parameter_consistency),
+        "technical_feasibility": _dimension_to_dict(evaluation.technical_feasibility),
         "demand_suitability": _dimension_to_dict(evaluation.demand_suitability),
         "fleet_feasibility": _dimension_to_dict(evaluation.fleet_feasibility),
         "headway_quality": _dimension_to_dict(evaluation.headway_quality),

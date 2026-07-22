@@ -238,9 +238,7 @@ def detect_demand_resolution_v1(
         )
 
     source_type = _source_resolution_type(demand)
-    confidence = _weakest_confidence(
-        [item.demand_confidence for item in demand.observations]
-    )
+    confidence = _weakest_confidence([item.demand_confidence for item in demand.observations])
     sample_count = sum(item.sample_count or 0 for item in demand.observations)
     return DemandResolutionContractV1(
         source_resolution_type=source_type,
@@ -250,8 +248,7 @@ def detect_demand_resolution_v1(
             for item in demand.observations
         ),
         source_is_trip_level=any(
-            item.source_resolution_type == DemandResolutionType.TRIP
-            for item in demand.observations
+            item.source_resolution_type == DemandResolutionType.TRIP for item in demand.observations
         ),
         source_is_irregular=(
             source_type == DemandResolutionType.IRREGULAR_INTERVAL
@@ -402,14 +399,10 @@ def _merge_group(
             next(iter(resolution_values)) if len(resolution_values) == 1 else None
         ),
         block_mode=mode,
-        aggregation_method=(
-            AggregationMethod.NONE if len(group) == 1 else AggregationMethod.SUM
-        ),
+        aggregation_method=(AggregationMethod.NONE if len(group) == 1 else AggregationMethod.SUM),
         confidence=_weakest_confidence([item.confidence for item in group]),
         interpolation_status=(
-            InterpolationStatus.NONE
-            if len(group) == 1
-            else InterpolationStatus.AGGREGATED
+            InterpolationStatus.NONE if len(group) == 1 else InterpolationStatus.AGGREGATED
         ),
         observation_days=observation_days,
         sample_count=sum(item.sample_count for item in group),
@@ -486,9 +479,7 @@ def _manual_blocks(
         )
     for boundary in boundaries[1:-1]:
         cutting = [
-            item.observation_id
-            for item in intervals
-            if item.start_time < boundary < item.end_time
+            item.observation_id for item in intervals if item.start_time < boundary < item.end_time
         ]
         if cutting:
             raise DemandResolutionError(
@@ -572,7 +563,5 @@ def build_demand_analysis_blocks_v1(
                 f"Block {block.block_id} is shorter than minimum_block_duration"
             )
         if block.duration_minutes > policy.maximum_block_duration:
-            raise DemandResolutionError(
-                f"Block {block.block_id} exceeds maximum_block_duration"
-            )
+            raise DemandResolutionError(f"Block {block.block_id} exceeds maximum_block_duration")
     return DemandResolutionResultV1(contract=contract, blocks=blocks)
