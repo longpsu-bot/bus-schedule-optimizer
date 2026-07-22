@@ -37,5 +37,4 @@ jobs:
         run: |
           python -m ruff format --check \
             src/bus_schedule_engine/contracts_v1 \
-            tests/test_contract_schemas.py \
-            tests/test_contract_v1_normalization.py
+            tests/test_contract*.py
