@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://bus-schedule.example/contracts/v1/schedule_solution.schema.json",
   "title": "ScheduleSolutionV1",
-  "description": "Independently validated Scenario C solution with complete B traceability.",
+  "description": "An accepted, independently validated Scenario C solution with complete B traceability. Non-run, infeasible, and rejected outcomes use ScheduleGenerationOutcomeV1 with solution = null.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,7 +17,10 @@
   ],
   "properties": {
     "contract_version": {"const": "1.0.0"},
-    "solver_status": {"enum": ["OPTIMAL", "FEASIBLE", "INFEASIBLE", "MODEL_INVALID", "UNKNOWN"]},
+    "solver_status": {
+      "enum": ["OPTIMAL", "FEASIBLE"],
+      "description": "Native solver proof status for the accepted candidate. FEASIBLE must not be presented as proven optimal."
+    },
     "solver_adapter": {"type": "string", "minLength": 1},
     "solve_duration_seconds": {"type": "number", "minimum": 0},
     "solution_fingerprint": {"$ref": "#/$defs/fingerprint"},
@@ -37,15 +40,15 @@
     "maximum_simultaneous_vehicle_use": {"type": "integer", "minimum": 0},
     "vehicle_stock_profile_terminal_1": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stockEvent"}},
     "vehicle_stock_profile_terminal_2": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stockEvent"}},
-    "fleet_feasibility_status": {"enum": ["FLEET_FEASIBLE", "FLEET_INFEASIBLE", "INSUFFICIENT_DATA"]},
+    "fleet_feasibility_status": {"const": "FLEET_FEASIBLE"},
     "block_evaluation": {"type": "array", "items": {"$ref": "#/$defs/blockEvaluation"}},
     "residual_overload": {"type": "number", "minimum": 0},
     "shifted_trip_count": {"type": "integer", "minimum": 0},
     "total_shift_minutes": {"type": "number", "minimum": 0},
     "maximum_shift_minutes": {"type": "number", "minimum": 0},
-    "status": {"enum": ["SOLUTION_ACCEPTED", "NO_FEASIBLE_C_WITH_B_PARAMETERS", "C_NOT_GENERATED_INSUFFICIENT_DATA", "C_NOT_REQUIRED_B_SUITABLE", "CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR"]},
-    "explanations": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-    "limitations": {"type": "array", "items": {"type": "string"}}
+    "status": {"const": "SOLUTION_ACCEPTED"},
+    "explanations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}}
   },
   "$defs": {
     "time": {"type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"},
