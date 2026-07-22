@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/authoritative-demand-evaluator-v1
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -32,7 +33,6 @@ jobs:
               'src/bus_schedule_engine/contracts_v1/demand_resolution.py'
           )
           resolution = resolution_path.read_text(encoding='utf-8')
-          anchor = '\ndef detect_demand_resolution_v1(\n'
           helper = '''
 
 def _validate_source_observations(
@@ -82,71 +82,61 @@ def _validate_source_observations(
                     f"{current.observation_id}"
                 )
 '''
-          if helper.strip() not in resolution:
-              if anchor not in resolution:
+          detector_anchor = '\ndef detect_demand_resolution_v1(\n'
+          if '_validate_source_observations(' not in resolution:
+              if detector_anchor not in resolution:
                   raise SystemExit('Resolution detector anchor not found')
-              resolution = resolution.replace(anchor, helper + anchor, 1)
-
-          old = '''    if policy.smoothing_method != SmoothingMethod.NONE:
-              raise DemandResolutionError(
-                  "PR-02 authoritative implementation supports smoothing_method=none only"
+              resolution = resolution.replace(
+                  detector_anchor,
+                  helper + detector_anchor,
+                  1,
               )
-
-              source_type = _source_resolution_type(demand)
-          '''.replace('          ', '')
-          new = '''    if policy.smoothing_method != SmoothingMethod.NONE:
-              raise DemandResolutionError(
-                  "PR-02 authoritative implementation supports smoothing_method=none only"
+          validation_call = '    _validate_source_observations(demand, policy)\n\n'
+          source_anchor = '    source_type = _source_resolution_type(demand)\n'
+          if validation_call not in resolution:
+              if source_anchor not in resolution:
+                  raise SystemExit('Source resolution anchor not found')
+              resolution = resolution.replace(
+                  source_anchor,
+                  validation_call + source_anchor,
+                  1,
               )
-              _validate_source_observations(demand, policy)
-
-              source_type = _source_resolution_type(demand)
-          '''.replace('          ', '')
-          if old not in resolution:
-              raise SystemExit('Resolution validation insertion point not found')
-          resolution_path.write_text(
-              resolution.replace(old, new, 1),
-              encoding='utf-8',
-          )
+          resolution_path.write_text(resolution, encoding='utf-8')
 
           evaluation_path = Path(
               'src/bus_schedule_engine/contracts_v1/evaluation.py'
           )
           evaluation = evaluation_path.read_text(encoding='utf-8')
-          old = '''    if BlockSupplyStatus.INSUFFICIENT_DATA in statuses:
-              status = DimensionStatus.INSUFFICIENT_DATA
-          elif any(item.severity == EvaluationIssueSeverity.ERROR for item in issues):
-              status = DimensionStatus.FAIL
-          elif issues:
-              status = DimensionStatus.WARNING
-          else:
-              status = DimensionStatus.PASS
-          '''.replace('          ', '')
-          new = '''    if any(
-              item.severity == EvaluationIssueSeverity.ERROR for item in issues
-          ):
-              status = DimensionStatus.FAIL
-          elif BlockSupplyStatus.INSUFFICIENT_DATA in statuses:
-              status = DimensionStatus.INSUFFICIENT_DATA
-          elif issues:
-              status = DimensionStatus.WARNING
-          else:
-              status = DimensionStatus.PASS
-          '''.replace('          ', '')
-          if old not in evaluation:
-              raise SystemExit('Demand dimension precedence block not found')
-          evaluation_path.write_text(
-              evaluation.replace(old, new, 1),
-              encoding='utf-8',
+          start_marker = (
+              '    if BlockSupplyStatus.INSUFFICIENT_DATA in statuses:\n'
           )
+          end_marker = '    evidence = tuple(\n'
+          start = evaluation.find(start_marker)
+          end = evaluation.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit('Demand dimension precedence markers not found')
+          replacement = '''    if any(
+        item.severity == EvaluationIssueSeverity.ERROR for item in issues
+    ):
+        status = DimensionStatus.FAIL
+    elif BlockSupplyStatus.INSUFFICIENT_DATA in statuses:
+        status = DimensionStatus.INSUFFICIENT_DATA
+    elif issues:
+        status = DimensionStatus.WARNING
+    else:
+        status = DimensionStatus.PASS
+'''
+          evaluation = evaluation[:start] + replacement + evaluation[end:]
+          evaluation_path.write_text(evaluation, encoding='utf-8')
 
           test_path = Path('tests/test_contract_v1_evaluation.py')
           tests = test_path.read_text(encoding='utf-8')
-          tests = tests.replace(
-              '    DemandResolutionError,\n',
-              '    DemandResolutionError,\n    InterpolationMethod,\n',
-              1,
-          )
+          if '    InterpolationMethod,\n' not in tests:
+              tests = tests.replace(
+                  '    DemandResolutionError,\n',
+                  '    DemandResolutionError,\n    InterpolationMethod,\n',
+                  1,
+              )
           additions = '''
 
 
@@ -248,10 +238,12 @@ def test_no_service_failure_is_not_erased_by_insufficient_blocks(
       - name: Commit clean result
         run: |
           rm .github/workflows/pr02-final-invariants.yml
+          rm -f .pr02-trigger
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/bus_schedule_engine/contracts_v1 \
             tests/test_contract_v1_evaluation.py \
-            .github/workflows/pr02-final-invariants.yml
+            .github/workflows/pr02-final-invariants.yml \
+            .pr02-trigger
           git commit -m 'Enforce final PR-02 demand evaluation invariants'
           git push origin HEAD:feat/authoritative-demand-evaluator-v1
