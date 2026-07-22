@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import asdict, replace
+from dataclasses import replace
 
 from .evaluation import BDisposition
 from .serialization import canonical_sha256
+from .solver_fingerprints import outcome_fingerprint_payload
 from .solver_models import (
     GenerationResultStatus,
     NativeSolverStatus,
@@ -13,17 +14,7 @@ from .solver_models import (
     ScheduleSolver,
     SolverExecutionStatus,
 )
-from .solver_problem import jsonable
 from .solver_validation import validate_and_build_solution_v1
-
-
-def _outcome_fingerprint_payload(
-    outcome: ScheduleGenerationOutcomeV1,
-) -> dict[str, object]:
-    payload = jsonable(asdict(outcome))
-    payload.pop("outcome_fingerprint", None)
-    payload.pop("solve_duration_seconds", None)
-    return payload
 
 
 def _finalize_outcome(
@@ -31,7 +22,7 @@ def _finalize_outcome(
 ) -> ScheduleGenerationOutcomeV1:
     return replace(
         outcome,
-        outcome_fingerprint=canonical_sha256(_outcome_fingerprint_payload(outcome)),
+        outcome_fingerprint=canonical_sha256(outcome_fingerprint_payload(outcome)),
     )
 
 
@@ -111,10 +102,14 @@ def run_schedule_solver_v1(
 
     run = solver.solve(problem)
     if run.execution_status != SolverExecutionStatus.COMPLETED:
-        return _not_run_outcome(
+        return _completed_without_solution(
             problem,
-            GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID,
-            "Solver adapter returned an invalid execution-state combination.",
+            result_status=GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID,
+            solver_status=NativeSolverStatus.MODEL_INVALID,
+            solver_adapter=run.solver_adapter,
+            solve_duration_seconds=run.solve_duration_seconds,
+            explanations=("Solver adapter returned an invalid execution-state combination.",),
+            limitations=run.limitations,
         )
     if run.solver_status == NativeSolverStatus.MODEL_INVALID:
         return _completed_without_solution(
@@ -146,7 +141,11 @@ def run_schedule_solver_v1(
             explanations=run.explanations,
             limitations=run.limitations,
         )
-    if run.candidate is None or run.candidate.solver_status != run.solver_status:
+    if (
+        run.candidate is None
+        or run.candidate.solver_status != run.solver_status
+        or run.candidate.solver_adapter != run.solver_adapter
+    ):
         return _completed_without_solution(
             problem,
             result_status=GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import asdict, replace
+from dataclasses import replace
 
 from bus_schedule_engine.fleet import assign_fleet
 from bus_schedule_engine.models import Trip
@@ -23,6 +23,7 @@ from .models import (
     ScenarioId,
 )
 from .serialization import canonical_sha256
+from .solver_fingerprints import candidate_fingerprint, solution_fingerprint_payload
 from .solver_models import (
     CandidateValidationResultV1,
     CandidateValidationStatus,
@@ -37,7 +38,7 @@ from .solver_models import (
     SolutionTripV1,
     StockProfileEventV1,
 )
-from .solver_problem import jsonable, legacy_direction
+from .solver_problem import legacy_direction
 from .validation import validate_scenario_input
 
 _CONFIDENCE_RANK = {
@@ -301,6 +302,10 @@ def _operating_locks(problem: ScheduleProblemV1) -> tuple[OperatingParameterLock
             "terminal_2": b.last_departures.terminal_2,
         },
         "available_fleet_limit": b.available_fleet_limit,
+        "approved_active_fleet": b.approved_active_fleet,
+        "fleet_constraint_mode": "available_upper_bound",
+        "initial_fleet_positioning_mode": "solver_determined",
+        "direction_trip_lock_mode": "fixed_by_direction",
         "operating_day_type": b.operating_day_type.value,
     }
     return tuple(
@@ -311,13 +316,6 @@ def _operating_locks(problem: ScheduleProblemV1) -> tuple[OperatingParameterLock
         )
         for field, value in values.items()
     )
-
-
-def _solution_fingerprint_payload(solution: ScheduleSolutionV1) -> dict[str, object]:
-    payload = jsonable(asdict(solution))
-    payload.pop("solution_fingerprint", None)
-    payload.pop("solve_duration_seconds", None)
-    return payload
 
 
 def _source_lock_errors(
@@ -343,6 +341,19 @@ def _source_lock_errors(
     return errors
 
 
+def _maximum_simultaneous_vehicle_use(assignments) -> int:
+    events: list[tuple[int, int]] = []
+    for assignment in assignments:
+        events.append((assignment.departure_seconds, 1))
+        events.append((assignment.ready_seconds, -1))
+    active = 0
+    maximum = 0
+    for _, delta in sorted(events, key=lambda item: (item[0], item[1])):
+        active += delta
+        maximum = max(maximum, active)
+    return maximum
+
+
 def validate_and_build_solution_v1(
     problem: ScheduleProblemV1,
     candidate: RawScheduleCandidateV1,
@@ -358,6 +369,14 @@ def validate_and_build_solution_v1(
         rejection_codes.append("DUPLICATE_SOURCE_B_TRIP_ID")
     if set(source_ids) != set(expected_source_ids):
         rejection_codes.append("SOURCE_B_MAPPING_NOT_ONE_TO_ONE")
+    expected_candidate_fingerprint = candidate_fingerprint(
+        source_b_fingerprint=problem.normalized_inputs.scenario_b_fingerprint,
+        solver_adapter=candidate.solver_adapter,
+        exact_timetable=candidate.exact_timetable,
+        headway_regimes=candidate.headway_regimes,
+    )
+    if candidate.candidate_fingerprint != expected_candidate_fingerprint:
+        rejection_codes.append("CANDIDATE_FINGERPRINT_MISMATCH")
     rejection_codes.extend(_source_lock_errors(problem, candidate))
     if candidate.solver_status not in {
         NativeSolverStatus.OPTIMAL,
@@ -462,7 +481,7 @@ def validate_and_build_solution_v1(
         recommended_initial_fleet_terminal_2=(fleet.recommended_initial_fleet_terminal_2),
         initial_fleet_positioning_mode=(InitialFleetPositioningMode.SOLVER_DETERMINED),
         fleet_margin=fleet.fleet_margin,
-        maximum_simultaneous_vehicle_use=fleet.minimum_required_fleet,
+        maximum_simultaneous_vehicle_use=_maximum_simultaneous_vehicle_use(assignments.assignments),
         vehicle_stock_profile_terminal_1=_stock_events(fleet.terminal_1_events),
         vehicle_stock_profile_terminal_2=_stock_events(fleet.terminal_2_events),
         fleet_feasibility_status="FLEET_FEASIBLE",
@@ -478,11 +497,15 @@ def validate_and_build_solution_v1(
             candidate.explanation,
             "Candidate passed independent timetable, traceability, and fleet validation.",
         ),
-        limitations=candidate.limitations,
+        limitations=candidate.limitations
+        + (
+            "PR-03 supports available_upper_bound fleet constraints and "
+            "solver_determined initial positioning only.",
+        ),
     )
     solution = replace(
         provisional,
-        solution_fingerprint=canonical_sha256(_solution_fingerprint_payload(provisional)),
+        solution_fingerprint=canonical_sha256(solution_fingerprint_payload(provisional)),
     )
     return CandidateValidationResultV1(
         status=CandidateValidationStatus.ACCEPTED,

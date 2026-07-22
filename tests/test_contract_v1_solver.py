@@ -390,3 +390,80 @@ def test_accepted_solution_and_outcome_match_json_schemas() -> None:
         )
         == []
     )
+
+
+def test_candidate_fingerprint_tampering_is_rejected() -> None:
+    problem, *_ = _problem()
+    run = HeuristicScheduleSolverAdapter().solve(problem)
+    assert run.candidate is not None
+    tampered = replace(run.candidate, candidate_fingerprint="0" * 64)
+
+    validation = validate_and_build_solution_v1(problem, tampered)
+
+    assert validation.status == CandidateValidationStatus.REJECTED
+    assert "CANDIDATE_FINGERPRINT_MISMATCH" in validation.rejection_codes
+
+
+def test_outcome_fingerprint_ignores_solve_duration() -> None:
+    problem, *_ = _problem()
+    run = HeuristicScheduleSolverAdapter().solve(problem)
+    assert run.candidate is not None
+    first = run_schedule_solver_v1(problem, _StaticSolver(run))
+    delayed_candidate = replace(
+        run.candidate,
+        solve_duration_seconds=run.candidate.solve_duration_seconds + 9,
+    )
+    delayed_run = replace(
+        run,
+        solve_duration_seconds=run.solve_duration_seconds + 9,
+        candidate=delayed_candidate,
+    )
+    second = run_schedule_solver_v1(problem, _StaticSolver(delayed_run))
+
+    assert first.outcome_fingerprint == second.outcome_fingerprint
+    assert first.solution is not None
+    assert second.solution is not None
+    assert first.solution.solution_fingerprint == second.solution.solution_fingerprint
+
+
+def test_invalid_execution_state_is_completed_model_invalid_not_not_run() -> None:
+    problem, *_ = _problem()
+    invalid_run = SolverRunResultV1(
+        execution_status=SolverExecutionStatus.NOT_RUN,
+        solver_status=NativeSolverStatus.FEASIBLE,
+        solver_adapter="invalid_test_adapter",
+        solve_duration_seconds=0.1,
+        candidate=None,
+        explanations=("invalid",),
+        limitations=(),
+    )
+
+    outcome = run_schedule_solver_v1(problem, _StaticSolver(invalid_run))
+
+    assert outcome.execution_status == SolverExecutionStatus.COMPLETED
+    assert outcome.solver_status == NativeSolverStatus.MODEL_INVALID
+    assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID
+
+
+def test_solution_reports_modes_locks_and_actual_maximum_vehicle_use() -> None:
+    problem, *_ = _problem()
+    outcome = run_schedule_solver_v1(problem, HeuristicScheduleSolverAdapter())
+    assert outcome.solution is not None
+    solution = outcome.solution
+    lock_fields = {lock.field for lock in solution.operating_parameter_locks}
+    assert {
+        "fleet_constraint_mode",
+        "initial_fleet_positioning_mode",
+        "direction_trip_lock_mode",
+    } <= lock_fields
+    events = []
+    for assignment in solution.fleet_assignment:
+        events.append((assignment.departure_time, 1))
+        events.append((assignment.ready_time, -1))
+    active = 0
+    maximum = 0
+    for _, delta in sorted(events, key=lambda item: (item[0], item[1])):
+        active += delta
+        maximum = max(maximum, active)
+    assert solution.maximum_simultaneous_vehicle_use == maximum
+    assert maximum <= solution.minimum_required_fleet

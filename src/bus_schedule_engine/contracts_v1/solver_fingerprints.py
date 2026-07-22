@@ -23,12 +23,8 @@ def candidate_fingerprint(
         {
             "source_b_fingerprint": source_b_fingerprint,
             "solver_adapter": solver_adapter,
-            "exact_timetable": jsonable(
-                [asdict(item) for item in exact_timetable]
-            ),
-            "headway_regimes": jsonable(
-                [asdict(item) for item in headway_regimes]
-            ),
+            "exact_timetable": jsonable([asdict(item) for item in exact_timetable]),
+            "headway_regimes": jsonable([asdict(item) for item in headway_regimes]),
         }
     )
 
