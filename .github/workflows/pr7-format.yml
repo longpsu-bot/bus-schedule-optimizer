@@ -1,0 +1,55 @@
+name: Format PR 7 audit fix
+
+on:
+  push:
+    branches:
+      - fix/pr02-authoritative-boundary
+
+permissions:
+  contents: write
+
+jobs:
+  format-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/pr02-authoritative-boundary
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -e '.[dev]'
+
+      - name: Ruff fix and format
+        run: |
+          python -m ruff check --fix \
+            src/bus_schedule_engine/contracts_v1/public_api.py \
+            tests/test_contract_v1_public_boundary.py
+          python -m ruff format \
+            src/bus_schedule_engine/contracts_v1/public_api.py \
+            tests/test_contract_v1_public_boundary.py
+
+      - name: Validate
+        run: |
+          python -m pytest
+          python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
+          python -m ruff format --check \
+            src/bus_schedule_engine/contracts_v1 \
+            tests/test_contract*.py
+
+      - name: Commit clean result
+        run: |
+          rm .github/workflows/pr7-format.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/bus_schedule_engine/contracts_v1/public_api.py \
+            tests/test_contract_v1_public_boundary.py \
+            .github/workflows/pr7-format.yml
+          git commit -m 'Format PR-02 authoritative boundary fix'
+          git push origin HEAD:fix/pr02-authoritative-boundary
