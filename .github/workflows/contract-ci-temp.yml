@@ -1,0 +1,31 @@
+name: Contract CI (temporary)
+
+on:
+  push:
+    branches:
+      - docs/bus-schedule-engine-contract-v1-pr
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: Tests
+        run: python -m pytest
+
+      - name: Ruff lint
+        run: python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
+
+      - name: Ruff format changed Python
+        run: python -m ruff format tests/test_contract_schemas.py --check
