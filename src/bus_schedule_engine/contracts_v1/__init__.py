@@ -18,8 +18,6 @@ from .demand_resolution import (
     InterpolationMethod,
     InterpolationStatus,
     SmoothingMethod,
-    build_demand_analysis_blocks_v1,
-    detect_demand_resolution_v1,
 )
 from .evaluation import (
     BDisposition,
@@ -38,7 +36,6 @@ from .evaluation import (
     TerminalStockEventV1,
     assess_scenario_b_fleet_v1,
     build_block_supply_plans_v1,
-    evaluate_scenario_b_v1,
 )
 from .evaluation_serialization import (
     block_supply_plan_to_contract_dict,
@@ -67,6 +64,11 @@ from .models import (
     TripsByDirection,
     TurnaroundMinutes,
     VolumeClassification,
+)
+from .public_api import (
+    build_demand_analysis_blocks_v1,
+    detect_demand_resolution_v1,
+    evaluate_scenario_b_v1,
 )
 from .serialization import (
     demand_to_contract_dict,
