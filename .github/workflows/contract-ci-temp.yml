@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - docs/bus-schedule-engine-contract-v1-pr
+  pull_request:
+    branches:
+      - main
 
 jobs:
   validate:
