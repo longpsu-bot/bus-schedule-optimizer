@@ -12,6 +12,7 @@ CONTRACT_VERSION = "1.0.0"
 class ScenarioId(StrEnum):
     A = "A"
     B = "B"
+    C = "C"
 
 
 class ContractDirection(StrEnum):
