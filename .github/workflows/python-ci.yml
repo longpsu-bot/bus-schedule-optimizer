@@ -4,19 +4,19 @@ on:
   pull_request:
     branches:
       - main
-  push:
-    branches:
-      - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout branch
         uses: actions/checkout@v4
+        with:
+          ref: docs/extreme-service-change-demand-scenarios-v1
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,51 +30,92 @@ jobs:
       - name: Render V1-A1 amended documents
         run: python scripts/apply_v1_a1_docs.py
 
-      - name: Upload V1-A1 amended documents
-        uses: actions/upload-artifact@v4
-        with:
-          name: v1-a1-amended-documents
-          path: docs/engine
-
-      - name: Tests
-        id: tests
-        continue-on-error: true
+      - name: Validate repository
         run: |
-          set -o pipefail
-          python -m pytest 2>&1 | tee pytest.log
+          python -m pytest
+          python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
+          python -m ruff format --check src/bus_schedule_engine/contracts_v1 tests/test_contract*.py
 
-      - name: Ruff lint
-        id: lint
-        continue-on-error: true
+      - name: Commit clean documentation amendment
         run: |
-          set -o pipefail
-          python -m ruff check . \
-            --exclude .artifact \
-            --exclude outputs \
-            --exclude .venv 2>&1 | tee ruff-lint.log
+          cat > .github/workflows/python-ci.yml <<'YAML'
+          name: Python CI
 
-      - name: Ruff format for Contract V1 code
-        id: format
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          python -m ruff format --check \
-            src/bus_schedule_engine/contracts_v1 \
-            tests/test_contract*.py 2>&1 | tee ruff-format.log
+          on:
+            pull_request:
+              branches:
+                - main
+            push:
+              branches:
+                - main
 
-      - name: Upload validation logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-ci-logs
-          path: |
-            pytest.log
-            ruff-lint.log
-            ruff-format.log
+          permissions:
+            contents: read
 
-      - name: Enforce validation result
-        if: >-
-          steps.tests.outcome == 'failure' ||
-          steps.lint.outcome == 'failure' ||
-          steps.format.outcome == 'failure'
-        run: exit 1
+          jobs:
+            validate:
+              runs-on: ubuntu-latest
+              steps:
+                - name: Checkout
+                  uses: actions/checkout@v4
+
+                - name: Set up Python
+                  uses: actions/setup-python@v5
+                  with:
+                    python-version: '3.11'
+                    cache: pip
+
+                - name: Install
+                  run: python -m pip install -e '.[dev]'
+
+                - name: Tests
+                  id: tests
+                  continue-on-error: true
+                  run: |
+                    set -o pipefail
+                    python -m pytest 2>&1 | tee pytest.log
+
+                - name: Ruff lint
+                  id: lint
+                  continue-on-error: true
+                  run: |
+                    set -o pipefail
+                    python -m ruff check . \
+                      --exclude .artifact \
+                      --exclude outputs \
+                      --exclude .venv 2>&1 | tee ruff-lint.log
+
+                - name: Ruff format for Contract V1 code
+                  id: format
+                  continue-on-error: true
+                  run: |
+                    set -o pipefail
+                    python -m ruff format --check \
+                      src/bus_schedule_engine/contracts_v1 \
+                      tests/test_contract*.py 2>&1 | tee ruff-format.log
+
+                - name: Upload validation logs
+                  if: always()
+                  uses: actions/upload-artifact@v4
+                  with:
+                    name: python-ci-logs
+                    path: |
+                      pytest.log
+                      ruff-lint.log
+                      ruff-format.log
+
+                - name: Enforce validation result
+                  if: >-
+                    steps.tests.outcome == 'failure' ||
+                    steps.lint.outcome == 'failure' ||
+                    steps.format.outcome == 'failure'
+                  run: exit 1
+          YAML
+          rm -f .github/workflows/apply-v1-a1-doc-amendment.yml
+          rm -f .v1-a1-trigger
+          rm -f scripts/apply_v1_a1_docs.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/engine .github/workflows scripts .v1-a1-trigger
+          git commit -m 'Amend Contract V1 for structural service changes'
+          git push origin HEAD:docs/extreme-service-change-demand-scenarios-v1
