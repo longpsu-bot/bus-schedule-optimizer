@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
+from .demand_coverage import DemandCoverageAssessmentV1
 from .models import (
     CONTRACT_VERSION,
     ContractDirection,
@@ -16,6 +17,10 @@ from .models import (
 
 class DemandResolutionError(ValueError):
     """Raised when authoritative demand blocks cannot be built without inventing data."""
+
+    def __init__(self, message: str, *, code: str | None = None) -> None:
+        super().__init__(f"{code}: {message}" if code is not None else message)
+        self.code = code
 
 
 class BlockMode(StrEnum):
@@ -155,6 +160,7 @@ class DemandResolutionResultV1:
     blocks: tuple[DemandAnalysisBlockV1, ...]
     warnings: tuple[str, ...] = ()
     limitations: tuple[str, ...] = ()
+    coverage_assessment: DemandCoverageAssessmentV1 | None = None
 
 
 @dataclass(frozen=True, slots=True)
