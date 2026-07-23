@@ -118,7 +118,7 @@ def _fixture(
                 )
             )
 
-    volumes = [10] * 6 if low_demand else [150, 150, 30, 30, 150, 150]
+    volumes = [10] * 7 if low_demand else [150, 150, 30, 30, 150, 150, 0]
     demand = [
         DemandRecord(
             period_start=date(2026, 7, 1),
@@ -204,12 +204,36 @@ def _contract_problem(
     fleet_limit: int,
     turnaround: tuple[int, int],
 ):
+    demand = []
+    for direction in (
+        Direction.TERMINAL_1_TO_2,
+        Direction.TERMINAL_2_TO_1,
+    ):
+        start = min(trip.departure_seconds for trip in trips if trip.direction == direction)
+        coverage_end = (
+            max(trip.departure_seconds for trip in trips if trip.direction == direction) + 60
+        )
+        while start < coverage_end:
+            end = min(start + 60 * 60, coverage_end)
+            demand.append(
+                DemandRecord(
+                    period_start=date(2026, 7, 1),
+                    period_end=date(2026, 7, 7),
+                    observation_days=1,
+                    block_start_seconds=start,
+                    block_end_seconds=end,
+                    direction=direction,
+                    passenger_volume=0,
+                    volume_type=VolumeType.AVERAGE_DAY,
+                )
+            )
+            start = end
     imported = ImportedWorkbook(
-        parameters_a=None,
-        trips_a=[],
+        parameters_a=parameters,
+        trips_a=[replace(trip, scenario="A") for trip in trips],
         parameters_b=parameters,
         trips_b=trips,
-        demand=[],
+        demand=demand,
         configuration={},
     )
     normalized = normalize_imported_workbook_v1(
@@ -217,8 +241,11 @@ def _contract_problem(
         NormalizationOptions(
             source_id="solver-v1-h2-fixture",
             imported_at=datetime(2026, 7, 23, 8, 0, tzinfo=UTC),
+            operating_day_type_a=OperatingDayType.WEEKDAY,
             operating_day_type_b=OperatingDayType.WEEKDAY,
+            available_fleet_limit_a=fleet_limit,
             available_fleet_limit_b=fleet_limit,
+            demand_confidence=DemandConfidence.HIGH,
         ),
     )
     scenario_b = replace(
@@ -239,7 +266,7 @@ def _contract_problem(
         evaluation,
         parameters,
         trips,
-        [],
+        demand,
         ScenarioCConfig(),
     )
 
@@ -906,6 +933,158 @@ def test_insufficient_data_returns_not_run_without_fabricated_c() -> None:
     assert outcome.solution is None
 
 
+def test_case_12_and_23_combined_unsuitable_b_returns_sanitized_no_run() -> None:
+    parameters, trips, _, fleet_limit = _fixture()
+    combined_demand = [
+        DemandRecord(
+            period_start=date(2026, 7, 1),
+            period_end=date(2026, 7, 7),
+            observation_days=1,
+            block_start_seconds=(6 + index) * 3600,
+            block_end_seconds=(7 + index) * 3600,
+            direction=Direction.COMBINED,
+            passenger_volume=300 if index == 0 else 0,
+            volume_type=VolumeType.AVERAGE_DAY,
+        )
+        for index in range(7)
+    ]
+    normalized = _normalized(
+        parameters,
+        trips,
+        combined_demand,
+        fleet_limit,
+    )
+    evaluation = evaluate_scenario_b_v1(normalized)
+    problem = build_schedule_problem_v1(
+        normalized,
+        evaluation,
+        parameters,
+        trips,
+        combined_demand,
+        ScenarioCConfig(),
+    )
+
+    outcome = run_schedule_solver_v1(problem, _BombSolver())
+
+    assert (
+        evaluation.evaluation.disposition == BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE
+    )
+    assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_INSUFFICIENT_DATA
+    assert outcome.execution_status == SolverExecutionStatus.NOT_RUN
+    assert outcome.solver_status is None
+    assert outcome.solver_adapter is None
+    assert outcome.solve_duration_seconds == 0
+    assert outcome.solution is None
+    assert outcome.diagnostic_candidate is None
+    assert any(
+        "COMBINED_DEMAND_UNSUPPORTED_FOR_DIRECTIONAL_C" in item for item in outcome.limitations
+    )
+
+
+def test_case_24_technically_infeasible_b_with_incomplete_coverage_does_not_run() -> None:
+    parameters, trips, _, _ = _fixture()
+    normalized = _normalized(parameters, trips, [], 1)
+    evaluation = evaluate_scenario_b_v1(normalized)
+    problem = build_schedule_problem_v1(
+        normalized,
+        evaluation,
+        parameters,
+        trips,
+        [],
+        ScenarioCConfig(),
+    )
+
+    outcome = run_schedule_solver_v1(problem, _BombSolver())
+
+    assert (
+        evaluation.evaluation.disposition
+        == BDisposition.TECHNICALLY_INFEASIBLE_BUT_PARAMETERS_MAY_ALLOW_REDISTRIBUTION
+    )
+    assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_INSUFFICIENT_DATA
+    assert outcome.execution_status == SolverExecutionStatus.NOT_RUN
+
+
+def test_case_25_fixed_parameter_infeasibility_precedes_demand_coverage() -> None:
+    parameters, trips, _, fleet_limit = _fixture()
+    normalized = _normalized(parameters, trips, [], fleet_limit)
+    evaluation = evaluate_scenario_b_v1(normalized)
+    problem = build_schedule_problem_v1(
+        normalized,
+        evaluation,
+        parameters,
+        trips,
+        [],
+        ScenarioCConfig(),
+    )
+    proven = replace(
+        problem,
+        b_evaluation=replace(
+            problem.b_evaluation,
+            evaluation=replace(
+                problem.b_evaluation.evaluation,
+                disposition=BDisposition.PARAMETERS_INFEASIBLE,
+            ),
+        ),
+    )
+
+    outcome = run_schedule_solver_v1(proven, _BombSolver())
+
+    assert outcome.result_status == GenerationResultStatus.NO_FEASIBLE_C_WITH_B_PARAMETERS
+    assert outcome.execution_status == SolverExecutionStatus.NOT_RUN
+    assert outcome.solution is None
+
+
+def test_case_26_direct_candidate_validation_rejects_missing_c_authority() -> None:
+    full_problem, parameters, trips, _, fleet_limit = _problem()
+    candidate = _candidate(full_problem)
+    normalized = _normalized(parameters, trips, [], fleet_limit)
+    evaluation = evaluate_scenario_b_v1(normalized)
+    incomplete_problem = build_schedule_problem_v1(
+        normalized,
+        evaluation,
+        parameters,
+        trips,
+        [],
+        ScenarioCConfig(),
+    )
+    bypass_candidate = _refingerprint(incomplete_problem, candidate)
+
+    validation = validate_and_build_solution_v1(
+        incomplete_problem,
+        bypass_candidate,
+    )
+
+    assert validation.status == CandidateValidationStatus.REJECTED
+    assert "DEMAND_COVERAGE_INCOMPLETE_FOR_AUTHORITATIVE_C" in validation.rejection_codes
+    assert validation.solution is None
+
+
+def test_case_28_coverage_change_alters_problem_fingerprint() -> None:
+    full_problem, parameters, trips, demand, fleet_limit = _problem()
+    gapped_demand = [item for item in demand if item.block_start_seconds < 12 * 3600]
+    gapped_normalized = _normalized(
+        parameters,
+        trips,
+        gapped_demand,
+        fleet_limit,
+    )
+    gapped_evaluation = evaluate_scenario_b_v1(gapped_normalized)
+    gapped_problem = build_schedule_problem_v1(
+        gapped_normalized,
+        gapped_evaluation,
+        parameters,
+        trips,
+        gapped_demand,
+        ScenarioCConfig(),
+    )
+
+    assert full_problem.problem_fingerprint != gapped_problem.problem_fingerprint
+    assert full_problem.b_evaluation.demand_resolution.coverage_assessment.directional_c_generation_supported
+    assert not (
+        gapped_problem.b_evaluation.demand_resolution.coverage_assessment.directional_c_generation_supported
+    )
+
+
 def test_heuristic_candidate_crosses_boundary_and_matches_legacy_behavior() -> None:
     problem, parameters, trips, demand, fleet_limit = _problem()
     baseline = tuple(trips)
@@ -921,6 +1100,7 @@ def test_heuristic_candidate_crosses_boundary_and_matches_legacy_behavior() -> N
     )
     outcome = run_schedule_solver_v1(problem, HeuristicScheduleSolverAdapter())
 
+    assert problem.b_evaluation.demand_resolution.coverage_assessment.directional_c_generation_supported
     assert outcome.result_status == GenerationResultStatus.SOLUTION_ACCEPTED
     assert outcome.execution_status == SolverExecutionStatus.COMPLETED
     assert outcome.solver_status == NativeSolverStatus.FEASIBLE

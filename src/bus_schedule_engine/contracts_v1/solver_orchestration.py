@@ -3,6 +3,10 @@ from __future__ import annotations
 import time
 from dataclasses import replace
 
+from .demand_coverage import (
+    DEMAND_COVERAGE_INCOMPLETE_FOR_C_GENERATION,
+    assess_demand_coverage_v1,
+)
 from .evaluation import BDisposition
 from .serialization import canonical_sha256
 from .solver_fingerprints import outcome_fingerprint_payload
@@ -90,23 +94,31 @@ def run_schedule_solver_v1(
     solver: ScheduleSolver,
 ) -> ScheduleGenerationOutcomeV1:
     disposition = problem.b_evaluation.evaluation.disposition
+    if disposition == BDisposition.PARAMETERS_INFEASIBLE:
+        return _not_run_outcome(
+            problem,
+            GenerationResultStatus.NO_FEASIBLE_C_WITH_B_PARAMETERS,
+            "B's locked parameters were proven infeasible before solver invocation.",
+        )
     if disposition == BDisposition.TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE:
         return _not_run_outcome(
             problem,
             GenerationResultStatus.C_NOT_REQUIRED_B_SUITABLE,
             "Scenario B is feasible and demand-suitable; no duplicate C is generated.",
         )
-    if disposition == BDisposition.INSUFFICIENT_DATA:
+    coverage = assess_demand_coverage_v1(
+        problem.normalized_inputs,
+        minimum_confidence=(problem.evaluation_policy.minimum_authoritative_demand_confidence),
+    )
+    if not coverage.directional_c_generation_supported:
         return _not_run_outcome(
             problem,
             GenerationResultStatus.C_NOT_GENERATED_INSUFFICIENT_DATA,
-            "Demand evidence is insufficient for demand-optimized C generation.",
-        )
-    if disposition == BDisposition.PARAMETERS_INFEASIBLE:
-        return _not_run_outcome(
-            problem,
-            GenerationResultStatus.NO_FEASIBLE_C_WITH_B_PARAMETERS,
-            "B's locked parameters were proven infeasible before solver invocation.",
+            (
+                f"{DEMAND_COVERAGE_INCOMPLETE_FOR_C_GENERATION}: "
+                "Demand evidence is insufficient for authoritative directional C generation."
+            ),
+            limitations=coverage.limitations,
         )
 
     started = time.perf_counter()

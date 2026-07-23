@@ -4,6 +4,10 @@ import math
 from collections import Counter
 from dataclasses import dataclass, replace
 
+from .demand_coverage import (
+    DEMAND_COVERAGE_INCOMPLETE_FOR_AUTHORITATIVE_C,
+    assess_demand_coverage_v1,
+)
 from .demand_resolution import DemandAnalysisBlockV1, InterpolationStatus
 from .evaluation import (
     BlockEvaluationV1,
@@ -547,6 +551,12 @@ def validate_and_build_solution_v1(
     candidate: RawScheduleCandidateV1,
 ) -> CandidateValidationResultV1:
     rejection_codes: list[str] = []
+    coverage = assess_demand_coverage_v1(
+        problem.normalized_inputs,
+        minimum_confidence=(problem.evaluation_policy.minimum_authoritative_demand_confidence),
+    )
+    if not coverage.directional_c_generation_supported:
+        rejection_codes.append(DEMAND_COVERAGE_INCOMPLETE_FOR_AUTHORITATIVE_C)
     b = problem.normalized_inputs.scenario_b
     source_ids = [trip.source_b_trip_id for trip in candidate.exact_timetable]
     c_ids = [trip.c_trip_id for trip in candidate.exact_timetable]

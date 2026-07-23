@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from .demand_coverage import demand_source_defects_v1
 from .demand_resolution import (
     DemandBlockPolicyV1,
     DemandResolutionContractV1,
@@ -28,8 +29,6 @@ from .evaluation import (
     evaluate_scenario_b_v1 as _evaluate_scenario_b_v1,
 )
 from .models import (
-    ContractDirection,
-    DemandObservation,
     DemandResolutionType,
     NormalizedInputBundleV1,
     ObservedDemandInput,
@@ -55,31 +54,10 @@ def _validate_authoritative_demand_source(
             "Regular-interval demand requires one explicit common source resolution"
         )
 
-    observations_by_direction: dict[
-        ContractDirection,
-        list[DemandObservation],
-    ] = {}
-    for observation in demand.observations:
-        if observation.source_resolution_type == DemandResolutionType.DAILY_TOTAL:
-            continue
-        observations_by_direction.setdefault(observation.direction, []).append(observation)
-
-    for direction, observations in observations_by_direction.items():
-        ordered = sorted(
-            observations,
-            key=lambda item: (
-                item.interval_start,
-                item.interval_end,
-                item.observation_id,
-            ),
-        )
-        for previous, current in zip(ordered, ordered[1:], strict=False):
-            if current.interval_start < previous.interval_end:
-                raise DemandResolutionError(
-                    "Overlapping demand observations are not authoritative within "
-                    f"direction {direction.value}: {previous.observation_id}, "
-                    f"{current.observation_id}"
-                )
+    defects = demand_source_defects_v1(demand.observations)
+    if defects:
+        first = defects[0]
+        raise DemandResolutionError(first.message, code=first.code)
 
 
 def detect_demand_resolution_v1(

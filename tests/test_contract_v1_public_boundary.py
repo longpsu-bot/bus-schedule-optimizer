@@ -85,8 +85,36 @@ def test_public_boundary_rejects_overlapping_same_direction_demand(
         ],
     )
 
-    with pytest.raises(DemandResolutionError, match="Overlapping demand observations"):
+    with pytest.raises(
+        DemandResolutionError,
+        match="OVERLAPPING_DEMAND_OBSERVATIONS",
+    ) as raised:
         build_demand_analysis_blocks_v1(bundle.observed_demand)
+
+    assert raised.value.code == "OVERLAPPING_DEMAND_OBSERVATIONS"
+
+
+def test_public_boundary_rejects_overlapping_combined_and_directional_grain(
+    make_parameters,
+    make_valid_trips,
+) -> None:
+    parameters = make_parameters()
+    bundle = _bundle(
+        parameters,
+        make_valid_trips(parameters),
+        [
+            _record(6, 8, 40),
+            _record(7, 9, 40, direction=Direction.TERMINAL_1_TO_2),
+        ],
+    )
+
+    with pytest.raises(
+        DemandResolutionError,
+        match="MIXED_DIRECTION_GRAIN_OVERLAP",
+    ) as raised:
+        build_demand_analysis_blocks_v1(bundle.observed_demand)
+
+    assert raised.value.code == "MIXED_DIRECTION_GRAIN_OVERLAP"
 
 
 def test_public_boundary_rejects_unimplemented_interpolation(

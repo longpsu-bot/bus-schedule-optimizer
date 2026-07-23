@@ -5,6 +5,18 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from statistics import mean, pstdev
 
+from .demand_coverage import (
+    COMBINED_DEMAND_DIRECTIONAL_SUPPORT_UNAVAILABLE,
+    DEMAND_DEPARTURE_NOT_COVERED,
+    DEMAND_DIRECTION_STREAM_MISSING,
+    DEMAND_SERVICE_WINDOW_NOT_COVERED,
+    DEMAND_TEMPORAL_COVERAGE_GAP,
+    MIXED_DIRECTION_GRAIN_OVERLAP,
+    MIXED_DIRECTION_GRAIN_PARTIAL_SUPPORT,
+    OVERLAPPING_DEMAND_OBSERVATIONS,
+    DemandCoverageAssessmentV1,
+    assess_demand_coverage_v1,
+)
 from .demand_resolution import (
     BlockBoundaryReason,
     BlockMode,
@@ -597,16 +609,68 @@ def _protect_adaptive_critical_conditions(
     )
 
 
+_COVERAGE_ISSUE_MESSAGES = {
+    DEMAND_TEMPORAL_COVERAGE_GAP: (
+        "At least one demand stream contains a positive-duration temporal coverage gap."
+    ),
+    DEMAND_SERVICE_WINDOW_NOT_COVERED: (
+        "Authoritative observations do not cover a required A/B comparison-span boundary."
+    ),
+    DEMAND_DEPARTURE_NOT_COVERED: (
+        "At least one exact A/B departure is outside every compatible half-open demand interval."
+    ),
+    DEMAND_DIRECTION_STREAM_MISSING: (
+        "Both outbound and inbound demand streams are required for a directional conclusion."
+    ),
+    MIXED_DIRECTION_GRAIN_PARTIAL_SUPPORT: (
+        "Non-overlapping combined and directional observations preserve local findings "
+        "but do not support one whole-window demand conclusion."
+    ),
+    COMBINED_DEMAND_DIRECTIONAL_SUPPORT_UNAVAILABLE: (
+        "Combined demand supports an aggregate B conclusion only; directional support is unavailable."
+    ),
+    OVERLAPPING_DEMAND_OBSERVATIONS: (
+        "Overlapping observations within one demand stream are not authoritative."
+    ),
+    MIXED_DIRECTION_GRAIN_OVERLAP: (
+        "Overlapping combined and directional observations lack an approved reconciliation policy."
+    ),
+}
+
+
+def _coverage_issues(
+    assessment: DemandCoverageAssessmentV1 | None,
+) -> tuple[EvaluationIssueV1, ...]:
+    if assessment is None:
+        return ()
+    output: list[EvaluationIssueV1] = []
+    for code in assessment.evaluation_issue_codes:
+        references = tuple(item for item in assessment.evidence if item.startswith(code)) or (code,)
+        if code in {
+            OVERLAPPING_DEMAND_OBSERVATIONS,
+            MIXED_DIRECTION_GRAIN_OVERLAP,
+        }:
+            severity = EvaluationIssueSeverity.ERROR
+        elif code == COMBINED_DEMAND_DIRECTIONAL_SUPPORT_UNAVAILABLE:
+            severity = EvaluationIssueSeverity.INFO
+        else:
+            severity = EvaluationIssueSeverity.WARNING
+        output.append(
+            EvaluationIssueV1(
+                code=code,
+                severity=severity,
+                message=_COVERAGE_ISSUE_MESSAGES[code],
+                references=references,
+            )
+        )
+    return tuple(output)
+
+
 def _demand_dimension(
     plans: tuple[BlockSupplyPlanV1, ...],
     resolution: DemandResolutionResultV1 | None,
 ) -> EvaluationDimensionV1:
-    if resolution is None or not resolution.blocks:
-        return _dimension(
-            DimensionStatus.INSUFFICIENT_DATA,
-            "No authoritative intraday demand blocks are available.",
-            confidence=DemandConfidence.UNKNOWN,
-        )
+    assessment = resolution.coverage_assessment if resolution is not None else None
     statuses = {item.status for item in plans}
     confidence = min(
         (item.confidence for item in plans),
@@ -657,15 +721,32 @@ def _demand_dimension(
                 ),
             )
         )
-    if BlockSupplyStatus.INSUFFICIENT_DATA in statuses:
-        status = DimensionStatus.INSUFFICIENT_DATA
-    elif any(item.severity == EvaluationIssueSeverity.ERROR for item in issues):
+    issues.extend(_coverage_issues(assessment))
+
+    has_known_failure = any(
+        item.status
+        in {
+            BlockSupplyStatus.NO_SERVICE_WITH_DEMAND,
+            BlockSupplyStatus.CRITICAL_ABOVE_90,
+        }
+        for item in plans
+    )
+    has_known_warning = BlockSupplyStatus.WARNING_ABOVE_85 in statuses
+    whole_b_supported = bool(assessment is not None and assessment.whole_b_suitability_supported)
+    if has_known_failure:
         status = DimensionStatus.FAIL
-    elif issues:
+    elif has_known_warning:
         status = DimensionStatus.WARNING
+    elif (
+        resolution is None
+        or not resolution.blocks
+        or BlockSupplyStatus.INSUFFICIENT_DATA in statuses
+        or not whole_b_supported
+    ):
+        status = DimensionStatus.INSUFFICIENT_DATA
     else:
         status = DimensionStatus.PASS
-    evidence = tuple(
+    block_evidence = tuple(
         f"{item.block_id}/{item.direction.value}: trips={item.b_trip_count}, "
         f"demand={item.passenger_demand:.6f}, lf={item.load_factor}, "
         f"required_85={item.required_trips_85}, "
@@ -673,11 +754,15 @@ def _demand_dimension(
         f"shortage={item.shortage:.6f}, status={item.status.value}"
         for item in plans
     )
+    coverage_evidence = assessment.evidence if assessment is not None else ()
     return _dimension(
         status,
-        "Demand suitability uses one-sided 85% and 90% ceilings; low load is review-only.",
+        (
+            "Demand suitability preserves observed local adverse findings and requires "
+            "whole-window coverage before a suitable conclusion."
+        ),
         issues=tuple(issues),
-        evidence=evidence,
+        evidence=block_evidence + coverage_evidence,
         confidence=confidence,
     )
 
@@ -776,6 +861,21 @@ def evaluate_scenario_b_v1(
             bundle,
             resolution,
             policy,
+        )
+        coverage = assess_demand_coverage_v1(
+            bundle,
+            minimum_confidence=policy.minimum_authoritative_demand_confidence,
+        )
+        coverage_warnings = tuple(
+            f"{code}: authoritative demand coverage requires review."
+            for code in coverage.evaluation_issue_codes
+            if code != COMBINED_DEMAND_DIRECTIONAL_SUPPORT_UNAVAILABLE
+        )
+        resolution = replace(
+            resolution,
+            warnings=tuple(dict.fromkeys((*resolution.warnings, *coverage_warnings))),
+            limitations=tuple(dict.fromkeys((*resolution.limitations, *coverage.limitations))),
+            coverage_assessment=coverage,
         )
         a_supply, b_supply = build_block_supply_plans_v1(
             bundle,

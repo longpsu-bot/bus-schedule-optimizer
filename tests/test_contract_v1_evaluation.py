@@ -211,17 +211,17 @@ def test_combined_demand_remains_combined(
     ("passengers", "expected_status", "expected_disposition"),
     [
         (
-            170,
+            340,
             BlockSupplyStatus.WITHIN_PLANNING_CEILING,
             BDisposition.TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE,
         ),
         (
-            171,
+            341,
             BlockSupplyStatus.WARNING_ABOVE_85,
             BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE,
         ),
         (
-            181,
+            361,
             BlockSupplyStatus.CRITICAL_ABOVE_90,
             BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE,
         ),
@@ -238,16 +238,16 @@ def test_one_sided_load_factor_thresholds(
     bundle = _bundle(
         parameters,
         make_valid_trips(parameters),
-        [_record(6, 7, passengers)],
+        [_record(6, 8, passengers)],
     )
 
     result = evaluate_scenario_b_v1(bundle)
     plan = result.b_block_supply[0]
 
-    assert plan.b_trip_count == 2
+    assert plan.b_trip_count == 4
     assert plan.status == expected_status
     assert result.evaluation.disposition == expected_disposition
-    if passengers == 170:
+    if passengers == 340:
         assert plan.load_factor == pytest.approx(0.85)
 
 
@@ -259,7 +259,7 @@ def test_low_load_is_review_only_not_donor_or_reduction_signal(
     bundle = _bundle(
         parameters,
         make_valid_trips(parameters),
-        [_record(6, 7, 10)],
+        [_record(6, 8, 10)],
     )
 
     result = evaluate_scenario_b_v1(bundle)
