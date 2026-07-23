@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
+from dataclasses import fields, replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -13,12 +13,17 @@ from bus_schedule_engine.c_config import ScenarioCConfig
 from bus_schedule_engine.c_generator import generate_scenario_c
 from bus_schedule_engine.contracts_v1 import (
     BDisposition,
+    BoundaryConvention,
     CandidateValidationStatus,
     ContractDirection,
     DemandConfidence,
+    DemandResolutionType,
     DepartureTerminal,
+    DirectionTripLockMode,
+    FleetConstraintMode,
     GenerationResultStatus,
-    HeuristicScheduleSolverAdapter,
+    InitialFleetPositioningMode,
+    InputSourceType,
     NativeSolverStatus,
     NormalizationOptions,
     OperatingDayType,
@@ -27,17 +32,28 @@ from bus_schedule_engine.contracts_v1 import (
     RawScheduleCandidateV1,
     ScenarioBEvaluationPolicyV1,
     ScheduleProblemError,
+    ScheduleProblemV1,
     SolverExecutionStatus,
+    SolverPolicyV1,
     SolverRunResultV1,
     TurnaroundMinutes,
-    build_schedule_problem_v1,
+    build_heuristic_schedule_request_v1,
     evaluate_scenario_b_v1,
     normalize_imported_workbook_v1,
+    observed_demand_fingerprint,
     run_schedule_solver_v1,
     scenario_fingerprint,
     schedule_outcome_to_contract_dict,
+    schedule_problem_to_contract_dict,
     schedule_solution_to_contract_dict,
     validate_and_build_solution_v1,
+    validate_schedule_problem_v1,
+)
+from bus_schedule_engine.contracts_v1 import (
+    HeuristicScheduleSolverAdapter as _HeuristicScheduleSolverAdapter,
+)
+from bus_schedule_engine.contracts_v1 import (
+    build_schedule_problem_v1 as build_canonical_schedule_problem_v1,
 )
 from bus_schedule_engine.contracts_v1.fleet_assignment import assign_contract_v1_fleet
 from bus_schedule_engine.contracts_v1.solver_fingerprints import candidate_fingerprint
@@ -45,6 +61,7 @@ from bus_schedule_engine.contracts_v1.solver_problem import (
     HEURISTIC_TURNAROUND_BRIDGE_MODE,
     RUNTIME_LOCK_MODE,
     TURNAROUND_APPLICATION_MODE,
+    empty_adapter_context_fingerprint,
 )
 from bus_schedule_engine.fingerprint import timetable_fingerprint
 from bus_schedule_engine.fleet import assign_fleet
@@ -67,6 +84,52 @@ SCHEMAS = {
 REGISTRY = Registry().with_resources(
     (schema["$id"], Resource.from_contents(schema)) for schema in SCHEMAS.values()
 )
+_HEURISTIC_ADAPTERS: dict[str, _HeuristicScheduleSolverAdapter] = {}
+
+
+def build_schedule_problem_v1(
+    normalized,
+    evaluation,
+    parameters,
+    trips,
+    demand,
+    config,
+    policy=None,
+):
+    context, adapter = build_heuristic_schedule_request_v1(
+        normalized,
+        evaluation,
+        parameters,
+        trips,
+        demand,
+        config,
+        policy,
+    )
+    _HEURISTIC_ADAPTERS[context.problem_fingerprint] = adapter
+    return context
+
+
+def _heuristic_adapter(context) -> _HeuristicScheduleSolverAdapter:
+    return _HEURISTIC_ADAPTERS[context.problem_fingerprint]
+
+
+def _heuristic_context(context):
+    return _heuristic_adapter(context).compatibility_context
+
+
+class HeuristicScheduleSolverAdapter:
+    """Compatibility proxy for the pre-H4 adversarial suite."""
+
+    adapter_id = _HeuristicScheduleSolverAdapter.adapter_id
+
+    def solve(self, problem):
+        context = problem if hasattr(problem, "problem") else None
+        canonical_problem = context.problem if context is not None else problem
+        if context is not None:
+            adapter = _heuristic_adapter(context)
+        else:
+            adapter = _HEURISTIC_ADAPTERS[canonical_problem.problem_fingerprint]
+        return adapter.solve(canonical_problem)
 
 
 def _schema_errors(instance: dict[str, object], schema_name: str) -> list[str]:
@@ -189,6 +252,83 @@ def _problem(
         policy,
     )
     return problem, parameters, trips, demand, effective_fleet_limit
+
+
+def _b_only_problem():
+    parameters, trips, _, fleet_limit = _fixture()
+    normalized = _normalized(parameters, trips, [], fleet_limit)
+    normalized = replace(
+        normalized,
+        scenario_a=None,
+        scenario_a_fingerprint=None,
+    )
+    evaluation = evaluate_scenario_b_v1(normalized)
+    context = build_schedule_problem_v1(
+        normalized,
+        evaluation,
+        parameters,
+        trips,
+        [],
+        ScenarioCConfig(),
+    )
+    return context, parameters, trips, fleet_limit
+
+
+def _daily_total_problem():
+    parameters, trips, demand, fleet_limit = _fixture()
+    daily_rows = [
+        replace(
+            demand[0],
+            direction=direction,
+        )
+        for direction in (
+            Direction.TERMINAL_1_TO_2,
+            Direction.TERMINAL_2_TO_1,
+        )
+    ]
+    normalized = _normalized(parameters, trips, daily_rows, fleet_limit)
+    assert normalized.observed_demand is not None
+    observed = replace(
+        normalized.observed_demand,
+        observations=tuple(
+            replace(
+                item,
+                source_resolution_type=DemandResolutionType.DAILY_TOTAL,
+                source_resolution_minutes=None,
+            )
+            for item in normalized.observed_demand.observations
+        ),
+    )
+    normalized = replace(
+        normalized,
+        observed_demand=observed,
+        observed_demand_fingerprint=observed_demand_fingerprint(observed),
+    )
+    evaluation = evaluate_scenario_b_v1(normalized)
+    context = build_schedule_problem_v1(
+        normalized,
+        evaluation,
+        parameters,
+        trips,
+        daily_rows,
+        ScenarioCConfig(),
+    )
+    return context
+
+
+def _generic_problem(
+    normalized,
+    evaluation,
+    *,
+    solver_policy: SolverPolicyV1 | None = None,
+):
+    return build_canonical_schedule_problem_v1(
+        normalized,
+        evaluation,
+        solver_adapter="contract_v1_test_adapter",
+        adapter_context_fingerprint=empty_adapter_context_fingerprint(),
+        solver_policy=solver_policy,
+    )
 
 
 def _candidate(problem):
@@ -610,13 +750,14 @@ class _StaticSolver:
 
     def __init__(self, run: SolverRunResultV1):
         self._run = run
+        self.adapter_id = run.solver_adapter
 
     def solve(self, problem):
         return self._run
 
 
 class _RaisingSolver:
-    adapter_id = "raising_test_adapter"
+    adapter_id = _HeuristicScheduleSolverAdapter.adapter_id
 
     def solve(self, problem):
         raise RuntimeError("secret workbook value at C:\\private\\operator\\source.xlsx")
@@ -625,14 +766,18 @@ class _RaisingSolver:
 def test_problem_reconciles_normalized_and_legacy_inputs() -> None:
     problem, _, trips, _, _ = _problem()
 
-    assert len(problem.legacy_trips_b) == 26
+    assert len(_heuristic_context(problem).legacy_trips_b) == 26
     assert problem.normalized_inputs.scenario_b.total_daily_trips == 26
     assert problem.b_evaluation == evaluate_scenario_b_v1(
         problem.normalized_inputs,
         problem.evaluation_policy,
     )
     assert len(problem.problem_fingerprint) == 64
-    assert timetable_fingerprint(list(problem.legacy_trips_b)) == timetable_fingerprint(trips)
+    assert timetable_fingerprint(
+        list(_heuristic_context(problem).legacy_trips_b)
+    ) == timetable_fingerprint(
+        sorted(trips, key=lambda item: (item.departure_seconds, item.trip_id))
+    )
 
 
 def test_problem_binds_scenario_default_and_exact_source_runtime_mapping() -> None:
@@ -640,7 +785,7 @@ def test_problem_binds_scenario_default_and_exact_source_runtime_mapping() -> No
     changed_problem, _, _ = _runtime_problem(first_runtime=56)
 
     assert problem.normalized_inputs.scenario_b.trip_runtime_minutes == 60
-    assert problem.legacy_parameters.default_trip_runtime_minutes == 65
+    assert _heuristic_context(problem).legacy_parameters.default_trip_runtime_minutes == 65
     assert {
         trip.runtime_minutes for trip in problem.normalized_inputs.scenario_b.exact_timetable
     } == {55, 65}
@@ -666,7 +811,7 @@ def test_fleet_assessment_uses_each_exact_runtime_not_scenario_or_fallback() -> 
     )
     assert ready_by_trip["B-O-1"] != (
         source_by_id["B-O-1"].departure_time
-        + problem.legacy_parameters.default_trip_runtime_minutes * 60
+        + _heuristic_context(problem).legacy_parameters.default_trip_runtime_minutes * 60
         + 5 * 60
     )
 
@@ -679,8 +824,8 @@ def test_problem_accepts_5_20_and_derives_conservative_heuristic_bridge() -> Non
         terminal_1=5,
         terminal_2=20,
     )
-    assert problem.legacy_parameters.effective_layover_minutes == 20
-    assert problem.legacy_parameters is not parameters
+    assert _heuristic_context(problem).legacy_parameters.effective_layover_minutes == 20
+    assert _heuristic_context(problem).legacy_parameters is not parameters
 
 
 def test_problem_fingerprint_changes_for_each_terminal_turnaround() -> None:
@@ -1004,7 +1149,7 @@ def test_case_24_technically_infeasible_b_with_incomplete_coverage_does_not_run(
     assert outcome.execution_status == SolverExecutionStatus.NOT_RUN
 
 
-def test_case_25_fixed_parameter_infeasibility_precedes_demand_coverage() -> None:
+def test_case_25_unbound_fixed_parameter_proof_is_model_invalid() -> None:
     parameters, trips, _, fleet_limit = _fixture()
     normalized = _normalized(parameters, trips, [], fleet_limit)
     evaluation = evaluate_scenario_b_v1(normalized)
@@ -1029,8 +1174,10 @@ def test_case_25_fixed_parameter_infeasibility_precedes_demand_coverage() -> Non
 
     outcome = run_schedule_solver_v1(proven, _BombSolver())
 
-    assert outcome.result_status == GenerationResultStatus.NO_FEASIBLE_C_WITH_B_PARAMETERS
-    assert outcome.execution_status == SolverExecutionStatus.NOT_RUN
+    assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID
+    assert outcome.execution_status == SolverExecutionStatus.COMPLETED
+    assert outcome.solver_status == NativeSolverStatus.MODEL_INVALID
+    assert any("PROBLEM_EVALUATION_FINGERPRINT_MISMATCH" in item for item in outcome.explanations)
     assert outcome.solution is None
 
 
@@ -1096,7 +1243,7 @@ def test_heuristic_candidate_crosses_boundary_and_matches_legacy_behavior() -> N
         trips,
         demand,
         fleet_limit,
-        problem.heuristic_config,
+        _heuristic_context(problem).heuristic_config,
     )
     outcome = run_schedule_solver_v1(problem, HeuristicScheduleSolverAdapter())
 
@@ -1109,7 +1256,7 @@ def test_heuristic_candidate_crosses_boundary_and_matches_legacy_behavior() -> N
     assert tuple(trips) == baseline
     assert timetable_fingerprint(trips) == baseline_fingerprint
     assert problem.normalized_inputs.scenario_b == scenario_b_before
-    assert problem.legacy_parameters.effective_layover_minutes == (
+    assert _heuristic_context(problem).legacy_parameters.effective_layover_minutes == (
         parameters.effective_layover_minutes
     )
     direct_times = {trip.source_b_trip_id: trip.departure_seconds for trip in direct.trips}
@@ -1610,7 +1757,7 @@ def test_solver_exception_returns_sanitized_model_invalid_envelope() -> None:
     assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID
     assert outcome.execution_status == SolverExecutionStatus.COMPLETED
     assert outcome.solver_status == NativeSolverStatus.MODEL_INVALID
-    assert outcome.solver_adapter == "raising_test_adapter"
+    assert outcome.solver_adapter == _HeuristicScheduleSolverAdapter.adapter_id
     assert outcome.solve_duration_seconds >= 0
     assert outcome.solution is None
     assert outcome.diagnostic_candidate is None
@@ -1864,3 +2011,509 @@ def test_solution_reports_modes_locks_and_actual_maximum_vehicle_use() -> None:
         maximum = max(maximum, active)
     assert solution.maximum_simultaneous_vehicle_use == maximum
     assert maximum <= solution.minimum_required_fleet
+
+
+def test_h4_typed_problem_contains_only_canonical_fields() -> None:
+    field_names = {item.name for item in fields(ScheduleProblemV1)}
+
+    assert {
+        "problem_id",
+        "problem_fingerprint",
+        "evaluation_fingerprint",
+        "scenario_a",
+        "scenario_b",
+        "adapter_context_fingerprint",
+        "operating_parameter_locks",
+        "solver_policy",
+    } <= field_names
+    assert {
+        "normalized_inputs",
+        "b_evaluation",
+        "evaluation_policy",
+        "legacy_parameters",
+        "legacy_trips_b",
+        "legacy_demand",
+        "heuristic_config",
+    }.isdisjoint(field_names)
+
+
+def test_h4_solver_receives_only_canonical_problem() -> None:
+    context, *_ = _problem()
+
+    class _CapturingSolver:
+        def __init__(self, adapter_id: str) -> None:
+            self.adapter_id = adapter_id
+            self.received = None
+
+        def solve(self, problem):
+            self.received = problem
+            return SolverRunResultV1(
+                execution_status=SolverExecutionStatus.COMPLETED,
+                solver_status=NativeSolverStatus.UNKNOWN,
+                solver_adapter=self.adapter_id,
+                solve_duration_seconds=0,
+                candidate=None,
+                explanations=("No candidate.",),
+                limitations=(),
+            )
+
+    solver = _CapturingSolver(context.problem.solver_adapter)
+    run_schedule_solver_v1(context, solver)
+
+    assert solver.received is context.problem
+    assert isinstance(solver.received, ScheduleProblemV1)
+
+
+def test_h4_full_directional_problem_serializes_and_validates_schema() -> None:
+    context, *_ = _problem()
+
+    payload = schedule_problem_to_contract_dict(context.problem)
+
+    assert payload["problem_id"] == ("PROBLEM-" + context.problem.problem_fingerprint[:16].upper())
+    assert len(payload["analysis_blocks"]) == len(context.problem.analysis_blocks)
+    assert {item["direction"] for item in payload["analysis_blocks"]} == {
+        "outbound",
+        "inbound",
+    }
+    assert _schema_errors(payload, "schedule_problem.schema.json") == []
+
+
+def test_h4_b_only_no_demand_problem_uses_nulls_and_empty_arrays() -> None:
+    context, *_ = _b_only_problem()
+    payload = schedule_problem_to_contract_dict(context.problem)
+
+    assert payload["scenario_a"] is None
+    assert payload["source_a_fingerprint"] is None
+    assert payload["observed_demand_fingerprint"] is None
+    assert payload["demand_response_mode"] is None
+    assert payload["demand_resolution"] is None
+    assert payload["analysis_blocks"] == []
+    assert payload["block_requirements"] == []
+    assert _schema_errors(payload, "schedule_problem.schema.json") == []
+
+
+def test_h4_daily_total_demand_has_resolution_without_intraday_blocks() -> None:
+    context = _daily_total_problem()
+    payload = schedule_problem_to_contract_dict(context.problem)
+
+    assert payload["observed_demand_fingerprint"] is not None
+    assert payload["demand_response_mode"] == "static"
+    assert payload["demand_resolution"]["source_resolution_type"] == ("daily_total")
+    assert payload["analysis_blocks"] == []
+    assert payload["block_requirements"] == []
+    outcome = run_schedule_solver_v1(context, _BombSolver())
+    assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_INSUFFICIENT_DATA
+
+
+def test_h4_scenario_a_object_and_fingerprint_are_nullable_together() -> None:
+    context, *_ = _problem()
+    missing_fingerprint = replace(
+        context.problem,
+        source_a_fingerprint=None,
+    )
+    missing_object = replace(
+        context.problem,
+        scenario_a=None,
+    )
+
+    assert "PROBLEM_SCENARIO_A_NULLABILITY_MISMATCH" in {
+        item.code for item in validate_schedule_problem_v1(missing_fingerprint).issues
+    }
+    assert "PROBLEM_SCENARIO_A_NULLABILITY_MISMATCH" in {
+        item.code for item in validate_schedule_problem_v1(missing_object).issues
+    }
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda problem: replace(
+            problem,
+            observed_demand_fingerprint=None,
+        ),
+        lambda problem: replace(problem, demand_response_mode=None),
+        lambda problem: replace(problem, demand_resolution=None),
+        lambda problem: replace(problem, analysis_blocks=()),
+        lambda problem: replace(problem, block_requirements=()),
+    ],
+)
+def test_h4_demand_identity_resolution_and_blocks_must_reconcile(
+    mutation,
+) -> None:
+    context, *_ = _problem()
+
+    codes = {item.code for item in validate_schedule_problem_v1(mutation(context.problem)).issues}
+
+    assert {
+        "PROBLEM_DEMAND_NULLABILITY_MISMATCH",
+        "PROBLEM_BLOCK_RECONCILIATION_MISMATCH",
+    } & codes
+
+
+def test_h4_nested_scenario_tampering_is_rejected() -> None:
+    context, *_ = _problem()
+    first_b = context.problem.scenario_b.exact_timetable[0]
+    tampered_b = replace(
+        context.problem.scenario_b,
+        exact_timetable=(
+            replace(first_b, runtime_minutes=first_b.runtime_minutes + 1),
+            *context.problem.scenario_b.exact_timetable[1:],
+        ),
+    )
+    assert "PROBLEM_SCENARIO_B_FINGERPRINT_MISMATCH" in {
+        item.code
+        for item in validate_schedule_problem_v1(
+            replace(context.problem, scenario_b=tampered_b)
+        ).issues
+    }
+
+    assert context.problem.scenario_a is not None
+    tampered_a = replace(
+        context.problem.scenario_a,
+        route_name=context.problem.scenario_a.route_name + " changed",
+    )
+    assert "PROBLEM_SCENARIO_A_FINGERPRINT_MISMATCH" in {
+        item.code
+        for item in validate_schedule_problem_v1(
+            replace(context.problem, scenario_a=tampered_a)
+        ).issues
+    }
+
+
+def test_h4_evaluation_problem_fingerprint_and_problem_id_tampering_fail() -> None:
+    context, *_ = _problem()
+    cases = (
+        (
+            replace(context.problem, evaluation_fingerprint="0" * 64),
+            "PROBLEM_FINGERPRINT_MISMATCH",
+        ),
+        (
+            replace(context.problem, problem_fingerprint="0" * 64),
+            "PROBLEM_FINGERPRINT_MISMATCH",
+        ),
+        (
+            replace(context.problem, problem_id="PROBLEM-" + "0" * 16),
+            "PROBLEM_ID_FINGERPRINT_MISMATCH",
+        ),
+    )
+    for problem, expected_code in cases:
+        assert expected_code in {item.code for item in validate_schedule_problem_v1(problem).issues}
+    assert context.problem.problem_id == (
+        "PROBLEM-" + context.problem.problem_fingerprint[:16].upper()
+    )
+
+
+def test_h4_duplicate_and_mismatched_block_ids_are_rejected() -> None:
+    context, *_ = _problem()
+    blocks = context.problem.analysis_blocks
+    requirements = context.problem.block_requirements
+    duplicate = replace(
+        context.problem,
+        analysis_blocks=(
+            blocks[0],
+            replace(blocks[1], block_id=blocks[0].block_id),
+            *blocks[2:],
+        ),
+    )
+    assert "PROBLEM_DUPLICATE_BLOCK_ID" in {
+        item.code for item in validate_schedule_problem_v1(duplicate).issues
+    }
+
+    for changed_requirements in (
+        requirements[:-1],
+        (*requirements, replace(requirements[0], block_id="EXTRA-BLOCK")),
+        (
+            replace(
+                requirements[0],
+                block_id="MISMATCHED-BLOCK",
+            ),
+            *requirements[1:],
+        ),
+    ):
+        changed = replace(
+            context.problem,
+            block_requirements=tuple(changed_requirements),
+        )
+        assert "PROBLEM_BLOCK_RECONCILIATION_MISMATCH" in {
+            item.code for item in validate_schedule_problem_v1(changed).issues
+        }
+
+
+def test_h4_operating_locks_are_complete_unique_locked_and_source_bound() -> None:
+    context, *_ = _problem()
+    locks = context.problem.operating_parameter_locks
+    cases = (
+        (
+            replace(context.problem, operating_parameter_locks=locks[1:]),
+            "PROBLEM_LOCK_SET_INCOMPLETE",
+        ),
+        (
+            replace(
+                context.problem,
+                operating_parameter_locks=(*locks, locks[0]),
+            ),
+            "PROBLEM_LOCK_DUPLICATE_FIELD",
+        ),
+        (
+            replace(
+                context.problem,
+                operating_parameter_locks=(
+                    replace(locks[0], locked=False),
+                    *locks[1:],
+                ),
+            ),
+            "PROBLEM_LOCK_SET_INCOMPLETE",
+        ),
+        (
+            replace(
+                context.problem,
+                operating_parameter_locks=(
+                    replace(locks[0], source_fingerprint="0" * 64),
+                    *locks[1:],
+                ),
+            ),
+            "PROBLEM_LOCK_SOURCE_MISMATCH",
+        ),
+        (
+            replace(
+                context.problem,
+                operating_parameter_locks=(
+                    replace(locks[0], value="tampered"),
+                    *locks[1:],
+                ),
+            ),
+            "PROBLEM_LOCK_VALUE_MISMATCH",
+        ),
+    )
+    for problem, expected_code in cases:
+        assert expected_code in {item.code for item in validate_schedule_problem_v1(problem).issues}
+
+
+def test_h4_accepted_solution_reuses_exact_problem_lock_tuple() -> None:
+    context, *_ = _problem()
+
+    outcome = run_schedule_solver_v1(
+        context,
+        _heuristic_adapter(context),
+    )
+
+    assert outcome.solution is not None
+    assert outcome.solution.operating_parameter_locks is context.problem.operating_parameter_locks
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("direction_trip_lock_mode", DirectionTripLockMode.TOTAL_ONLY),
+        ("fleet_constraint_mode", FleetConstraintMode.EXACT_SCHEDULED_FLEET),
+        (
+            "initial_fleet_positioning_mode",
+            InitialFleetPositioningMode.FIXED,
+        ),
+        (
+            "boundary_convention",
+            BoundaryConvention.HALF_OPEN_WITH_FINAL_SENTINEL,
+        ),
+    ],
+)
+def test_h4_unsupported_problem_modes_fail_closed(field, value) -> None:
+    context, *_ = _problem()
+    changed = replace(context.problem, **{field: value})
+
+    assert "UNSUPPORTED_PROBLEM_MODE" in {
+        item.code for item in validate_schedule_problem_v1(changed).issues
+    }
+
+
+def test_h4_problem_serialization_never_contains_legacy_context() -> None:
+    context, *_ = _problem()
+
+    payload = schedule_problem_to_contract_dict(context.problem)
+    serialized = json.dumps(payload, sort_keys=True)
+
+    assert "legacy_parameters" not in payload
+    assert "legacy_trips_b" not in payload
+    assert "legacy_demand" not in payload
+    assert "heuristic_config" not in payload
+    assert "preferred_max_shift_per_trip_minutes" not in serialized
+
+
+def test_h4_scenario_c_config_changes_context_and_problem_identity() -> None:
+    first, *_ = _problem()
+    second, *_ = _problem(
+        config=replace(
+            ScenarioCConfig(),
+            preferred_max_shift_per_trip_minutes=14,
+        )
+    )
+
+    assert (
+        _heuristic_context(first).context_fingerprint
+        != _heuristic_context(second).context_fingerprint
+    )
+    assert first.problem_fingerprint != second.problem_fingerprint
+
+
+def test_h4_bridge_value_changes_context_and_problem_identity() -> None:
+    first, *_ = _turnaround_problem(turnaround=(5, 20))
+    second, *_ = _turnaround_problem(turnaround=(5, 21))
+
+    assert (
+        _heuristic_context(first).context_fingerprint
+        != _heuristic_context(second).context_fingerprint
+    )
+    assert first.problem_fingerprint != second.problem_fingerprint
+
+
+def test_h4_legacy_demand_row_changes_context_fingerprint() -> None:
+    parameters, trips, demand, fleet_limit = _fixture()
+    changed_demand = [
+        replace(demand[0], passenger_volume=demand[0].passenger_volume + 1),
+        *demand[1:],
+    ]
+    first_normalized = _normalized(parameters, trips, demand, fleet_limit)
+    second_normalized = _normalized(
+        parameters,
+        trips,
+        changed_demand,
+        fleet_limit,
+    )
+    first = build_schedule_problem_v1(
+        first_normalized,
+        evaluate_scenario_b_v1(first_normalized),
+        parameters,
+        trips,
+        demand,
+        ScenarioCConfig(),
+    )
+    second = build_schedule_problem_v1(
+        second_normalized,
+        evaluate_scenario_b_v1(second_normalized),
+        parameters,
+        trips,
+        changed_demand,
+        ScenarioCConfig(),
+    )
+
+    assert (
+        _heuristic_context(first).context_fingerprint
+        != _heuristic_context(second).context_fingerprint
+    )
+
+
+def test_h4_adapter_rejects_context_from_another_b_problem() -> None:
+    first, *_ = _problem()
+    second, *_ = _runtime_problem()
+
+    run = _heuristic_adapter(first).solve(second.problem)
+
+    assert run.solver_status == NativeSolverStatus.MODEL_INVALID
+    assert run.candidate is None
+    assert any("HEURISTIC_CONTEXT_SOURCE_MISMATCH" in item for item in run.explanations)
+
+
+def test_h4_adapter_rejects_demand_context_mismatch() -> None:
+    high_demand, *_ = _problem()
+    low_demand, *_ = _problem(low_demand=True)
+
+    run = _heuristic_adapter(high_demand).solve(low_demand.problem)
+
+    assert run.solver_status == NativeSolverStatus.MODEL_INVALID
+    assert run.candidate is None
+    assert any("HEURISTIC_CONTEXT_DEMAND_MISMATCH" in item for item in run.explanations)
+
+
+def test_h4_orchestration_rejects_wrong_adapter_without_invocation() -> None:
+    context, *_ = _problem()
+
+    outcome = run_schedule_solver_v1(context, _BombSolver())
+
+    assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID
+    assert outcome.solver_status == NativeSolverStatus.MODEL_INVALID
+    assert any("PROBLEM_ADAPTER_CONTEXT_MISMATCH" in item for item in outcome.explanations)
+
+
+def test_h4_identical_inputs_have_deterministic_context_and_problem_ids() -> None:
+    first, *_ = _problem()
+    second, *_ = _problem()
+
+    assert (
+        _heuristic_context(first).context_fingerprint
+        == _heuristic_context(second).context_fingerprint
+    )
+    assert first.problem_fingerprint == second.problem_fingerprint
+    assert first.problem.problem_id == second.problem.problem_id
+
+
+def test_h4_generic_solver_policy_changes_problem_fingerprint() -> None:
+    parameters, trips, demand, fleet_limit = _fixture()
+    normalized = _normalized(parameters, trips, demand, fleet_limit)
+    evaluation = evaluate_scenario_b_v1(normalized)
+    first = _generic_problem(normalized, evaluation)
+    second = _generic_problem(
+        normalized,
+        evaluation,
+        solver_policy=SolverPolicyV1(random_seed=7),
+    )
+
+    assert first.problem_fingerprint != second.problem_fingerprint
+
+
+def test_h4_import_timestamps_and_notes_do_not_change_problem_identity() -> None:
+    parameters, trips, demand, fleet_limit = _fixture()
+    normalized = _normalized(parameters, trips, demand, fleet_limit)
+    assert normalized.scenario_a is not None
+    assert normalized.observed_demand is not None
+    changed_a = replace(
+        normalized.scenario_a,
+        source_metadata=replace(
+            normalized.scenario_a.source_metadata,
+            imported_at=datetime(2030, 1, 1, tzinfo=UTC),
+            notes="Changed A note",
+        ),
+    )
+    changed_b = replace(
+        normalized.scenario_b,
+        source_metadata=replace(
+            normalized.scenario_b.source_metadata,
+            imported_at=datetime(2030, 1, 2, tzinfo=UTC),
+            notes="Changed B note",
+        ),
+    )
+    changed_demand = replace(
+        normalized.observed_demand,
+        source_metadata=replace(
+            normalized.observed_demand.source_metadata,
+            imported_at=datetime(2030, 1, 3, tzinfo=UTC),
+            notes="Changed demand note",
+        ),
+    )
+    changed = replace(
+        normalized,
+        scenario_a=changed_a,
+        scenario_b=changed_b,
+        observed_demand=changed_demand,
+    )
+    first = _generic_problem(normalized, evaluate_scenario_b_v1(normalized))
+    second = _generic_problem(changed, evaluate_scenario_b_v1(changed))
+
+    assert first.problem_fingerprint == second.problem_fingerprint
+
+
+def test_h4_stable_source_id_and_type_change_problem_identity() -> None:
+    parameters, trips, demand, fleet_limit = _fixture()
+    normalized = _normalized(parameters, trips, demand, fleet_limit)
+    changed_b = replace(
+        normalized.scenario_b,
+        source_metadata=replace(
+            normalized.scenario_b.source_metadata,
+            source_type=InputSourceType.API,
+            source_id="changed-stable-source",
+        ),
+    )
+    changed = replace(normalized, scenario_b=changed_b)
+    first = _generic_problem(normalized, evaluate_scenario_b_v1(normalized))
+    second = _generic_problem(changed, evaluate_scenario_b_v1(changed))
+
+    assert first.source_b_fingerprint == second.source_b_fingerprint
+    assert first.problem_fingerprint != second.problem_fingerprint

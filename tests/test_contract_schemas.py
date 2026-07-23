@@ -112,6 +112,10 @@ def _accepted_outcome() -> dict[str, Any]:
             "schedule_evaluation_result.example.json",
         ),
         ("schedule_problem.schema.json", "schedule_problem.example.json"),
+        (
+            "schedule_problem.schema.json",
+            "schedule_problem_b_only_no_demand.example.json",
+        ),
         ("schedule_solution.schema.json", "schedule_solution.example.json"),
         (
             "schedule_generation_outcome.schema.json",
@@ -157,6 +161,46 @@ def test_contract_defaults_are_upper_bound_and_solver_determined() -> None:
     properties = SCHEMAS["schedule_problem.schema.json"]["properties"]
     assert properties["fleet_constraint_mode"]["default"] == "available_upper_bound"
     assert properties["initial_fleet_positioning_mode"]["default"] == "solver_determined"
+
+
+def test_completed_problem_schema_has_h4_identity_and_nullable_controls() -> None:
+    properties = SCHEMAS["schedule_problem.schema.json"]["properties"]
+    required = set(SCHEMAS["schedule_problem.schema.json"]["required"])
+
+    assert {
+        "problem_fingerprint",
+        "evaluation_fingerprint",
+        "solver_adapter",
+        "adapter_context_fingerprint",
+        "fixed_initial_fleet",
+        "bounded_initial_fleet",
+    } <= required
+    assert "half_open" in properties["boundary_convention"]["enum"]
+    assert properties["solver_policy"]["properties"]["time_limit_seconds"]["type"] == [
+        "number",
+        "null",
+    ]
+    assert properties["solver_policy"]["properties"]["worker_count"]["type"] == [
+        "integer",
+        "null",
+    ]
+    assert properties["solver_policy"]["properties"]["random_seed"]["type"] == [
+        "integer",
+        "null",
+    ]
+
+
+def test_b_only_problem_example_uses_null_and_empty_semantics() -> None:
+    problem = _load(EXAMPLE_DIR / "schedule_problem_b_only_no_demand.example.json")
+
+    assert problem["scenario_a"] is None
+    assert problem["source_a_fingerprint"] is None
+    assert problem["observed_demand_fingerprint"] is None
+    assert problem["demand_response_mode"] is None
+    assert problem["demand_resolution"] is None
+    assert problem["analysis_blocks"] == []
+    assert problem["block_requirements"] == []
+    assert _schema_errors(problem, "schedule_problem.schema.json") == []
 
 
 def test_fixed_initial_positioning_requires_both_terminal_values() -> None:

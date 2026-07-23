@@ -8,12 +8,14 @@ from .demand_coverage import (
     assess_demand_coverage_v1,
 )
 from .evaluation import BDisposition
+from .problem_validation import validate_schedule_generation_context_v1
 from .serialization import canonical_sha256
 from .solver_fingerprints import outcome_fingerprint_payload
 from .solver_models import (
     GenerationResultStatus,
     NativeSolverStatus,
     RejectedCandidateDiagnosticV1,
+    ScheduleGenerationContextV1,
     ScheduleGenerationOutcomeV1,
     ScheduleProblemV1,
     ScheduleSolver,
@@ -52,7 +54,7 @@ def _not_run_outcome(
             solver_adapter=None,
             solve_duration_seconds=0.0,
             outcome_fingerprint="",
-            source_b_fingerprint=problem.normalized_inputs.scenario_b_fingerprint,
+            source_b_fingerprint=problem.source_b_fingerprint,
             solution=None,
             diagnostic_candidate=None,
             explanations=(explanation,),
@@ -80,7 +82,7 @@ def _completed_without_solution(
             solver_adapter=solver_adapter,
             solve_duration_seconds=solve_duration_seconds,
             outcome_fingerprint="",
-            source_b_fingerprint=problem.normalized_inputs.scenario_b_fingerprint,
+            source_b_fingerprint=problem.source_b_fingerprint,
             solution=None,
             diagnostic_candidate=None,
             explanations=explanations,
@@ -90,10 +92,27 @@ def _completed_without_solution(
 
 
 def run_schedule_solver_v1(
-    problem: ScheduleProblemV1,
+    context: ScheduleGenerationContextV1,
     solver: ScheduleSolver,
 ) -> ScheduleGenerationOutcomeV1:
-    disposition = problem.b_evaluation.evaluation.disposition
+    problem = context.problem
+    context_validation = validate_schedule_generation_context_v1(context)
+    if not context_validation.passed:
+        return _completed_without_solution(
+            problem,
+            result_status=(GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID),
+            solver_status=NativeSolverStatus.MODEL_INVALID,
+            solver_adapter=solver.adapter_id,
+            solve_duration_seconds=0.0,
+            explanations=tuple(
+                f"{issue.code}: generation context rejected." for issue in context_validation.issues
+            ),
+            limitations=(
+                "MODEL_INVALID identifies a problem/context integration defect, "
+                "not route, demand, timetable, fleet, or parameter infeasibility.",
+            ),
+        )
+    disposition = context.b_evaluation.evaluation.disposition
     if disposition == BDisposition.PARAMETERS_INFEASIBLE:
         return _not_run_outcome(
             problem,
@@ -107,8 +126,8 @@ def run_schedule_solver_v1(
             "Scenario B is feasible and demand-suitable; no duplicate C is generated.",
         )
     coverage = assess_demand_coverage_v1(
-        problem.normalized_inputs,
-        minimum_confidence=(problem.evaluation_policy.minimum_authoritative_demand_confidence),
+        context.normalized_inputs,
+        minimum_confidence=(context.evaluation_policy.minimum_authoritative_demand_confidence),
     )
     if not coverage.directional_c_generation_supported:
         return _not_run_outcome(
@@ -119,6 +138,23 @@ def run_schedule_solver_v1(
                 "Demand evidence is insufficient for authoritative directional C generation."
             ),
             limitations=coverage.limitations,
+        )
+    if solver.adapter_id != problem.solver_adapter:
+        return _completed_without_solution(
+            problem,
+            result_status=(GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID),
+            solver_status=NativeSolverStatus.MODEL_INVALID,
+            solver_adapter=solver.adapter_id,
+            solve_duration_seconds=0.0,
+            explanations=(
+                "PROBLEM_ADAPTER_CONTEXT_MISMATCH: solver adapter does not "
+                "match the canonical problem.",
+            ),
+            limitations=(
+                "MODEL_INVALID identifies an adapter-context or integration "
+                "defect, not route, demand, timetable, fleet, or parameter "
+                "infeasibility.",
+            ),
         )
 
     started = time.perf_counter()
@@ -151,6 +187,19 @@ def run_schedule_solver_v1(
             explanations=("Solver adapter returned an invalid execution-state combination.",),
             limitations=run.limitations,
         )
+    if run.solver_adapter != problem.solver_adapter:
+        return _completed_without_solution(
+            problem,
+            result_status=(GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID),
+            solver_status=NativeSolverStatus.MODEL_INVALID,
+            solver_adapter=run.solver_adapter,
+            solve_duration_seconds=run.solve_duration_seconds,
+            explanations=(
+                "PROBLEM_ADAPTER_CONTEXT_MISMATCH: solver result adapter does "
+                "not match the canonical problem.",
+            ),
+            limitations=run.limitations,
+        )
     if run.solver_status == NativeSolverStatus.MODEL_INVALID:
         return _completed_without_solution(
             problem,
@@ -158,7 +207,8 @@ def run_schedule_solver_v1(
             solver_status=run.solver_status,
             solver_adapter=run.solver_adapter,
             solve_duration_seconds=run.solve_duration_seconds,
-            explanations=("Solver adapter reported an invalid model or adapter result.",),
+            explanations=run.explanations
+            or ("Solver adapter reported an invalid model or adapter result.",),
             limitations=run.limitations,
         )
     if run.solver_status == NativeSolverStatus.INFEASIBLE:
@@ -196,7 +246,7 @@ def run_schedule_solver_v1(
             limitations=run.limitations,
         )
 
-    validation = validate_and_build_solution_v1(problem, run.candidate)
+    validation = validate_and_build_solution_v1(context, run.candidate)
     if not validation.passed or validation.solution is None:
         diagnostic = RejectedCandidateDiagnosticV1(
             candidate_fingerprint=run.candidate.candidate_fingerprint,
@@ -212,7 +262,7 @@ def run_schedule_solver_v1(
                 solver_adapter=run.solver_adapter,
                 solve_duration_seconds=run.solve_duration_seconds,
                 outcome_fingerprint="",
-                source_b_fingerprint=(problem.normalized_inputs.scenario_b_fingerprint),
+                source_b_fingerprint=problem.source_b_fingerprint,
                 solution=None,
                 diagnostic_candidate=diagnostic,
                 explanations=run.explanations,
@@ -228,7 +278,7 @@ def run_schedule_solver_v1(
             solver_adapter=run.solver_adapter,
             solve_duration_seconds=run.solve_duration_seconds,
             outcome_fingerprint="",
-            source_b_fingerprint=problem.normalized_inputs.scenario_b_fingerprint,
+            source_b_fingerprint=problem.source_b_fingerprint,
             solution=validation.solution,
             diagnostic_candidate=None,
             explanations=run.explanations,
