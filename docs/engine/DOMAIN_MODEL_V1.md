@@ -1,6 +1,6 @@
 # Domain Model V1
 
-This document organizes the model defined normatively in [Engine Contract V1](ENGINE_CONTRACT_V1.md) and the [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md). If a field or rule here appears ambiguous, the normative contracts prevail.
+This document organizes the model defined normatively in [Engine Contract V1](ENGINE_CONTRACT_V1.md), the [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md), and [Amendment V1-A1](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md). If a field or rule here appears ambiguous, the normative contracts prevail.
 
 ## Bounded contexts
 
@@ -105,3 +105,22 @@ An accepted outcome must contain a complete validated solution. A non-accepted o
 - `SolutionFingerprintService`: canonical serialization → solution/outcome fingerprints.
 
 All services above are framework-neutral. Adapters translate their outputs for UI and export.
+
+## V1-A1 structural-change domain additions
+
+The `1.1.0` target introduces:
+
+| Model | Purpose |
+|---|---|
+| `ServiceChangeAssessment` | derived total/directional/local change metrics and `routine_adjustment`/`material_change`/`structural_change` classification |
+| `DemandSupportAssessment` | temporal, frequency-change, and demand-response support with diagnostics and provenance |
+| `DemandScenarioDefinition` | configured sensitivity method, parameters, approval source, scope, confidence, and limitations |
+| `DemandScenarioSelection` | recorded user analysis decision; never an observed fact |
+| `DemandScenarioEvaluation` | scenario demand and supply results at authoritative source-demand grain |
+| `PostImplementationMonitoringPlan` | review dates, required observations, thresholds, and service-retention/adjustment criteria |
+
+New domain services are `ServiceChangeClassifier`, `DemandSupportEvaluator`, `DemandScenarioEvaluator`, and `MonitoringPlanFactory`. Presentation owns scenario selection interaction but MUST NOT calculate classifications, scenario demand, or load factors.
+
+`total_daily_trips` remains the two-direction total. Directional counts and headways are derived from exact directional timetables and remain independent authoritative values. A symmetric half split is never a domain inference.
+
+A structural-change aggregate may be technically feasible while its demand response is unresolved. This state blocks an authoritative demand-optimized C until an approved scenario selection or calibrated model is present.

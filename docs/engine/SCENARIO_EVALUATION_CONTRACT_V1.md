@@ -1,6 +1,6 @@
 # Scenario Evaluation Contract V1
 
-The normative rules are [Engine Contract V1 §§5–6 and §11](ENGINE_CONTRACT_V1.md). This document defines evaluation sequencing and evidence expectations.
+The normative rules are [Engine Contract V1 §§2.6, 5–6 and §11](ENGINE_CONTRACT_V1.md) together with [Amendment V1-A1](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md). This document defines evaluation sequencing and evidence expectations.
 
 ## Evaluation sequence
 
@@ -24,6 +24,7 @@ Each dimension returns `status`, `issues`, `evidence`, `explanation`, and `confi
 |---|---|---|---|---|
 | valid/consistent | feasible | suitable | `B_TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE` | normally no optimization; explain |
 | valid/consistent | feasible | unsuitable | `B_TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE` | may generate C |
+| valid/consistent structural change | feasible | response unresolved | `B_TECHNICALLY_FEASIBLE_DEMAND_RESPONSE_UNRESOLVED` | scenario workflow; no authoritative demand-optimized C |
 | valid/consistent | infeasible timetable | any known result | `B_TECHNICALLY_INFEASIBLE_BUT_PARAMETERS_MAY_ALLOW_REDISTRIBUTION` | may search for feasible C under locks |
 | fixed parameters infeasible | infeasible | any | `B_PARAMETERS_INFEASIBLE` | return `NO_FEASIBLE_C_WITH_B_PARAMETERS` |
 | demand evidence insufficient | feasible or not evaluable | insufficient | `B_INSUFFICIENT_DATA` | no demand-optimized C |
@@ -45,3 +46,16 @@ C is validated with the same B parameters and independent rules. In addition, co
 ## Explanations
 
 Explanations state: what was evaluated; which observed evidence was used; what changed from B to C; which high-priority objective improved; which residual shortages remain; solver proof status; and limitations. They do not claim forecasted ridership response in `static` mode.
+
+## Structural-change evaluation
+
+Before binary demand suitability, the evaluator derives service-change metrics and demand support. A configured percentage may trigger review but cannot alone determine classification. Total, directional, local-interval, headway-compression, operating-span, and source-grain relationships are evaluated together.
+
+For `structural_change` without calibrated demand response:
+
+- technical, fleet, parameter, and timetable-quality dimensions remain deterministic;
+- demand suitability is `NOT_EVALUATED` or the dedicated unresolved target state, not `PASS`/`FAIL`;
+- the top-level target disposition is `B_TECHNICALLY_FEASIBLE_DEMAND_RESPONSE_UNRESOLVED` when technical feasibility passes;
+- scenario evaluations disclose assumptions and remain sensitivity analysis;
+- the target generation action is `C_NOT_GENERATED_DEMAND_RESPONSE_UNRESOLVED` until an approved scenario or calibrated model exists;
+- explanations require post-implementation validation and include all triggering metrics/diagnostics.

@@ -1,6 +1,6 @@
 # Input and Output Contracts V1
 
-The normative rules are [Engine Contract V1 §§2–5 and §§11–16](ENGINE_CONTRACT_V1.md), together with the normative [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md). JSON files in `contracts/v1/` are draft validation artifacts; the Markdown contracts remain authoritative until schemas are formally approved.
+The normative rules are [Engine Contract V1 §§2–5 and §§11–16](ENGINE_CONTRACT_V1.md), together with the normative [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md) and [Amendment V1-A1](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md). JSON files in `contracts/v1/` are draft validation artifacts; the Markdown contracts remain authoritative until schemas are formally approved.
 
 ## Contract envelope
 
@@ -67,3 +67,18 @@ Draft schemas set `additionalProperties: false` to expose accidental drift. Adap
 ## Example data
 
 Anonymized examples under `examples/contracts/v1/` intentionally use a fictional two-terminal route. They demonstrate shape only and are not approved operational fixtures, benchmarks, or forecasts.
+
+## V1-A1 target additions
+
+The `1.1.0` target adds solver-neutral service-change and scenario-analysis contracts. Required derived fields include total/directional service-change factors, directional A/B headways, headway-compression factors, departures per source-demand interval, service-change classification, and demand temporal/frequency/response support.
+
+The base user input remains exact A/B timetables plus operating parameters. Totals, directional counts, first/last departures, headways, change metrics, and fleet requirements are derived. Observed passenger data is imported or linked evidence context; the structural-change UI does not require users to re-enter passenger rows.
+
+The target output catalogue adds:
+
+- `B_TECHNICALLY_FEASIBLE_DEMAND_RESPONSE_UNRESOLVED`;
+- `C_NOT_GENERATED_DEMAND_RESPONSE_UNRESOLVED`;
+- scenario catalogue/selection, assumptions, provenance, confidence, and monitoring plan;
+- per-scenario interval demand, capacity, load-factor, shortage, and comparison rows.
+
+These additions are documentation-approved migration targets only until `1.1.0` schemas, examples, typed models, validators, serialization, and compatibility tests are merged. Strict `1.0.0` consumers MUST NOT receive undeclared fields or enum values.

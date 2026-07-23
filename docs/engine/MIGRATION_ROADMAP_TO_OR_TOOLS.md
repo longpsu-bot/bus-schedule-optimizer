@@ -26,6 +26,14 @@ Add `ScheduleProblemV1`, `ScheduleSolver`, raw candidate, independent validator,
 
 **Exit gate:** heuristic output crosses the new boundary, passes independent validation, and produces a full solution fingerprint; existing runtime remains behaviorally equivalent.
 
+## Stage 3A — Structural-change demand boundary
+
+Implement Amendment V1-A1: schema/domain version `1.1.0`, derived total/directional/local service-change metrics, support classifications, unresolved-demand disposition/result, scenario catalogue/provenance, UI selection workflow, scenario-aware visualization/XLSX, and monitoring contract.
+
+Hard-constraint OR-Tools feasibility work may proceed in parallel. Production-conforming demand allocation for structural-change cases is blocked until Stage 3A exits.
+
+**Exit gate:** extreme/coarse-resolution fixtures prove no fabricated departure-level demand; scenario assumptions are fully traceable; UI/export distinguish observed demand from scenarios; unresolved cases cannot return binary demand suitability or authoritative demand-optimized C.
+
 ## Stage 4 — OR-Tools feasibility solver
 
 Implement only hard constraints: counts, direction mode, endpoints/windows, order, runtime/turnaround, solver-determined or explicit initial terminal positioning, continuous event-level terminal stock, available fleet upper bound, minimum service, and block reconciliation. Report any feasible C or prove infeasibility for the encoded problem.
@@ -34,7 +42,7 @@ Implement only hard constraints: counts, direction mode, endpoints/windows, orde
 
 ## Stage 5 — OR-Tools demand allocation
 
-Add Level 1 block allocation and lexicographic no-service/90%/85% overload stages. Keep static demand limitations explicit.
+Add Level 1 block allocation and lexicographic no-service/90%/85% overload stages. Keep static demand limitations explicit. Structural-change cases require completed Stage 3A scenario/calibration support and MUST NOT optimize against coarse A demand as if it were fine-grained B demand.
 
 **Exit gate:** one-sided objective tests and demand-allocation regression suite pass; no higher-priority degradation between stages.
 
@@ -61,7 +69,10 @@ Switch the production solver adapter behind a controlled feature flag. Update pr
 ```mermaid
 flowchart LR
   S0["0 Contract freeze"] --> S1["1 Normalize"] --> S2["2 Evaluate"] --> S3["3 Solver interface"]
-  S3 --> S4["4 Feasibility"] --> S5["5 Demand allocation"] --> S6["6 Regularity"]
+  S3 --> S3A["3A Structural-change demand boundary"]
+  S3 --> S4["4 Feasibility"]
+  S3A --> S5["5 Demand allocation"]
+  S4 --> S5 --> S6["6 Regularity"]
   S6 --> S7["7 Parallel validation"] --> S8["8 Cutover"]
 ```
 
@@ -76,6 +87,7 @@ Stages 1–3 are additive and keep legacy adapters. Stages 4–7 run side by sid
 3. Build normalization and independent validation fixtures.
 4. Implement authoritative demand blocks and B disposition.
 5. Introduce solver interface/heuristic adapter.
-6. Benchmark event-balance/reservoir and connection-graph fleet formulations on tiny and 40–80 trip cases.
-7. Implement CP-SAT feasibility, then demand allocation, then regularity.
-8. Complete visualization/export cutover only after solution reconciliation is stable.
+6. Implement V1-A1 service-change classification, scenario workflow, and `1.1.0` contracts.
+7. Benchmark event-balance/reservoir and connection-graph fleet formulations on tiny and 40–80 trip cases.
+8. Implement CP-SAT hard feasibility in parallel with V1-A1; add demand allocation only after both gates pass.
+9. Complete visualization/export cutover only after solution and scenario reconciliation are stable.

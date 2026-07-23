@@ -1,6 +1,6 @@
 # XLSX Export Contract V1
 
-The normative export rules are [Engine Contract V1 §§14–16](ENGINE_CONTRACT_V1.md) together with the [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md). This is a target design only; Contract V1 does not change the current exporter.
+The normative export rules are [Engine Contract V1 §§14–16](ENGINE_CONTRACT_V1.md), the [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md), and [Amendment V1-A1](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md). This is a target design only; Contract V1 does not change the current exporter.
 
 ## Workbook principles
 
@@ -29,6 +29,8 @@ An accepted outcome serializes the embedded `ScheduleSolutionV1`. A non-accepted
 | `NHAT_KY_SOLVER` | execution status, adapter/native status when run, timings, stages/objectives | generation outcome + solver diagnostics |
 | `CAU_HINH_DA_DUNG` | thresholds, modes, lock values | problem/configuration |
 | `GIOI_HAN_DU_LIEU` | demand/static-mode/solver limitations | provenance + generation outcome |
+| `KICH_BAN_NHU_CAU` | V1-A1 scenario catalogue, selected assumptions, provenance, and comparative results | service-change assessment + scenario evaluations |
+| `KE_HOACH_HAU_KIEM` | post-implementation evidence and review criteria for structural changes | monitoring plan |
 
 ## Formatting
 
@@ -54,3 +56,13 @@ For non-accepted outcomes, the exporter verifies that authoritative C fields are
 ## Charts in workbook
 
 If embedded, the two primary charts follow the visualization contract and use the same data tables. Excel category charts must not replace continuous-time/proportional-width semantics; when Excel limitations prevent fidelity, embed a verified image and retain the underlying authoritative table. A non-accepted C appears as a labeled empty state, never as a duplicated B line.
+
+## Structural-change export
+
+For a structural-change case, `TONG_QUAN` and `DANH_GIA_B` show total and actual directional A/B trips, directional headways, service-change classification, support classifications, triggering diagnostics, and `B_TECHNICALLY_FEASIBLE_DEMAND_RESPONSE_UNRESOLVED` where applicable.
+
+`KICH_BAN_NHU_CAU` distinguishes observed A demand from scenario assumptions and compares static/cautious/moderate/high/custom scenarios at authoritative source-demand grain. It records every parameter, unit, approval/provenance source, confidence, limitation, and selected scenario. It MUST NOT allocate assumed demand to individual B departures without supported finer evidence.
+
+`KE_HOACH_HAU_KIEM` records implementation/review dates, trip/direction/time boarding evidence, denied boarding, headway/reliability observations, segmentation, and retain/increase/reduce/redistribute criteria.
+
+Until `1.1.0` output schemas and exporters are implemented, these sheets and statuses are target design and MUST NOT be simulated by placing undeclared fields in a strict `1.0.0` workbook.

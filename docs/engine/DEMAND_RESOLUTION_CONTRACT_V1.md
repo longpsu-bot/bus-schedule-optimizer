@@ -1,6 +1,6 @@
 # Demand Resolution Contract V1
 
-The normative source is [Engine Contract V1 §§2.4–2.5 and §7](ENGINE_CONTRACT_V1.md). This document describes the planned block-building workflow without redefining those rules.
+The normative sources are [Engine Contract V1 §§2.4–2.6 and §7](ENGINE_CONTRACT_V1.md) and [Amendment V1-A1](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md). This document describes the planned block-building workflow without redefining those rules.
 
 ## Resolution detection
 
@@ -63,3 +63,19 @@ Confidence is propagated, not upgraded by aggregation. A block confidence may be
 - critical/no-service states survive adaptive construction;
 - daily-total-only data remains intraday-insufficient;
 - demand block boundaries are not emitted as headway regime anchors.
+
+## Structural service-change support
+
+Demand resolution and proposed service resolution are separate. The engine derives `departures_per_source_demand_interval_A/B`, directional headways, total/directional service-change factors, and local interval changes from exact A/B timetables.
+
+A source interval that contains several B departures supports aggregate interval demand and capacity only. It does not support observed passenger counts for each proposed departure. `demand_temporal_support` is `full`, `partial`, `coarse`, or `unsupported`; `frequency_change_support` is `within_observed_range`, `extrapolation`, or `structural_change`.
+
+When the proposal is structural and no calibrated model exists, `demand_response_support = scenario_analysis_required`. Native/adaptive/manual block construction remains at source-supported grain. Scenario demand assumptions are evaluated over those same authoritative blocks and are labeled assumptions, never observations.
+
+Acceptance checks additionally require:
+
+- total trips are reconciled to actual directional counts before headway analysis;
+- no global percentage threshold is the sole structural-change rule;
+- coarse source demand is not split among finer B departures;
+- static A demand is identified as a lower-bound comparison rather than a ridership forecast;
+- required V1-A1 diagnostic codes and post-implementation monitoring limitations propagate to evaluation and presentation.
