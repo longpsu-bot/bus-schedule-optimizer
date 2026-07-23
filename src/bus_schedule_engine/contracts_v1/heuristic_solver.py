@@ -15,7 +15,11 @@ from .solver_models import (
     SolverExecutionStatus,
     SolverRunResultV1,
 )
-from .solver_problem import contract_direction, departure_terminal
+from .solver_problem import (
+    HEURISTIC_TURNAROUND_BRIDGE_MODE,
+    contract_direction,
+    departure_terminal,
+)
 
 _ACCEPTED_HEURISTIC_STATUSES = {
     ScenarioCStatus.SUITABLE_REGULAR,
@@ -45,12 +49,14 @@ def _raw_candidate_from_generated(
         if source is None:
             raise ValueError(f"Heuristic candidate trip {trip.trip_id} has unknown source B trip")
         direction = contract_direction(trip.direction)
-        arrival = trip.resolved_arrival_seconds(
+        generated_arrival = trip.resolved_arrival_seconds(
             problem.normalized_inputs.scenario_b.trip_runtime_minutes
         )
-        runtime_seconds = arrival - trip.departure_seconds
-        if runtime_seconds <= 0 or runtime_seconds % 60:
-            raise ValueError(f"Heuristic candidate trip {trip.trip_id} has invalid runtime")
+        arrival = trip.departure_seconds + source.runtime_minutes * 60
+        if generated_arrival != arrival:
+            raise ValueError(
+                f"Heuristic candidate trip {trip.trip_id} changed its source B runtime"
+            )
         trips.append(
             RawCandidateTripV1(
                 c_trip_id=trip.trip_id,
@@ -60,7 +66,7 @@ def _raw_candidate_from_generated(
                 b_departure_time=source.departure_time,
                 c_departure_time=trip.departure_seconds,
                 arrival_time=arrival,
-                runtime_minutes=runtime_seconds // 60,
+                runtime_minutes=source.runtime_minutes,
                 shift_minutes=(trip.departure_seconds - source.departure_time) / 60,
                 previous_b_headway=(trace.original_previous_headway if trace is not None else None),
                 previous_c_headway=(trace.new_previous_headway if trace is not None else None),
@@ -113,6 +119,11 @@ def _raw_candidate_from_generated(
         limitations=(
             "The legacy heuristic adapter finds candidates but does not prove "
             "optimality or global infeasibility.",
+            f"The heuristic searched with {HEURISTIC_TURNAROUND_BRIDGE_MODE} "
+            f"using scalar {problem.legacy_parameters.effective_layover_minutes} minutes; "
+            "authoritative validation uses the exact arrival-terminal values "
+            f"{problem.normalized_inputs.scenario_b.turnaround_minutes.terminal_1}/"
+            f"{problem.normalized_inputs.scenario_b.turnaround_minutes.terminal_2}.",
         ),
     )
 
@@ -157,6 +168,9 @@ class HeuristicScheduleSolverAdapter:
                 limitations=(
                     "The heuristic search ended without an accepted candidate; "
                     "this is not proof that B's locked parameters are infeasible.",
+                    f"Search used {HEURISTIC_TURNAROUND_BRIDGE_MODE} with scalar "
+                    f"{problem.legacy_parameters.effective_layover_minutes} minutes and may "
+                    "miss candidates that rely on the shorter terminal turnaround.",
                 ),
             )
         except Exception as exc:
