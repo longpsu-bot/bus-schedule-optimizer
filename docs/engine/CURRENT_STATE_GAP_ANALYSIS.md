@@ -1,6 +1,6 @@
 # Current-State Gap Analysis
 
-Audit date: 2026-07-22. The target rules are in [Engine Contract V1](ENGINE_CONTRACT_V1.md). This report describes the inspected workspace without changing runtime code.
+Audit date: 2026-07-22. The target rules are in [Engine Contract V1](ENGINE_CONTRACT_V1.md), including [Amendment V1-A1](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md). This report describes the inspected workspace without changing runtime code.
 
 ## Inspected structure
 
@@ -59,3 +59,9 @@ Multi-day demand normalization, blocking capacity validation, regulatory turnaro
 ## Known scope limitations
 
 The current README explicitly excludes mixed fleet optimization, multi-route operations, deadhead, driver duties, maintenance, mature cross-midnight optimization, and global optimality. These remain outside Contract V1 unless separately approved.
+
+## V1-A1 implementation gap
+
+Runtime `1.0.0` does not yet derive total/directional/local service-change metrics, classify structural changes, evaluate temporal/frequency/response support, run a scenario-selection workflow, return unresolved-demand statuses, or export scenario/monitoring records. It may therefore overstate demand suitability when A demand is coarse and B service changes substantially.
+
+This is a documented migration gap, not permission to infer fine-grained or induced demand. The next contract implementation PR must add `1.1.0` schemas/models/validators before OR-Tools demand allocation is considered conforming. Hard technical feasibility work remains separable and may continue.

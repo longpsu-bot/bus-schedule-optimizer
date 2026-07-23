@@ -1,6 +1,6 @@
 # Visualization Contract V1
 
-The authoritative visual rules are [Engine Contract V1 §§13–14](ENGINE_CONTRACT_V1.md). Visuals consume `DemandAnalysisBlock`, `BlockSupplyPlan`, exact timetable, evaluation, and fingerprints; they do not recalculate them.
+The authoritative visual rules are [Engine Contract V1 §§13–14](ENGINE_CONTRACT_V1.md) and [Amendment V1-A1](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md). Visuals consume authoritative domain outputs and fingerprints; they do not recalculate them.
 
 ## Shared controls and units
 
@@ -63,3 +63,13 @@ Do not rely on color alone: use line dash/markers and textual status. Legends ar
 - trace totals reconcile with timetable totals;
 - no trace is labeled vehicle count;
 - view metadata fingerprint equals solution fingerprint.
+
+## Structural-change scenario workflow
+
+When `scenario_analysis_required = true`, the UI first presents a technical-change summary rather than a binary demand verdict. It shows A/B total trips, actual directional counts, directional headways, service-change factors, source-demand resolution, departures per source interval, triggering diagnostics, technical/fleet results, and the unresolved-demand status.
+
+The base workflow does not ask users to re-enter demand. It offers configured scenario cards (`static_lower_bound`, `cautious_growth`, `moderate_growth`, `high_growth`, and `custom_approved`) with visible assumptions, provenance, confidence, total demand, passengers per trip, interval LF/shortage ranges, and monitoring requirements.
+
+Observed A demand and scenario demand MUST use different labels and visual treatments. Scenario curves/areas are assumptions, never observations. Demand remains at source-supported interval grain; charts MUST NOT create one passenger point per proposed B departure.
+
+Rendering acceptance additionally requires actual directional counts to reconcile to the two-direction total, per-direction headway display, structural-change trigger explanations, scenario-selection provenance, and an explicit post-implementation validation notice.

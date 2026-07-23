@@ -4,7 +4,7 @@
 
 **Contract version:** `1.0.0`
 
-**Normative source of truth:** this file, together with the incorporated [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md)
+**Normative source of truth:** this file, together with the incorporated [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md) and [Extreme Service Change and Demand Scenario Amendment V1](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md)
 
 **Scope:** business rules, normalized domain contracts, scenario evaluation, Scenario C generation, fleet feasibility, output reconciliation, and solver boundaries
 
@@ -98,6 +98,16 @@ Demand direction values are `outbound`, `inbound`, and `combined`. Combined obse
 Contract V1 authoritative mode is `static`. The same normalized observations are used to compare A, B, and C. This is a comparison assumption, not a ridership forecast. Outputs MUST state that the engine does not claim demand will remain unchanged, added service will create ridership, or reduced service will preserve ridership.
 
 The enum reserves `elasticity_scenario` and `calibrated`. They are non-authoritative placeholders until a reviewed model, calibration provenance, and uncertainty contract exist. Contract V1 defines no uncalibrated elasticity formula.
+
+### 2.6 Structural service-change demand boundary
+
+Contract V1 incorporates [Amendment V1-A1](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md). `total_daily_trips` is the total across both directions. Directional totals and headways are derived from exact directional departures; an even split is explanatory only and MUST NOT replace actual counts.
+
+When B changes service beyond the temporal or behavioral support of demand observed under A, the engine MUST classify the service change, expose demand temporal/frequency/response support, and separate deterministic technical feasibility from unresolved ridership response. Coarse demand may support aggregate interval capacity analysis but MUST NOT be fabricated into proposed departure-level observations.
+
+For `structural_change` without an approved calibrated response model, `scenario_analysis_required = true`. Demand results are sensitivity scenarios with explicit assumptions, not an authoritative binary suitability conclusion or a forecast. The base user workflow requires A/B exact timetables and operating parameters; passenger evidence is loaded from existing engine context rather than re-entered by the user.
+
+The target additive fields and statuses require a reviewed `1.1.0` schema/domain implementation before runtime use.
 
 ## 3. Operating parameter locks for C
 
@@ -205,11 +215,12 @@ Exactly one top-level disposition MUST be returned:
 
 - `B_TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE`;
 - `B_TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE`;
+- `B_TECHNICALLY_FEASIBLE_DEMAND_RESPONSE_UNRESOLVED` (V1-A1 target);
 - `B_TECHNICALLY_INFEASIBLE_BUT_PARAMETERS_MAY_ALLOW_REDISTRIBUTION`;
 - `B_PARAMETERS_INFEASIBLE`;
 - `B_INSUFFICIENT_DATA`.
 
-C generation MAY proceed for a technically feasible but demand-unsuitable B, or for a technically infeasible B whose locked parameters may admit another distribution. If the fixed B parameters are infeasible, return a generation outcome with `NO_FEASIBLE_C_WITH_B_PARAMETERS`; do not fabricate C. `B_INSUFFICIENT_DATA` MUST return `C_NOT_GENERATED_INSUFFICIENT_DATA` and MUST NOT produce a demand-optimized C. If B is already suitable, return `C_NOT_REQUIRED_B_SUITABLE` rather than duplicating B as C.
+C generation MAY proceed for a technically feasible but demand-unsuitable B, or for a technically infeasible B whose locked parameters may admit another distribution. If the fixed B parameters are infeasible, return a generation outcome with `NO_FEASIBLE_C_WITH_B_PARAMETERS`; do not fabricate C. `B_INSUFFICIENT_DATA` MUST return `C_NOT_GENERATED_INSUFFICIENT_DATA` and MUST NOT produce a demand-optimized C. If B is already suitable, return `C_NOT_REQUIRED_B_SUITABLE` rather than duplicating B as C. Under V1-A1, a technically feasible structural-change case without calibrated demand response returns `B_TECHNICALLY_FEASIBLE_DEMAND_RESPONSE_UNRESOLVED`; the target generation result is `C_NOT_GENERATED_DEMAND_RESPONSE_UNRESOLVED` until an approved scenario or calibrated model is recorded.
 
 ## 6. Load-factor and capacity contract
 
@@ -453,6 +464,7 @@ Until approved, implementations MUST expose these as limitations/configuration a
 - [Input/output contracts](INPUT_OUTPUT_CONTRACTS_V1.md)
 - [Schedule generation outcome contract](RESULT_ENVELOPE_CONTRACT_V1.md)
 - [Demand resolution](DEMAND_RESOLUTION_CONTRACT_V1.md)
+- [Extreme service change and demand scenarios](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md)
 - [Scenario evaluation](SCENARIO_EVALUATION_CONTRACT_V1.md)
 - [Visualization contract](VISUALIZATION_CONTRACT_V1.md)
 - [XLSX export contract](XLSX_EXPORT_CONTRACT_V1.md)
