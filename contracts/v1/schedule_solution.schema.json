@@ -6,36 +6,14 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "contract_version",
-    "solver_status",
-    "solver_adapter",
-    "solve_duration_seconds",
-    "solution_fingerprint",
-    "source_b_fingerprint",
-    "operating_parameter_locks",
-    "c_block_supply_plan",
-    "c_headway_regimes",
-    "c_exact_timetable",
-    "fleet_assignment",
-    "available_fleet_limit",
-    "approved_active_fleet",
-    "minimum_required_fleet",
-    "recommended_initial_fleet_terminal_1",
-    "recommended_initial_fleet_terminal_2",
-    "initial_fleet_positioning_mode",
-    "fleet_margin",
-    "maximum_simultaneous_vehicle_use",
-    "vehicle_stock_profile_terminal_1",
-    "vehicle_stock_profile_terminal_2",
-    "fleet_feasibility_status",
-    "block_evaluation",
-    "residual_overload",
-    "shifted_trip_count",
-    "total_shift_minutes",
-    "maximum_shift_minutes",
-    "status",
-    "explanations",
-    "limitations"
+    "contract_version", "solver_status", "solver_adapter", "solve_duration_seconds", "solution_fingerprint",
+    "source_b_fingerprint", "operating_parameter_locks", "c_block_supply_plan", "c_headway_regimes",
+    "c_exact_timetable", "fleet_assignment", "available_fleet_limit", "approved_active_fleet",
+    "minimum_required_fleet", "recommended_initial_fleet_terminal_1", "recommended_initial_fleet_terminal_2",
+    "initial_fleet_positioning_mode", "fleet_margin", "maximum_simultaneous_vehicle_use",
+    "vehicle_stock_profile_terminal_1", "vehicle_stock_profile_terminal_2", "fleet_feasibility_status",
+    "block_evaluation", "residual_overload", "shifted_trip_count", "total_shift_minutes", "maximum_shift_minutes",
+    "status", "explanations", "limitations"
   ],
   "properties": {
     "contract_version": {"const": "1.0.0"},
@@ -47,222 +25,74 @@
     "solve_duration_seconds": {"type": "number", "minimum": 0},
     "solution_fingerprint": {"$ref": "#/$defs/fingerprint"},
     "source_b_fingerprint": {"$ref": "#/$defs/fingerprint"},
-    "operating_parameter_locks": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"$ref": "#/$defs/lock"}
-    },
-    "c_block_supply_plan": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"$ref": "block_supply_plan.schema.json"}
-    },
-    "c_headway_regimes": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"$ref": "#/$defs/regime"}
-    },
-    "c_exact_timetable": {
-      "type": "array",
-      "minItems": 2,
-      "items": {"$ref": "#/$defs/cTrip"}
-    },
-    "fleet_assignment": {
-      "type": "array",
-      "minItems": 2,
-      "items": {"$ref": "#/$defs/fleetAssignment"}
-    },
+    "operating_parameter_locks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/lock"}},
+    "c_block_supply_plan": {"type": "array", "minItems": 1, "items": {"$ref": "block_supply_plan.schema.json"}},
+    "c_headway_regimes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/regime"}},
+    "c_exact_timetable": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/cTrip"}},
+    "fleet_assignment": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/fleetAssignment"}},
     "available_fleet_limit": {"type": "integer", "minimum": 1},
     "approved_active_fleet": {"type": ["integer", "null"], "minimum": 1},
-    "minimum_required_fleet": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Derived from the timetable and vehicle-balance model, never copied from Scenario B."
-    },
+    "minimum_required_fleet": {"type": "integer", "minimum": 1, "description": "Derived from the timetable and vehicle-balance model, never copied from Scenario B."},
     "recommended_initial_fleet_terminal_1": {"type": "integer", "minimum": 0},
     "recommended_initial_fleet_terminal_2": {"type": "integer", "minimum": 0},
-    "initial_fleet_positioning_mode": {
-      "enum": ["solver_determined", "fixed", "bounded"]
-    },
+    "initial_fleet_positioning_mode": {"enum": ["solver_determined", "fixed", "bounded"]},
     "fleet_margin": {"type": "integer", "minimum": 0},
     "maximum_simultaneous_vehicle_use": {"type": "integer", "minimum": 0},
-    "vehicle_stock_profile_terminal_1": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"$ref": "#/$defs/stockEvent"}
-    },
-    "vehicle_stock_profile_terminal_2": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"$ref": "#/$defs/stockEvent"}
-    },
+    "vehicle_stock_profile_terminal_1": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stockEvent"}},
+    "vehicle_stock_profile_terminal_2": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stockEvent"}},
     "fleet_feasibility_status": {"const": "FLEET_FEASIBLE"},
-    "block_evaluation": {
-      "type": "array",
-      "items": {"$ref": "#/$defs/blockEvaluation"}
-    },
+    "block_evaluation": {"type": "array", "items": {"$ref": "#/$defs/blockEvaluation"}},
     "residual_overload": {"type": "number", "minimum": 0},
     "shifted_trip_count": {"type": "integer", "minimum": 0},
     "total_shift_minutes": {"type": "number", "minimum": 0},
     "maximum_shift_minutes": {"type": "number", "minimum": 0},
     "status": {"const": "SOLUTION_ACCEPTED"},
-    "explanations": {
-      "type": "array",
-      "minItems": 1,
-      "items": {"type": "string", "minLength": 1}
-    },
-    "limitations": {
-      "type": "array",
-      "items": {"type": "string", "minLength": 1}
-    }
+    "explanations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}}
   },
   "$defs": {
-    "time": {
-      "type": "string",
-      "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
-    },
-    "fingerprint": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
+    "time": {"type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"},
+    "fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "lock": {
-      "type": "object",
-      "additionalProperties": false,
+      "type": "object", "additionalProperties": false,
       "required": ["field", "value", "locked", "source_fingerprint"],
-      "properties": {
-        "field": {"type": "string", "minLength": 1},
-        "value": {},
-        "locked": {"const": true},
-        "source_fingerprint": {"$ref": "#/$defs/fingerprint"},
-        "authorized_exception": {"type": ["string", "null"]}
-      }
+      "properties": {"field": {"type": "string", "minLength": 1}, "value": {}, "locked": {"const": true}, "source_fingerprint": {"$ref": "#/$defs/fingerprint"}, "authorized_exception": {"type": ["string", "null"]}}
     },
     "regime": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "regime_id",
-        "direction",
-        "start_time",
-        "end_time",
-        "covered_analysis_blocks",
-        "trip_count",
-        "target_service_rate",
-        "target_headway",
-        "actual_headway_sequence",
-        "transition_headways",
-        "exceptional_headways",
-        "boundary_reason",
-        "regularity_status"
-      ],
+      "type": "object", "additionalProperties": false,
+      "required": ["regime_id", "direction", "start_time", "end_time", "covered_analysis_blocks", "trip_count", "target_service_rate", "target_headway", "actual_headway_sequence", "transition_headways", "exceptional_headways", "boundary_reason", "regularity_status"],
       "properties": {
-        "regime_id": {"type": "string", "minLength": 1},
-        "direction": {"enum": ["outbound", "inbound"]},
-        "start_time": {"$ref": "#/$defs/time"},
-        "end_time": {"$ref": "#/$defs/time"},
-        "covered_analysis_blocks": {
-          "type": "array",
-          "minItems": 1,
-          "items": {"type": "string"}
-        },
-        "trip_count": {"type": "integer", "minimum": 1},
-        "target_service_rate": {"type": "number", "minimum": 0},
-        "target_headway": {"type": "number", "exclusiveMinimum": 0},
-        "actual_headway_sequence": {
-          "type": "array",
-          "items": {"type": "integer", "minimum": 0},
-          "description": "Exact consecutive directional gaps in minutes. Zero is valid for simultaneous departures by distinct vehicles."
-        },
-        "transition_headways": {
-          "type": "array",
-          "items": {"type": "integer", "minimum": 0}
-        },
-        "exceptional_headways": {
-          "type": "array",
-          "items": {"type": "integer", "minimum": 0}
-        },
-        "boundary_reason": {
-          "enum": [
-            "SUSTAINED_DEMAND_CHANGE",
-            "MATERIAL_FREQUENCY_CHANGE",
-            "FLEET_FEASIBILITY",
-            "TURNAROUND_FEASIBILITY",
-            "FIRST_SERVICE_CONSTRAINT",
-            "FINAL_SERVICE_CONSTRAINT",
-            "OPERATING_WINDOW_BOUNDARY"
-          ]
-        },
-        "regularity_status": {
-          "enum": ["REGULAR", "BALANCED_ROUNDING", "TRANSITION", "EXCEPTIONAL"]
-        }
+        "regime_id": {"type": "string", "minLength": 1}, "direction": {"enum": ["outbound", "inbound"]},
+        "start_time": {"$ref": "#/$defs/time"}, "end_time": {"$ref": "#/$defs/time"},
+        "covered_analysis_blocks": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "trip_count": {"type": "integer", "minimum": 1}, "target_service_rate": {"type": "number", "minimum": 0},
+        "target_headway": {"type": "number", "exclusiveMinimum": 0}, "actual_headway_sequence": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+        "transition_headways": {"type": "array", "items": {"type": "integer", "minimum": 0}}, "exceptional_headways": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+        "boundary_reason": {"enum": ["SUSTAINED_DEMAND_CHANGE", "MATERIAL_FREQUENCY_CHANGE", "FLEET_FEASIBILITY", "TURNAROUND_FEASIBILITY", "FIRST_SERVICE_CONSTRAINT", "FINAL_SERVICE_CONSTRAINT", "OPERATING_WINDOW_BOUNDARY"]},
+        "regularity_status": {"enum": ["REGULAR", "BALANCED_ROUNDING", "TRANSITION", "EXCEPTIONAL"]}
       }
     },
     "cTrip": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "c_trip_id",
-        "source_b_trip_id",
-        "direction",
-        "departure_terminal",
-        "b_departure_time",
-        "c_departure_time",
-        "shift_minutes",
-        "previous_b_headway",
-        "previous_c_headway",
-        "headway_regime_id",
-        "change_reason",
-        "vehicle_assignment"
-      ],
+      "type": "object", "additionalProperties": false,
+      "required": ["c_trip_id", "source_b_trip_id", "direction", "departure_terminal", "b_departure_time", "c_departure_time", "shift_minutes", "previous_b_headway", "previous_c_headway", "headway_regime_id", "change_reason", "vehicle_assignment"],
       "properties": {
-        "c_trip_id": {"type": "string", "minLength": 1},
-        "source_b_trip_id": {"type": "string", "minLength": 1},
-        "direction": {"enum": ["outbound", "inbound"]},
-        "departure_terminal": {"enum": ["terminal_1", "terminal_2"]},
-        "b_departure_time": {"$ref": "#/$defs/time"},
-        "c_departure_time": {"$ref": "#/$defs/time"},
-        "shift_minutes": {"type": "number"},
-        "previous_b_headway": {"type": ["number", "null"], "minimum": 0},
-        "previous_c_headway": {"type": ["number", "null"], "minimum": 0},
-        "headway_regime_id": {"type": "string", "minLength": 1},
-        "change_reason": {"type": "string", "minLength": 1},
-        "vehicle_assignment": {"type": "string", "minLength": 1}
+        "c_trip_id": {"type": "string", "minLength": 1}, "source_b_trip_id": {"type": "string", "minLength": 1},
+        "direction": {"enum": ["outbound", "inbound"]}, "departure_terminal": {"enum": ["terminal_1", "terminal_2"]},
+        "b_departure_time": {"$ref": "#/$defs/time"}, "c_departure_time": {"$ref": "#/$defs/time"},
+        "shift_minutes": {"type": "number"}, "previous_b_headway": {"type": ["number", "null"], "minimum": 0},
+        "previous_c_headway": {"type": ["number", "null"], "minimum": 0}, "headway_regime_id": {"type": "string", "minLength": 1},
+        "change_reason": {"type": "string", "minLength": 1}, "vehicle_assignment": {"type": "string", "minLength": 1}
       }
     },
     "fleetAssignment": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "vehicle_id",
-        "c_trip_id",
-        "departure_terminal",
-        "arrival_terminal",
-        "departure_time",
-        "arrival_time",
-        "ready_time"
-      ],
-      "properties": {
-        "vehicle_id": {"type": "string", "minLength": 1},
-        "c_trip_id": {"type": "string", "minLength": 1},
-        "departure_terminal": {"enum": ["terminal_1", "terminal_2"]},
-        "arrival_terminal": {"enum": ["terminal_1", "terminal_2"]},
-        "departure_time": {"$ref": "#/$defs/time"},
-        "arrival_time": {"$ref": "#/$defs/time"},
-        "ready_time": {"$ref": "#/$defs/time"}
-      }
+      "type": "object", "additionalProperties": false,
+      "required": ["vehicle_id", "c_trip_id", "departure_terminal", "arrival_terminal", "departure_time", "arrival_time", "ready_time"],
+      "properties": {"vehicle_id": {"type": "string", "minLength": 1}, "c_trip_id": {"type": "string", "minLength": 1}, "departure_terminal": {"enum": ["terminal_1", "terminal_2"]}, "arrival_terminal": {"enum": ["terminal_1", "terminal_2"]}, "departure_time": {"$ref": "#/$defs/time"}, "arrival_time": {"$ref": "#/$defs/time"}, "ready_time": {"$ref": "#/$defs/time"}}
     },
     "stockEvent": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "event_time",
-        "event_type",
-        "trip_id",
-        "stock_before",
-        "stock_after",
-        "arriving_or_ready_vehicle_count",
-        "departure_count"
-      ],
+      "required": ["event_time", "event_type", "trip_id", "stock_before", "stock_after", "arriving_or_ready_vehicle_count", "departure_count"],
       "properties": {
         "event_time": {"$ref": "#/$defs/time"},
         "event_type": {"enum": ["VEHICLE_READY", "DEPARTURE", "READY_AND_DEPARTURE"]},
@@ -275,26 +105,9 @@
       "description": "The domain validator, not JSON Schema, proves stock_after = stock_before + ready - departures and continuity between records."
     },
     "blockEvaluation": {
-      "type": "object",
-      "additionalProperties": false,
+      "type": "object", "additionalProperties": false,
       "required": ["block_id", "direction", "load_factor", "shortage", "status"],
-      "properties": {
-        "block_id": {"type": "string", "minLength": 1},
-        "direction": {"enum": ["outbound", "inbound", "combined"]},
-        "load_factor": {"type": ["number", "null"], "minimum": 0},
-        "shortage": {"type": "number", "minimum": 0},
-        "status": {
-          "enum": [
-            "WITHIN_PLANNING_CEILING",
-            "WARNING_ABOVE_85",
-            "CRITICAL_ABOVE_90",
-            "NO_SERVICE_WITH_DEMAND",
-            "LOW_LOAD_REVIEW_ONLY",
-            "ELIGIBLE_DONOR_PERIOD",
-            "INSUFFICIENT_DATA"
-          ]
-        }
-      }
+      "properties": {"block_id": {"type": "string", "minLength": 1}, "direction": {"enum": ["outbound", "inbound", "combined"]}, "load_factor": {"type": ["number", "null"], "minimum": 0}, "shortage": {"type": "number", "minimum": 0}, "status": {"enum": ["WITHIN_PLANNING_CEILING", "WARNING_ABOVE_85", "CRITICAL_ABOVE_90", "NO_SERVICE_WITH_DEMAND", "LOW_LOAD_REVIEW_ONLY", "ELIGIBLE_DONOR_PERIOD", "INSUFFICIENT_DATA"]}}
     }
   }
 }
