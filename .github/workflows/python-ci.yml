@@ -27,6 +27,15 @@ jobs:
       - name: Install
         run: python -m pip install -e '.[dev]'
 
+      - name: Render V1-A1 amended documents
+        run: python scripts/apply_v1_a1_docs.py
+
+      - name: Upload V1-A1 amended documents
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1-a1-amended-documents
+          path: docs/engine
+
       - name: Tests
         id: tests
         continue-on-error: true
