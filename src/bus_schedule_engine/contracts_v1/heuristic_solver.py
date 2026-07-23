@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
+from typing import ClassVar
 
 from bus_schedule_engine.c_generator import generate_scenario_c
 from bus_schedule_engine.models import GeneratedScenario, ScenarioCStatus
 
+from .heuristic_context import (
+    HEURISTIC_TURNAROUND_BRIDGE_MODE,
+    HeuristicCompatibilityContextV1,
+    contract_direction,
+    departure_terminal,
+    heuristic_context_mismatch_codes,
+)
 from .solver_fingerprints import candidate_fingerprint
 from .solver_models import (
     NativeSolverStatus,
@@ -14,11 +23,6 @@ from .solver_models import (
     ScheduleProblemV1,
     SolverExecutionStatus,
     SolverRunResultV1,
-)
-from .solver_problem import (
-    HEURISTIC_TURNAROUND_BRIDGE_MODE,
-    contract_direction,
-    departure_terminal,
 )
 
 _ACCEPTED_HEURISTIC_STATUSES = {
@@ -33,9 +37,10 @@ def _raw_candidate_from_generated(
     problem: ScheduleProblemV1,
     solve_duration_seconds: float,
     adapter_id: str,
+    context: HeuristicCompatibilityContextV1,
 ) -> RawScheduleCandidateV1:
     traces = {trace.c_trip_id: trace for trace in generated.trip_traces}
-    source_b = {trip.trip_id: trip for trip in problem.normalized_inputs.scenario_b.exact_timetable}
+    source_b = {trip.trip_id: trip for trip in problem.scenario_b.exact_timetable}
     trips: list[RawCandidateTripV1] = []
     for trip in sorted(
         generated.trips,
@@ -49,9 +54,7 @@ def _raw_candidate_from_generated(
         if source is None:
             raise ValueError(f"Heuristic candidate trip {trip.trip_id} has unknown source B trip")
         direction = contract_direction(trip.direction)
-        generated_arrival = trip.resolved_arrival_seconds(
-            problem.normalized_inputs.scenario_b.trip_runtime_minutes
-        )
+        generated_arrival = trip.resolved_arrival_seconds(problem.scenario_b.trip_runtime_minutes)
         arrival = trip.departure_seconds + source.runtime_minutes * 60
         if generated_arrival != arrival:
             raise ValueError(
@@ -120,26 +123,56 @@ def _raw_candidate_from_generated(
             "The legacy heuristic adapter finds candidates but does not prove "
             "optimality or global infeasibility.",
             f"The heuristic searched with {HEURISTIC_TURNAROUND_BRIDGE_MODE} "
-            f"using scalar {problem.legacy_parameters.effective_layover_minutes} minutes; "
+            f"using scalar "
+            f"{context.turnaround_bridge_value_minutes} minutes; "
             "authoritative validation uses the exact arrival-terminal values "
-            f"{problem.normalized_inputs.scenario_b.turnaround_minutes.terminal_1}/"
-            f"{problem.normalized_inputs.scenario_b.turnaround_minutes.terminal_2}.",
+            f"{problem.scenario_b.turnaround_minutes.terminal_1}/"
+            f"{problem.scenario_b.turnaround_minutes.terminal_2}.",
         ),
     )
 
 
+@dataclass(frozen=True, slots=True)
 class HeuristicScheduleSolverAdapter:
-    adapter_id = "legacy_heuristic_v1"
+    compatibility_context: HeuristicCompatibilityContextV1
+    adapter_id: ClassVar[str] = "legacy_heuristic_v1"
 
     def solve(self, problem: ScheduleProblemV1) -> SolverRunResultV1:
         started = time.perf_counter()
+        mismatch_codes = list(
+            heuristic_context_mismatch_codes(
+                problem,
+                self.compatibility_context,
+            )
+        )
+        if problem.solver_adapter != self.adapter_id:
+            mismatch_codes.append("PROBLEM_ADAPTER_CONTEXT_MISMATCH")
+        if mismatch_codes:
+            duration = max(0.0, time.perf_counter() - started)
+            codes = tuple(sorted(set(mismatch_codes)))
+            return SolverRunResultV1(
+                execution_status=SolverExecutionStatus.COMPLETED,
+                solver_status=NativeSolverStatus.MODEL_INVALID,
+                solver_adapter=self.adapter_id,
+                solve_duration_seconds=duration,
+                candidate=None,
+                explanations=tuple(
+                    f"{code}: heuristic compatibility context rejected." for code in codes
+                ),
+                limitations=(
+                    "MODEL_INVALID identifies an adapter-context or integration "
+                    "defect, not route, demand, timetable, fleet, or parameter "
+                    "infeasibility.",
+                ),
+            )
         try:
+            context = self.compatibility_context
             generated = generate_scenario_c(
-                problem.legacy_parameters,
-                list(problem.legacy_trips_b),
-                list(problem.legacy_demand),
-                problem.normalized_inputs.scenario_b.available_fleet_limit,
-                problem.heuristic_config,
+                context.legacy_parameters,
+                list(context.legacy_trips_b),
+                list(context.legacy_demand),
+                problem.scenario_b.available_fleet_limit,
+                context.heuristic_config,
             )
             duration = max(0.0, time.perf_counter() - started)
             if generated.generation_status in _ACCEPTED_HEURISTIC_STATUSES:
@@ -148,6 +181,7 @@ class HeuristicScheduleSolverAdapter:
                     problem,
                     duration,
                     self.adapter_id,
+                    context,
                 )
                 return SolverRunResultV1(
                     execution_status=SolverExecutionStatus.COMPLETED,
@@ -169,11 +203,11 @@ class HeuristicScheduleSolverAdapter:
                     "The heuristic search ended without an accepted candidate; "
                     "this is not proof that B's locked parameters are infeasible.",
                     f"Search used {HEURISTIC_TURNAROUND_BRIDGE_MODE} with scalar "
-                    f"{problem.legacy_parameters.effective_layover_minutes} minutes and may "
+                    f"{context.turnaround_bridge_value_minutes} minutes and may "
                     "miss candidates that rely on the shorter terminal turnaround.",
                 ),
             )
-        except Exception as exc:
+        except Exception:
             duration = max(0.0, time.perf_counter() - started)
             return SolverRunResultV1(
                 execution_status=SolverExecutionStatus.COMPLETED,
@@ -181,7 +215,10 @@ class HeuristicScheduleSolverAdapter:
                 solver_adapter=self.adapter_id,
                 solve_duration_seconds=duration,
                 candidate=None,
-                explanations=(f"Heuristic adapter failed: {exc}",),
+                explanations=(
+                    "HEURISTIC_ADAPTER_FAILURE: Heuristic adapter failed "
+                    "before returning a valid result.",
+                ),
                 limitations=(
                     "MODEL_INVALID identifies an adapter or compatibility defect, "
                     "not route or timetable infeasibility.",

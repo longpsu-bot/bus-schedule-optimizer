@@ -4,9 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
-from bus_schedule_engine.c_config import ScenarioCConfig
-from bus_schedule_engine.models import DemandRecord, ScenarioParameters, Trip
-
+from .demand_resolution import DemandAnalysisBlockV1, DemandResolutionContractV1
 from .evaluation import (
     BlockEvaluationV1,
     BlockSupplyPlanV1,
@@ -17,8 +15,12 @@ from .evaluation import (
 from .models import (
     CONTRACT_VERSION,
     ContractDirection,
+    DemandConfidence,
+    DemandResponseMode,
     DepartureTerminal,
     NormalizedInputBundleV1,
+    ScenarioAInput,
+    ScenarioBInput,
 )
 
 
@@ -54,6 +56,55 @@ class InitialFleetPositioningMode(StrEnum):
     SOLVER_DETERMINED = "solver_determined"
     FIXED = "fixed"
     BOUNDED = "bounded"
+
+
+class DirectionTripLockMode(StrEnum):
+    FIXED_BY_DIRECTION = "fixed_by_direction"
+    TOTAL_ONLY = "total_only"
+
+
+class FleetConstraintMode(StrEnum):
+    AVAILABLE_UPPER_BOUND = "available_upper_bound"
+    EXACT_SCHEDULED_FLEET = "exact_scheduled_fleet"
+
+
+class BoundaryConvention(StrEnum):
+    HALF_OPEN = "half_open"
+    HALF_OPEN_WITH_FINAL_SENTINEL = "half_open_with_final_sentinel"
+    HALF_OPEN_WITH_DOCUMENTED_FINAL_INCLUSIVE = "half_open_with_documented_final_inclusive"
+
+
+@dataclass(frozen=True, slots=True)
+class DirectionRedistributionAuthorizationV1:
+    enabled: bool
+    authorized_by: str
+    directional_demand_confidence: DemandConfidence
+
+
+@dataclass(frozen=True, slots=True)
+class InitialFleetValuesV1:
+    terminal_1: int
+    terminal_2: int
+
+
+@dataclass(frozen=True, slots=True)
+class InitialFleetBoundsV1:
+    minimum: int
+    maximum: int
+
+
+@dataclass(frozen=True, slots=True)
+class BoundedInitialFleetV1:
+    terminal_1: InitialFleetBoundsV1
+    terminal_2: InitialFleetBoundsV1
+
+
+@dataclass(frozen=True, slots=True)
+class SolverPolicyV1:
+    time_limit_seconds: float | None = None
+    worker_count: int | None = None
+    random_seed: int | None = None
+    require_independent_validation: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -254,18 +305,51 @@ class ScheduleGenerationOutcomeV1:
 
 @dataclass(frozen=True, slots=True)
 class ScheduleProblemV1:
-    normalized_inputs: NormalizedInputBundleV1
-    b_evaluation: ScenarioBEvaluationBundleV1
-    evaluation_policy: ScenarioBEvaluationPolicyV1
-    legacy_parameters: ScenarioParameters
-    legacy_trips_b: tuple[Trip, ...]
-    legacy_demand: tuple[DemandRecord, ...]
-    heuristic_config: ScenarioCConfig
+    problem_id: str
     problem_fingerprint: str
+    evaluation_fingerprint: str
+    source_a_fingerprint: str | None
+    source_b_fingerprint: str
+    observed_demand_fingerprint: str | None
+    solver_adapter: str
+    adapter_context_fingerprint: str
+    scenario_a: ScenarioAInput | None
+    scenario_b: ScenarioBInput
+    demand_response_mode: DemandResponseMode | None
+    demand_resolution: DemandResolutionContractV1 | None
+    analysis_blocks: tuple[DemandAnalysisBlockV1, ...]
+    operating_parameter_locks: tuple[OperatingParameterLockV1, ...]
+    direction_trip_lock_mode: DirectionTripLockMode
+    direction_redistribution_authorization: DirectionRedistributionAuthorizationV1 | None
+    fleet_constraint_mode: FleetConstraintMode
+    initial_fleet_positioning_mode: InitialFleetPositioningMode
+    fixed_initial_fleet: InitialFleetValuesV1 | None
+    bounded_initial_fleet: BoundedInitialFleetV1 | None
+    planning_load_factor_ceiling: float
+    critical_load_factor_ceiling: float
+    block_requirements: tuple[BlockSupplyPlanV1, ...]
+    boundary_convention: BoundaryConvention
+    solver_policy: SolverPolicyV1
 
     @property
     def contract_version(self) -> str:
         return CONTRACT_VERSION
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduleGenerationContextV1:
+    problem: ScheduleProblemV1
+    normalized_inputs: NormalizedInputBundleV1
+    b_evaluation: ScenarioBEvaluationBundleV1
+    evaluation_policy: ScenarioBEvaluationPolicyV1
+
+    @property
+    def problem_fingerprint(self) -> str:
+        return self.problem.problem_fingerprint
+
+    @property
+    def contract_version(self) -> str:
+        return self.problem.contract_version
 
 
 class ScheduleSolver(Protocol):

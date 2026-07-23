@@ -29,6 +29,7 @@ from .models import (
     ScenarioBInput,
     ScenarioId,
 )
+from .problem_validation import validate_schedule_generation_context_v1
 from .serialization import canonical_sha256
 from .solver_fingerprints import candidate_fingerprint, solution_fingerprint_payload
 from .solver_models import (
@@ -36,10 +37,10 @@ from .solver_models import (
     CandidateValidationStatus,
     InitialFleetPositioningMode,
     NativeSolverStatus,
-    OperatingParameterLockV1,
     RawCandidateTripV1,
     RawHeadwayRegimeV1,
     RawScheduleCandidateV1,
+    ScheduleGenerationContextV1,
     ScheduleProblemV1,
     ScheduleSolutionV1,
     SolutionHeadwayRegimeV1,
@@ -47,10 +48,7 @@ from .solver_models import (
     StockProfileEventV1,
 )
 from .solver_problem import (
-    HEURISTIC_TURNAROUND_BRIDGE_MODE,
     NUMERIC_RECONCILIATION_TOLERANCE_MINUTES,
-    RUNTIME_LOCK_MODE,
-    TURNAROUND_APPLICATION_MODE,
 )
 from .validation import validate_scenario_input
 
@@ -117,11 +115,11 @@ def _derive_trip_facts(
     problem: ScheduleProblemV1,
     candidate: RawScheduleCandidateV1,
 ) -> tuple[dict[str, _DerivedTripFacts], list[str]]:
-    b_by_id = {trip.trip_id: trip for trip in problem.normalized_inputs.scenario_b.exact_timetable}
+    b_by_id = {trip.trip_id: trip for trip in problem.scenario_b.exact_timetable}
     previous_b = _directional_previous_headways(
         [
             (trip.direction, trip.departure_time, trip.trip_id)
-            for trip in problem.normalized_inputs.scenario_b.exact_timetable
+            for trip in problem.scenario_b.exact_timetable
         ]
     )
     previous_c = _directional_previous_headways(
@@ -248,7 +246,7 @@ def _candidate_scenario(
     problem: ScheduleProblemV1,
     candidate: RawScheduleCandidateV1,
 ) -> ScenarioBInput:
-    b = problem.normalized_inputs.scenario_b
+    b = problem.scenario_b
     source_by_id = {trip.trip_id: trip for trip in b.exact_timetable}
     exact = tuple(
         ExactTimetableTrip(
@@ -321,32 +319,32 @@ def _candidate_block_status(
 
 
 def _candidate_block_supply(
-    problem: ScheduleProblemV1,
+    context: ScheduleGenerationContextV1,
     candidate: RawScheduleCandidateV1,
 ) -> tuple[BlockSupplyPlanV1, ...]:
-    resolution = problem.b_evaluation.demand_resolution
-    if resolution is None:
+    problem = context.problem
+    if problem.demand_resolution is None:
         return ()
-    a_by_id = {item.block_id: item for item in problem.b_evaluation.a_block_supply}
-    b_by_id = {item.block_id: item for item in problem.b_evaluation.b_block_supply}
-    capacity = problem.normalized_inputs.scenario_b.vehicle_capacity
+    a_by_id = {item.block_id: item for item in context.b_evaluation.a_block_supply}
+    b_by_id = {item.block_id: item for item in problem.block_requirements}
+    capacity = problem.scenario_b.vehicle_capacity
     rows: list[BlockSupplyPlanV1] = []
-    for block in resolution.blocks:
+    for block in problem.analysis_blocks:
         count = _block_trip_count(candidate, block)
         nominal = count * capacity
         load_factor = block.observed_passengers / nominal if nominal > 0 else None
         required_85 = _required_trips(
             block.observed_passengers,
             capacity,
-            problem.evaluation_policy.planning_load_factor_ceiling,
+            problem.planning_load_factor_ceiling,
         )
         required_90 = _required_trips(
             block.observed_passengers,
             capacity,
-            problem.evaluation_policy.critical_load_factor_ceiling,
+            problem.critical_load_factor_ceiling,
         )
-        capacity_85 = nominal * problem.evaluation_policy.planning_load_factor_ceiling
-        capacity_90 = nominal * problem.evaluation_policy.critical_load_factor_ceiling
+        capacity_85 = nominal * problem.planning_load_factor_ceiling
+        capacity_90 = nominal * problem.critical_load_factor_ceiling
         rows.append(
             BlockSupplyPlanV1(
                 scenario=ScenarioId.C,
@@ -380,7 +378,7 @@ def _candidate_block_supply(
                     block,
                     count,
                     load_factor,
-                    problem.evaluation_policy,
+                    context.evaluation_policy,
                 ),
                 allocation_reason=(
                     "Validated heuristic candidate: planned and actual C counts reconcile."
@@ -395,8 +393,7 @@ def _solution_regimes(
     problem: ScheduleProblemV1,
     reconciled_regimes: tuple[_ReconciledRegime, ...],
 ) -> tuple[SolutionHeadwayRegimeV1, ...]:
-    resolution = problem.b_evaluation.demand_resolution
-    blocks = resolution.blocks if resolution is not None else ()
+    blocks = problem.analysis_blocks
     output: list[SolutionHeadwayRegimeV1] = []
     for reconciled in reconciled_regimes:
         regime = reconciled.raw
@@ -449,72 +446,11 @@ def _stock_events(events) -> tuple[StockProfileEventV1, ...]:
     )
 
 
-def _operating_locks(
-    problem: ScheduleProblemV1,
-    solver_adapter: str,
-) -> tuple[OperatingParameterLockV1, ...]:
-    b = problem.normalized_inputs.scenario_b
-    source = problem.normalized_inputs.scenario_b_fingerprint
-    values = {
-        "route_id": b.route_id,
-        "route_name": b.route_name,
-        "route_type": b.route_type.value,
-        "terminal_1_name": b.terminal_1_name,
-        "terminal_2_name": b.terminal_2_name,
-        "trip_runtime_minutes": b.trip_runtime_minutes,
-        "runtime_lock_mode": RUNTIME_LOCK_MODE,
-        "exact_trip_runtime_minutes_by_source_b_trip_id": {
-            trip.trip_id: trip.runtime_minutes
-            for trip in sorted(b.exact_timetable, key=lambda item: item.trip_id)
-        },
-        "turnaround_minutes": {
-            "terminal_1": b.turnaround_minutes.terminal_1,
-            "terminal_2": b.turnaround_minutes.terminal_2,
-        },
-        "turnaround_application_mode": TURNAROUND_APPLICATION_MODE,
-        "vehicle_capacity": b.vehicle_capacity,
-        "total_daily_trips": b.total_daily_trips,
-        "trips_by_direction": {
-            "outbound": b.trips_by_direction.outbound,
-            "inbound": b.trips_by_direction.inbound,
-        },
-        "first_departures": {
-            "terminal_1": b.first_departures.terminal_1,
-            "terminal_2": b.first_departures.terminal_2,
-        },
-        "last_departures": {
-            "terminal_1": b.last_departures.terminal_1,
-            "terminal_2": b.last_departures.terminal_2,
-        },
-        "available_fleet_limit": b.available_fleet_limit,
-        "approved_active_fleet": b.approved_active_fleet,
-        "fleet_constraint_mode": "available_upper_bound",
-        "initial_fleet_positioning_mode": "solver_determined",
-        "direction_trip_lock_mode": "fixed_by_direction",
-        "operating_day_type": b.operating_day_type.value,
-    }
-    if solver_adapter == "legacy_heuristic_v1":
-        values["heuristic_turnaround_bridge_mode"] = HEURISTIC_TURNAROUND_BRIDGE_MODE
-        values["heuristic_turnaround_bridge_value_minutes"] = (
-            problem.legacy_parameters.effective_layover_minutes
-        )
-    return tuple(
-        OperatingParameterLockV1(
-            field=field,
-            value=value,
-            source_fingerprint=source,
-        )
-        for field, value in values.items()
-    )
-
-
 def _source_lock_errors(
     problem: ScheduleProblemV1,
     candidate: RawScheduleCandidateV1,
 ) -> list[str]:
-    source_by_id = {
-        trip.trip_id: trip for trip in problem.normalized_inputs.scenario_b.exact_timetable
-    }
+    source_by_id = {trip.trip_id: trip for trip in problem.scenario_b.exact_timetable}
     errors: list[str] = []
     for trip in candidate.exact_timetable:
         source = source_by_id.get(trip.source_b_trip_id)
@@ -547,17 +483,22 @@ def _maximum_simultaneous_vehicle_use(assignments) -> int:
 
 
 def validate_and_build_solution_v1(
-    problem: ScheduleProblemV1,
+    context: ScheduleGenerationContextV1,
     candidate: RawScheduleCandidateV1,
 ) -> CandidateValidationResultV1:
     rejection_codes: list[str] = []
+    problem = context.problem
+    context_validation = validate_schedule_generation_context_v1(context)
+    rejection_codes.extend(issue.code for issue in context_validation.issues)
     coverage = assess_demand_coverage_v1(
-        problem.normalized_inputs,
-        minimum_confidence=(problem.evaluation_policy.minimum_authoritative_demand_confidence),
+        context.normalized_inputs,
+        minimum_confidence=(context.evaluation_policy.minimum_authoritative_demand_confidence),
     )
     if not coverage.directional_c_generation_supported:
         rejection_codes.append(DEMAND_COVERAGE_INCOMPLETE_FOR_AUTHORITATIVE_C)
-    b = problem.normalized_inputs.scenario_b
+    b = problem.scenario_b
+    if candidate.solver_adapter != problem.solver_adapter:
+        rejection_codes.append("PROBLEM_ADAPTER_CONTEXT_MISMATCH")
     source_ids = [trip.source_b_trip_id for trip in candidate.exact_timetable]
     c_ids = [trip.c_trip_id for trip in candidate.exact_timetable]
     expected_source_ids = [trip.trip_id for trip in b.exact_timetable]
@@ -661,7 +602,7 @@ def validate_and_build_solution_v1(
         for trip in candidate.exact_timetable
     )
     fleet_assignments = assignments.assignments
-    block_supply = _candidate_block_supply(problem, candidate)
+    block_supply = _candidate_block_supply(context, candidate)
     block_evaluation = tuple(
         BlockEvaluationV1(
             block_id=item.block_id,
@@ -679,8 +620,8 @@ def validate_and_build_solution_v1(
         solver_adapter=candidate.solver_adapter,
         solve_duration_seconds=candidate.solve_duration_seconds,
         solution_fingerprint="",
-        source_b_fingerprint=problem.normalized_inputs.scenario_b_fingerprint,
-        operating_parameter_locks=_operating_locks(problem, candidate.solver_adapter),
+        source_b_fingerprint=problem.source_b_fingerprint,
+        operating_parameter_locks=problem.operating_parameter_locks,
         c_block_supply_plan=block_supply,
         c_headway_regimes=_solution_regimes(problem, reconciled_regimes),
         c_exact_timetable=solution_trips,

@@ -1,53 +1,58 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, replace
 from enum import Enum
 from typing import Any
 
-from bus_schedule_engine.c_config import ScenarioCConfig
-from bus_schedule_engine.models import (
-    DemandRecord,
-    Direction,
-    ScenarioParameters,
-    Trip,
-)
-
-from .evaluation import (
-    ScenarioBEvaluationBundleV1,
-    ScenarioBEvaluationPolicyV1,
-)
+from .evaluation import ScenarioBEvaluationBundleV1, ScenarioBEvaluationPolicyV1
 from .evaluation_fingerprints import evaluation_fingerprint
-from .models import (
-    ContractDirection,
-    DepartureTerminal,
-    NormalizedInputBundleV1,
+from .evaluation_serialization import (
+    block_supply_plan_to_contract_dict,
+    demand_analysis_block_to_contract_dict,
+    demand_resolution_to_contract_dict,
 )
+from .heuristic_context import (
+    HEURISTIC_TURNAROUND_BRIDGE_MODE as HEURISTIC_TURNAROUND_BRIDGE_MODE,
+)
+from .models import NormalizedInputBundleV1, ScenarioBInput
 from .public_api import evaluate_scenario_b_v1
 from .serialization import canonical_sha256
-from .solver_models import ScheduleProblemV1
+from .solver_models import (
+    BoundaryConvention,
+    BoundedInitialFleetV1,
+    DirectionRedistributionAuthorizationV1,
+    DirectionTripLockMode,
+    FleetConstraintMode,
+    InitialFleetPositioningMode,
+    InitialFleetValuesV1,
+    OperatingParameterLockV1,
+    ScheduleGenerationContextV1,
+    ScheduleProblemV1,
+    SolverPolicyV1,
+)
 
-PROBLEM_FINGERPRINT_PROFILE = "contract_v1_h2_problem"
+PROBLEM_FINGERPRINT_PROFILE = "contract_v1_h4_problem"
+EMPTY_ADAPTER_CONTEXT_FINGERPRINT_PROFILE = "contract_v1_h4_empty_adapter_context"
 NUMERIC_RECONCILIATION_TOLERANCE_MINUTES = 1e-9
-ANALYTICAL_BLOCK_MEMBERSHIP_CONVENTION = "start_inclusive_end_exclusive"
+ANALYTICAL_BLOCK_MEMBERSHIP_CONVENTION = "half_open"
 RUNTIME_LOCK_MODE = "fixed_by_source_trip"
 TURNAROUND_APPLICATION_MODE = "arrival_terminal_specific"
-HEURISTIC_TURNAROUND_BRIDGE_MODE = "conservative_max_terminal_turnaround"
-SUPPORTED_OPERATING_MODES = {
-    "fleet_constraint_mode": "available_upper_bound",
-    "initial_fleet_positioning_mode": "solver_determined",
-    "direction_trip_lock_mode": "fixed_by_direction",
-    "runtime_lock_mode": RUNTIME_LOCK_MODE,
-    "turnaround_application_mode": TURNAROUND_APPLICATION_MODE,
-    "heuristic_turnaround_bridge_mode": HEURISTIC_TURNAROUND_BRIDGE_MODE,
-}
 
 
 class ScheduleProblemError(ValueError):
-    """Raised when legacy heuristic inputs do not reconcile with Contract V1."""
+    """Raised when a canonical Schedule Problem cannot be proven valid."""
 
-    def __init__(self, message: str, *, code: str | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        codes: tuple[str, ...] = (),
+    ) -> None:
         super().__init__(message)
-        self.code = code
+        self.code = code or (codes[0] if codes else None)
+        self.codes = codes or ((code,) if code is not None else ())
 
 
 def jsonable(value: Any) -> Any:
@@ -60,164 +65,223 @@ def jsonable(value: Any) -> Any:
     return value
 
 
-def contract_direction(direction: Direction) -> ContractDirection:
-    if direction == Direction.TERMINAL_1_TO_2:
-        return ContractDirection.OUTBOUND
-    if direction == Direction.TERMINAL_2_TO_1:
-        return ContractDirection.INBOUND
-    return ContractDirection.COMBINED
+def empty_adapter_context_fingerprint() -> str:
+    return canonical_sha256({"fingerprint_profile": (EMPTY_ADAPTER_CONTEXT_FINGERPRINT_PROFILE)})
 
 
-def legacy_direction(direction: ContractDirection) -> Direction:
-    if direction == ContractDirection.OUTBOUND:
-        return Direction.TERMINAL_1_TO_2
-    if direction == ContractDirection.INBOUND:
-        return Direction.TERMINAL_2_TO_1
-    raise ScheduleProblemError("Timetable candidates cannot use combined direction")
-
-
-def departure_terminal(direction: ContractDirection) -> DepartureTerminal:
-    if direction == ContractDirection.OUTBOUND:
-        return DepartureTerminal.TERMINAL_1
-    if direction == ContractDirection.INBOUND:
-        return DepartureTerminal.TERMINAL_2
-    raise ScheduleProblemError("Timetable candidates cannot use combined direction")
-
-
-def _validate_legacy_parameters(
-    normalized: NormalizedInputBundleV1,
-    legacy: ScenarioParameters,
-) -> None:
-    scenario_b = normalized.scenario_b
-    comparisons = {
-        "route_id": (legacy.route_id, scenario_b.route_id),
-        "route_name": (legacy.route_name, scenario_b.route_name),
-        "route_type": (legacy.route_type, scenario_b.route_type),
-        "terminal_1_name": (legacy.terminal_1_name, scenario_b.terminal_1_name),
-        "terminal_2_name": (legacy.terminal_2_name, scenario_b.terminal_2_name),
-        "total_daily_trips": (
-            legacy.total_daily_trips,
-            scenario_b.total_daily_trips,
-        ),
-        "vehicle_capacity": (legacy.capacity, scenario_b.vehicle_capacity),
-        "trip_runtime_minutes": (
-            legacy.trip_runtime_minutes,
-            scenario_b.trip_runtime_minutes,
-        ),
-        "terminal_1_first_departure": (
-            legacy.terminal_1_first_departure,
-            scenario_b.first_departures.terminal_1,
-        ),
-        "terminal_2_first_departure": (
-            legacy.terminal_2_first_departure,
-            scenario_b.first_departures.terminal_2,
-        ),
-        "terminal_1_last_departure": (
-            legacy.terminal_1_last_departure,
-            scenario_b.last_departures.terminal_1,
-        ),
-        "terminal_2_last_departure": (
-            legacy.terminal_2_last_departure,
-            scenario_b.last_departures.terminal_2,
-        ),
+def _scenario_source_identity(scenario) -> dict[str, str]:
+    return {
+        "source_type": scenario.source_metadata.source_type.value,
+        "source_id": scenario.source_metadata.source_id,
     }
-    mismatches = [
-        field
-        for field, (legacy_value, normalized_value) in comparisons.items()
-        if legacy_value != normalized_value
-    ]
-    if mismatches:
-        raise ScheduleProblemError(
-            "Legacy parameters do not reconcile with Scenario B: " + ", ".join(mismatches)
-        )
 
 
-def _validate_legacy_timetable(
-    normalized: NormalizedInputBundleV1,
-    legacy_trips_b: tuple[Trip, ...],
-    legacy_parameters: ScenarioParameters,
-) -> None:
-    normalized_by_id = {trip.trip_id: trip for trip in normalized.scenario_b.exact_timetable}
-    legacy_by_id = {trip.trip_id: trip for trip in legacy_trips_b}
-    if len(legacy_by_id) != len(legacy_trips_b):
-        raise ScheduleProblemError("Legacy Scenario B contains duplicate trip IDs")
-    if set(normalized_by_id) != set(legacy_by_id):
-        raise ScheduleProblemError(
-            "Legacy and normalized Scenario B trip identities do not reconcile"
-        )
-    for trip_id, normalized_trip in normalized_by_id.items():
-        legacy_trip = legacy_by_id[trip_id]
-        expected_direction = contract_direction(legacy_trip.direction)
-        expected_terminal = departure_terminal(expected_direction)
-        arrival = legacy_trip.resolved_arrival_seconds(
-            legacy_parameters.default_trip_runtime_minutes
-        )
-        runtime_seconds = arrival - legacy_trip.departure_seconds
-        if (
-            expected_direction != normalized_trip.direction
-            or expected_terminal != normalized_trip.departure_terminal
-            or legacy_trip.departure_seconds != normalized_trip.departure_time
-            or arrival != normalized_trip.resolved_arrival_time
-            or runtime_seconds != normalized_trip.runtime_minutes * 60
-        ):
-            raise ScheduleProblemError(
-                f"Legacy and normalized Scenario B differ for trip {trip_id}"
+def build_operating_parameter_locks_v1(
+    scenario_b: ScenarioBInput,
+    source_b_fingerprint: str,
+    *,
+    direction_trip_lock_mode: DirectionTripLockMode,
+    fleet_constraint_mode: FleetConstraintMode,
+    initial_fleet_positioning_mode: InitialFleetPositioningMode,
+    adapter_operating_lock_values: Mapping[str, object] | None = None,
+) -> tuple[OperatingParameterLockV1, ...]:
+    values: dict[str, object] = {
+        "route_id": scenario_b.route_id,
+        "route_name": scenario_b.route_name,
+        "route_type": scenario_b.route_type.value,
+        "terminal_1_name": scenario_b.terminal_1_name,
+        "terminal_2_name": scenario_b.terminal_2_name,
+        "trip_runtime_minutes": scenario_b.trip_runtime_minutes,
+        "runtime_lock_mode": RUNTIME_LOCK_MODE,
+        "exact_trip_runtime_minutes_by_source_b_trip_id": {
+            trip.trip_id: trip.runtime_minutes
+            for trip in sorted(
+                scenario_b.exact_timetable,
+                key=lambda item: item.trip_id,
             )
-
-
-def _validate_legacy_demand(
-    normalized: NormalizedInputBundleV1,
-    legacy_demand: tuple[DemandRecord, ...],
-) -> None:
-    observed = normalized.observed_demand
-    if observed is None:
-        if legacy_demand:
+        },
+        "turnaround_minutes": {
+            "terminal_1": scenario_b.turnaround_minutes.terminal_1,
+            "terminal_2": scenario_b.turnaround_minutes.terminal_2,
+        },
+        "turnaround_application_mode": TURNAROUND_APPLICATION_MODE,
+        "vehicle_capacity": scenario_b.vehicle_capacity,
+        "total_daily_trips": scenario_b.total_daily_trips,
+        "trips_by_direction": {
+            "outbound": scenario_b.trips_by_direction.outbound,
+            "inbound": scenario_b.trips_by_direction.inbound,
+        },
+        "first_departures": {
+            "terminal_1": scenario_b.first_departures.terminal_1,
+            "terminal_2": scenario_b.first_departures.terminal_2,
+        },
+        "last_departures": {
+            "terminal_1": scenario_b.last_departures.terminal_1,
+            "terminal_2": scenario_b.last_departures.terminal_2,
+        },
+        "available_fleet_limit": scenario_b.available_fleet_limit,
+        "approved_active_fleet": scenario_b.approved_active_fleet,
+        "fleet_constraint_mode": fleet_constraint_mode.value,
+        "initial_fleet_positioning_mode": (initial_fleet_positioning_mode.value),
+        "direction_trip_lock_mode": direction_trip_lock_mode.value,
+        "operating_day_type": scenario_b.operating_day_type.value,
+    }
+    for field, value in (adapter_operating_lock_values or {}).items():
+        if field in values:
             raise ScheduleProblemError(
-                "Legacy demand is present while normalized observed demand is absent"
+                f"Adapter lock duplicates canonical lock {field}",
+                code="PROBLEM_LOCK_DUPLICATE_FIELD",
             )
-        return
-    if len(observed.observations) != len(legacy_demand):
-        raise ScheduleProblemError("Legacy and normalized demand row counts do not reconcile")
-    normalized_rows = sorted(
-        (
-            observation.direction.value,
-            observation.interval_start,
-            observation.interval_end,
-            float(observation.passenger_count),
-            observation.volume_classification.value,
+        values[field] = value
+    return tuple(
+        OperatingParameterLockV1(
+            field=field,
+            value=value,
+            source_fingerprint=source_b_fingerprint,
         )
-        for observation in observed.observations
+        for field, value in sorted(values.items())
     )
-    legacy_rows = sorted(
-        (
-            contract_direction(record.direction).value,
-            record.block_start_seconds,
-            record.block_end_seconds,
-            float(record.passenger_volume),
-            record.volume_type.value,
-        )
-        for record in legacy_demand
+
+
+def _lock_payload(lock: OperatingParameterLockV1) -> dict[str, object]:
+    return {
+        "field": lock.field,
+        "value": jsonable(lock.value),
+        "locked": lock.locked,
+        "source_fingerprint": lock.source_fingerprint,
+        "authorized_exception": lock.authorized_exception,
+    }
+
+
+def problem_fingerprint_payload(
+    problem: ScheduleProblemV1,
+) -> dict[str, object]:
+    blocks = sorted(
+        problem.analysis_blocks,
+        key=lambda item: (
+            item.direction.value,
+            item.start_time,
+            item.end_time,
+            item.block_id,
+        ),
     )
-    if normalized_rows != legacy_rows:
-        raise ScheduleProblemError("Legacy and normalized demand observations do not reconcile")
+    requirements = sorted(
+        problem.block_requirements,
+        key=lambda item: (
+            item.direction.value,
+            item.block_start,
+            item.block_end,
+            item.block_id,
+        ),
+    )
+    authorization = problem.direction_redistribution_authorization
+    fixed = problem.fixed_initial_fleet
+    bounded = problem.bounded_initial_fleet
+    return {
+        "fingerprint_profile": PROBLEM_FINGERPRINT_PROFILE,
+        "contract_version": problem.contract_version,
+        "source_a_fingerprint": problem.source_a_fingerprint,
+        "source_b_fingerprint": problem.source_b_fingerprint,
+        "observed_demand_fingerprint": (problem.observed_demand_fingerprint),
+        "scenario_a_source_identity": (
+            _scenario_source_identity(problem.scenario_a)
+            if problem.scenario_a is not None
+            else None
+        ),
+        "scenario_b_source_identity": _scenario_source_identity(problem.scenario_b),
+        "evaluation_fingerprint": problem.evaluation_fingerprint,
+        "demand_response_mode": (
+            problem.demand_response_mode.value if problem.demand_response_mode is not None else None
+        ),
+        "demand_resolution": (
+            demand_resolution_to_contract_dict(problem.demand_resolution)
+            if problem.demand_resolution is not None
+            else None
+        ),
+        "analysis_blocks": [demand_analysis_block_to_contract_dict(item) for item in blocks],
+        "operating_parameter_locks": [
+            _lock_payload(item)
+            for item in sorted(
+                problem.operating_parameter_locks,
+                key=lambda item: item.field,
+            )
+        ],
+        "direction_trip_lock_mode": problem.direction_trip_lock_mode.value,
+        "direction_redistribution_authorization": (
+            {
+                "enabled": authorization.enabled,
+                "authorized_by": authorization.authorized_by,
+                "directional_demand_confidence": (
+                    authorization.directional_demand_confidence.value
+                ),
+            }
+            if authorization is not None
+            else None
+        ),
+        "fleet_constraint_mode": problem.fleet_constraint_mode.value,
+        "initial_fleet_positioning_mode": (problem.initial_fleet_positioning_mode.value),
+        "fixed_initial_fleet": (
+            {
+                "terminal_1": fixed.terminal_1,
+                "terminal_2": fixed.terminal_2,
+            }
+            if fixed is not None
+            else None
+        ),
+        "bounded_initial_fleet": (
+            {
+                "terminal_1": asdict(bounded.terminal_1),
+                "terminal_2": asdict(bounded.terminal_2),
+            }
+            if bounded is not None
+            else None
+        ),
+        "planning_load_factor_ceiling": (problem.planning_load_factor_ceiling),
+        "critical_load_factor_ceiling": (problem.critical_load_factor_ceiling),
+        "block_requirements": [block_supply_plan_to_contract_dict(item) for item in requirements],
+        "boundary_convention": problem.boundary_convention.value,
+        "solver_adapter": problem.solver_adapter,
+        "adapter_context_fingerprint": (problem.adapter_context_fingerprint),
+        "solver_policy": jsonable(asdict(problem.solver_policy)),
+    }
+
+
+def calculate_problem_fingerprint(problem: ScheduleProblemV1) -> str:
+    return canonical_sha256(problem_fingerprint_payload(problem))
+
+
+def derive_problem_id(problem_fingerprint: str) -> str:
+    return f"PROBLEM-{problem_fingerprint[:16].upper()}"
+
+
+def _raise_problem_issues(issues) -> None:
+    codes = tuple(issue.code for issue in issues)
+    raise ScheduleProblemError(
+        "Canonical Schedule Problem validation failed: " + ", ".join(codes),
+        codes=codes,
+    )
 
 
 def build_schedule_problem_v1(
     normalized_inputs: NormalizedInputBundleV1,
     b_evaluation: ScenarioBEvaluationBundleV1,
-    legacy_parameters: ScenarioParameters,
-    legacy_trips_b: list[Trip] | tuple[Trip, ...],
-    legacy_demand: list[DemandRecord] | tuple[DemandRecord, ...],
-    heuristic_config: ScenarioCConfig,
+    *,
+    solver_adapter: str,
+    adapter_context_fingerprint: str,
     evaluation_policy: ScenarioBEvaluationPolicyV1 | None = None,
+    solver_policy: SolverPolicyV1 | None = None,
+    direction_trip_lock_mode: DirectionTripLockMode = (DirectionTripLockMode.FIXED_BY_DIRECTION),
+    direction_redistribution_authorization: (DirectionRedistributionAuthorizationV1 | None) = None,
+    fleet_constraint_mode: FleetConstraintMode = (FleetConstraintMode.AVAILABLE_UPPER_BOUND),
+    initial_fleet_positioning_mode: InitialFleetPositioningMode = (
+        InitialFleetPositioningMode.SOLVER_DETERMINED
+    ),
+    fixed_initial_fleet: InitialFleetValuesV1 | None = None,
+    bounded_initial_fleet: BoundedInitialFleetV1 | None = None,
+    boundary_convention: BoundaryConvention = BoundaryConvention.HALF_OPEN,
+    adapter_operating_lock_values: Mapping[str, object] | None = None,
 ) -> ScheduleProblemV1:
     effective_policy = evaluation_policy or ScenarioBEvaluationPolicyV1()
-    trips = tuple(legacy_trips_b)
-    demand = tuple(legacy_demand)
-    _validate_legacy_parameters(normalized_inputs, legacy_parameters)
-    _validate_legacy_timetable(normalized_inputs, trips, legacy_parameters)
-    _validate_legacy_demand(normalized_inputs, demand)
-
     authoritative_evaluation = evaluate_scenario_b_v1(
         normalized_inputs,
         effective_policy,
@@ -240,53 +304,93 @@ def build_schedule_problem_v1(
             code=code,
         )
 
-    scenario_b = normalized_inputs.scenario_b
-    compatibility_layover = max(
-        scenario_b.turnaround_minutes.terminal_1,
-        scenario_b.turnaround_minutes.terminal_2,
+    resolution = authoritative_evaluation.demand_resolution
+    problem = ScheduleProblemV1(
+        problem_id="",
+        problem_fingerprint="",
+        evaluation_fingerprint=authoritative_evaluation_fingerprint,
+        source_a_fingerprint=normalized_inputs.scenario_a_fingerprint,
+        source_b_fingerprint=normalized_inputs.scenario_b_fingerprint,
+        observed_demand_fingerprint=(normalized_inputs.observed_demand_fingerprint),
+        solver_adapter=solver_adapter,
+        adapter_context_fingerprint=adapter_context_fingerprint,
+        scenario_a=normalized_inputs.scenario_a,
+        scenario_b=normalized_inputs.scenario_b,
+        demand_response_mode=(
+            normalized_inputs.observed_demand.demand_response_mode
+            if normalized_inputs.observed_demand is not None
+            else None
+        ),
+        demand_resolution=(resolution.contract if resolution is not None else None),
+        analysis_blocks=(tuple(resolution.blocks) if resolution is not None else ()),
+        operating_parameter_locks=build_operating_parameter_locks_v1(
+            normalized_inputs.scenario_b,
+            normalized_inputs.scenario_b_fingerprint,
+            direction_trip_lock_mode=direction_trip_lock_mode,
+            fleet_constraint_mode=fleet_constraint_mode,
+            initial_fleet_positioning_mode=(initial_fleet_positioning_mode),
+            adapter_operating_lock_values=adapter_operating_lock_values,
+        ),
+        direction_trip_lock_mode=direction_trip_lock_mode,
+        direction_redistribution_authorization=(direction_redistribution_authorization),
+        fleet_constraint_mode=fleet_constraint_mode,
+        initial_fleet_positioning_mode=initial_fleet_positioning_mode,
+        fixed_initial_fleet=fixed_initial_fleet,
+        bounded_initial_fleet=bounded_initial_fleet,
+        planning_load_factor_ceiling=(effective_policy.planning_load_factor_ceiling),
+        critical_load_factor_ceiling=(effective_policy.critical_load_factor_ceiling),
+        block_requirements=tuple(authoritative_evaluation.b_block_supply),
+        boundary_convention=boundary_convention,
+        solver_policy=solver_policy or SolverPolicyV1(),
     )
-    compatibility_parameters = replace(
-        legacy_parameters,
-        minimum_layover_minutes=compatibility_layover,
+    fingerprint = calculate_problem_fingerprint(problem)
+    problem = replace(
+        problem,
+        problem_fingerprint=fingerprint,
+        problem_id=derive_problem_id(fingerprint),
     )
-    exact_runtime_mapping = {
-        trip.trip_id: trip.runtime_minutes
-        for trip in sorted(scenario_b.exact_timetable, key=lambda item: item.trip_id)
-    }
-    payload = {
-        "fingerprint_profile": PROBLEM_FINGERPRINT_PROFILE,
-        "contract_version": scenario_b.contract_version,
-        "scenario_a_fingerprint": normalized_inputs.scenario_a_fingerprint,
-        "scenario_b_fingerprint": normalized_inputs.scenario_b_fingerprint,
-        "observed_demand_fingerprint": normalized_inputs.observed_demand_fingerprint,
-        "authoritative_evaluation_fingerprint": (authoritative_evaluation_fingerprint),
-        "evaluation_policy": jsonable(asdict(effective_policy)),
-        "heuristic_config": jsonable(asdict(heuristic_config)),
-        "supported_operating_modes": SUPPORTED_OPERATING_MODES,
-        "analytical_block_membership_convention": (ANALYTICAL_BLOCK_MEMBERSHIP_CONVENTION),
-        "numeric_reconciliation_tolerance_minutes": (NUMERIC_RECONCILIATION_TOLERANCE_MINUTES),
-        "regime_membership_source": "raw_trip_headway_regime_id",
-        "directional_ordering": ["departure_time", "trip_id"],
-        "regime_endpoint_convention": "inclusive_member_departure_endpoints",
-        "scenario_default_trip_runtime_minutes": scenario_b.trip_runtime_minutes,
-        "exact_trip_runtime_minutes_by_source_b_trip_id": exact_runtime_mapping,
-        "turnaround_minutes": {
-            "terminal_1": scenario_b.turnaround_minutes.terminal_1,
-            "terminal_2": scenario_b.turnaround_minutes.terminal_2,
-        },
-        "turnaround_application_mode": TURNAROUND_APPLICATION_MODE,
-        "heuristic_turnaround_bridge": {
-            "mode": HEURISTIC_TURNAROUND_BRIDGE_MODE,
-            "scalar_layover_minutes": compatibility_layover,
-        },
-    }
-    return ScheduleProblemV1(
+    from .problem_validation import validate_schedule_problem_v1
+
+    validation = validate_schedule_problem_v1(problem)
+    if not validation.passed:
+        _raise_problem_issues(validation.issues)
+    return problem
+
+
+def build_schedule_generation_context_v1(
+    problem: ScheduleProblemV1,
+    normalized_inputs: NormalizedInputBundleV1,
+    b_evaluation: ScenarioBEvaluationBundleV1,
+    evaluation_policy: ScenarioBEvaluationPolicyV1 | None = None,
+) -> ScheduleGenerationContextV1:
+    effective_policy = evaluation_policy or ScenarioBEvaluationPolicyV1()
+    authoritative_evaluation = evaluate_scenario_b_v1(
+        normalized_inputs,
+        effective_policy,
+    )
+    if evaluation_fingerprint(
+        normalized_inputs,
+        b_evaluation,
+        effective_policy,
+    ) != evaluation_fingerprint(
+        normalized_inputs,
+        authoritative_evaluation,
+        effective_policy,
+    ):
+        raise ScheduleProblemError(
+            "PROBLEM_EVALUATION_FINGERPRINT_MISMATCH: supplied evaluation "
+            "does not match current generation-context authority.",
+            code="PROBLEM_EVALUATION_FINGERPRINT_MISMATCH",
+        )
+    context = ScheduleGenerationContextV1(
+        problem=problem,
         normalized_inputs=normalized_inputs,
         b_evaluation=authoritative_evaluation,
         evaluation_policy=effective_policy,
-        legacy_parameters=compatibility_parameters,
-        legacy_trips_b=trips,
-        legacy_demand=demand,
-        heuristic_config=heuristic_config,
-        problem_fingerprint=canonical_sha256(payload),
     )
+    from .problem_validation import validate_schedule_generation_context_v1
+
+    validation = validate_schedule_generation_context_v1(context)
+    if not validation.passed:
+        _raise_problem_issues(validation.issues)
+    return context

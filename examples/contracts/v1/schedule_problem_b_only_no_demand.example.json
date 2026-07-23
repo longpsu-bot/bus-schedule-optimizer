@@ -1,0 +1,225 @@
+{
+  "contract_version": "1.0.0",
+  "problem_id": "PROBLEM-1111111111111111",
+  "problem_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+  "evaluation_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+  "source_a_fingerprint": null,
+  "source_b_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "observed_demand_fingerprint": null,
+  "solver_adapter": "contract_v1_example_adapter",
+  "adapter_context_fingerprint": "3333333333333333333333333333333333333333333333333333333333333333",
+  "scenario_a": null,
+  "scenario_b": {
+    "contract_version": "1.0.0",
+    "scenario_id": "B",
+    "route_id": "ROUTE-ANON-01",
+    "route_name": "Tuyáº¿n minh há»a 01",
+    "route_type": "intra_provincial",
+    "terminal_1_name": "Báº¿n Báº¯c",
+    "terminal_2_name": "Báº¿n Nam",
+    "trip_runtime_minutes": 30,
+    "turnaround_minutes": {"terminal_1": 5, "terminal_2": 5},
+    "total_daily_trips": 2,
+    "trips_by_direction": {"outbound": 1, "inbound": 1},
+    "first_departures": {"terminal_1": "06:00", "terminal_2": "06:40"},
+    "last_departures": {"terminal_1": "06:00", "terminal_2": "06:40"},
+    "vehicle_capacity": 60,
+    "approved_active_fleet": 1,
+    "available_fleet_limit": 2,
+    "operating_day_type": "weekday",
+    "exact_timetable": [
+      {
+        "trip_id": "B-O-001",
+        "direction": "outbound",
+        "departure_terminal": "terminal_1",
+        "departure_time": "06:00",
+        "arrival_time": "06:30",
+        "runtime_minutes": 30,
+        "vehicle_assignment": null
+      },
+      {
+        "trip_id": "B-I-001",
+        "direction": "inbound",
+        "departure_terminal": "terminal_2",
+        "departure_time": "06:40",
+        "arrival_time": "07:10",
+        "runtime_minutes": 30,
+        "vehicle_assignment": null
+      }
+    ],
+    "source_metadata": {
+      "source_type": "ui",
+      "source_id": "anon-b",
+      "imported_at": "2026-07-22T08:05:00+07:00",
+      "notes": "Fictional B-only example."
+    }
+  },
+  "demand_response_mode": null,
+  "demand_resolution": null,
+  "analysis_blocks": [],
+  "operating_parameter_locks": [
+    {
+      "field": "approved_active_fleet",
+      "value": 1,
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "available_fleet_limit",
+      "value": 2,
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "direction_trip_lock_mode",
+      "value": "fixed_by_direction",
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "exact_trip_runtime_minutes_by_source_b_trip_id",
+      "value": {"B-I-001": 30, "B-O-001": 30},
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "first_departures",
+      "value": {"terminal_1": 21600, "terminal_2": 24000},
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "fleet_constraint_mode",
+      "value": "available_upper_bound",
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "initial_fleet_positioning_mode",
+      "value": "solver_determined",
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "last_departures",
+      "value": {"terminal_1": 21600, "terminal_2": 24000},
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "operating_day_type",
+      "value": "weekday",
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "route_id",
+      "value": "ROUTE-ANON-01",
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "route_name",
+      "value": "Tuyáº¿n minh há»a 01",
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "route_type",
+      "value": "intra_provincial",
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "runtime_lock_mode",
+      "value": "fixed_by_source_trip",
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "terminal_1_name",
+      "value": "Báº¿n Báº¯c",
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "terminal_2_name",
+      "value": "Báº¿n Nam",
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "total_daily_trips",
+      "value": 2,
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "trip_runtime_minutes",
+      "value": 30,
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "trips_by_direction",
+      "value": {"outbound": 1, "inbound": 1},
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "turnaround_application_mode",
+      "value": "arrival_terminal_specific",
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "turnaround_minutes",
+      "value": {"terminal_1": 5, "terminal_2": 5},
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    },
+    {
+      "field": "vehicle_capacity",
+      "value": 60,
+      "locked": true,
+      "source_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "authorized_exception": null
+    }
+  ],
+  "direction_trip_lock_mode": "fixed_by_direction",
+  "direction_redistribution_authorization": null,
+  "fleet_constraint_mode": "available_upper_bound",
+  "initial_fleet_positioning_mode": "solver_determined",
+  "fixed_initial_fleet": null,
+  "bounded_initial_fleet": null,
+  "planning_load_factor_ceiling": 0.85,
+  "critical_load_factor_ceiling": 0.9,
+  "block_requirements": [],
+  "boundary_convention": "half_open",
+  "solver_policy": {
+    "time_limit_seconds": null,
+    "worker_count": null,
+    "random_seed": null,
+    "require_independent_validation": true
+  }
+}
