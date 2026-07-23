@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import replace
 
 from .evaluation import BDisposition
@@ -18,11 +19,17 @@ from .solver_validation import validate_and_build_solution_v1
 
 
 def _finalize_outcome(
+    problem: ScheduleProblemV1,
     outcome: ScheduleGenerationOutcomeV1,
 ) -> ScheduleGenerationOutcomeV1:
     return replace(
         outcome,
-        outcome_fingerprint=canonical_sha256(outcome_fingerprint_payload(outcome)),
+        outcome_fingerprint=canonical_sha256(
+            outcome_fingerprint_payload(
+                outcome,
+                problem_fingerprint=problem.problem_fingerprint,
+            )
+        ),
     )
 
 
@@ -33,6 +40,7 @@ def _not_run_outcome(
     limitations: tuple[str, ...] = (),
 ) -> ScheduleGenerationOutcomeV1:
     return _finalize_outcome(
+        problem,
         ScheduleGenerationOutcomeV1(
             result_status=result_status,
             execution_status=SolverExecutionStatus.NOT_RUN,
@@ -45,7 +53,7 @@ def _not_run_outcome(
             diagnostic_candidate=None,
             explanations=(explanation,),
             limitations=limitations,
-        )
+        ),
     )
 
 
@@ -60,6 +68,7 @@ def _completed_without_solution(
     limitations: tuple[str, ...],
 ) -> ScheduleGenerationOutcomeV1:
     return _finalize_outcome(
+        problem,
         ScheduleGenerationOutcomeV1(
             result_status=result_status,
             execution_status=SolverExecutionStatus.COMPLETED,
@@ -72,7 +81,7 @@ def _completed_without_solution(
             diagnostic_candidate=None,
             explanations=explanations,
             limitations=limitations,
-        )
+        ),
     )
 
 
@@ -100,7 +109,26 @@ def run_schedule_solver_v1(
             "B's locked parameters were proven infeasible before solver invocation.",
         )
 
-    run = solver.solve(problem)
+    started = time.perf_counter()
+    try:
+        run = solver.solve(problem)
+    except Exception:
+        elapsed = max(0.0, time.perf_counter() - started)
+        return _completed_without_solution(
+            problem,
+            result_status=GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID,
+            solver_status=NativeSolverStatus.MODEL_INVALID,
+            solver_adapter=solver.adapter_id,
+            solve_duration_seconds=elapsed,
+            explanations=(
+                "SOLVER_ADAPTER_EXCEPTION: Solver adapter raised an exception "
+                "before returning a valid result.",
+            ),
+            limitations=(
+                "MODEL_INVALID identifies an adapter or implementation defect, "
+                "not route, timetable, fleet, or parameter infeasibility.",
+            ),
+        )
     if run.execution_status != SolverExecutionStatus.COMPLETED:
         return _completed_without_solution(
             problem,
@@ -118,7 +146,7 @@ def run_schedule_solver_v1(
             solver_status=run.solver_status,
             solver_adapter=run.solver_adapter,
             solve_duration_seconds=run.solve_duration_seconds,
-            explanations=run.explanations,
+            explanations=("Solver adapter reported an invalid model or adapter result.",),
             limitations=run.limitations,
         )
     if run.solver_status == NativeSolverStatus.INFEASIBLE:
@@ -164,6 +192,7 @@ def run_schedule_solver_v1(
             summary=validation.summary,
         )
         return _finalize_outcome(
+            problem,
             ScheduleGenerationOutcomeV1(
                 result_status=(GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR),
                 execution_status=run.execution_status,
@@ -176,9 +205,10 @@ def run_schedule_solver_v1(
                 diagnostic_candidate=diagnostic,
                 explanations=run.explanations,
                 limitations=run.limitations,
-            )
+            ),
         )
     return _finalize_outcome(
+        problem,
         ScheduleGenerationOutcomeV1(
             result_status=GenerationResultStatus.SOLUTION_ACCEPTED,
             execution_status=run.execution_status,
@@ -191,5 +221,5 @@ def run_schedule_solver_v1(
             diagnostic_candidate=None,
             explanations=run.explanations,
             limitations=run.limitations,
-        )
+        ),
     )

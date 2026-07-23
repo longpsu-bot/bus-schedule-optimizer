@@ -70,32 +70,45 @@ def _raw_candidate_from_generated(
                 change_reason=(trace.change_reason if trace is not None else generated.reason),
             )
         )
-    regimes = tuple(
-        RawHeadwayRegimeV1(
-            regime_id=regime.regime_id,
-            direction=contract_direction(regime.direction),
-            start_time=regime.start_seconds,
-            end_time=regime.end_seconds,
-            trip_count=regime.trip_count,
-            target_headway=regime.target_headway_minutes,
-            actual_headway_sequence=tuple(regime.actual_headway_sequence),
-            boundary_reason=regime.boundary_reason.value,
-            legacy_regularity_status=regime.headway_status,
+    raw_trips = tuple(trips)
+    regimes: list[RawHeadwayRegimeV1] = []
+    for regime in generated.headway_regimes:
+        members = sorted(
+            (trip for trip in raw_trips if trip.headway_regime_id == regime.regime_id),
+            key=lambda item: (item.c_departure_time, item.c_trip_id),
         )
-        for regime in generated.headway_regimes
-    )
+        if not members:
+            continue
+        actual_headways = tuple(
+            (right.c_departure_time - left.c_departure_time) / 60
+            for left, right in zip(members, members[1:], strict=False)
+        )
+        regimes.append(
+            RawHeadwayRegimeV1(
+                regime_id=regime.regime_id,
+                direction=contract_direction(regime.direction),
+                start_time=members[0].c_departure_time,
+                end_time=members[-1].c_departure_time,
+                trip_count=len(members),
+                target_headway=regime.target_headway_minutes,
+                actual_headway_sequence=actual_headways,
+                boundary_reason=regime.boundary_reason.value,
+                legacy_regularity_status=regime.headway_status,
+            )
+        )
+    raw_regimes = tuple(regimes)
     return RawScheduleCandidateV1(
         solver_status=NativeSolverStatus.FEASIBLE,
         solver_adapter=adapter_id,
         solve_duration_seconds=solve_duration_seconds,
         candidate_fingerprint=candidate_fingerprint(
-            source_b_fingerprint=problem.normalized_inputs.scenario_b_fingerprint,
+            problem_fingerprint=problem.problem_fingerprint,
             solver_adapter=adapter_id,
-            exact_timetable=tuple(trips),
-            headway_regimes=regimes,
+            exact_timetable=raw_trips,
+            headway_regimes=raw_regimes,
         ),
-        exact_timetable=tuple(trips),
-        headway_regimes=regimes,
+        exact_timetable=raw_trips,
+        headway_regimes=raw_regimes,
         explanation=generated.reason,
         limitations=(
             "The legacy heuristic adapter finds candidates but does not prove "

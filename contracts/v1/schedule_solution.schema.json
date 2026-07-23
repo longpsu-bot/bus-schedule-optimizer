@@ -66,8 +66,8 @@
         "start_time": {"$ref": "#/$defs/time"}, "end_time": {"$ref": "#/$defs/time"},
         "covered_analysis_blocks": {"type": "array", "minItems": 1, "items": {"type": "string"}},
         "trip_count": {"type": "integer", "minimum": 1}, "target_service_rate": {"type": "number", "minimum": 0},
-        "target_headway": {"type": "number", "exclusiveMinimum": 0}, "actual_headway_sequence": {"type": "array", "items": {"type": "integer", "minimum": 1}},
-        "transition_headways": {"type": "array", "items": {"type": "integer", "minimum": 1}}, "exceptional_headways": {"type": "array", "items": {"type": "integer", "minimum": 1}},
+        "target_headway": {"type": "number", "exclusiveMinimum": 0}, "actual_headway_sequence": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+        "transition_headways": {"type": "array", "items": {"type": "integer", "minimum": 0}}, "exceptional_headways": {"type": "array", "items": {"type": "integer", "minimum": 0}},
         "boundary_reason": {"enum": ["SUSTAINED_DEMAND_CHANGE", "MATERIAL_FREQUENCY_CHANGE", "FLEET_FEASIBILITY", "TURNAROUND_FEASIBILITY", "FIRST_SERVICE_CONSTRAINT", "FINAL_SERVICE_CONSTRAINT", "OPERATING_WINDOW_BOUNDARY"]},
         "regularity_status": {"enum": ["REGULAR", "BALANCED_ROUNDING", "TRANSITION", "EXCEPTIONAL"]}
       }

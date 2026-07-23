@@ -16,17 +16,32 @@ from .evaluation import (
     ScenarioBEvaluationBundleV1,
     ScenarioBEvaluationPolicyV1,
 )
+from .evaluation_fingerprints import evaluation_fingerprint
 from .models import (
     ContractDirection,
     DepartureTerminal,
     NormalizedInputBundleV1,
 )
+from .public_api import evaluate_scenario_b_v1
 from .serialization import canonical_sha256
 from .solver_models import ScheduleProblemV1
+
+PROBLEM_FINGERPRINT_PROFILE = "contract_v1_h1_problem"
+NUMERIC_RECONCILIATION_TOLERANCE_MINUTES = 1e-9
+ANALYTICAL_BLOCK_MEMBERSHIP_CONVENTION = "start_inclusive_end_exclusive"
+SUPPORTED_OPERATING_MODES = {
+    "fleet_constraint_mode": "available_upper_bound",
+    "initial_fleet_positioning_mode": "solver_determined",
+    "direction_trip_lock_mode": "fixed_by_direction",
+}
 
 
 class ScheduleProblemError(ValueError):
     """Raised when legacy heuristic inputs do not reconcile with Contract V1."""
+
+    def __init__(self, message: str, *, code: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 def jsonable(value: Any) -> Any:
@@ -200,17 +215,47 @@ def build_schedule_problem_v1(
     _validate_legacy_timetable(normalized_inputs, trips)
     _validate_legacy_demand(normalized_inputs, demand)
 
+    authoritative_evaluation = evaluate_scenario_b_v1(
+        normalized_inputs,
+        effective_policy,
+    )
+    authoritative_evaluation_fingerprint = evaluation_fingerprint(
+        normalized_inputs,
+        authoritative_evaluation,
+        effective_policy,
+    )
+    supplied_evaluation_fingerprint = evaluation_fingerprint(
+        normalized_inputs,
+        b_evaluation,
+        effective_policy,
+    )
+    if supplied_evaluation_fingerprint != authoritative_evaluation_fingerprint:
+        code = "B_EVALUATION_PROVENANCE_MISMATCH"
+        raise ScheduleProblemError(
+            f"{code}: supplied Scenario B evaluation does not match "
+            "the authoritative current evaluation",
+            code=code,
+        )
+
     payload = {
+        "fingerprint_profile": PROBLEM_FINGERPRINT_PROFILE,
         "contract_version": normalized_inputs.scenario_b.contract_version,
-        "source_b_fingerprint": normalized_inputs.scenario_b_fingerprint,
-        "observed_demand_fingerprint": (normalized_inputs.observed_demand_fingerprint),
-        "b_disposition": b_evaluation.evaluation.disposition.value,
+        "scenario_a_fingerprint": normalized_inputs.scenario_a_fingerprint,
+        "scenario_b_fingerprint": normalized_inputs.scenario_b_fingerprint,
+        "observed_demand_fingerprint": normalized_inputs.observed_demand_fingerprint,
+        "authoritative_evaluation_fingerprint": (authoritative_evaluation_fingerprint),
         "evaluation_policy": jsonable(asdict(effective_policy)),
         "heuristic_config": jsonable(asdict(heuristic_config)),
+        "supported_operating_modes": SUPPORTED_OPERATING_MODES,
+        "analytical_block_membership_convention": (ANALYTICAL_BLOCK_MEMBERSHIP_CONVENTION),
+        "numeric_reconciliation_tolerance_minutes": (NUMERIC_RECONCILIATION_TOLERANCE_MINUTES),
+        "regime_membership_source": "raw_trip_headway_regime_id",
+        "directional_ordering": ["departure_time", "trip_id"],
+        "regime_endpoint_convention": "inclusive_member_departure_endpoints",
     }
     return ScheduleProblemV1(
         normalized_inputs=normalized_inputs,
-        b_evaluation=b_evaluation,
+        b_evaluation=authoritative_evaluation,
         evaluation_policy=effective_policy,
         legacy_parameters=legacy_parameters,
         legacy_trips_b=trips,
