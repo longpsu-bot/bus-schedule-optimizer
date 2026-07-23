@@ -95,6 +95,88 @@ def test_legacy_scenario_b_normalizes_and_matches_schema(make_parameters, make_v
     )
 
 
+def test_scenario_runtime_is_default_while_exact_trip_runtimes_are_authoritative(
+    make_parameters,
+    make_valid_trips,
+) -> None:
+    parameters = make_parameters(
+        trip_runtime_minutes=60,
+        allowed_trip_runtime_minutes=(55, 65),
+    )
+    trips = make_valid_trips(parameters)
+    trips[0] = replace(
+        trips[0],
+        arrival_seconds=trips[0].departure_seconds + 55 * 60,
+    )
+    trips[1] = replace(
+        trips[1],
+        arrival_seconds=trips[1].departure_seconds + 65 * 60,
+    )
+
+    bundle = normalize_imported_workbook_v1(
+        _imported_b_only(parameters, trips),
+        _options(),
+    )
+
+    assert bundle.scenario_b.trip_runtime_minutes == 60
+    runtime_by_id = {
+        trip.trip_id: trip.runtime_minutes for trip in bundle.scenario_b.exact_timetable
+    }
+    assert runtime_by_id["T1"] == 55
+    assert runtime_by_id["T2"] == 65
+    assert validate_scenario_input(bundle.scenario_b).passed
+
+
+def test_explicit_legacy_runtime_outside_allowed_range_fails_closed(
+    make_parameters,
+    make_valid_trips,
+) -> None:
+    parameters = make_parameters(
+        trip_runtime_minutes=60,
+        allowed_trip_runtime_minutes=(55, 65),
+    )
+    trips = make_valid_trips(parameters)
+    trips[0] = replace(
+        trips[0],
+        arrival_seconds=trips[0].departure_seconds + 66 * 60,
+    )
+
+    with pytest.raises(
+        NormalizationError,
+        match="TRIP_RUNTIME_OUTSIDE_ALLOWED_RANGE",
+    ) as raised:
+        normalize_imported_workbook_v1(
+            _imported_b_only(parameters, trips),
+            _options(),
+        )
+
+    assert raised.value.code == "TRIP_RUNTIME_OUTSIDE_ALLOWED_RANGE"
+
+
+def test_missing_legacy_arrival_uses_maximum_configured_runtime_fallback(
+    make_parameters,
+    make_valid_trips,
+) -> None:
+    parameters = make_parameters(
+        trip_runtime_minutes=60,
+        allowed_trip_runtime_minutes=(55, 65),
+    )
+    trips = make_valid_trips(parameters)
+    trips[0] = replace(trips[0], arrival_seconds=None)
+
+    bundle = normalize_imported_workbook_v1(
+        _imported_b_only(parameters, trips),
+        _options(),
+    )
+    normalized = next(
+        trip for trip in bundle.scenario_b.exact_timetable if trip.trip_id == trips[0].trip_id
+    )
+
+    assert bundle.scenario_b.trip_runtime_minutes == 60
+    assert normalized.runtime_minutes == 65
+    assert normalized.arrival_time == normalized.departure_time + 65 * 60
+
+
 def test_normalization_refuses_to_infer_required_fleet(make_parameters, make_valid_trips) -> None:
     parameters = make_parameters()
     imported = _imported_b_only(parameters, make_valid_trips(parameters))

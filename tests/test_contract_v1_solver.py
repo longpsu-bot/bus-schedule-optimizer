@@ -16,25 +16,36 @@ from bus_schedule_engine.contracts_v1 import (
     CandidateValidationStatus,
     ContractDirection,
     DemandConfidence,
+    DepartureTerminal,
     GenerationResultStatus,
     HeuristicScheduleSolverAdapter,
     NativeSolverStatus,
     NormalizationOptions,
     OperatingDayType,
+    RawCandidateTripV1,
+    RawHeadwayRegimeV1,
     RawScheduleCandidateV1,
     ScenarioBEvaluationPolicyV1,
     ScheduleProblemError,
     SolverExecutionStatus,
     SolverRunResultV1,
+    TurnaroundMinutes,
     build_schedule_problem_v1,
     evaluate_scenario_b_v1,
     normalize_imported_workbook_v1,
     run_schedule_solver_v1,
+    scenario_fingerprint,
     schedule_outcome_to_contract_dict,
     schedule_solution_to_contract_dict,
     validate_and_build_solution_v1,
 )
+from bus_schedule_engine.contracts_v1.fleet_assignment import assign_contract_v1_fleet
 from bus_schedule_engine.contracts_v1.solver_fingerprints import candidate_fingerprint
+from bus_schedule_engine.contracts_v1.solver_problem import (
+    HEURISTIC_TURNAROUND_BRIDGE_MODE,
+    RUNTIME_LOCK_MODE,
+    TURNAROUND_APPLICATION_MODE,
+)
 from bus_schedule_engine.fingerprint import timetable_fingerprint
 from bus_schedule_engine.fleet import assign_fleet
 from bus_schedule_engine.importer import ImportedWorkbook
@@ -186,6 +197,266 @@ def _candidate(problem):
     return run.candidate
 
 
+def _contract_problem(
+    parameters: ScenarioParameters,
+    trips: list[Trip],
+    *,
+    fleet_limit: int,
+    turnaround: tuple[int, int],
+):
+    imported = ImportedWorkbook(
+        parameters_a=None,
+        trips_a=[],
+        parameters_b=parameters,
+        trips_b=trips,
+        demand=[],
+        configuration={},
+    )
+    normalized = normalize_imported_workbook_v1(
+        imported,
+        NormalizationOptions(
+            source_id="solver-v1-h2-fixture",
+            imported_at=datetime(2026, 7, 23, 8, 0, tzinfo=UTC),
+            operating_day_type_b=OperatingDayType.WEEKDAY,
+            available_fleet_limit_b=fleet_limit,
+        ),
+    )
+    scenario_b = replace(
+        normalized.scenario_b,
+        turnaround_minutes=TurnaroundMinutes(
+            terminal_1=turnaround[0],
+            terminal_2=turnaround[1],
+        ),
+    )
+    normalized = replace(
+        normalized,
+        scenario_b=scenario_b,
+        scenario_b_fingerprint=scenario_fingerprint(scenario_b),
+    )
+    evaluation = evaluate_scenario_b_v1(normalized)
+    return build_schedule_problem_v1(
+        normalized,
+        evaluation,
+        parameters,
+        trips,
+        [],
+        ScenarioCConfig(),
+    )
+
+
+def _turnaround_problem(
+    *,
+    turnaround: tuple[int, int] = (5, 20),
+    fleet_limit: int = 2,
+):
+    parameters = ScenarioParameters(
+        route_id="TURNAROUND-V1-H2",
+        route_name="Runtime and turnaround authority",
+        route_type=RouteType.INTRA_PROVINCIAL,
+        trip_runtime_minutes=30,
+        total_daily_trips=4,
+        terminal_1_name="Terminal 1",
+        terminal_1_first_departure=6 * 3600,
+        terminal_1_last_departure=7 * 3600,
+        terminal_2_name="Terminal 2",
+        terminal_2_first_departure=6 * 3600 + 15 * 60,
+        terminal_2_last_departure=7 * 3600 + 15 * 60,
+        vehicle_capacity_passengers=60,
+        minimum_layover_minutes=5,
+    )
+    definitions = (
+        ("B-O-1", Direction.TERMINAL_1_TO_2, 6 * 3600),
+        ("B-I-1", Direction.TERMINAL_2_TO_1, 6 * 3600 + 15 * 60),
+        ("B-O-2", Direction.TERMINAL_1_TO_2, 7 * 3600),
+        ("B-I-2", Direction.TERMINAL_2_TO_1, 7 * 3600 + 15 * 60),
+    )
+    trips = [
+        Trip(
+            scenario="B",
+            trip_id=trip_id,
+            departure_terminal=parameters.terminal_for_direction(direction),
+            direction=direction,
+            departure_seconds=departure,
+            arrival_seconds=departure + 30 * 60,
+        )
+        for trip_id, direction, departure in definitions
+    ]
+    return (
+        _contract_problem(
+            parameters,
+            trips,
+            fleet_limit=fleet_limit,
+            turnaround=turnaround,
+        ),
+        parameters,
+        trips,
+    )
+
+
+def _runtime_problem(
+    *,
+    first_runtime: int = 55,
+    fleet_limit: int = 8,
+):
+    parameters = ScenarioParameters(
+        route_id="RUNTIME-V1-H2",
+        route_name="Exact source runtime authority",
+        route_type=RouteType.INTRA_PROVINCIAL,
+        trip_runtime_minutes=60,
+        allowed_trip_runtime_minutes=(55, 65),
+        total_daily_trips=4,
+        terminal_1_name="Terminal 1",
+        terminal_1_first_departure=6 * 3600,
+        terminal_1_last_departure=9 * 3600,
+        terminal_2_name="Terminal 2",
+        terminal_2_first_departure=6 * 3600 + 10 * 60,
+        terminal_2_last_departure=9 * 3600 + 10 * 60,
+        vehicle_capacity_passengers=60,
+        minimum_layover_minutes=5,
+    )
+    definitions = (
+        ("B-O-1", Direction.TERMINAL_1_TO_2, 6 * 3600, first_runtime),
+        ("B-I-1", Direction.TERMINAL_2_TO_1, 6 * 3600 + 10 * 60, 65),
+        ("B-O-2", Direction.TERMINAL_1_TO_2, 9 * 3600, 65),
+        ("B-I-2", Direction.TERMINAL_2_TO_1, 9 * 3600 + 10 * 60, 55),
+    )
+    trips = [
+        Trip(
+            scenario="B",
+            trip_id=trip_id,
+            departure_terminal=parameters.terminal_for_direction(direction),
+            direction=direction,
+            departure_seconds=departure,
+            arrival_seconds=departure + runtime * 60,
+        )
+        for trip_id, direction, departure, runtime in definitions
+    ]
+    return (
+        _contract_problem(
+            parameters,
+            trips,
+            fleet_limit=fleet_limit,
+            turnaround=(5, 5),
+        ),
+        parameters,
+        trips,
+    )
+
+
+def _two_trip_turnaround_problem(
+    *,
+    inbound_departure: int,
+    fleet_limit: int,
+):
+    parameters = ScenarioParameters(
+        route_id="TURNAROUND-CHAIN-V1-H2",
+        route_name="Arrival-terminal turnaround chain",
+        route_type=RouteType.INTRA_PROVINCIAL,
+        trip_runtime_minutes=30,
+        total_daily_trips=2,
+        terminal_1_name="Terminal 1",
+        terminal_1_first_departure=6 * 3600,
+        terminal_1_last_departure=6 * 3600,
+        terminal_2_name="Terminal 2",
+        terminal_2_first_departure=inbound_departure,
+        terminal_2_last_departure=inbound_departure,
+        vehicle_capacity_passengers=60,
+        minimum_layover_minutes=5,
+    )
+    trips = [
+        Trip(
+            scenario="B",
+            trip_id="B-O-1",
+            departure_terminal=parameters.terminal_1_name,
+            direction=Direction.TERMINAL_1_TO_2,
+            departure_seconds=6 * 3600,
+            arrival_seconds=6 * 3600 + 30 * 60,
+        ),
+        Trip(
+            scenario="B",
+            trip_id="B-I-1",
+            departure_terminal=parameters.terminal_2_name,
+            direction=Direction.TERMINAL_2_TO_1,
+            departure_seconds=inbound_departure,
+            arrival_seconds=inbound_departure + 30 * 60,
+        ),
+    ]
+    return _contract_problem(
+        parameters,
+        trips,
+        fleet_limit=fleet_limit,
+        turnaround=(5, 20),
+    )
+
+
+def _baseline_candidate(problem) -> RawScheduleCandidateV1:
+    source_rows = sorted(
+        problem.normalized_inputs.scenario_b.exact_timetable,
+        key=lambda item: (item.departure_time, item.trip_id),
+    )
+    c_id_by_source = {
+        trip.trip_id: f"C-{index:04d}" for index, trip in enumerate(source_rows, start=1)
+    }
+    previous_b = _previous_headways(
+        [(trip.direction, trip.departure_time, trip.trip_id) for trip in source_rows]
+    )
+    raw_trips = tuple(
+        RawCandidateTripV1(
+            c_trip_id=c_id_by_source[trip.trip_id],
+            source_b_trip_id=trip.trip_id,
+            direction=trip.direction,
+            departure_terminal=trip.departure_terminal,
+            b_departure_time=trip.departure_time,
+            c_departure_time=trip.departure_time,
+            arrival_time=trip.departure_time + trip.runtime_minutes * 60,
+            runtime_minutes=trip.runtime_minutes,
+            shift_minutes=0,
+            previous_b_headway=previous_b[trip.trip_id],
+            previous_c_headway=previous_b[trip.trip_id],
+            headway_regime_id=f"REGIME-{trip.direction.value}",
+            change_reason="V1-H2 authority fixture",
+        )
+        for trip in source_rows
+    )
+    regimes: list[RawHeadwayRegimeV1] = []
+    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
+        members = [trip for trip in raw_trips if trip.direction == direction]
+        gaps = tuple(
+            (right.c_departure_time - left.c_departure_time) / 60
+            for left, right in zip(members, members[1:], strict=False)
+        )
+        regimes.append(
+            RawHeadwayRegimeV1(
+                regime_id=f"REGIME-{direction.value}",
+                direction=direction,
+                start_time=members[0].c_departure_time,
+                end_time=members[-1].c_departure_time,
+                trip_count=len(members),
+                target_headway=(sum(gaps) / len(gaps) if gaps else 60),
+                actual_headway_sequence=gaps,
+                boundary_reason="FIRST_SERVICE_CONSTRAINT",
+                legacy_regularity_status="REGULAR",
+            )
+        )
+    raw_regimes = tuple(regimes)
+    adapter_id = "legacy_heuristic_v1"
+    return RawScheduleCandidateV1(
+        solver_status=NativeSolverStatus.FEASIBLE,
+        solver_adapter=adapter_id,
+        solve_duration_seconds=0,
+        candidate_fingerprint=candidate_fingerprint(
+            problem_fingerprint=problem.problem_fingerprint,
+            solver_adapter=adapter_id,
+            exact_timetable=raw_trips,
+            headway_regimes=raw_regimes,
+        ),
+        exact_timetable=raw_trips,
+        headway_regimes=raw_regimes,
+        explanation="V1-H2 exact authority candidate",
+        limitations=(),
+    )
+
+
 def _refingerprint(problem, candidate: RawScheduleCandidateV1) -> RawScheduleCandidateV1:
     return replace(
         candidate,
@@ -335,6 +606,136 @@ def test_problem_reconciles_normalized_and_legacy_inputs() -> None:
     )
     assert len(problem.problem_fingerprint) == 64
     assert timetable_fingerprint(list(problem.legacy_trips_b)) == timetable_fingerprint(trips)
+
+
+def test_problem_binds_scenario_default_and_exact_source_runtime_mapping() -> None:
+    problem, _, _ = _runtime_problem(first_runtime=55)
+    changed_problem, _, _ = _runtime_problem(first_runtime=56)
+
+    assert problem.normalized_inputs.scenario_b.trip_runtime_minutes == 60
+    assert problem.legacy_parameters.default_trip_runtime_minutes == 65
+    assert {
+        trip.runtime_minutes for trip in problem.normalized_inputs.scenario_b.exact_timetable
+    } == {55, 65}
+    assert changed_problem.normalized_inputs.scenario_b.trip_runtime_minutes == 60
+    assert problem.problem_fingerprint != changed_problem.problem_fingerprint
+
+
+def test_fleet_assessment_uses_each_exact_runtime_not_scenario_or_fallback() -> None:
+    problem, _, _ = _runtime_problem()
+    scenario = problem.normalized_inputs.scenario_b
+    fleet = problem.b_evaluation.fleet_assessment
+    ready_by_trip = {
+        event.trip_id: event.event_time
+        for event in (*fleet.terminal_1_events, *fleet.terminal_2_events)
+        if event.event_type == "READY"
+    }
+    source_by_id = {trip.trip_id: trip for trip in scenario.exact_timetable}
+
+    assert ready_by_trip["B-O-1"] == (source_by_id["B-O-1"].departure_time + 55 * 60 + 5 * 60)
+    assert ready_by_trip["B-I-1"] == (source_by_id["B-I-1"].departure_time + 65 * 60 + 5 * 60)
+    assert ready_by_trip["B-O-1"] != (
+        source_by_id["B-O-1"].departure_time + scenario.trip_runtime_minutes * 60 + 5 * 60
+    )
+    assert ready_by_trip["B-O-1"] != (
+        source_by_id["B-O-1"].departure_time
+        + problem.legacy_parameters.default_trip_runtime_minutes * 60
+        + 5 * 60
+    )
+
+
+def test_problem_accepts_5_20_and_derives_conservative_heuristic_bridge() -> None:
+    problem, parameters, _ = _turnaround_problem()
+
+    assert parameters.effective_layover_minutes == 5
+    assert problem.normalized_inputs.scenario_b.turnaround_minutes == TurnaroundMinutes(
+        terminal_1=5,
+        terminal_2=20,
+    )
+    assert problem.legacy_parameters.effective_layover_minutes == 20
+    assert problem.legacy_parameters is not parameters
+
+
+def test_problem_fingerprint_changes_for_each_terminal_turnaround() -> None:
+    baseline, _, _ = _turnaround_problem(turnaround=(5, 20))
+    terminal_1_changed, _, _ = _turnaround_problem(turnaround=(6, 20))
+    terminal_2_changed, _, _ = _turnaround_problem(turnaround=(5, 21))
+
+    assert baseline.problem_fingerprint != terminal_1_changed.problem_fingerprint
+    assert baseline.problem_fingerprint != terminal_2_changed.problem_fingerprint
+    assert terminal_1_changed.problem_fingerprint != terminal_2_changed.problem_fingerprint
+
+
+def test_asymmetric_bridge_exhaustion_is_unknown_and_disclosed() -> None:
+    problem, _, _ = _turnaround_problem()
+
+    run = HeuristicScheduleSolverAdapter().solve(problem)
+
+    assert run.candidate is None
+    assert run.solver_status == NativeSolverStatus.UNKNOWN
+    assert any(HEURISTIC_TURNAROUND_BRIDGE_MODE in item for item in run.limitations)
+    assert any("scalar 20 minutes" in item for item in run.limitations)
+
+
+def test_exact_5_20_validation_accepts_candidate_stricter_bridge_misses() -> None:
+    problem, parameters, legacy_trips = _turnaround_problem()
+    candidate = _baseline_candidate(problem)
+    validation = validate_and_build_solution_v1(problem, candidate)
+    conservative_legacy = assign_fleet(
+        legacy_trips,
+        replace(parameters, minimum_layover_minutes=20),
+    )
+
+    assert conservative_legacy.minimum_vehicles == 3
+    assert validation.status == CandidateValidationStatus.ACCEPTED
+    assert validation.solution is not None
+    solution = validation.solution
+    assert solution.minimum_required_fleet == 2
+    assert len({item.vehicle_id for item in solution.fleet_assignment}) == 2
+    assert solution.minimum_required_fleet == (
+        solution.recommended_initial_fleet_terminal_1
+        + solution.recommended_initial_fleet_terminal_2
+    )
+    for assignment in solution.fleet_assignment:
+        expected_turnaround = (
+            5 if assignment.arrival_terminal == DepartureTerminal.TERMINAL_1 else 20
+        )
+        assert assignment.ready_time == assignment.arrival_time + expected_turnaround * 60
+
+
+def test_ready_at_same_timestamp_is_available_before_departure() -> None:
+    problem = _two_trip_turnaround_problem(
+        inbound_departure=6 * 3600 + 50 * 60,
+        fleet_limit=1,
+    )
+    candidate = _baseline_candidate(problem)
+    assignment = assign_contract_v1_fleet(
+        candidate.exact_timetable,
+        problem.normalized_inputs.scenario_b.exact_timetable,
+        problem.normalized_inputs.scenario_b.turnaround_minutes,
+        problem.normalized_inputs.scenario_b.available_fleet_limit,
+    )
+    validation = validate_and_build_solution_v1(problem, candidate)
+
+    assert assignment.vehicle_count == 1
+    assert assignment.assignments[0].ready_time == assignment.assignments[1].departure_time
+    assert assignment.assignments[0].vehicle_id == assignment.assignments[1].vehicle_id
+    assert validation.status == CandidateValidationStatus.ACCEPTED
+
+
+def test_candidate_requiring_shorter_terminal_2_turnaround_is_rejected() -> None:
+    problem = _two_trip_turnaround_problem(
+        inbound_departure=6 * 3600 + 49 * 60,
+        fleet_limit=1,
+    )
+    candidate = _baseline_candidate(problem)
+
+    validation = validate_and_build_solution_v1(problem, candidate)
+
+    assert validation.status == CandidateValidationStatus.REJECTED
+    assert "AVAILABLE_FLEET_LIMIT_EXCEEDED" in validation.rejection_codes
+    assert validation.fleet_assessment is not None
+    assert validation.fleet_assessment.minimum_required_fleet == 2
 
 
 def test_problem_rejects_low_demand_evaluation_for_high_demand_bundle() -> None:
@@ -528,6 +929,9 @@ def test_heuristic_candidate_crosses_boundary_and_matches_legacy_behavior() -> N
     assert tuple(trips) == baseline
     assert timetable_fingerprint(trips) == baseline_fingerprint
     assert problem.normalized_inputs.scenario_b == scenario_b_before
+    assert problem.legacy_parameters.effective_layover_minutes == (
+        parameters.effective_layover_minutes
+    )
     direct_times = {trip.source_b_trip_id: trip.departure_seconds for trip in direct.trips}
     adapter_times = {
         trip.source_b_trip_id: trip.c_departure_time for trip in outcome.solution.c_exact_timetable
@@ -592,6 +996,54 @@ def test_tampered_runtime_is_rejected_as_diagnostic_only() -> None:
     assert outcome.result_status == GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR
     assert outcome.solution is None
     assert outcome.diagnostic_candidate is not None
+
+
+def test_candidate_arrival_inconsistent_with_locked_source_runtime_is_rejected() -> None:
+    problem, _, _ = _runtime_problem()
+    candidate = _baseline_candidate(problem)
+    first = candidate.exact_timetable[0]
+    tampered = _refingerprint(
+        problem,
+        replace(
+            candidate,
+            exact_timetable=(
+                replace(first, arrival_time=first.arrival_time + 60),
+                *candidate.exact_timetable[1:],
+            ),
+        ),
+    )
+
+    validation = validate_and_build_solution_v1(problem, tampered)
+
+    assert validation.status == CandidateValidationStatus.REJECTED
+    assert "CANDIDATE_ARRIVAL_RUNTIME_MISMATCH" in validation.rejection_codes
+    assert "SOURCE_RUNTIME_LOCK_VIOLATION" not in validation.rejection_codes
+    assert "CANDIDATE_FINGERPRINT_MISMATCH" not in validation.rejection_codes
+
+
+def test_accepted_arrivals_and_ready_times_use_source_runtime_and_arrival_terminal() -> None:
+    problem, _, _ = _runtime_problem()
+    candidate = _baseline_candidate(problem)
+
+    validation = validate_and_build_solution_v1(problem, candidate)
+
+    assert validation.solution is not None
+    source_by_id = {
+        trip.trip_id: trip for trip in problem.normalized_inputs.scenario_b.exact_timetable
+    }
+    candidate_by_id = {trip.c_trip_id: trip for trip in candidate.exact_timetable}
+    for assignment in validation.solution.fleet_assignment:
+        raw = candidate_by_id[assignment.c_trip_id]
+        source = source_by_id[raw.source_b_trip_id]
+        assert assignment.arrival_time == raw.c_departure_time + source.runtime_minutes * 60
+        assert assignment.ready_time == assignment.arrival_time + 5 * 60
+    locks = {lock.field: lock.value for lock in validation.solution.operating_parameter_locks}
+    assert locks["trip_runtime_minutes"] == 60
+    assert locks["exact_trip_runtime_minutes_by_source_b_trip_id"] == {
+        trip_id: source_by_id[trip_id].runtime_minutes for trip_id in sorted(source_by_id)
+    }
+    assert locks["turnaround_minutes"] == {"terminal_1": 5, "terminal_2": 5}
+    assert locks["turnaround_application_mode"] == TURNAROUND_APPLICATION_MODE
 
 
 def test_shift_claim_is_rejected_even_with_valid_candidate_fingerprint() -> None:
@@ -942,6 +1394,34 @@ def test_accepted_solution_fingerprint_changes_with_bound_problem_identity() -> 
     assert first.solution.solution_fingerprint != second.solution.solution_fingerprint
 
 
+def test_solution_fingerprint_changes_with_authoritative_arrival_ready_evidence() -> None:
+    first_problem, _, _ = _runtime_problem(first_runtime=55)
+    second_problem, _, _ = _runtime_problem(first_runtime=56)
+    first_validation = validate_and_build_solution_v1(
+        first_problem,
+        _baseline_candidate(first_problem),
+    )
+    second_validation = validate_and_build_solution_v1(
+        second_problem,
+        _baseline_candidate(second_problem),
+    )
+
+    assert first_validation.solution is not None
+    assert second_validation.solution is not None
+    first_assignment = next(
+        item for item in first_validation.solution.fleet_assignment if item.c_trip_id == "C-0001"
+    )
+    second_assignment = next(
+        item for item in second_validation.solution.fleet_assignment if item.c_trip_id == "C-0001"
+    )
+    assert first_assignment.arrival_time != second_assignment.arrival_time
+    assert first_assignment.ready_time != second_assignment.ready_time
+    assert (
+        first_validation.solution.solution_fingerprint
+        != second_validation.solution.solution_fingerprint
+    )
+
+
 def test_solver_exception_returns_sanitized_model_invalid_envelope() -> None:
     problem, *_ = _problem()
 
@@ -1171,10 +1651,28 @@ def test_solution_reports_modes_locks_and_actual_maximum_vehicle_use() -> None:
     solution = outcome.solution
     lock_fields = {lock.field for lock in solution.operating_parameter_locks}
     assert {
+        "trip_runtime_minutes",
         "fleet_constraint_mode",
         "initial_fleet_positioning_mode",
         "direction_trip_lock_mode",
+        "runtime_lock_mode",
+        "exact_trip_runtime_minutes_by_source_b_trip_id",
+        "turnaround_minutes",
+        "turnaround_application_mode",
+        "heuristic_turnaround_bridge_mode",
+        "heuristic_turnaround_bridge_value_minutes",
     } <= lock_fields
+    locks = {lock.field: lock.value for lock in solution.operating_parameter_locks}
+    assert locks["runtime_lock_mode"] == RUNTIME_LOCK_MODE
+    assert locks["turnaround_application_mode"] == TURNAROUND_APPLICATION_MODE
+    assert locks["heuristic_turnaround_bridge_mode"] == (HEURISTIC_TURNAROUND_BRIDGE_MODE)
+    assert list(locks["exact_trip_runtime_minutes_by_source_b_trip_id"]) == sorted(
+        locks["exact_trip_runtime_minutes_by_source_b_trip_id"]
+    )
+    assert all(
+        lock.source_fingerprint == problem.normalized_inputs.scenario_b_fingerprint
+        for lock in solution.operating_parameter_locks
+    )
     events = []
     for assignment in solution.fleet_assignment:
         events.append((assignment.departure_time, 1))

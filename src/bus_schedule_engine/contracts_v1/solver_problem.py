@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from enum import Enum
 from typing import Any
 
@@ -26,13 +26,19 @@ from .public_api import evaluate_scenario_b_v1
 from .serialization import canonical_sha256
 from .solver_models import ScheduleProblemV1
 
-PROBLEM_FINGERPRINT_PROFILE = "contract_v1_h1_problem"
+PROBLEM_FINGERPRINT_PROFILE = "contract_v1_h2_problem"
 NUMERIC_RECONCILIATION_TOLERANCE_MINUTES = 1e-9
 ANALYTICAL_BLOCK_MEMBERSHIP_CONVENTION = "start_inclusive_end_exclusive"
+RUNTIME_LOCK_MODE = "fixed_by_source_trip"
+TURNAROUND_APPLICATION_MODE = "arrival_terminal_specific"
+HEURISTIC_TURNAROUND_BRIDGE_MODE = "conservative_max_terminal_turnaround"
 SUPPORTED_OPERATING_MODES = {
     "fleet_constraint_mode": "available_upper_bound",
     "initial_fleet_positioning_mode": "solver_determined",
     "direction_trip_lock_mode": "fixed_by_direction",
+    "runtime_lock_mode": RUNTIME_LOCK_MODE,
+    "turnaround_application_mode": TURNAROUND_APPLICATION_MODE,
+    "heuristic_turnaround_bridge_mode": HEURISTIC_TURNAROUND_BRIDGE_MODE,
 }
 
 
@@ -95,7 +101,7 @@ def _validate_legacy_parameters(
         ),
         "vehicle_capacity": (legacy.capacity, scenario_b.vehicle_capacity),
         "trip_runtime_minutes": (
-            legacy.default_trip_runtime_minutes,
+            legacy.trip_runtime_minutes,
             scenario_b.trip_runtime_minutes,
         ),
         "terminal_1_first_departure": (
@@ -124,19 +130,12 @@ def _validate_legacy_parameters(
         raise ScheduleProblemError(
             "Legacy parameters do not reconcile with Scenario B: " + ", ".join(mismatches)
         )
-    if not (
-        legacy.effective_layover_minutes
-        == scenario_b.turnaround_minutes.terminal_1
-        == scenario_b.turnaround_minutes.terminal_2
-    ):
-        raise ScheduleProblemError(
-            "The heuristic adapter supports equal terminal turnaround values only"
-        )
 
 
 def _validate_legacy_timetable(
     normalized: NormalizedInputBundleV1,
     legacy_trips_b: tuple[Trip, ...],
+    legacy_parameters: ScenarioParameters,
 ) -> None:
     normalized_by_id = {trip.trip_id: trip for trip in normalized.scenario_b.exact_timetable}
     legacy_by_id = {trip.trip_id: trip for trip in legacy_trips_b}
@@ -150,12 +149,16 @@ def _validate_legacy_timetable(
         legacy_trip = legacy_by_id[trip_id]
         expected_direction = contract_direction(legacy_trip.direction)
         expected_terminal = departure_terminal(expected_direction)
-        arrival = legacy_trip.resolved_arrival_seconds(normalized.scenario_b.trip_runtime_minutes)
+        arrival = legacy_trip.resolved_arrival_seconds(
+            legacy_parameters.default_trip_runtime_minutes
+        )
+        runtime_seconds = arrival - legacy_trip.departure_seconds
         if (
             expected_direction != normalized_trip.direction
             or expected_terminal != normalized_trip.departure_terminal
             or legacy_trip.departure_seconds != normalized_trip.departure_time
             or arrival != normalized_trip.resolved_arrival_time
+            or runtime_seconds != normalized_trip.runtime_minutes * 60
         ):
             raise ScheduleProblemError(
                 f"Legacy and normalized Scenario B differ for trip {trip_id}"
@@ -212,7 +215,7 @@ def build_schedule_problem_v1(
     trips = tuple(legacy_trips_b)
     demand = tuple(legacy_demand)
     _validate_legacy_parameters(normalized_inputs, legacy_parameters)
-    _validate_legacy_timetable(normalized_inputs, trips)
+    _validate_legacy_timetable(normalized_inputs, trips, legacy_parameters)
     _validate_legacy_demand(normalized_inputs, demand)
 
     authoritative_evaluation = evaluate_scenario_b_v1(
@@ -237,9 +240,22 @@ def build_schedule_problem_v1(
             code=code,
         )
 
+    scenario_b = normalized_inputs.scenario_b
+    compatibility_layover = max(
+        scenario_b.turnaround_minutes.terminal_1,
+        scenario_b.turnaround_minutes.terminal_2,
+    )
+    compatibility_parameters = replace(
+        legacy_parameters,
+        minimum_layover_minutes=compatibility_layover,
+    )
+    exact_runtime_mapping = {
+        trip.trip_id: trip.runtime_minutes
+        for trip in sorted(scenario_b.exact_timetable, key=lambda item: item.trip_id)
+    }
     payload = {
         "fingerprint_profile": PROBLEM_FINGERPRINT_PROFILE,
-        "contract_version": normalized_inputs.scenario_b.contract_version,
+        "contract_version": scenario_b.contract_version,
         "scenario_a_fingerprint": normalized_inputs.scenario_a_fingerprint,
         "scenario_b_fingerprint": normalized_inputs.scenario_b_fingerprint,
         "observed_demand_fingerprint": normalized_inputs.observed_demand_fingerprint,
@@ -252,12 +268,23 @@ def build_schedule_problem_v1(
         "regime_membership_source": "raw_trip_headway_regime_id",
         "directional_ordering": ["departure_time", "trip_id"],
         "regime_endpoint_convention": "inclusive_member_departure_endpoints",
+        "scenario_default_trip_runtime_minutes": scenario_b.trip_runtime_minutes,
+        "exact_trip_runtime_minutes_by_source_b_trip_id": exact_runtime_mapping,
+        "turnaround_minutes": {
+            "terminal_1": scenario_b.turnaround_minutes.terminal_1,
+            "terminal_2": scenario_b.turnaround_minutes.terminal_2,
+        },
+        "turnaround_application_mode": TURNAROUND_APPLICATION_MODE,
+        "heuristic_turnaround_bridge": {
+            "mode": HEURISTIC_TURNAROUND_BRIDGE_MODE,
+            "scalar_layover_minutes": compatibility_layover,
+        },
     }
     return ScheduleProblemV1(
         normalized_inputs=normalized_inputs,
         b_evaluation=authoritative_evaluation,
         evaluation_policy=effective_policy,
-        legacy_parameters=legacy_parameters,
+        legacy_parameters=compatibility_parameters,
         legacy_trips_b=trips,
         legacy_demand=demand,
         heuristic_config=heuristic_config,

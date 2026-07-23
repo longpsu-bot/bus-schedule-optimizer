@@ -37,6 +37,10 @@ from .validation import ContractValidationError, ensure_valid_bundle
 class NormalizationError(ValueError):
     """Raised when a legacy input cannot be normalized without inventing required data."""
 
+    def __init__(self, message: str, *, code: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
+
 
 @dataclass(frozen=True, slots=True)
 class NormalizationOptions:
@@ -132,13 +136,24 @@ def _normalized_trip(parameters: ScenarioParameters, trip: Trip) -> ExactTimetab
         raise NormalizationError(
             f"Trip {trip.trip_id} has a non-positive or non-integer-minute runtime"
         )
+    runtime_minutes = runtime_seconds // 60
+    if trip.arrival_seconds is not None and not parameters.accepts_trip_runtime(runtime_minutes):
+        minimum_runtime = min(parameters.runtime_options)
+        maximum_runtime = max(parameters.runtime_options)
+        code = "TRIP_RUNTIME_OUTSIDE_ALLOWED_RANGE"
+        raise NormalizationError(
+            "TRIP_RUNTIME_OUTSIDE_ALLOWED_RANGE: "
+            f"Trip {trip.trip_id} has explicit runtime {runtime_minutes} minutes; "
+            f"allowed range is {minimum_runtime}-{maximum_runtime} minutes",
+            code=code,
+        )
     return ExactTimetableTrip(
         trip_id=trip.trip_id,
         direction=direction,
         departure_terminal=departure_terminal,
         departure_time=trip.departure_seconds,
         arrival_time=arrival_time,
-        runtime_minutes=runtime_seconds // 60,
+        runtime_minutes=runtime_minutes,
         vehicle_assignment=trip.vehicle_id,
     )
 
@@ -167,7 +182,7 @@ def _scenario_input(
         route_type=parameters.route_type,
         terminal_1_name=parameters.terminal_1_name,
         terminal_2_name=parameters.terminal_2_name,
-        trip_runtime_minutes=parameters.default_trip_runtime_minutes,
+        trip_runtime_minutes=parameters.trip_runtime_minutes,
         turnaround_minutes=TurnaroundMinutes(
             terminal_1=parameters.effective_layover_minutes,
             terminal_2=parameters.effective_layover_minutes,
