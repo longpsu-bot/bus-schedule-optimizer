@@ -4,13 +4,15 @@ on:
   push:
     branches:
       - docs/extreme-service-change-demand-scenarios-v1
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   amend:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +49,6 @@ jobs:
                   return text
               return text.rstrip() + '\n\n' + addition.strip() + '\n'
 
-          # ENGINE_CONTRACT_V1.md
           name = 'ENGINE_CONTRACT_V1.md'
           text = read(name)
           text = replace_once(
@@ -92,7 +93,6 @@ The target additive fields and statuses require a reviewed `1.1.0` schema/domain
           )
           write(name, text)
 
-          # DEMAND_RESOLUTION_CONTRACT_V1.md
           name = 'DEMAND_RESOLUTION_CONTRACT_V1.md'
           text = read(name)
           text = replace_once(
@@ -118,7 +118,6 @@ Acceptance checks additionally require:
 - required V1-A1 diagnostic codes and post-implementation monitoring limitations propagate to evaluation and presentation.''')
           write(name, text)
 
-          # INPUT_OUTPUT_CONTRACTS_V1.md
           name = 'INPUT_OUTPUT_CONTRACTS_V1.md'
           text = read(name)
           text = replace_once(
@@ -143,7 +142,6 @@ The target output catalogue adds:
 These additions are documentation-approved migration targets only until `1.1.0` schemas, examples, typed models, validators, serialization, and compatibility tests are merged. Strict `1.0.0` consumers MUST NOT receive undeclared fields or enum values.''')
           write(name, text)
 
-          # DOMAIN_MODEL_V1.md
           name = 'DOMAIN_MODEL_V1.md'
           text = read(name)
           text = replace_once(
@@ -172,7 +170,6 @@ New domain services are `ServiceChangeClassifier`, `DemandSupportEvaluator`, `De
 A structural-change aggregate may be technically feasible while its demand response is unresolved. This state blocks an authoritative demand-optimized C until an approved scenario selection or calibrated model is present.''')
           write(name, text)
 
-          # SCENARIO_EVALUATION_CONTRACT_V1.md
           name = 'SCENARIO_EVALUATION_CONTRACT_V1.md'
           text = read(name)
           text = replace_once(
@@ -201,7 +198,6 @@ For `structural_change` without calibrated demand response:
 - explanations require post-implementation validation and include all triggering metrics/diagnostics.''')
           write(name, text)
 
-          # VISUALIZATION_CONTRACT_V1.md
           name = 'VISUALIZATION_CONTRACT_V1.md'
           text = read(name)
           text = replace_once(
@@ -221,7 +217,6 @@ Observed A demand and scenario demand MUST use different labels and visual treat
 Rendering acceptance additionally requires actual directional counts to reconcile to the two-direction total, per-direction headway display, structural-change trigger explanations, scenario-selection provenance, and an explicit post-implementation validation notice.''')
           write(name, text)
 
-          # XLSX_EXPORT_CONTRACT_V1.md
           name = 'XLSX_EXPORT_CONTRACT_V1.md'
           text = read(name)
           text = replace_once(
@@ -247,7 +242,6 @@ For a structural-change case, `TONG_QUAN` and `DANH_GIA_B` show total and actual
 Until `1.1.0` output schemas and exporters are implemented, these sheets and statuses are target design and MUST NOT be simulated by placing undeclared fields in a strict `1.0.0` workbook.''')
           write(name, text)
 
-          # MIGRATION_ROADMAP_TO_OR_TOOLS.md
           name = 'MIGRATION_ROADMAP_TO_OR_TOOLS.md'
           text = read(name)
           stage = '''## Stage 3A — Structural-change demand boundary
@@ -284,7 +278,6 @@ Hard-constraint OR-Tools feasibility work may proceed in parallel. Production-co
           )
           write(name, text)
 
-          # CURRENT_STATE_GAP_ANALYSIS.md
           name = 'CURRENT_STATE_GAP_ANALYSIS.md'
           text = read(name)
           text = replace_once(
@@ -308,7 +301,15 @@ This is a documented migration gap, not permission to infer fine-grained or indu
           python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
           python -m ruff format --check src/bus_schedule_engine/contracts_v1 tests/test_contract*.py
 
-      - name: Commit amendment
+      - name: Upload amended documents
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v1-a1-amended-documents
+          path: docs/engine
+
+      - name: Commit amendment on push
+        if: github.event_name == 'push'
         run: |
           rm .github/workflows/apply-v1-a1-doc-amendment.yml
           rm -f .v1-a1-trigger
