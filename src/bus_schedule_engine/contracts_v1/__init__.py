@@ -6,6 +6,12 @@ from .adapters import (
     import_and_normalize_workbook_v1,
     normalize_imported_workbook_v1,
 )
+from .adjustment_context import (
+    RepeatabilityDayEvidenceV1,
+    RepeatabilityEvidenceV1,
+    ServiceAdjustmentDecisionPolicyV1,
+    ServiceAdjustmentEvaluationContextV1,
+)
 from .demand_resolution import (
     AggregationMethod,
     BlockBoundaryReason,
@@ -75,9 +81,12 @@ from .problem_validation import (
 )
 from .public_api import (
     build_demand_analysis_blocks_v1,
+    build_service_adjustment_evaluation_context_v1,
     detect_demand_resolution_v1,
     evaluate_scenario_b_v1,
+    evaluate_service_adjustment_need_from_generation_context_v1,
     evaluate_service_adjustment_need_v1,
+    project_service_adjustment_decision_policy_v1,
 )
 from .serialization import (
     demand_to_contract_dict,
@@ -95,8 +104,6 @@ from .service_adjustment import (
     HeadwayRegularityClassificationV1,
     JointDonorValidationEvidenceV1,
     JointReductionValidationEvidenceV1,
-    RepeatabilityDayEvidenceV1,
-    RepeatabilityEvidenceV1,
     RespaceDiagnosticEvidenceV1,
     ServiceAdjustmentAssessmentV1,
     ServiceAdjustmentDecisionV1,
@@ -236,7 +243,9 @@ __all__ = [
     "ScenarioBEvaluationPolicyV1",
     "ScenarioId",
     "ServiceAdjustmentAssessmentV1",
+    "ServiceAdjustmentDecisionPolicyV1",
     "ServiceAdjustmentDecisionV1",
+    "ServiceAdjustmentEvaluationContextV1",
     "ServiceAdjustmentPolicyV1",
     "ScheduleEvaluationResultV1",
     "ScheduleGenerationContextV1",
@@ -269,6 +278,7 @@ __all__ = [
     "block_supply_plan_to_contract_dict",
     "build_block_supply_plans_v1",
     "build_demand_analysis_blocks_v1",
+    "build_service_adjustment_evaluation_context_v1",
     "build_heuristic_compatibility_context_v1",
     "build_heuristic_schedule_request_v1",
     "build_schedule_generation_context_v1",
@@ -279,10 +289,12 @@ __all__ = [
     "detect_demand_resolution_v1",
     "ensure_valid_bundle",
     "evaluate_scenario_b_v1",
+    "evaluate_service_adjustment_need_from_generation_context_v1",
     "evaluate_service_adjustment_need_v1",
     "import_and_normalize_workbook_v1",
     "normalize_imported_workbook_v1",
     "observed_demand_fingerprint",
+    "project_service_adjustment_decision_policy_v1",
     "run_schedule_solver_v1",
     "scenario_fingerprint",
     "scenario_to_contract_dict",

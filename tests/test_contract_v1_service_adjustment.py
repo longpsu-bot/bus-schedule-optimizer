@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import ast
+import inspect
 from copy import deepcopy
+from dataclasses import asdict, fields, replace
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
 from bus_schedule_engine.contracts_v1 import (
     BlockSupplyStatus,
     ContractDirection,
+    ContractValidationError,
     DemandConfidence,
     DemandObservation,
     DemandResolutionType,
@@ -25,7 +30,10 @@ from bus_schedule_engine.contracts_v1 import (
     ScenarioAInput,
     ScenarioBEvaluationPolicyV1,
     ScenarioBInput,
+    ServiceAdjustmentAssessmentV1,
+    ServiceAdjustmentDecisionPolicyV1,
     ServiceAdjustmentDecisionV1,
+    ServiceAdjustmentEvaluationContextV1,
     ServiceAdjustmentPolicyV1,
     SourceMetadata,
     TerminalDepartureTimes,
@@ -34,10 +42,16 @@ from bus_schedule_engine.contracts_v1 import (
     VolumeClassification,
     build_schedule_generation_context_v1,
     build_schedule_problem_v1,
+    build_service_adjustment_evaluation_context_v1,
     evaluate_scenario_b_v1,
+    evaluate_service_adjustment_need_from_generation_context_v1,
     evaluate_service_adjustment_need_v1,
     observed_demand_fingerprint,
+    project_service_adjustment_decision_policy_v1,
     scenario_fingerprint,
+)
+from bus_schedule_engine.contracts_v1.adjustment_context import (
+    calculate_service_adjustment_decision_policy_fingerprint_v1,
 )
 from bus_schedule_engine.models import RouteType
 
@@ -68,6 +82,9 @@ def _context(
     source_notes: str | None = None,
     observation_notes: str | None = None,
     evaluation_policy: ScenarioBEvaluationPolicyV1 | None = None,
+    decision_policy: ServiceAdjustmentDecisionPolicyV1 | None = None,
+    repeatability_evidence: RepeatabilityEvidenceV1 | None = None,
+    generation_context: bool = False,
     vehicle_assignments: dict[str, str] | None = None,
 ):
     source = SourceMetadata(
@@ -189,6 +206,22 @@ def _context(
     )
     effective_evaluation_policy = evaluation_policy or ScenarioBEvaluationPolicyV1()
     evaluation = evaluate_scenario_b_v1(bundle, effective_evaluation_policy)
+    effective_decision_policy = decision_policy or ServiceAdjustmentDecisionPolicyV1(
+        planning_load_factor_ceiling=(effective_evaluation_policy.planning_load_factor_ceiling),
+        critical_load_factor_ceiling=(effective_evaluation_policy.critical_load_factor_ceiling),
+        low_load_review_threshold=effective_evaluation_policy.low_load_review_threshold,
+        minimum_authoritative_demand_confidence=(
+            effective_evaluation_policy.minimum_authoritative_demand_confidence
+        ),
+    )
+    if not generation_context:
+        return build_service_adjustment_evaluation_context_v1(
+            bundle,
+            effective_evaluation_policy,
+            effective_decision_policy,
+            repeatability_evidence,
+            evaluation,
+        )
     problem = build_schedule_problem_v1(
         bundle,
         evaluation,
@@ -205,6 +238,46 @@ def _context(
         bundle,
         evaluation,
         effective_evaluation_policy,
+    )
+
+
+def _with_authority(
+    context,
+    *,
+    policy: ServiceAdjustmentPolicyV1 | None = None,
+    repeatability_evidence: RepeatabilityEvidenceV1 | None = None,
+):
+    decision_policy = (
+        project_service_adjustment_decision_policy_v1(policy)
+        if policy is not None
+        else context.decision_policy
+    )
+    return build_service_adjustment_evaluation_context_v1(
+        context.normalized_inputs,
+        context.b_evaluation_policy,
+        decision_policy,
+        repeatability_evidence,
+        context.b_evaluation,
+    )
+
+
+def _generation_context_from_authority(context):
+    problem = build_schedule_problem_v1(
+        context.normalized_inputs,
+        context.b_evaluation,
+        solver_adapter="legacy_heuristic_v1",
+        adapter_context_fingerprint="a" * 64,
+        evaluation_policy=context.b_evaluation_policy,
+        adapter_operating_lock_values={
+            "heuristic_turnaround_bridge_mode": "conservative_max_terminal_turnaround",
+            "heuristic_turnaround_bridge_value_minutes": 5,
+        },
+    )
+    return build_schedule_generation_context_v1(
+        problem,
+        context.normalized_inputs,
+        context.b_evaluation,
+        context.b_evaluation_policy,
     )
 
 
@@ -291,7 +364,7 @@ def test_positive_demand_without_service_remains_visible() -> None:
     assert result.primary_decision == ServiceAdjustmentDecisionV1.INCREASE_TOTAL_TRIPS
 
 
-def test_daily_shortage_requires_more_total_trips_and_disallows_heuristic() -> None:
+def test_daily_shortage_requires_more_total_trips() -> None:
     context = _context(_directional_rows((171, 171), (171, 171)))
 
     result = evaluate_service_adjustment_need_v1(context)
@@ -299,8 +372,6 @@ def test_daily_shortage_requires_more_total_trips_and_disallows_heuristic() -> N
     assert result.daily_evidence.required_daily_trips == 12
     assert result.daily_evidence.daily_trip_gap == 4
     assert result.primary_decision == ServiceAdjustmentDecisionV1.INCREASE_TOTAL_TRIPS
-    assert not result.heuristic_authorized
-    assert result.authorized_generation_action is None
 
 
 def test_combined_only_evidence_can_identify_aggregate_total_shortage() -> None:
@@ -315,7 +386,6 @@ def test_combined_only_evidence_can_identify_aggregate_total_shortage() -> None:
     assert result.daily_evidence.daily_trip_gap == 2
     assert result.primary_decision == ServiceAdjustmentDecisionV1.INCREASE_TOTAL_TRIPS
     assert "DIRECTIONAL_ACTION_NOT_SUPPORTED_BY_COMBINED_DEMAND" in result.reason_codes
-    assert not result.heuristic_authorized
 
 
 def test_shortage_and_same_direction_eligible_donor_redistributes() -> None:
@@ -336,8 +406,6 @@ def test_shortage_and_same_direction_eligible_donor_redistributes() -> None:
     assert proof.proven_joint_capacity == 1
     assert proof.selected_jointly_feasible_trip_ids == donor.eligible_donor_trip_ids
     assert result.primary_decision == ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
-    assert result.heuristic_authorized
-    assert result.authorized_generation_action == "fixed_resource_trip_redistribution"
 
 
 def test_nominal_surplus_without_endpoint_safe_donor_does_not_redistribute() -> None:
@@ -352,7 +420,6 @@ def test_nominal_surplus_without_endpoint_safe_donor_does_not_redistribute() -> 
     assert any(item.potential_surplus_trips == 1 for item in result.block_evidence)
     assert not any(item.donor_eligible for item in result.block_evidence)
     assert result.primary_decision != ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
-    assert not result.heuristic_authorized
 
 
 def _two_trip_donor_context(*, fleet_limit: int):
@@ -384,7 +451,6 @@ def test_individually_feasible_donors_are_not_summed_when_pair_is_infeasible() -
     assert proof.search_complete
     assert "JOINT_DONOR_CAPACITY_NOT_PROVEN" in proof.issue_codes
     assert result.primary_decision != ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
-    assert not result.heuristic_authorized
 
 
 def test_jointly_feasible_two_trip_donor_set_is_deterministic() -> None:
@@ -403,7 +469,6 @@ def test_jointly_feasible_two_trip_donor_set_is_deterministic() -> None:
         item for item in second.joint_donor_evidence if item.direction == ContractDirection.OUTBOUND
     )
     assert first.primary_decision == ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
-    assert first.heuristic_authorized
 
 
 def test_cross_direction_donor_capacity_cannot_cover_shortage() -> None:
@@ -429,7 +494,6 @@ def test_cross_direction_donor_capacity_cannot_cover_shortage() -> None:
     assert proof_by_direction[ContractDirection.OUTBOUND].proven_joint_capacity == 0
     assert proof_by_direction[ContractDirection.INBOUND].candidate_trip_ids
     assert result.primary_decision != ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
-    assert not result.heuristic_authorized
 
 
 def test_low_load_without_repeatability_is_review_only() -> None:
@@ -441,15 +505,13 @@ def test_low_load_without_repeatability_is_review_only() -> None:
     assert result.primary_decision != ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
     assert "LOW_LOAD_REVIEW_ONLY" in result.reason_codes
     assert "INSUFFICIENT_DAYS_FOR_REDUCTION_DECISION" in result.reason_codes
-    assert not result.heuristic_authorized
 
 
 def test_sufficient_repeatability_supports_bounded_reduction() -> None:
     context = _context(_directional_rows((85, 85), (85, 85)))
 
     result = evaluate_service_adjustment_need_v1(
-        context,
-        repeatability_evidence=_repeatability(),
+        _with_authority(context, repeatability_evidence=_repeatability())
     )
 
     assert result.primary_decision == ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
@@ -467,7 +529,6 @@ def test_sufficient_repeatability_supports_bounded_reduction() -> None:
         == result.maximum_supported_reduction_quantity
     )
     assert "STABLE_RESIDUAL_TRIP_SURPLUS" in result.reason_codes
-    assert not result.heuristic_authorized
 
 
 def test_intermediate_assigned_trip_removal_breaks_retained_vehicle_chain() -> None:
@@ -481,8 +542,10 @@ def test_intermediate_assigned_trip_removal_breaks_retained_vehicle_chain() -> N
     )
 
     result = evaluate_service_adjustment_need_v1(
-        context,
-        repeatability_evidence=_repeatability((1, 1, 1)),
+        _with_authority(
+            context,
+            repeatability_evidence=_repeatability((1, 1, 1)),
+        )
     )
     proof = result.joint_reduction_evidence
 
@@ -498,8 +561,10 @@ def test_intermediate_assigned_trip_removal_breaks_retained_vehicle_chain() -> N
 
 def test_joint_reduction_search_proves_non_greedy_pair_is_true_maximum() -> None:
     result = evaluate_service_adjustment_need_v1(
-        _non_greedy_reduction_context(170),
-        repeatability_evidence=_repeatability((2, 2, 2)),
+        _with_authority(
+            _non_greedy_reduction_context(170),
+            repeatability_evidence=_repeatability((2, 2, 2)),
+        )
     )
     proof = result.joint_reduction_evidence
 
@@ -518,8 +583,10 @@ def test_joint_reduction_search_proves_non_greedy_pair_is_true_maximum() -> None
 
 def test_joint_reduction_exhausts_quantity_three_before_proving_two() -> None:
     result = evaluate_service_adjustment_need_v1(
-        _non_greedy_reduction_context(85),
-        repeatability_evidence=_repeatability((3, 3, 3)),
+        _with_authority(
+            _non_greedy_reduction_context(85),
+            repeatability_evidence=_repeatability((3, 3, 3)),
+        )
     )
     proof = result.joint_reduction_evidence
 
@@ -536,13 +603,14 @@ def test_joint_reduction_exhausts_quantity_three_before_proving_two() -> None:
 def test_joint_reduction_search_limit_never_exposes_lower_bound_as_maximum() -> None:
     context = _context(_directional_rows((85, 85), (85, 85)))
     complete = evaluate_service_adjustment_need_v1(
-        context,
-        repeatability_evidence=_repeatability(),
+        _with_authority(context, repeatability_evidence=_repeatability())
     )
     limited = evaluate_service_adjustment_need_v1(
-        context,
-        policy=ServiceAdjustmentPolicyV1(maximum_joint_reduction_search_states=1),
-        repeatability_evidence=_repeatability(),
+        _with_authority(
+            context,
+            policy=ServiceAdjustmentPolicyV1(maximum_joint_reduction_search_states=1),
+            repeatability_evidence=_repeatability(),
+        )
     )
     proof = limited.joint_reduction_evidence
 
@@ -557,7 +625,6 @@ def test_joint_reduction_search_limit_never_exposes_lower_bound_as_maximum() -> 
     assert "LOW_LOAD_REVIEW_ONLY" in limited.reason_codes
     assert limited.maximum_supported_reduction_quantity == 0
     assert limited.primary_decision != ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
-    assert not limited.heuristic_authorized
     assert complete.evaluator_fingerprint != limited.evaluator_fingerprint
 
 
@@ -569,8 +636,10 @@ def test_joint_reduction_can_prove_no_positive_feasible_quantity() -> None:
     )
 
     result = evaluate_service_adjustment_need_v1(
-        context,
-        repeatability_evidence=_repeatability((2, 2, 2)),
+        _with_authority(
+            context,
+            repeatability_evidence=_repeatability((2, 2, 2)),
+        )
     )
     proof = result.joint_reduction_evidence
 
@@ -624,7 +693,9 @@ def test_locally_deficient_historical_day_does_not_support_reduction() -> None:
         representative_day_type_or_provenance="weekday block-level replay",
     )
 
-    result = evaluate_service_adjustment_need_v1(context, repeatability_evidence=evidence)
+    result = evaluate_service_adjustment_need_v1(
+        _with_authority(context, repeatability_evidence=evidence)
+    )
 
     assert evidence.days[0].daily_surplus_trips == 3
     assert not evidence.days[0].qualifies_as_surplus_day
@@ -638,8 +709,10 @@ def test_insufficient_repeatability_days_cannot_support_reduction() -> None:
     context = _context(_directional_rows((85, 85), (85, 85)))
 
     result = evaluate_service_adjustment_need_v1(
-        context,
-        repeatability_evidence=_repeatability((4, 4)),
+        _with_authority(
+            context,
+            repeatability_evidence=_repeatability((4, 4)),
+        )
     )
 
     assert result.primary_decision != ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
@@ -651,8 +724,7 @@ def test_shortage_and_critical_evidence_prevent_reduction() -> None:
     context = _context(_directional_rows((181, 85), (170, 170)))
 
     result = evaluate_service_adjustment_need_v1(
-        context,
-        repeatability_evidence=_repeatability(),
+        _with_authority(context, repeatability_evidence=_repeatability())
     )
 
     assert any(
@@ -763,7 +835,6 @@ def test_irregular_adequate_headways_require_departure_redistribution() -> None:
         == HeadwayRegularityClassificationV1.IRREGULAR
     )
     assert result.primary_decision == ServiceAdjustmentDecisionV1.REDISTRIBUTE_DEPARTURE_TIMES
-    assert result.heuristic_authorized
 
 
 def test_infeasible_balanced_respace_retains_diagnostic_and_is_not_authorized() -> None:
@@ -795,7 +866,6 @@ def test_infeasible_balanced_respace_retains_diagnostic_and_is_not_authorized() 
     assert not outbound.respace_technically_possible
     assert "DIAGNOSTIC_TURNAROUND_MARGIN_NEGATIVE" in (outbound.respace_diagnostic.issue_codes)
     assert result.primary_decision != ServiceAdjustmentDecisionV1.REDISTRIBUTE_DEPARTURE_TIMES
-    assert not result.heuristic_authorized
 
 
 def test_zero_headway_remains_exact_and_exceptional() -> None:
@@ -825,7 +895,6 @@ def test_technical_infeasibility_precedes_demand_shortage() -> None:
     assert result.primary_decision == ServiceAdjustmentDecisionV1.TECHNICAL_ADJUSTMENT_REQUIRED
     assert result.technical_evidence.fleet_ratio > 1
     assert "FLEET_RATIO_ABOVE_ONE" in result.reason_codes
-    assert not result.heuristic_authorized
 
 
 def test_combined_only_demand_cannot_authorize_directional_redistribution() -> None:
@@ -840,7 +909,6 @@ def test_combined_only_demand_cannot_authorize_directional_redistribution() -> N
     assert result.allocation_evidence == ()
     assert result.primary_decision != ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
     assert "DIRECTIONAL_ACTION_NOT_SUPPORTED_BY_COMBINED_DEMAND" in result.reason_codes
-    assert not result.heuristic_authorized
 
 
 def test_incomplete_coverage_is_insufficient_but_preserves_local_findings() -> None:
@@ -879,8 +947,6 @@ def test_keep_current_when_all_quantitative_gates_pass() -> None:
         item.regularity_classification == HeadwayRegularityClassificationV1.REGULAR
         for item in result.headway_evidence
     )
-    assert not result.heuristic_authorized
-    assert result.authorized_generation_action is None
 
 
 def test_reason_evidence_order_and_fingerprint_are_deterministic() -> None:
@@ -913,16 +979,40 @@ def test_decision_relevant_demand_changes_evaluator_fingerprint() -> None:
 def test_repeatability_change_changes_evaluator_fingerprint() -> None:
     context = _context(_directional_rows((85, 85), (85, 85)))
     first = evaluate_service_adjustment_need_v1(
-        context,
-        repeatability_evidence=_repeatability((4, 4, 3)),
+        _with_authority(
+            context,
+            repeatability_evidence=_repeatability((4, 4, 3)),
+        )
     )
     second = evaluate_service_adjustment_need_v1(
-        context,
-        repeatability_evidence=_repeatability((4, 3, 3)),
+        _with_authority(
+            context,
+            repeatability_evidence=_repeatability((4, 3, 3)),
+        )
     )
 
     assert first.primary_decision == second.primary_decision
     assert first.evaluator_fingerprint != second.evaluator_fingerprint
+
+
+def test_timetable_change_changes_evaluator_fingerprint() -> None:
+    rows = _directional_rows((170, 170), (170, 170))
+    regular = evaluate_service_adjustment_need_v1(_context(rows))
+    irregular = evaluate_service_adjustment_need_v1(
+        _context(rows, outbound_times=(360, 375, 420, 450))
+    )
+
+    assert regular.headway_evidence != irregular.headway_evidence
+    assert regular.evaluator_fingerprint != irregular.evaluator_fingerprint
+
+
+def test_technical_evidence_change_changes_evaluator_fingerprint() -> None:
+    rows = _directional_rows((170, 170), (170, 170))
+    feasible = evaluate_service_adjustment_need_v1(_context(rows, fleet_limit=4))
+    infeasible = evaluate_service_adjustment_need_v1(_context(rows, fleet_limit=1))
+
+    assert feasible.technical_evidence != infeasible.technical_evidence
+    assert feasible.evaluator_fingerprint != infeasible.evaluator_fingerprint
 
 
 def test_selected_reduction_set_and_maximum_outcome_bind_fingerprint() -> None:
@@ -931,28 +1021,34 @@ def test_selected_reduction_set_and_maximum_outcome_bind_fingerprint() -> None:
         (ContractDirection.COMBINED, 420, 480, 170),
     )
     constrained = evaluate_service_adjustment_need_v1(
-        _non_greedy_reduction_context(170),
-        repeatability_evidence=_repeatability((2, 2, 2)),
+        _with_authority(
+            _non_greedy_reduction_context(170),
+            repeatability_evidence=_repeatability((2, 2, 2)),
+        )
     )
     unconstrained = evaluate_service_adjustment_need_v1(
-        _context(
-            rows,
-            outbound_times=(360, 380, 410, 450),
-            inbound_times=(365, 385, 455),
-            fleet_limit=4,
-        ),
-        repeatability_evidence=_repeatability((2, 2, 2)),
+        _with_authority(
+            _context(
+                rows,
+                outbound_times=(360, 380, 410, 450),
+                inbound_times=(365, 385, 455),
+                fleet_limit=4,
+            ),
+            repeatability_evidence=_repeatability((2, 2, 2)),
+        )
     )
     rejected = evaluate_service_adjustment_need_v1(
-        _context(
-            _directional_rows((170, 170), (85, 170)),
-            vehicle_assignments={
-                "OUT-01": "BUS-01",
-                "IN-02": "BUS-01",
-                "OUT-03": "BUS-01",
-            },
-        ),
-        repeatability_evidence=_repeatability((1, 1, 1)),
+        _with_authority(
+            _context(
+                _directional_rows((170, 170), (85, 170)),
+                vehicle_assignments={
+                    "OUT-01": "BUS-01",
+                    "IN-02": "BUS-01",
+                    "OUT-03": "BUS-01",
+                },
+            ),
+            repeatability_evidence=_repeatability((1, 1, 1)),
+        )
     )
 
     assert constrained.joint_reduction_evidence is not None
@@ -991,11 +1087,16 @@ def test_policy_change_changes_policy_and_evaluator_fingerprints() -> None:
     context = _context(_directional_rows((170, 170), (170, 170)))
     first = evaluate_service_adjustment_need_v1(context)
     second = evaluate_service_adjustment_need_v1(
-        context,
-        ServiceAdjustmentPolicyV1(headway_rounding_tolerance_minutes=2),
+        _with_authority(
+            context,
+            policy=ServiceAdjustmentPolicyV1(headway_rounding_tolerance_minutes=2),
+        )
     )
 
-    assert first.adjustment_policy_fingerprint != second.adjustment_policy_fingerprint
+    assert (
+        first.adjustment_decision_policy_fingerprint
+        != second.adjustment_decision_policy_fingerprint
+    )
     assert first.evaluator_fingerprint != second.evaluator_fingerprint
 
 
@@ -1004,14 +1105,13 @@ def test_context_and_scenario_b_are_not_mutated() -> None:
     before = deepcopy(context)
 
     result = evaluate_service_adjustment_need_v1(
-        context,
-        repeatability_evidence=_repeatability(),
+        _with_authority(context, repeatability_evidence=_repeatability())
     )
 
     assert result.primary_decision == ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
     assert context == before
     assert context.normalized_inputs.scenario_b == before.normalized_inputs.scenario_b
-    assert context.problem == before.problem
+    assert context.b_evaluation == before.b_evaluation
 
 
 def test_repeatability_evidence_derives_counts_and_rate() -> None:
@@ -1022,3 +1122,476 @@ def test_repeatability_evidence_derives_counts_and_rate() -> None:
     assert evidence.surplus_consistency_rate == pytest.approx(2 / 3)
     assert evidence.daily_required_trip_sequence == (4, 8, 5)
     assert evidence.daily_surplus_sequence == (4, 0, 3)
+
+
+def test_legacy_policy_projection_copies_every_quantitative_field() -> None:
+    legacy = ServiceAdjustmentPolicyV1(
+        planning_load_factor_ceiling=0.80,
+        critical_load_factor_ceiling=0.95,
+        low_load_review_threshold=0.25,
+        minimum_authoritative_demand_confidence=DemandConfidence.HIGH,
+        headway_rounding_tolerance_minutes=2,
+        required_regular_headway_rate=0.90,
+        minimum_sustained_change_intervals=3,
+        minimum_material_headway_change_minutes=7,
+        minimum_material_service_rate_change_ratio=0.20,
+        maximum_headway_regimes_per_direction=7,
+        minimum_valid_observed_days_for_reduction=4,
+        minimum_surplus_consistency_rate=0.90,
+        minimum_residual_surplus_trips_for_reduction=2,
+        minimum_service_trips_per_direction=2,
+        maximum_joint_donor_search_states=9_999,
+        maximum_joint_reduction_search_states=8_888,
+    )
+
+    projected = project_service_adjustment_decision_policy_v1(legacy)
+
+    for field in fields(ServiceAdjustmentDecisionPolicyV1):
+        assert getattr(projected, field.name) == getattr(legacy, field.name)
+
+
+def test_legacy_routing_fields_do_not_change_quantitative_authority() -> None:
+    baseline = ServiceAdjustmentPolicyV1()
+    other_adapter = replace(
+        baseline,
+        fixed_resource_solver_adapter="another_adapter",
+    )
+    other_decisions = replace(
+        baseline,
+        fixed_resource_authorized_decisions=(ServiceAdjustmentDecisionV1.INCREASE_TOTAL_TRIPS,),
+    )
+    projected = project_service_adjustment_decision_policy_v1(baseline)
+    projected_adapter = project_service_adjustment_decision_policy_v1(other_adapter)
+    projected_decisions = project_service_adjustment_decision_policy_v1(other_decisions)
+
+    assert projected == projected_adapter == projected_decisions
+    assert (
+        calculate_service_adjustment_decision_policy_fingerprint_v1(projected)
+        == calculate_service_adjustment_decision_policy_fingerprint_v1(projected_adapter)
+        == calculate_service_adjustment_decision_policy_fingerprint_v1(projected_decisions)
+    )
+
+    context = _context(_directional_rows((171, 85), (170, 170)))
+    projected_contexts = tuple(
+        build_service_adjustment_evaluation_context_v1(
+            context.normalized_inputs,
+            context.b_evaluation_policy,
+            decision_policy,
+            b_evaluation_cache=context.b_evaluation,
+        )
+        for decision_policy in (
+            projected,
+            projected_adapter,
+            projected_decisions,
+        )
+    )
+    assert len({item.context_fingerprint for item in projected_contexts}) == 1
+
+    generation_context = _generation_context_from_authority(context)
+    baseline_assessment = evaluate_service_adjustment_need_from_generation_context_v1(
+        generation_context,
+        baseline,
+    )
+    adapter_assessment = evaluate_service_adjustment_need_from_generation_context_v1(
+        generation_context,
+        other_adapter,
+    )
+    decisions_assessment = evaluate_service_adjustment_need_from_generation_context_v1(
+        generation_context,
+        other_decisions,
+    )
+
+    assert baseline_assessment == adapter_assessment == decisions_assessment
+    assert baseline_assessment.primary_decision == ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
+
+
+@pytest.mark.parametrize(
+    ("field_name", "changed_value"),
+    (
+        ("planning_load_factor_ceiling", 0.84),
+        ("critical_load_factor_ceiling", 0.91),
+        ("low_load_review_threshold", 0.31),
+        ("minimum_authoritative_demand_confidence", DemandConfidence.HIGH),
+        ("headway_rounding_tolerance_minutes", 2),
+        ("required_regular_headway_rate", 0.90),
+        ("minimum_sustained_change_intervals", 3),
+        ("minimum_material_headway_change_minutes", 6),
+        ("minimum_material_service_rate_change_ratio", 0.20),
+        ("maximum_headway_regimes_per_direction", 7),
+        ("minimum_valid_observed_days_for_reduction", 4),
+        ("minimum_surplus_consistency_rate", 0.90),
+        ("minimum_residual_surplus_trips_for_reduction", 2),
+        ("minimum_service_trips_per_direction", 2),
+        ("maximum_joint_donor_search_states", 9_999),
+        ("maximum_joint_reduction_search_states", 9_999),
+    ),
+)
+def test_every_quantitative_policy_field_changes_fingerprint(
+    field_name: str,
+    changed_value,
+) -> None:
+    baseline = ServiceAdjustmentDecisionPolicyV1()
+    changed = replace(baseline, **{field_name: changed_value})
+
+    assert calculate_service_adjustment_decision_policy_fingerprint_v1(
+        baseline
+    ) != calculate_service_adjustment_decision_policy_fingerprint_v1(changed)
+
+
+@pytest.mark.parametrize(
+    "invalid_values",
+    (
+        {"planning_load_factor_ceiling": 0},
+        {"critical_load_factor_ceiling": 1.1},
+        {
+            "planning_load_factor_ceiling": 0.95,
+            "critical_load_factor_ceiling": 0.90,
+        },
+        {"required_regular_headway_rate": -0.1},
+        {"minimum_sustained_change_intervals": 0},
+        {"minimum_surplus_consistency_rate": 0},
+        {"maximum_joint_donor_search_states": 0},
+        {"maximum_joint_reduction_search_states": 0},
+    ),
+)
+def test_invalid_quantitative_policy_values_fail_closed(invalid_values) -> None:
+    with pytest.raises(ValueError):
+        ServiceAdjustmentDecisionPolicyV1(**invalid_values)
+    with pytest.raises(ValueError):
+        ServiceAdjustmentPolicyV1(**invalid_values)
+
+
+def test_context_recomputes_authoritative_evaluation_and_accepts_exact_cache() -> None:
+    existing = _context(_directional_rows((170, 170), (170, 170)))
+    rebuilt = build_service_adjustment_evaluation_context_v1(
+        existing.normalized_inputs,
+        existing.b_evaluation_policy,
+        existing.decision_policy,
+        b_evaluation_cache=existing.b_evaluation,
+    )
+
+    assert rebuilt.b_evaluation == evaluate_scenario_b_v1(
+        existing.normalized_inputs,
+        existing.b_evaluation_policy,
+    )
+    assert (
+        rebuilt.authoritative_b_evaluation_fingerprint
+        == existing.authoritative_b_evaluation_fingerprint
+    )
+
+
+def test_context_rejects_cross_bundle_or_stale_evaluation_cache() -> None:
+    existing = _context(_directional_rows((170, 170), (170, 170)))
+    other = _context(_directional_rows((169, 170), (170, 170)))
+
+    with pytest.raises(ContractValidationError) as error:
+        build_service_adjustment_evaluation_context_v1(
+            existing.normalized_inputs,
+            existing.b_evaluation_policy,
+            existing.decision_policy,
+            b_evaluation_cache=other.b_evaluation,
+        )
+
+    assert "ADJUSTMENT_CONTEXT_B_EVALUATION_CACHE_MISMATCH" in {
+        issue.code for issue in error.value.issues
+    }
+
+
+@pytest.mark.parametrize(
+    "stored_field",
+    (
+        "scenario_a_fingerprint",
+        "scenario_b_fingerprint",
+        "observed_demand_fingerprint",
+    ),
+)
+def test_context_rejects_stored_source_fingerprint_mismatch(
+    stored_field: str,
+) -> None:
+    existing = _context(_directional_rows((170, 170), (170, 170)))
+    bundle = replace(
+        existing.normalized_inputs,
+        **{stored_field: "f" * 64},
+    )
+
+    with pytest.raises(ContractValidationError):
+        build_service_adjustment_evaluation_context_v1(
+            bundle,
+            existing.b_evaluation_policy,
+            existing.decision_policy,
+        )
+
+
+@pytest.mark.parametrize(
+    "policy_change",
+    (
+        {"planning_load_factor_ceiling": 0.84},
+        {"critical_load_factor_ceiling": 0.91},
+        {
+            "minimum_authoritative_demand_confidence": DemandConfidence.HIGH,
+        },
+    ),
+)
+def test_context_rejects_decision_policy_evaluation_authority_mismatch(
+    policy_change,
+) -> None:
+    existing = _context(_directional_rows((170, 170), (170, 170)))
+    mismatched = replace(existing.decision_policy, **policy_change)
+
+    with pytest.raises(ContractValidationError) as error:
+        build_service_adjustment_evaluation_context_v1(
+            existing.normalized_inputs,
+            existing.b_evaluation_policy,
+            mismatched,
+        )
+
+    assert "ADJUSTMENT_DECISION_POLICY_EVALUATION_AUTHORITY_MISMATCH" in {
+        issue.code for issue in error.value.issues
+    }
+
+
+def test_repeatability_evidence_changes_context_fingerprint() -> None:
+    existing = _context(_directional_rows((85, 85), (85, 85)))
+    first = _with_authority(
+        existing,
+        repeatability_evidence=_repeatability((4, 4, 3)),
+    )
+    second = _with_authority(
+        existing,
+        repeatability_evidence=_repeatability((4, 3, 3)),
+    )
+
+    assert first.repeatability_evidence_fingerprint != (second.repeatability_evidence_fingerprint)
+    assert first.context_fingerprint != second.context_fingerprint
+
+
+def test_canonical_evaluator_rejects_manual_context_tampering() -> None:
+    context = _with_authority(
+        _context(_directional_rows((85, 85), (85, 85))),
+        repeatability_evidence=_repeatability(),
+    )
+    other = _context(_directional_rows((169, 170), (170, 170)))
+    tampered_contexts = (
+        replace(context, normalized_inputs=other.normalized_inputs),
+        replace(context, b_evaluation=other.b_evaluation),
+        replace(
+            context,
+            b_evaluation_policy=replace(
+                context.b_evaluation_policy,
+                headway_cv_warning_threshold=0.40,
+            ),
+        ),
+        replace(
+            context,
+            decision_policy=replace(
+                context.decision_policy,
+                low_load_review_threshold=0.31,
+            ),
+        ),
+        replace(context, decision_policy=ServiceAdjustmentPolicyV1()),
+        replace(
+            context,
+            repeatability_evidence=_repeatability((4, 3, 3)),
+        ),
+        replace(context, source_b_fingerprint="0" * 64),
+        replace(context, authoritative_b_evaluation_fingerprint=""),
+        replace(context, context_fingerprint="0" * 64),
+    )
+
+    for tampered in tampered_contexts:
+        with pytest.raises(ContractValidationError):
+            evaluate_service_adjustment_need_v1(tampered)
+
+
+def test_context_and_assessment_shapes_exclude_problem_and_routing_authority() -> None:
+    context_fields = {field.name for field in fields(ServiceAdjustmentEvaluationContextV1)}
+    assessment_fields = {field.name for field in fields(ServiceAdjustmentAssessmentV1)}
+    prohibited = {
+        "problem",
+        "source_problem_fingerprint",
+        "adapter_context_fingerprint",
+        "solver_adapter",
+        "heuristic_authorized",
+        "authorized_generation_action",
+    }
+
+    assert not context_fields.intersection(prohibited)
+    assert not assessment_fields.intersection(prohibited)
+    assert "source_evaluation_context_fingerprint" in assessment_fields
+    assert "adjustment_decision_policy_fingerprint" in assessment_fields
+
+    result = evaluate_service_adjustment_need_v1(
+        _context(_directional_rows((170, 170), (170, 170)))
+    )
+    assert not {
+        "CURRENT_SOLVER_CAN_IMPLEMENT",
+        "CURRENT_SOLVER_CAPABILITY_INSUFFICIENT",
+        "NO_GENERATION_REQUIRED",
+    }.intersection(result.reason_codes)
+
+
+@pytest.mark.parametrize(
+    ("expected_decision", "rows", "options", "repeatability"),
+    (
+        (ServiceAdjustmentDecisionV1.INSUFFICIENT_DATA, (), {}, None),
+        (
+            ServiceAdjustmentDecisionV1.TECHNICAL_ADJUSTMENT_REQUIRED,
+            _directional_rows((170, 170), (170, 170)),
+            {"fleet_limit": 1},
+            None,
+        ),
+        (
+            ServiceAdjustmentDecisionV1.INCREASE_TOTAL_TRIPS,
+            _directional_rows((171, 171), (171, 171)),
+            {},
+            None,
+        ),
+        (
+            ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS,
+            _directional_rows((171, 85), (170, 170)),
+            {},
+            None,
+        ),
+        (
+            ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS,
+            _directional_rows((85, 85), (85, 85)),
+            {},
+            _repeatability(),
+        ),
+        (
+            ServiceAdjustmentDecisionV1.REDISTRIBUTE_DEPARTURE_TIMES,
+            _directional_rows((170, 170), (170, 170)),
+            {"outbound_times": (360, 375, 420, 450)},
+            None,
+        ),
+        (
+            ServiceAdjustmentDecisionV1.KEEP_CURRENT_TIMETABLE,
+            _directional_rows((170, 170), (170, 170)),
+            {},
+            None,
+        ),
+    ),
+)
+def test_canonical_and_compatibility_paths_are_identical_for_all_decisions(
+    expected_decision,
+    rows,
+    options,
+    repeatability,
+) -> None:
+    base_context = _context(rows, **options)
+    canonical_context = _with_authority(
+        base_context,
+        repeatability_evidence=repeatability,
+    )
+    generation_context = _generation_context_from_authority(base_context)
+
+    canonical = evaluate_service_adjustment_need_v1(canonical_context)
+    compatible = evaluate_service_adjustment_need_from_generation_context_v1(
+        generation_context,
+        repeatability_evidence=repeatability,
+    )
+
+    assert canonical.primary_decision == expected_decision
+    assert compatible == canonical
+    assert asdict(compatible) == asdict(canonical)
+    assert compatible.evaluator_fingerprint == canonical.evaluator_fingerprint
+
+
+def test_compatibility_wrapper_calls_canonical_evaluator_once_and_returns_it(
+    monkeypatch,
+) -> None:
+    from bus_schedule_engine.contracts_v1 import public_api
+
+    context = _context(_directional_rows((170, 170), (170, 170)))
+    generation_context = _generation_context_from_authority(context)
+    canonical = public_api.evaluate_service_adjustment_need_v1
+    returned = []
+
+    def recording_evaluator(evaluation_context):
+        result = canonical(evaluation_context)
+        returned.append(result)
+        return result
+
+    monkeypatch.setattr(
+        public_api,
+        "evaluate_service_adjustment_need_v1",
+        recording_evaluator,
+    )
+
+    result = public_api.evaluate_service_adjustment_need_from_generation_context_v1(
+        generation_context
+    )
+
+    assert len(returned) == 1
+    assert result is returned[0]
+
+
+def test_pre_problem_modules_have_no_problem_or_generation_context_dependency() -> None:
+    import bus_schedule_engine.contracts_v1.adjustment_context as adjustment_context
+    import bus_schedule_engine.contracts_v1.service_adjustment as service_adjustment
+
+    for module in (adjustment_context, service_adjustment):
+        source = Path(inspect.getsourcefile(module)).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        imported_modules = {
+            node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+        }
+        assert not {
+            "solver_models",
+            "solver_problem",
+            "problem_validation",
+        }.intersection(imported_modules)
+        assert "PROBLEM_LOCK_" not in source
+
+    service_tree = ast.parse(
+        Path(inspect.getsourcefile(service_adjustment)).read_text(encoding="utf-8")
+    )
+    evaluator = next(
+        node
+        for node in service_tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "evaluate_service_adjustment_need_v1"
+    )
+    assert [argument.arg for argument in evaluator.args.args] == ["context"]
+    assert not any(
+        isinstance(node, ast.Attribute) and node.attr == "problem" for node in ast.walk(evaluator)
+    )
+    assert not any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "validate_schedule_generation_context_v1"
+        for node in ast.walk(evaluator)
+    )
+
+
+def test_canonical_public_signature_accepts_only_pre_problem_context() -> None:
+    signature = inspect.signature(evaluate_service_adjustment_need_v1)
+    assert tuple(signature.parameters) == ("context",)
+    assert signature.parameters["context"].annotation == "ServiceAdjustmentEvaluationContextV1"
+
+
+def test_context_construction_does_not_call_problem_or_compatibility_builders(
+    monkeypatch,
+) -> None:
+    import bus_schedule_engine.contracts_v1.heuristic_context as heuristic_context
+    import bus_schedule_engine.contracts_v1.solver_problem as solver_problem
+
+    existing = _context(_directional_rows((170, 170), (170, 170)))
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("pre-problem context attempted prohibited construction")
+
+    monkeypatch.setattr(solver_problem, "build_schedule_problem_v1", forbidden)
+    monkeypatch.setattr(
+        heuristic_context,
+        "build_heuristic_compatibility_context_v1",
+        forbidden,
+    )
+
+    rebuilt = build_service_adjustment_evaluation_context_v1(
+        existing.normalized_inputs,
+        existing.b_evaluation_policy,
+        existing.decision_policy,
+        b_evaluation_cache=existing.b_evaluation,
+    )
+
+    assert rebuilt == existing

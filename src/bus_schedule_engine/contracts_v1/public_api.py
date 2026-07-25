@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-
-from .demand_coverage import demand_source_defects_v1
+from .adjustment_context import (
+    RepeatabilityEvidenceV1,
+    ServiceAdjustmentDecisionPolicyV1,
+    ServiceAdjustmentEvaluationContextV1,
+    _build_service_adjustment_evaluation_context_core_v1,
+)
+from .authoritative_evaluation import (
+    evaluate_authoritative_scenario_b_v1,
+    validate_authoritative_demand_source_v1,
+)
 from .demand_resolution import (
     DemandBlockPolicyV1,
     DemandResolutionContractV1,
-    DemandResolutionError,
     DemandResolutionResultV1,
-    InterpolationMethod,
 )
 from .demand_resolution import (
     build_demand_analysis_blocks_v1 as _build_demand_analysis_blocks_v1,
@@ -19,22 +24,14 @@ from .demand_resolution import (
     detect_demand_resolution_v1 as _detect_demand_resolution_v1,
 )
 from .evaluation import (
-    BDisposition,
-    DimensionStatus,
-    EvaluationIssueSeverity,
     ScenarioBEvaluationBundleV1,
     ScenarioBEvaluationPolicyV1,
 )
-from .evaluation import (
-    evaluate_scenario_b_v1 as _evaluate_scenario_b_v1,
-)
 from .models import (
-    DemandResolutionType,
     NormalizedInputBundleV1,
     ObservedDemandInput,
 )
 from .service_adjustment import (
-    RepeatabilityEvidenceV1,
     ServiceAdjustmentAssessmentV1,
     ServiceAdjustmentPolicyV1,
 )
@@ -42,31 +39,17 @@ from .service_adjustment import (
     evaluate_service_adjustment_need_v1 as _evaluate_service_adjustment_need_v1,
 )
 from .solver_models import ScheduleGenerationContextV1
+from .validation import (
+    ContractValidationError,
+    ensure_valid_bundle,
+)
 
 
 def _validate_authoritative_demand_source(
     demand: ObservedDemandInput,
     policy: DemandBlockPolicyV1,
 ) -> None:
-    if policy.interpolation_method != InterpolationMethod.NONE:
-        raise DemandResolutionError(
-            "PR-02 authoritative evaluation supports interpolation_method=none only"
-        )
-
-    regular_resolutions = {
-        observation.source_resolution_minutes
-        for observation in demand.observations
-        if observation.source_resolution_type == DemandResolutionType.REGULAR_INTERVAL
-    }
-    if regular_resolutions and (None in regular_resolutions or len(regular_resolutions) != 1):
-        raise DemandResolutionError(
-            "Regular-interval demand requires one explicit common source resolution"
-        )
-
-    defects = demand_source_defects_v1(demand.observations)
-    if defects:
-        first = defects[0]
-        raise DemandResolutionError(first.message, code=first.code)
+    validate_authoritative_demand_source_v1(demand, policy)
 
 
 def detect_demand_resolution_v1(
@@ -92,49 +75,110 @@ def evaluate_scenario_b_v1(
     policy: ScenarioBEvaluationPolicyV1 | None = None,
 ) -> ScenarioBEvaluationBundleV1:
     effective_policy = policy or ScenarioBEvaluationPolicyV1()
-    if bundle.observed_demand is not None:
-        _validate_authoritative_demand_source(
-            bundle.observed_demand,
-            effective_policy.demand_blocks,
-        )
+    return evaluate_authoritative_scenario_b_v1(bundle, effective_policy)
 
-    result = _evaluate_scenario_b_v1(bundle, effective_policy)
-    demand_dimension = result.evaluation.demand_suitability
-    has_blocking_demand_issue = any(
-        issue.severity
-        in {
-            EvaluationIssueSeverity.BLOCKING,
-            EvaluationIssueSeverity.ERROR,
-        }
-        for issue in demand_dimension.issues
-    )
-    if not (
-        has_blocking_demand_issue and demand_dimension.status == DimensionStatus.INSUFFICIENT_DATA
-    ):
-        return result
 
-    corrected_dimension = replace(demand_dimension, status=DimensionStatus.FAIL)
-    disposition = (
-        BDisposition.TECHNICALLY_INFEASIBLE_BUT_PARAMETERS_MAY_ALLOW_REDISTRIBUTION
-        if not result.fleet_assessment.feasible
-        else BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE
+def project_service_adjustment_decision_policy_v1(
+    legacy_policy: ServiceAdjustmentPolicyV1,
+) -> ServiceAdjustmentDecisionPolicyV1:
+    """Project only quantitative authority from the temporary legacy policy."""
+    return ServiceAdjustmentDecisionPolicyV1(
+        planning_load_factor_ceiling=legacy_policy.planning_load_factor_ceiling,
+        critical_load_factor_ceiling=legacy_policy.critical_load_factor_ceiling,
+        low_load_review_threshold=legacy_policy.low_load_review_threshold,
+        minimum_authoritative_demand_confidence=(
+            legacy_policy.minimum_authoritative_demand_confidence
+        ),
+        headway_rounding_tolerance_minutes=(legacy_policy.headway_rounding_tolerance_minutes),
+        required_regular_headway_rate=legacy_policy.required_regular_headway_rate,
+        minimum_sustained_change_intervals=(legacy_policy.minimum_sustained_change_intervals),
+        minimum_material_headway_change_minutes=(
+            legacy_policy.minimum_material_headway_change_minutes
+        ),
+        minimum_material_service_rate_change_ratio=(
+            legacy_policy.minimum_material_service_rate_change_ratio
+        ),
+        maximum_headway_regimes_per_direction=(legacy_policy.maximum_headway_regimes_per_direction),
+        minimum_valid_observed_days_for_reduction=(
+            legacy_policy.minimum_valid_observed_days_for_reduction
+        ),
+        minimum_surplus_consistency_rate=(legacy_policy.minimum_surplus_consistency_rate),
+        minimum_residual_surplus_trips_for_reduction=(
+            legacy_policy.minimum_residual_surplus_trips_for_reduction
+        ),
+        minimum_service_trips_per_direction=(legacy_policy.minimum_service_trips_per_direction),
+        maximum_joint_donor_search_states=(legacy_policy.maximum_joint_donor_search_states),
+        maximum_joint_reduction_search_states=(legacy_policy.maximum_joint_reduction_search_states),
     )
-    corrected_evaluation = replace(
-        result.evaluation,
-        demand_suitability=corrected_dimension,
-        disposition=disposition,
+
+
+def build_service_adjustment_evaluation_context_v1(
+    bundle: NormalizedInputBundleV1,
+    evaluation_policy: ScenarioBEvaluationPolicyV1,
+    decision_policy: ServiceAdjustmentDecisionPolicyV1,
+    repeatability_evidence: RepeatabilityEvidenceV1 | None = None,
+    b_evaluation_cache: ScenarioBEvaluationBundleV1 | None = None,
+) -> ServiceAdjustmentEvaluationContextV1:
+    """Build the canonical pre-problem quantitative authority."""
+    ensure_valid_bundle(bundle)
+    authoritative = evaluate_authoritative_scenario_b_v1(
+        bundle,
+        evaluation_policy,
     )
-    return replace(result, evaluation=corrected_evaluation)
+    return _build_service_adjustment_evaluation_context_core_v1(
+        bundle,
+        evaluation_policy,
+        decision_policy,
+        authoritative,
+        repeatability_evidence,
+        b_evaluation_cache,
+    )
 
 
 def evaluate_service_adjustment_need_v1(
+    context: ServiceAdjustmentEvaluationContextV1,
+) -> ServiceAdjustmentAssessmentV1:
+    """Return the canonical problem-free quantitative assessment."""
+    return _evaluate_service_adjustment_need_v1(context)
+
+
+def _effective_legacy_service_adjustment_policy_v1(
+    requested: ServiceAdjustmentPolicyV1 | None,
+    evaluation_policy: ScenarioBEvaluationPolicyV1,
+) -> ServiceAdjustmentPolicyV1:
+    if requested is not None:
+        return requested
+    return ServiceAdjustmentPolicyV1(
+        planning_load_factor_ceiling=evaluation_policy.planning_load_factor_ceiling,
+        critical_load_factor_ceiling=evaluation_policy.critical_load_factor_ceiling,
+        low_load_review_threshold=evaluation_policy.low_load_review_threshold,
+        minimum_authoritative_demand_confidence=(
+            evaluation_policy.minimum_authoritative_demand_confidence
+        ),
+    )
+
+
+def evaluate_service_adjustment_need_from_generation_context_v1(
     context: ScheduleGenerationContextV1,
     policy: ServiceAdjustmentPolicyV1 | None = None,
     repeatability_evidence: RepeatabilityEvidenceV1 | None = None,
 ) -> ServiceAdjustmentAssessmentV1:
-    """Return the pure V1-D1 quantitative assessment for authoritative Scenario B."""
-    return _evaluate_service_adjustment_need_v1(
-        context,
+    """Transitional compatibility path from the old H4 generation context."""
+    from .problem_validation import validate_schedule_generation_context_v1
+
+    validation = validate_schedule_generation_context_v1(context)
+    if not validation.passed:
+        raise ContractValidationError(validation.issues)
+    effective_legacy_policy = _effective_legacy_service_adjustment_policy_v1(
         policy,
-        repeatability_evidence,
+        context.evaluation_policy,
     )
+    decision_policy = project_service_adjustment_decision_policy_v1(effective_legacy_policy)
+    evaluation_context = build_service_adjustment_evaluation_context_v1(
+        context.normalized_inputs,
+        context.evaluation_policy,
+        decision_policy,
+        repeatability_evidence,
+        context.b_evaluation,
+    )
+    return evaluate_service_adjustment_need_v1(evaluation_context)

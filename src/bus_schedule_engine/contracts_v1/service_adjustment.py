@@ -6,6 +6,13 @@ from enum import Enum, StrEnum
 from itertools import combinations
 from typing import Any
 
+from .adjustment_context import (
+    RepeatabilityDayEvidenceV1,
+    RepeatabilityEvidenceV1,
+    ServiceAdjustmentDecisionPolicyV1,
+    ServiceAdjustmentEvaluationContextV1,
+    ensure_valid_service_adjustment_evaluation_context_v1,
+)
 from .demand_coverage import (
     COMBINED_DEMAND_DIRECTIONAL_SUPPORT_UNAVAILABLE,
     DEMAND_DEPARTURE_NOT_COVERED,
@@ -21,7 +28,6 @@ from .evaluation import (
     BDisposition,
     BlockSupplyStatus,
     FleetAssessmentV1,
-    ScenarioBEvaluationPolicyV1,
     assess_scenario_b_fleet_v1,
 )
 from .fleet_assignment import ContractFleetAssignmentError, assign_contract_v1_fleet
@@ -39,17 +45,9 @@ from .models import (
     TripsByDirection,
 )
 from .serialization import canonical_sha256, scenario_fingerprint
-from .solver_models import (
-    BoundaryConvention,
-    DirectionTripLockMode,
-    FleetConstraintMode,
-    InitialFleetPositioningMode,
-    RawCandidateTripV1,
-    ScheduleGenerationContextV1,
-)
 from .validation import validate_scenario_input
 
-EVALUATOR_FINGERPRINT_PROFILE = "contract_v1_d1_service_adjustment"
+EVALUATOR_FINGERPRINT_PROFILE = "contract_v1_d2a_service_adjustment"
 HEURISTIC_ADAPTER_ID = "legacy_heuristic_v1"
 
 ADJUSTMENT_DECISION_DATA_INSUFFICIENT = "ADJUSTMENT_DECISION_DATA_INSUFFICIENT"
@@ -69,8 +67,6 @@ ZERO_HEADWAY_EXCEPTION_PRESENT = "ZERO_HEADWAY_EXCEPTION_PRESENT"
 FLEET_RATIO_ABOVE_ONE = "FLEET_RATIO_ABOVE_ONE"
 NEGATIVE_TERMINAL_STOCK = "NEGATIVE_TERMINAL_STOCK"
 TURNAROUND_MARGIN_NEGATIVE = "TURNAROUND_MARGIN_NEGATIVE"
-CURRENT_SOLVER_CAN_IMPLEMENT = "CURRENT_SOLVER_CAN_IMPLEMENT"
-CURRENT_SOLVER_CAPABILITY_INSUFFICIENT = "CURRENT_SOLVER_CAPABILITY_INSUFFICIENT"
 JOINT_DONOR_CAPACITY_NOT_PROVEN = "JOINT_DONOR_CAPACITY_NOT_PROVEN"
 JOINT_DONOR_SEARCH_LIMIT_REACHED = "JOINT_DONOR_SEARCH_LIMIT_REACHED"
 JOINT_REDUCTION_SEARCH_LIMIT_REACHED = "JOINT_REDUCTION_SEARCH_LIMIT_REACHED"
@@ -137,158 +133,36 @@ class ServiceAdjustmentPolicyV1:
     def __post_init__(self) -> None:
         if not isinstance(self.fixed_resource_authorized_decisions, tuple):
             raise ValueError("fixed_resource_authorized_decisions must be an immutable tuple")
-        for name, value in (
-            ("planning_load_factor_ceiling", self.planning_load_factor_ceiling),
-            ("critical_load_factor_ceiling", self.critical_load_factor_ceiling),
-            ("low_load_review_threshold", self.low_load_review_threshold),
-        ):
-            if (
-                isinstance(value, bool)
-                or not isinstance(value, (int, float))
-                or not math.isfinite(float(value))
-                or not 0 < float(value) <= 1
-            ):
-                raise ValueError(f"{name} must be finite and in (0, 1]")
-        if self.planning_load_factor_ceiling > self.critical_load_factor_ceiling:
-            raise ValueError("planning load-factor ceiling may not exceed the critical ceiling")
-        if self.headway_rounding_tolerance_minutes < 0:
-            raise ValueError("headway_rounding_tolerance_minutes must be non-negative")
-        if not 0 <= self.required_regular_headway_rate <= 1:
-            raise ValueError("required_regular_headway_rate must be in [0, 1]")
-        if self.minimum_sustained_change_intervals < 1:
-            raise ValueError("minimum_sustained_change_intervals must be positive")
-        if self.minimum_material_headway_change_minutes < 0:
-            raise ValueError("minimum_material_headway_change_minutes must be non-negative")
-        if not 0 <= self.minimum_material_service_rate_change_ratio <= 1:
-            raise ValueError("minimum material service-rate change must be in [0, 1]")
-        if self.maximum_headway_regimes_per_direction < 1:
-            raise ValueError("maximum_headway_regimes_per_direction must be positive")
-        if self.minimum_valid_observed_days_for_reduction < 1:
-            raise ValueError("minimum_valid_observed_days_for_reduction must be positive")
-        if not 0 < self.minimum_surplus_consistency_rate <= 1:
-            raise ValueError("minimum_surplus_consistency_rate must be in (0, 1]")
-        if self.minimum_residual_surplus_trips_for_reduction < 1:
-            raise ValueError("minimum_residual_surplus_trips_for_reduction must be positive")
-        if self.minimum_service_trips_per_direction < 1:
-            raise ValueError("minimum_service_trips_per_direction must be positive")
-        if self.maximum_joint_donor_search_states < 1:
-            raise ValueError("maximum_joint_donor_search_states must be positive")
-        if self.maximum_joint_reduction_search_states < 1:
-            raise ValueError("maximum_joint_reduction_search_states must be positive")
+        ServiceAdjustmentDecisionPolicyV1(
+            planning_load_factor_ceiling=self.planning_load_factor_ceiling,
+            critical_load_factor_ceiling=self.critical_load_factor_ceiling,
+            low_load_review_threshold=self.low_load_review_threshold,
+            minimum_authoritative_demand_confidence=(self.minimum_authoritative_demand_confidence),
+            headway_rounding_tolerance_minutes=(self.headway_rounding_tolerance_minutes),
+            required_regular_headway_rate=self.required_regular_headway_rate,
+            minimum_sustained_change_intervals=(self.minimum_sustained_change_intervals),
+            minimum_material_headway_change_minutes=(self.minimum_material_headway_change_minutes),
+            minimum_material_service_rate_change_ratio=(
+                self.minimum_material_service_rate_change_ratio
+            ),
+            maximum_headway_regimes_per_direction=(self.maximum_headway_regimes_per_direction),
+            minimum_valid_observed_days_for_reduction=(
+                self.minimum_valid_observed_days_for_reduction
+            ),
+            minimum_surplus_consistency_rate=self.minimum_surplus_consistency_rate,
+            minimum_residual_surplus_trips_for_reduction=(
+                self.minimum_residual_surplus_trips_for_reduction
+            ),
+            minimum_service_trips_per_direction=(self.minimum_service_trips_per_direction),
+            maximum_joint_donor_search_states=(self.maximum_joint_donor_search_states),
+            maximum_joint_reduction_search_states=(self.maximum_joint_reduction_search_states),
+        )
         if not self.fixed_resource_solver_adapter.strip():
             raise ValueError("fixed_resource_solver_adapter is required")
         if len(set(self.fixed_resource_authorized_decisions)) != len(
             self.fixed_resource_authorized_decisions
         ):
             raise ValueError("fixed_resource_authorized_decisions may not contain duplicates")
-
-
-@dataclass(frozen=True, slots=True)
-class RepeatabilityDayEvidenceV1:
-    day_reference: str
-    fully_supported: bool
-    current_daily_trips: int
-    required_daily_trips: int | None
-    shortage_block_count: int
-    no_service_with_demand_block_count: int
-    critical_block_count: int
-    authoritative_evidence_fingerprint: str
-    warning_block_count: int = 0
-
-    def __post_init__(self) -> None:
-        if not self.day_reference.strip():
-            raise ValueError("day_reference is required")
-        if self.current_daily_trips < 0:
-            raise ValueError("current_daily_trips must be non-negative")
-        if self.required_daily_trips is not None and self.required_daily_trips < 0:
-            raise ValueError("required_daily_trips must be non-negative when present")
-        for name, value in (
-            ("shortage_block_count", self.shortage_block_count),
-            ("no_service_with_demand_block_count", self.no_service_with_demand_block_count),
-            ("critical_block_count", self.critical_block_count),
-            ("warning_block_count", self.warning_block_count),
-        ):
-            if value < 0:
-                raise ValueError(f"{name} must be non-negative")
-        if self.fully_supported and self.required_daily_trips is None:
-            raise ValueError("fully supported days require required_daily_trips")
-        if not self.authoritative_evidence_fingerprint.strip():
-            raise ValueError("authoritative_evidence_fingerprint is required")
-
-    @property
-    def daily_surplus_trips(self) -> int:
-        if self.required_daily_trips is None:
-            return 0
-        return max(0, self.current_daily_trips - self.required_daily_trips)
-
-    @property
-    def qualifies_as_surplus_day(self) -> bool:
-        return bool(
-            self.fully_supported
-            and self.required_daily_trips is not None
-            and self.required_daily_trips < self.current_daily_trips
-            and self.shortage_block_count == 0
-            and self.no_service_with_demand_block_count == 0
-            and self.critical_block_count == 0
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class RepeatabilityEvidenceV1:
-    days: tuple[RepeatabilityDayEvidenceV1, ...]
-    configured_minimum_valid_day_count: int
-    configured_minimum_surplus_consistency_rate: float
-    representative_day_type_or_provenance: str
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.days, tuple):
-            raise ValueError("repeatability days must be an immutable tuple")
-        if self.configured_minimum_valid_day_count < 1:
-            raise ValueError("configured_minimum_valid_day_count must be positive")
-        if not 0 < self.configured_minimum_surplus_consistency_rate <= 1:
-            raise ValueError("configured minimum surplus consistency must be in (0, 1]")
-        if not self.representative_day_type_or_provenance.strip():
-            raise ValueError("representative day type or provenance is required")
-        day_references = tuple(day.day_reference for day in self.days)
-        if len(set(day_references)) != len(day_references):
-            raise ValueError("repeatability days may not contain duplicate day references")
-        if day_references != tuple(sorted(day_references)):
-            raise ValueError("repeatability days must use deterministic day-reference order")
-
-    @property
-    def valid_days(self) -> tuple[RepeatabilityDayEvidenceV1, ...]:
-        return tuple(
-            day for day in self.days if day.fully_supported and day.required_daily_trips is not None
-        )
-
-    @property
-    def valid_observed_day_count(self) -> int:
-        return len(self.valid_days)
-
-    @property
-    def surplus_day_count(self) -> int:
-        return sum(day.qualifies_as_surplus_day for day in self.valid_days)
-
-    @property
-    def surplus_consistency_rate(self) -> float:
-        if not self.valid_observed_day_count:
-            return 0.0
-        return self.surplus_day_count / self.valid_observed_day_count
-
-    @property
-    def daily_required_trip_sequence(self) -> tuple[int, ...]:
-        return tuple(
-            day.required_daily_trips
-            for day in self.valid_days
-            if day.required_daily_trips is not None
-        )
-
-    @property
-    def daily_surplus_sequence(self) -> tuple[int, ...]:
-        return tuple(
-            day.daily_surplus_trips if day.qualifies_as_surplus_day else 0
-            for day in self.valid_days
-        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -440,11 +314,11 @@ class ServiceAdjustmentAssessmentV1:
     assessment_id: str
     evaluator_fingerprint: str
     evaluator_fingerprint_profile: str
-    source_problem_fingerprint: str
+    source_evaluation_context_fingerprint: str
     source_b_fingerprint: str
     observed_demand_fingerprint: str | None
     authoritative_b_evaluation_fingerprint: str
-    adjustment_policy_fingerprint: str
+    adjustment_decision_policy_fingerprint: str
     primary_decision: ServiceAdjustmentDecisionV1
     reason_codes: tuple[str, ...]
     explanation: str
@@ -459,8 +333,6 @@ class ServiceAdjustmentAssessmentV1:
     joint_reduction_evidence: JointReductionValidationEvidenceV1 | None
     maximum_supported_reduction_quantity: int
     limitations: tuple[str, ...]
-    heuristic_authorized: bool
-    authorized_generation_action: str | None
 
     @property
     def contract_version(self) -> str:
@@ -481,60 +353,11 @@ def _deduplicate(values: list[str] | tuple[str, ...]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(values))
 
 
-def _effective_policy(
-    requested: ServiceAdjustmentPolicyV1 | None,
-    evaluation_policy: ScenarioBEvaluationPolicyV1,
-) -> ServiceAdjustmentPolicyV1:
-    if requested is not None:
-        return requested
-    return ServiceAdjustmentPolicyV1(
-        planning_load_factor_ceiling=evaluation_policy.planning_load_factor_ceiling,
-        critical_load_factor_ceiling=evaluation_policy.critical_load_factor_ceiling,
-        low_load_review_threshold=evaluation_policy.low_load_review_threshold,
-        minimum_authoritative_demand_confidence=(
-            evaluation_policy.minimum_authoritative_demand_confidence
-        ),
-    )
-
-
-def _policy_payload(policy: ServiceAdjustmentPolicyV1) -> dict[str, object]:
-    return {
-        "planning_load_factor_ceiling": policy.planning_load_factor_ceiling,
-        "critical_load_factor_ceiling": policy.critical_load_factor_ceiling,
-        "low_load_review_threshold": policy.low_load_review_threshold,
-        "minimum_authoritative_demand_confidence": (
-            policy.minimum_authoritative_demand_confidence.value
-        ),
-        "headway_rounding_tolerance_minutes": policy.headway_rounding_tolerance_minutes,
-        "required_regular_headway_rate": policy.required_regular_headway_rate,
-        "minimum_sustained_change_intervals": policy.minimum_sustained_change_intervals,
-        "minimum_material_headway_change_minutes": (policy.minimum_material_headway_change_minutes),
-        "minimum_material_service_rate_change_ratio": (
-            policy.minimum_material_service_rate_change_ratio
-        ),
-        "maximum_headway_regimes_per_direction": (policy.maximum_headway_regimes_per_direction),
-        "minimum_valid_observed_days_for_reduction": (
-            policy.minimum_valid_observed_days_for_reduction
-        ),
-        "minimum_surplus_consistency_rate": policy.minimum_surplus_consistency_rate,
-        "minimum_residual_surplus_trips_for_reduction": (
-            policy.minimum_residual_surplus_trips_for_reduction
-        ),
-        "minimum_service_trips_per_direction": policy.minimum_service_trips_per_direction,
-        "maximum_joint_donor_search_states": policy.maximum_joint_donor_search_states,
-        "maximum_joint_reduction_search_states": (policy.maximum_joint_reduction_search_states),
-        "fixed_resource_solver_adapter": policy.fixed_resource_solver_adapter,
-        "fixed_resource_authorized_decisions": [
-            item.value for item in policy.fixed_resource_authorized_decisions
-        ],
-    }
-
-
-def _coverage(context: ScheduleGenerationContextV1) -> DemandCoverageAssessmentV1:
+def _coverage(context: ServiceAdjustmentEvaluationContextV1) -> DemandCoverageAssessmentV1:
     resolution = context.b_evaluation.demand_resolution
     if resolution is not None and resolution.coverage_assessment is not None:
         return resolution.coverage_assessment
-    minimum = context.evaluation_policy.minimum_authoritative_demand_confidence
+    minimum = context.b_evaluation_policy.minimum_authoritative_demand_confidence
     return assess_demand_coverage_v1(
         context.normalized_inputs,
         minimum_confidence=minimum,
@@ -542,7 +365,7 @@ def _coverage(context: ScheduleGenerationContextV1) -> DemandCoverageAssessmentV
 
 
 def _block_evidence(
-    context: ScheduleGenerationContextV1,
+    context: ServiceAdjustmentEvaluationContextV1,
 ) -> tuple[BlockAdjustmentEvidenceV1, ...]:
     resolution = context.b_evaluation.demand_resolution
     source_ids = (
@@ -663,7 +486,7 @@ def _allocation_evidence(
 def _headway_classification(
     actual: tuple[float, ...],
     balanced: tuple[float, ...],
-    policy: ServiceAdjustmentPolicyV1,
+    policy: ServiceAdjustmentDecisionPolicyV1,
 ) -> _HeadwayClassificationResult:
     allowed = set(balanced)
     conforming = sum(
@@ -690,46 +513,53 @@ def _headway_classification(
     return regular_rate, minimum, maximum, headway_range, zero_count, classification
 
 
-def _diagnostic_lock_issues(
-    context: ScheduleGenerationContextV1,
+def _diagnostic_operating_fact_issues(
+    source: ScenarioBInput,
     scenario: ScenarioBInput,
 ) -> tuple[str, ...]:
-    from .solver_problem import build_operating_parameter_locks_v1
-
-    problem = context.problem
-    source_fingerprint = problem.source_b_fingerprint
-    core = build_operating_parameter_locks_v1(
-        context.normalized_inputs.scenario_b,
-        source_fingerprint,
-        direction_trip_lock_mode=problem.direction_trip_lock_mode,
-        fleet_constraint_mode=problem.fleet_constraint_mode,
-        initial_fleet_positioning_mode=problem.initial_fleet_positioning_mode,
+    compared_fields = (
+        "route_id",
+        "route_name",
+        "route_type",
+        "terminal_1_name",
+        "terminal_2_name",
+        "trip_runtime_minutes",
+        "turnaround_minutes",
+        "total_daily_trips",
+        "trips_by_direction",
+        "first_departures",
+        "last_departures",
+        "vehicle_capacity",
+        "available_fleet_limit",
+        "approved_active_fleet",
+        "operating_day_type",
     )
-    core_fields = {item.field for item in core}
-    adapter_values = {
-        item.field: item.value
-        for item in problem.operating_parameter_locks
-        if item.field not in core_fields
-    }
-    diagnostic = build_operating_parameter_locks_v1(
-        scenario,
-        source_fingerprint,
-        direction_trip_lock_mode=problem.direction_trip_lock_mode,
-        fleet_constraint_mode=problem.fleet_constraint_mode,
-        initial_fleet_positioning_mode=problem.initial_fleet_positioning_mode,
-        adapter_operating_lock_values=adapter_values,
-    )
-    expected = {item.field: item.value for item in problem.operating_parameter_locks}
-    actual = {item.field: item.value for item in diagnostic}
-    return tuple(
-        f"DIAGNOSTIC_OPERATING_LOCK_MISMATCH:{field}"
-        for field in sorted(set(expected) | set(actual))
-        if expected.get(field) != actual.get(field)
-    )
+    issues = [
+        f"DIAGNOSTIC_PRE_PROBLEM_OPERATING_FACT_MISMATCH:{field}"
+        for field in compared_fields
+        if getattr(source, field) != getattr(scenario, field)
+    ]
+    source_by_id = {trip.trip_id: trip for trip in source.exact_timetable}
+    diagnostic_by_id = {trip.trip_id: trip for trip in scenario.exact_timetable}
+    if set(source_by_id) != set(diagnostic_by_id):
+        issues.append("DIAGNOSTIC_PRE_PROBLEM_OPERATING_FACT_MISMATCH:trip_ids")
+    for trip_id in sorted(set(source_by_id) & set(diagnostic_by_id)):
+        expected = source_by_id[trip_id]
+        actual = diagnostic_by_id[trip_id]
+        if (
+            actual.direction != expected.direction
+            or actual.departure_terminal != expected.departure_terminal
+            or actual.runtime_minutes != expected.runtime_minutes
+            or actual.vehicle_assignment != expected.vehicle_assignment
+        ):
+            issues.append(
+                f"DIAGNOSTIC_PRE_PROBLEM_OPERATING_FACT_MISMATCH:exact_timetable:{trip_id}"
+            )
+    return tuple(issues)
 
 
 def _respace_diagnostic(
-    context: ScheduleGenerationContextV1,
+    context: ServiceAdjustmentEvaluationContextV1,
     departure_by_trip_id: dict[str, int],
 ) -> RespaceDiagnosticEvidenceV1:
     source = context.normalized_inputs.scenario_b
@@ -756,7 +586,7 @@ def _respace_diagnostic(
     )
     validation = validate_scenario_input(diagnostic)
     scenario_issue_codes = tuple(sorted({item.code for item in validation.issues}))
-    lock_issue_codes = _diagnostic_lock_issues(context, diagnostic)
+    lock_issue_codes = _diagnostic_operating_fact_issues(source, diagnostic)
     source_by_id = {trip.trip_id: trip for trip in source.exact_timetable}
     runtime_issues = tuple(
         sorted(
@@ -827,8 +657,8 @@ def _respace_diagnostic(
 
 
 def _headway_evidence(
-    context: ScheduleGenerationContextV1,
-    policy: ServiceAdjustmentPolicyV1,
+    context: ServiceAdjustmentEvaluationContextV1,
+    policy: ServiceAdjustmentDecisionPolicyV1,
 ) -> tuple[HeadwayRegimeEvidenceV1, ...]:
     scenario = context.normalized_inputs.scenario_b
     provisional: list[
@@ -908,22 +738,21 @@ def _headway_evidence(
     return tuple(output)
 
 
-def _raw_b_trips(scenario: ScenarioBInput) -> tuple[RawCandidateTripV1, ...]:
+@dataclass(frozen=True, slots=True)
+class _TechnicalTimetableTripV1:
+    c_trip_id: str
+    source_b_trip_id: str
+    departure_terminal: DepartureTerminal
+    c_departure_time: int
+
+
+def _raw_b_trips(scenario: ScenarioBInput) -> tuple[_TechnicalTimetableTripV1, ...]:
     return tuple(
-        RawCandidateTripV1(
+        _TechnicalTimetableTripV1(
             c_trip_id=trip.trip_id,
             source_b_trip_id=trip.trip_id,
-            direction=trip.direction,
             departure_terminal=trip.departure_terminal,
-            b_departure_time=trip.departure_time,
             c_departure_time=trip.departure_time,
-            arrival_time=trip.resolved_arrival_time,
-            runtime_minutes=trip.runtime_minutes,
-            shift_minutes=0.0,
-            previous_b_headway=None,
-            previous_c_headway=None,
-            headway_regime_id=f"B-HEADWAY-{trip.direction.value.upper()}",
-            change_reason="Scenario B technical evidence",
         )
         for trip in scenario.exact_timetable
     )
@@ -999,8 +828,7 @@ def _assigned_turnaround_evidence(
 
 
 def _technical_evidence(
-    context: ScheduleGenerationContextV1,
-    context_issue_codes: tuple[str, ...],
+    context: ServiceAdjustmentEvaluationContextV1,
 ) -> TechnicalAdjustmentEvidenceV1:
     scenario = context.normalized_inputs.scenario_b
     fleet: FleetAssessmentV1 = context.b_evaluation.fleet_assessment
@@ -1106,20 +934,6 @@ def _technical_evidence(
         issue_codes.append("FIRST_LAST_DEPARTURE_LOCK_FAILURE")
     if count_inconsistencies:
         issue_codes.append("TRIP_COUNT_INCONSISTENCY")
-    technical_context_codes = tuple(
-        sorted(
-            code
-            for code in context_issue_codes
-            if code
-            in {
-                "PROBLEM_LOCK_SET_INCOMPLETE",
-                "PROBLEM_LOCK_DUPLICATE_FIELD",
-                "PROBLEM_LOCK_SOURCE_MISMATCH",
-                "PROBLEM_LOCK_VALUE_MISMATCH",
-            }
-        )
-    )
-    issue_codes.extend(technical_context_codes)
     normalized_issue_codes = tuple(sorted(set(issue_codes)))
     return TechnicalAdjustmentEvidenceV1(
         minimum_required_fleet=fleet.minimum_required_fleet,
@@ -1137,9 +951,10 @@ def _technical_evidence(
         runtime_inconsistencies=runtime_inconsistencies,
         first_last_departure_lock_failures=tuple(first_last_failures),
         trip_count_and_directional_count_inconsistencies=tuple(count_inconsistencies),
-        context_validation_issue_codes=context_issue_codes,
+        # Invalid pre-problem contexts raise before evidence is constructed.
+        context_validation_issue_codes=(),
         issue_codes=normalized_issue_codes,
-        technically_feasible=not normalized_issue_codes and not context_issue_codes,
+        technically_feasible=not normalized_issue_codes,
     )
 
 
@@ -1193,7 +1008,7 @@ def _joint_removal_is_technically_feasible(
     scenario: ScenarioBInput,
     trip_ids: tuple[str, ...],
     donor_blocks: tuple[BlockAdjustmentEvidenceV1, ...],
-    policy: ServiceAdjustmentPolicyV1,
+    policy: ServiceAdjustmentDecisionPolicyV1,
 ) -> bool:
     trial = _scenario_without_trips(scenario, trip_ids)
     for terminal, expected_first, expected_last in (
@@ -1246,7 +1061,7 @@ def _joint_donor_validation(
     scenario: ScenarioBInput,
     blocks: tuple[BlockAdjustmentEvidenceV1, ...],
     coverage: DemandCoverageAssessmentV1,
-    policy: ServiceAdjustmentPolicyV1,
+    policy: ServiceAdjustmentDecisionPolicyV1,
     technical_feasible: bool,
 ) -> tuple[
     tuple[BlockAdjustmentEvidenceV1, ...],
@@ -1377,7 +1192,7 @@ def _maximum_repeatably_supported_surplus(
 def _reduction_candidates(
     scenario: ScenarioBInput,
     blocks: tuple[BlockAdjustmentEvidenceV1, ...],
-    policy: ServiceAdjustmentPolicyV1,
+    policy: ServiceAdjustmentDecisionPolicyV1,
 ) -> tuple[ExactTimetableTrip, ...]:
     surplus_blocks = tuple(block for block in blocks if block.potential_surplus_trips > 0)
     seen_ids: set[str] = set()
@@ -1445,7 +1260,7 @@ def _reduction_set_is_jointly_feasible(
     scenario: ScenarioBInput,
     trip_ids: tuple[str, ...],
     blocks: tuple[BlockAdjustmentEvidenceV1, ...],
-    policy: ServiceAdjustmentPolicyV1,
+    policy: ServiceAdjustmentDecisionPolicyV1,
 ) -> bool:
     source_by_id = {trip.trip_id: trip for trip in scenario.exact_timetable}
     if (
@@ -1550,7 +1365,7 @@ def _joint_reduction_validation(
     blocks: tuple[BlockAdjustmentEvidenceV1, ...],
     current_surplus: int,
     repeatably_supported_surplus: int,
-    policy: ServiceAdjustmentPolicyV1,
+    policy: ServiceAdjustmentDecisionPolicyV1,
 ) -> JointReductionValidationEvidenceV1:
     candidate_ids = tuple(trip.trip_id for trip in _reduction_candidates(scenario, blocks, policy))
     upper_bound = min(
@@ -1660,7 +1475,7 @@ def _joint_reduction_validation(
 
 def _repeatability_gate(
     evidence: RepeatabilityEvidenceV1 | None,
-    policy: ServiceAdjustmentPolicyV1,
+    policy: ServiceAdjustmentDecisionPolicyV1,
     current_surplus: int,
     scenario: ScenarioBInput,
     blocks: tuple[BlockAdjustmentEvidenceV1, ...],
@@ -1716,43 +1531,6 @@ def _repeatability_gate(
         reasons.extend(("REDUCTION_TECHNICAL_PROTECTION_NOT_SATISFIED", LOW_LOAD_REVIEW_ONLY))
         return False, proof, tuple(reasons)
     return True, proof, (STABLE_RESIDUAL_TRIP_SURPLUS,)
-
-
-def _fixed_resource_authorization(
-    *,
-    decision: ServiceAdjustmentDecisionV1,
-    context: ScheduleGenerationContextV1,
-    coverage: DemandCoverageAssessmentV1,
-    technical: TechnicalAdjustmentEvidenceV1,
-    policy: ServiceAdjustmentPolicyV1,
-    donor_capacity_sufficient: bool,
-    headway_respace_possible: bool,
-) -> tuple[bool, str | None]:
-    problem = context.problem
-    supported_problem = (
-        problem.solver_adapter == policy.fixed_resource_solver_adapter
-        and problem.direction_trip_lock_mode == DirectionTripLockMode.FIXED_BY_DIRECTION
-        and problem.fleet_constraint_mode == FleetConstraintMode.AVAILABLE_UPPER_BOUND
-        and problem.initial_fleet_positioning_mode == InitialFleetPositioningMode.SOLVER_DETERMINED
-        and problem.boundary_convention == BoundaryConvention.HALF_OPEN
-        and coverage.directional_c_generation_supported
-        and technical.technically_feasible
-    )
-    if decision not in policy.fixed_resource_authorized_decisions or not supported_problem:
-        return False, None
-    if decision == ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS:
-        return (
-            (True, "fixed_resource_trip_redistribution")
-            if donor_capacity_sufficient
-            else (False, None)
-        )
-    if decision == ServiceAdjustmentDecisionV1.REDISTRIBUTE_DEPARTURE_TIMES:
-        return (
-            (True, "fixed_resource_departure_respace")
-            if headway_respace_possible
-            else (False, None)
-        )
-    return False, None
 
 
 def _assessment_evidence(
@@ -1825,19 +1603,18 @@ def _assessment_evidence(
 
 def _fingerprint_payload(
     assessment: ServiceAdjustmentAssessmentV1,
-    evaluation_policy: ScenarioBEvaluationPolicyV1,
-    adjustment_policy: ServiceAdjustmentPolicyV1,
 ) -> dict[str, object]:
     return {
         "fingerprint_profile": EVALUATOR_FINGERPRINT_PROFILE,
-        "source_problem_fingerprint": assessment.source_problem_fingerprint,
+        "source_evaluation_context_fingerprint": (assessment.source_evaluation_context_fingerprint),
         "source_b_fingerprint": assessment.source_b_fingerprint,
         "observed_demand_fingerprint": assessment.observed_demand_fingerprint,
         "authoritative_b_evaluation_fingerprint": (
             assessment.authoritative_b_evaluation_fingerprint
         ),
-        "evaluation_policy": _jsonable(asdict(evaluation_policy)),
-        "adjustment_policy": _policy_payload(adjustment_policy),
+        "adjustment_decision_policy_fingerprint": (
+            assessment.adjustment_decision_policy_fingerprint
+        ),
         "block_metrics": _jsonable([asdict(item) for item in assessment.block_evidence]),
         "joint_donor_evidence": _jsonable(
             [asdict(item) for item in assessment.joint_donor_evidence]
@@ -1859,27 +1636,22 @@ def _fingerprint_payload(
         "maximum_supported_reduction_quantity": (assessment.maximum_supported_reduction_quantity),
         "primary_decision": assessment.primary_decision.value,
         "reason_codes": list(assessment.reason_codes),
+        "explanation": assessment.explanation,
+        "evidence": list(assessment.evidence),
         "limitations": list(assessment.limitations),
-        "heuristic_authorized": assessment.heuristic_authorized,
-        "authorized_generation_action": assessment.authorized_generation_action,
     }
 
 
 def evaluate_service_adjustment_need_v1(
-    context: ScheduleGenerationContextV1,
-    policy: ServiceAdjustmentPolicyV1 | None = None,
-    repeatability_evidence: RepeatabilityEvidenceV1 | None = None,
+    context: ServiceAdjustmentEvaluationContextV1,
 ) -> ServiceAdjustmentAssessmentV1:
-    """Evaluate quantitative service-adjustment need without mutating or generating a timetable."""
-    from .problem_validation import validate_schedule_generation_context_v1
-
-    effective_policy = _effective_policy(policy, context.evaluation_policy)
-    policy_fingerprint = canonical_sha256(_policy_payload(effective_policy))
-    context_validation = validate_schedule_generation_context_v1(context)
-    context_issue_codes = tuple(issue.code for issue in context_validation.issues)
+    """Evaluate quantitative need from validated pre-problem authority."""
+    ensure_valid_service_adjustment_evaluation_context_v1(context)
+    effective_policy = context.decision_policy
+    repeatability_evidence = context.repeatability_evidence
     coverage = _coverage(context)
     blocks = _block_evidence(context)
-    technical = _technical_evidence(context, context_issue_codes)
+    technical = _technical_evidence(context)
     blocks, joint_donors = _joint_donor_validation(
         context.normalized_inputs.scenario_b,
         blocks,
@@ -1908,28 +1680,6 @@ def evaluate_service_adjustment_need_v1(
     if coverage.mode == DemandCoverageModeV1.COMBINED_ONLY:
         reasons.append(DIRECTIONAL_ACTION_NOT_SUPPORTED_BY_COMBINED_DEMAND)
         limitations.append("Combined-only demand is not divided or duplicated across directions.")
-    if context_issue_codes:
-        reasons.append(ADJUSTMENT_DECISION_DATA_INSUFFICIENT)
-        reasons.extend(context_issue_codes)
-
-    ceiling_policy_mismatch = (
-        effective_policy.planning_load_factor_ceiling
-        != context.evaluation_policy.planning_load_factor_ceiling
-        or effective_policy.critical_load_factor_ceiling
-        != context.evaluation_policy.critical_load_factor_ceiling
-        or effective_policy.minimum_authoritative_demand_confidence
-        != context.evaluation_policy.minimum_authoritative_demand_confidence
-    )
-    if ceiling_policy_mismatch:
-        reasons.extend(
-            (
-                ADJUSTMENT_DECISION_DATA_INSUFFICIENT,
-                "ADJUSTMENT_POLICY_EVALUATION_AUTHORITY_MISMATCH",
-            )
-        )
-        limitations.append(
-            "Adjustment ceilings/confidence must match the authoritative B evaluation policy."
-        )
 
     if technical.issue_codes:
         reasons.extend(technical.issue_codes)
@@ -2001,13 +1751,7 @@ def evaluate_service_adjustment_need_v1(
             maximum_reduction = joint_reduction.proven_supported_quantity
         reasons.extend(repeatability_reasons)
 
-    if context_issue_codes or ceiling_policy_mismatch:
-        decision = ServiceAdjustmentDecisionV1.INSUFFICIENT_DATA
-        explanation = (
-            "The authoritative generation context or evaluation policy cannot support "
-            "a V1-D1 decision."
-        )
-    elif (
+    if (
         context.b_evaluation.evaluation.disposition == BDisposition.PARAMETERS_INFEASIBLE
         or not technical.technically_feasible
     ):
@@ -2083,22 +1827,6 @@ def evaluate_service_adjustment_need_v1(
             "gates pass without a supported adjustment."
         )
 
-    heuristic_authorized, authorized_action = _fixed_resource_authorization(
-        decision=decision,
-        context=context,
-        coverage=coverage,
-        technical=technical,
-        policy=effective_policy,
-        donor_capacity_sufficient=donor_capacity_sufficient,
-        headway_respace_possible=headway_respace_possible,
-    )
-    if heuristic_authorized:
-        reasons.append(CURRENT_SOLVER_CAN_IMPLEMENT)
-    elif decision == ServiceAdjustmentDecisionV1.KEEP_CURRENT_TIMETABLE:
-        reasons.append("NO_GENERATION_REQUIRED")
-    else:
-        reasons.append(CURRENT_SOLVER_CAPABILITY_INSUFFICIENT)
-
     reason_codes = _deduplicate(reasons)
     normalized_limitations = _deduplicate(limitations)
     evidence = _assessment_evidence(
@@ -2114,11 +1842,11 @@ def evaluate_service_adjustment_need_v1(
         assessment_id="",
         evaluator_fingerprint="",
         evaluator_fingerprint_profile=EVALUATOR_FINGERPRINT_PROFILE,
-        source_problem_fingerprint=context.problem.problem_fingerprint,
-        source_b_fingerprint=context.problem.source_b_fingerprint,
-        observed_demand_fingerprint=context.problem.observed_demand_fingerprint,
-        authoritative_b_evaluation_fingerprint=context.problem.evaluation_fingerprint,
-        adjustment_policy_fingerprint=policy_fingerprint,
+        source_evaluation_context_fingerprint=context.context_fingerprint,
+        source_b_fingerprint=context.source_b_fingerprint,
+        observed_demand_fingerprint=context.observed_demand_fingerprint,
+        authoritative_b_evaluation_fingerprint=(context.authoritative_b_evaluation_fingerprint),
+        adjustment_decision_policy_fingerprint=(context.adjustment_decision_policy_fingerprint),
         primary_decision=decision,
         reason_codes=reason_codes,
         explanation=explanation,
@@ -2133,16 +1861,8 @@ def evaluate_service_adjustment_need_v1(
         joint_reduction_evidence=joint_reduction,
         maximum_supported_reduction_quantity=maximum_reduction,
         limitations=normalized_limitations,
-        heuristic_authorized=heuristic_authorized,
-        authorized_generation_action=authorized_action,
     )
-    fingerprint = canonical_sha256(
-        _fingerprint_payload(
-            assessment,
-            context.evaluation_policy,
-            effective_policy,
-        )
-    )
+    fingerprint = canonical_sha256(_fingerprint_payload(assessment))
     return replace(
         assessment,
         assessment_id=f"ADJUSTMENT-{fingerprint[:16].upper()}",
