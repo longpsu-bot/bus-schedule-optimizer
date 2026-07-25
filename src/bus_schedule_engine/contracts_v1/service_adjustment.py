@@ -73,6 +73,8 @@ CURRENT_SOLVER_CAN_IMPLEMENT = "CURRENT_SOLVER_CAN_IMPLEMENT"
 CURRENT_SOLVER_CAPABILITY_INSUFFICIENT = "CURRENT_SOLVER_CAPABILITY_INSUFFICIENT"
 JOINT_DONOR_CAPACITY_NOT_PROVEN = "JOINT_DONOR_CAPACITY_NOT_PROVEN"
 JOINT_DONOR_SEARCH_LIMIT_REACHED = "JOINT_DONOR_SEARCH_LIMIT_REACHED"
+JOINT_REDUCTION_SEARCH_LIMIT_REACHED = "JOINT_REDUCTION_SEARCH_LIMIT_REACHED"
+JOINT_REDUCTION_MAXIMUM_NOT_PROVEN = "JOINT_REDUCTION_MAXIMUM_NOT_PROVEN"
 RESPACE_DIAGNOSTIC_VALIDATION_FAILED = "RESPACE_DIAGNOSTIC_VALIDATION_FAILED"
 
 _DIRECTION_ORDER = {
@@ -125,6 +127,7 @@ class ServiceAdjustmentPolicyV1:
     minimum_residual_surplus_trips_for_reduction: int = 1
     minimum_service_trips_per_direction: int = 1
     maximum_joint_donor_search_states: int = 10_000
+    maximum_joint_reduction_search_states: int = 10_000
     fixed_resource_solver_adapter: str = HEURISTIC_ADAPTER_ID
     fixed_resource_authorized_decisions: tuple[ServiceAdjustmentDecisionV1, ...] = (
         ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS,
@@ -170,6 +173,8 @@ class ServiceAdjustmentPolicyV1:
             raise ValueError("minimum_service_trips_per_direction must be positive")
         if self.maximum_joint_donor_search_states < 1:
             raise ValueError("maximum_joint_donor_search_states must be positive")
+        if self.maximum_joint_reduction_search_states < 1:
+            raise ValueError("maximum_joint_reduction_search_states must be positive")
         if not self.fixed_resource_solver_adapter.strip():
             raise ValueError("fixed_resource_solver_adapter is required")
         if len(set(self.fixed_resource_authorized_decisions)) != len(
@@ -320,6 +325,19 @@ class JointDonorValidationEvidenceV1:
 
 
 @dataclass(frozen=True, slots=True)
+class JointReductionValidationEvidenceV1:
+    candidate_trip_ids: tuple[str, ...]
+    selected_jointly_feasible_trip_ids: tuple[str, ...]
+    requested_upper_bound: int
+    proven_supported_quantity: int
+    maximum_proven: bool
+    search_complete: bool
+    search_state_count: int
+    search_state_limit: int
+    issue_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class DailyAdjustmentEvidenceV1:
     fully_supported: bool
     current_daily_trips: int
@@ -438,6 +456,7 @@ class ServiceAdjustmentAssessmentV1:
     headway_evidence: tuple[HeadwayRegimeEvidenceV1, ...]
     technical_evidence: TechnicalAdjustmentEvidenceV1
     repeatability_evidence: RepeatabilityEvidenceV1 | None
+    joint_reduction_evidence: JointReductionValidationEvidenceV1 | None
     maximum_supported_reduction_quantity: int
     limitations: tuple[str, ...]
     heuristic_authorized: bool
@@ -503,6 +522,7 @@ def _policy_payload(policy: ServiceAdjustmentPolicyV1) -> dict[str, object]:
         ),
         "minimum_service_trips_per_direction": policy.minimum_service_trips_per_direction,
         "maximum_joint_donor_search_states": policy.maximum_joint_donor_search_states,
+        "maximum_joint_reduction_search_states": (policy.maximum_joint_reduction_search_states),
         "fixed_resource_solver_adapter": policy.fixed_resource_solver_adapter,
         "fixed_resource_authorized_decisions": [
             item.value for item in policy.fixed_resource_authorized_decisions
@@ -1153,21 +1173,6 @@ def _endpoint_preserved_after_removal(
     return min(same_terminal) == expected_first and max(same_terminal) == expected_last
 
 
-def _scenario_without_trip(
-    scenario: ScenarioBInput,
-    trip_id: str,
-) -> ScenarioBInput:
-    timetable = tuple(item for item in scenario.exact_timetable if item.trip_id != trip_id)
-    outbound = sum(item.direction == ContractDirection.OUTBOUND for item in timetable)
-    inbound = sum(item.direction == ContractDirection.INBOUND for item in timetable)
-    return replace(
-        scenario,
-        exact_timetable=timetable,
-        total_daily_trips=len(timetable),
-        trips_by_direction=TripsByDirection(outbound=outbound, inbound=inbound),
-    )
-
-
 def _scenario_without_trips(
     scenario: ScenarioBInput,
     trip_ids: tuple[str, ...],
@@ -1369,51 +1374,288 @@ def _maximum_repeatably_supported_surplus(
     return supported
 
 
-def _maximum_technically_supported_reduction(
+def _reduction_candidates(
     scenario: ScenarioBInput,
     blocks: tuple[BlockAdjustmentEvidenceV1, ...],
-    requested_quantity: int,
     policy: ServiceAdjustmentPolicyV1,
-) -> int:
-    if requested_quantity <= 0:
-        return 0
-    current = scenario
-    accepted = 0
-    while accepted < requested_quantity:
-        candidate: ExactTimetableTrip | None = None
-        for trip in sorted(
-            current.exact_timetable,
-            key=lambda item: (
-                _DIRECTION_ORDER[item.direction],
-                item.departure_time,
-                item.trip_id,
-            ),
+) -> tuple[ExactTimetableTrip, ...]:
+    surplus_blocks = tuple(block for block in blocks if block.potential_surplus_trips > 0)
+    seen_ids: set[str] = set()
+    candidates: list[ExactTimetableTrip] = []
+    for trip in sorted(
+        scenario.exact_timetable,
+        key=lambda item: (
+            _DIRECTION_ORDER[item.direction],
+            item.departure_time,
+            item.trip_id,
+        ),
+    ):
+        if not trip.trip_id.strip() or trip.trip_id in seen_ids:
+            continue
+        seen_ids.add(trip.trip_id)
+        if not any(_trip_in_block(trip, block) for block in surplus_blocks):
+            continue
+        if not _endpoint_preserved_after_removal(scenario, trip):
+            continue
+        remaining_outbound = scenario.trips_by_direction.outbound - (
+            trip.direction == ContractDirection.OUTBOUND
+        )
+        remaining_inbound = scenario.trips_by_direction.inbound - (
+            trip.direction == ContractDirection.INBOUND
+        )
+        if (
+            remaining_outbound < policy.minimum_service_trips_per_direction
+            or remaining_inbound < policy.minimum_service_trips_per_direction
         ):
-            if not _endpoint_preserved_after_removal(current, trip):
-                continue
-            trial = _scenario_without_trip(current, trip.trip_id)
-            if (
-                trial.trips_by_direction.outbound < policy.minimum_service_trips_per_direction
-                or trial.trips_by_direction.inbound < policy.minimum_service_trips_per_direction
-            ):
-                continue
-            if not validate_scenario_input(trial).passed:
-                continue
-            if any(
-                sum(_trip_in_block(item, block) for item in trial.exact_timetable)
-                < block.required_trips_at_planning_ceiling
-                for block in blocks
-            ):
-                continue
-            if not assess_scenario_b_fleet_v1(trial).feasible:
-                continue
-            candidate = trip
-            current = trial
-            accepted += 1
+            continue
+        candidates.append(trip)
+    return tuple(candidates)
+
+
+def _retained_explicit_assignment_is_feasible(scenario: ScenarioBInput) -> bool:
+    assigned = tuple(trip for trip in scenario.exact_timetable if trip.vehicle_assignment)
+    by_vehicle: dict[str, list[ExactTimetableTrip]] = {}
+    for trip in assigned:
+        assert trip.vehicle_assignment is not None
+        by_vehicle.setdefault(trip.vehicle_assignment, []).append(trip)
+    for vehicle_id in sorted(by_vehicle):
+        trips = sorted(
+            by_vehicle[vehicle_id],
+            key=lambda item: (item.departure_time, item.trip_id),
+        )
+        for previous, current in zip(trips, trips[1:], strict=False):
+            arrival_terminal = (
+                DepartureTerminal.TERMINAL_2
+                if previous.departure_terminal == DepartureTerminal.TERMINAL_1
+                else DepartureTerminal.TERMINAL_1
+            )
+            if current.departure_terminal != arrival_terminal:
+                return False
+            turnaround = (
+                scenario.turnaround_minutes.terminal_1
+                if arrival_terminal == DepartureTerminal.TERMINAL_1
+                else scenario.turnaround_minutes.terminal_2
+            )
+            if current.departure_time < previous.resolved_arrival_time + turnaround * 60:
+                return False
+    return True
+
+
+def _reduction_set_is_jointly_feasible(
+    scenario: ScenarioBInput,
+    trip_ids: tuple[str, ...],
+    blocks: tuple[BlockAdjustmentEvidenceV1, ...],
+    policy: ServiceAdjustmentPolicyV1,
+) -> bool:
+    source_by_id = {trip.trip_id: trip for trip in scenario.exact_timetable}
+    if (
+        len(source_by_id) != len(scenario.exact_timetable)
+        or len(set(trip_ids)) != len(trip_ids)
+        or any(trip_id not in source_by_id for trip_id in trip_ids)
+    ):
+        return False
+    trial = _scenario_without_trips(scenario, trip_ids)
+    expected_retained_ids = set(source_by_id).difference(trip_ids)
+    retained_by_id = {trip.trip_id: trip for trip in trial.exact_timetable}
+    if (
+        len(retained_by_id) != len(trial.exact_timetable)
+        or set(retained_by_id) != expected_retained_ids
+        or len(trial.exact_timetable) != len(scenario.exact_timetable) - len(trip_ids)
+    ):
+        return False
+
+    for terminal, expected_first, expected_last in (
+        (
+            DepartureTerminal.TERMINAL_1,
+            scenario.first_departures.terminal_1,
+            scenario.last_departures.terminal_1,
+        ),
+        (
+            DepartureTerminal.TERMINAL_2,
+            scenario.first_departures.terminal_2,
+            scenario.last_departures.terminal_2,
+        ),
+    ):
+        times = tuple(
+            trip.departure_time
+            for trip in trial.exact_timetable
+            if trip.departure_terminal == terminal
+        )
+        if not times or min(times) != expected_first or max(times) != expected_last:
+            return False
+    if (
+        trial.trips_by_direction.outbound < policy.minimum_service_trips_per_direction
+        or trial.trips_by_direction.inbound < policy.minimum_service_trips_per_direction
+    ):
+        return False
+
+    for block in blocks:
+        remaining_count = sum(_trip_in_block(trip, block) for trip in trial.exact_timetable)
+        if remaining_count < block.required_trips_at_planning_ceiling:
+            return False
+        if block.passenger_demand > 0 and remaining_count == 0:
+            return False
+        remaining_load_factor = (
+            block.passenger_demand / (remaining_count * scenario.vehicle_capacity)
+            if remaining_count
+            else None
+        )
+        if remaining_load_factor is not None and (
+            remaining_load_factor > policy.planning_load_factor_ceiling
+            or remaining_load_factor > policy.critical_load_factor_ceiling
+        ):
+            return False
+
+    if not validate_scenario_input(trial).passed:
+        return False
+    for trip_id, retained in retained_by_id.items():
+        source = source_by_id[trip_id]
+        if (
+            retained.direction != source.direction
+            or retained.departure_terminal != source.departure_terminal
+            or retained.departure_time != source.departure_time
+            or retained.runtime_minutes != source.runtime_minutes
+            or retained.resolved_arrival_time
+            != retained.departure_time + source.runtime_minutes * 60
+        ):
+            return False
+    if not _retained_explicit_assignment_is_feasible(trial):
+        return False
+
+    try:
+        assignment = assign_contract_v1_fleet(
+            _raw_b_trips(trial),
+            scenario.exact_timetable,
+            trial.turnaround_minutes,
+            trial.available_fleet_limit,
+        )
+    except ContractFleetAssignmentError:
+        return False
+    if not assignment.feasible or assignment.vehicle_count > trial.available_fleet_limit:
+        return False
+
+    fleet = assess_scenario_b_fleet_v1(trial)
+    return not (
+        not fleet.feasible
+        or fleet.minimum_required_fleet > trial.available_fleet_limit
+        or any(
+            event.stock_before < 0 or event.stock_after < 0
+            for event in (*fleet.terminal_1_events, *fleet.terminal_2_events)
+        )
+    )
+
+
+def _joint_reduction_validation(
+    scenario: ScenarioBInput,
+    blocks: tuple[BlockAdjustmentEvidenceV1, ...],
+    current_surplus: int,
+    repeatably_supported_surplus: int,
+    policy: ServiceAdjustmentPolicyV1,
+) -> JointReductionValidationEvidenceV1:
+    candidate_ids = tuple(trip.trip_id for trip in _reduction_candidates(scenario, blocks, policy))
+    upper_bound = min(
+        current_surplus,
+        repeatably_supported_surplus,
+        len(candidate_ids),
+    )
+    state_limit = policy.maximum_joint_reduction_search_states
+    if upper_bound <= 0:
+        return JointReductionValidationEvidenceV1(
+            candidate_trip_ids=candidate_ids,
+            selected_jointly_feasible_trip_ids=(),
+            requested_upper_bound=upper_bound,
+            proven_supported_quantity=0,
+            maximum_proven=True,
+            search_complete=True,
+            search_state_count=0,
+            search_state_limit=state_limit,
+            issue_codes=(),
+        )
+
+    tested: set[tuple[str, ...]] = set()
+    state_count = 0
+    lower_bound: tuple[str, ...] = ()
+
+    # Seed a useful lower bound before the descending maximum-proof pass. The
+    # seed is never reported as a maximum unless every larger quantity is
+    # subsequently exhausted.
+    for trip_id in candidate_ids:
+        candidate_set = (trip_id,)
+        if state_count >= state_limit:
             break
-        if candidate is None:
+        tested.add(candidate_set)
+        state_count += 1
+        if _reduction_set_is_jointly_feasible(
+            scenario,
+            candidate_set,
+            blocks,
+            policy,
+        ):
+            lower_bound = candidate_set
             break
-    return accepted
+
+    for quantity in range(upper_bound, 0, -1):
+        if quantity == len(lower_bound):
+            return JointReductionValidationEvidenceV1(
+                candidate_trip_ids=candidate_ids,
+                selected_jointly_feasible_trip_ids=lower_bound,
+                requested_upper_bound=upper_bound,
+                proven_supported_quantity=quantity,
+                maximum_proven=True,
+                search_complete=True,
+                search_state_count=state_count,
+                search_state_limit=state_limit,
+                issue_codes=(),
+            )
+        for candidate_set in combinations(candidate_ids, quantity):
+            if candidate_set in tested:
+                continue
+            if state_count >= state_limit:
+                return JointReductionValidationEvidenceV1(
+                    candidate_trip_ids=candidate_ids,
+                    selected_jointly_feasible_trip_ids=lower_bound,
+                    requested_upper_bound=upper_bound,
+                    proven_supported_quantity=len(lower_bound),
+                    maximum_proven=False,
+                    search_complete=False,
+                    search_state_count=state_count,
+                    search_state_limit=state_limit,
+                    issue_codes=(
+                        JOINT_REDUCTION_SEARCH_LIMIT_REACHED,
+                        JOINT_REDUCTION_MAXIMUM_NOT_PROVEN,
+                    ),
+                )
+            tested.add(candidate_set)
+            state_count += 1
+            if _reduction_set_is_jointly_feasible(
+                scenario,
+                candidate_set,
+                blocks,
+                policy,
+            ):
+                return JointReductionValidationEvidenceV1(
+                    candidate_trip_ids=candidate_ids,
+                    selected_jointly_feasible_trip_ids=candidate_set,
+                    requested_upper_bound=upper_bound,
+                    proven_supported_quantity=quantity,
+                    maximum_proven=True,
+                    search_complete=True,
+                    search_state_count=state_count,
+                    search_state_limit=state_limit,
+                    issue_codes=(),
+                )
+
+    return JointReductionValidationEvidenceV1(
+        candidate_trip_ids=candidate_ids,
+        selected_jointly_feasible_trip_ids=(),
+        requested_upper_bound=upper_bound,
+        proven_supported_quantity=0,
+        maximum_proven=True,
+        search_complete=True,
+        search_state_count=state_count,
+        search_state_limit=state_limit,
+        issue_codes=(),
+    )
 
 
 def _repeatability_gate(
@@ -1422,12 +1664,16 @@ def _repeatability_gate(
     current_surplus: int,
     scenario: ScenarioBInput,
     blocks: tuple[BlockAdjustmentEvidenceV1, ...],
-) -> tuple[bool, int, tuple[str, ...]]:
+) -> tuple[
+    bool,
+    JointReductionValidationEvidenceV1 | None,
+    tuple[str, ...],
+]:
     reasons: list[str] = []
     if evidence is None:
         return (
             False,
-            0,
+            None,
             (
                 LOW_LOAD_REVIEW_ONLY,
                 INSUFFICIENT_DAYS_FOR_REDUCTION_DECISION,
@@ -1445,28 +1691,31 @@ def _repeatability_gate(
     )
     if not policy_matches:
         reasons.extend(("REPEATABILITY_EVIDENCE_POLICY_MISMATCH", LOW_LOAD_REVIEW_ONLY))
-        return False, 0, tuple(reasons)
+        return False, None, tuple(reasons)
     if evidence.valid_observed_day_count < policy.minimum_valid_observed_days_for_reduction:
         reasons.extend((INSUFFICIENT_DAYS_FOR_REDUCTION_DECISION, LOW_LOAD_REVIEW_ONLY))
-        return False, 0, tuple(reasons)
+        return False, None, tuple(reasons)
     if evidence.surplus_consistency_rate < policy.minimum_surplus_consistency_rate:
         reasons.extend(("SURPLUS_CONSISTENCY_RATE_BELOW_REQUIRED", LOW_LOAD_REVIEW_ONLY))
-        return False, 0, tuple(reasons)
+        return False, None, tuple(reasons)
     repeatable_quantity = _maximum_repeatably_supported_surplus(
         evidence,
         policy.minimum_surplus_consistency_rate,
     )
-    requested = min(current_surplus, repeatable_quantity)
-    technical_quantity = _maximum_technically_supported_reduction(
+    proof = _joint_reduction_validation(
         scenario,
         blocks,
-        requested,
+        current_surplus,
+        repeatable_quantity,
         policy,
     )
-    if technical_quantity < policy.minimum_residual_surplus_trips_for_reduction:
+    if not proof.maximum_proven or not proof.search_complete:
+        reasons.extend((*proof.issue_codes, LOW_LOAD_REVIEW_ONLY))
+        return False, proof, tuple(reasons)
+    if proof.proven_supported_quantity < policy.minimum_residual_surplus_trips_for_reduction:
         reasons.extend(("REDUCTION_TECHNICAL_PROTECTION_NOT_SATISFIED", LOW_LOAD_REVIEW_ONLY))
-        return False, technical_quantity, tuple(reasons)
-    return True, technical_quantity, (STABLE_RESIDUAL_TRIP_SURPLUS,)
+        return False, proof, tuple(reasons)
+    return True, proof, (STABLE_RESIDUAL_TRIP_SURPLUS,)
 
 
 def _fixed_resource_authorization(
@@ -1514,6 +1763,7 @@ def _assessment_evidence(
     allocation: tuple[DirectionalAllocationEvidenceV1, ...],
     headways: tuple[HeadwayRegimeEvidenceV1, ...],
     technical: TechnicalAdjustmentEvidenceV1,
+    joint_reduction: JointReductionValidationEvidenceV1 | None,
 ) -> tuple[str, ...]:
     output = [
         f"daily.current_trips={daily.current_daily_trips}",
@@ -1560,6 +1810,16 @@ def _assessment_evidence(
             f"{technical.minimum_turnaround_margin_minutes}",
         )
     )
+    if joint_reduction is not None:
+        output.append(
+            "reduction:"
+            f"upper_bound={joint_reduction.requested_upper_bound},"
+            f"proven_quantity={joint_reduction.proven_supported_quantity},"
+            f"maximum_proven={str(joint_reduction.maximum_proven).lower()},"
+            f"selected={list(joint_reduction.selected_jointly_feasible_trip_ids)},"
+            f"states={joint_reduction.search_state_count},"
+            f"complete={str(joint_reduction.search_complete).lower()}"
+        )
     return tuple(output)
 
 
@@ -1589,6 +1849,11 @@ def _fingerprint_payload(
         "repeatability_evidence": (
             _jsonable(asdict(assessment.repeatability_evidence))
             if assessment.repeatability_evidence is not None
+            else None
+        ),
+        "joint_reduction_evidence": (
+            _jsonable(asdict(assessment.joint_reduction_evidence))
+            if assessment.joint_reduction_evidence is not None
             else None
         ),
         "maximum_supported_reduction_quantity": (assessment.maximum_supported_reduction_quantity),
@@ -1715,6 +1980,7 @@ def evaluate_service_adjustment_need_v1(
     )
 
     repeatability_passed = False
+    joint_reduction: JointReductionValidationEvidenceV1 | None = None
     maximum_reduction = 0
     repeatability_reasons: tuple[str, ...] = ()
     if (
@@ -1724,13 +1990,15 @@ def evaluate_service_adjustment_need_v1(
         and daily.no_service_with_demand_block_count == 0
         and daily.critical_block_count == 0
     ):
-        repeatability_passed, maximum_reduction, repeatability_reasons = _repeatability_gate(
+        repeatability_passed, joint_reduction, repeatability_reasons = _repeatability_gate(
             repeatability_evidence,
             effective_policy,
             -daily.daily_trip_gap,
             context.normalized_inputs.scenario_b,
             blocks,
         )
+        if joint_reduction is not None and joint_reduction.maximum_proven:
+            maximum_reduction = joint_reduction.proven_supported_quantity
         reasons.extend(repeatability_reasons)
 
     if context_issue_codes or ceiling_policy_mismatch:
@@ -1840,6 +2108,7 @@ def evaluate_service_adjustment_need_v1(
         allocation=allocation,
         headways=headways,
         technical=technical,
+        joint_reduction=joint_reduction,
     )
     assessment = ServiceAdjustmentAssessmentV1(
         assessment_id="",
@@ -1861,6 +2130,7 @@ def evaluate_service_adjustment_need_v1(
         headway_evidence=headways,
         technical_evidence=technical,
         repeatability_evidence=repeatability_evidence,
+        joint_reduction_evidence=joint_reduction,
         maximum_supported_reduction_quantity=maximum_reduction,
         limitations=normalized_limitations,
         heuristic_authorized=heuristic_authorized,
@@ -1889,6 +2159,7 @@ __all__ = [
     "HeadwayRegimeEvidenceV1",
     "HeadwayRegularityClassificationV1",
     "JointDonorValidationEvidenceV1",
+    "JointReductionValidationEvidenceV1",
     "RepeatabilityDayEvidenceV1",
     "RepeatabilityEvidenceV1",
     "RespaceDiagnosticEvidenceV1",

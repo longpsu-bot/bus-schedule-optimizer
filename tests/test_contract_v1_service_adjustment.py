@@ -231,6 +231,26 @@ def _repeatability(
     )
 
 
+def _non_greedy_reduction_context(
+    second_block_passengers: float,
+):
+    return _context(
+        (
+            (ContractDirection.COMBINED, 360, 420, 255),
+            (ContractDirection.COMBINED, 420, 480, second_block_passengers),
+        ),
+        outbound_times=(360, 380, 410, 450),
+        inbound_times=(365, 385, 455),
+        fleet_limit=4,
+        vehicle_assignments={
+            "OUT-01": "BUS-01",
+            "IN-02": "BUS-01",
+            "OUT-03": "BUS-01",
+            "IN-03": "BUS-01",
+        },
+    )
+
+
 def test_exact_load_factor_and_required_trip_ceilings() -> None:
     policy = ScenarioBEvaluationPolicyV1(
         planning_load_factor_ceiling=0.80,
@@ -434,8 +454,134 @@ def test_sufficient_repeatability_supports_bounded_reduction() -> None:
 
     assert result.primary_decision == ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
     assert result.maximum_supported_reduction_quantity == 3
+    assert result.joint_reduction_evidence is not None
+    assert result.joint_reduction_evidence.search_complete
+    assert result.joint_reduction_evidence.maximum_proven
+    assert result.joint_reduction_evidence.selected_jointly_feasible_trip_ids == (
+        "OUT-02",
+        "OUT-03",
+        "IN-02",
+    )
+    assert (
+        result.joint_reduction_evidence.proven_supported_quantity
+        == result.maximum_supported_reduction_quantity
+    )
     assert "STABLE_RESIDUAL_TRIP_SURPLUS" in result.reason_codes
     assert not result.heuristic_authorized
+
+
+def test_intermediate_assigned_trip_removal_breaks_retained_vehicle_chain() -> None:
+    context = _context(
+        _directional_rows((170, 170), (85, 170)),
+        vehicle_assignments={
+            "OUT-01": "BUS-01",
+            "IN-02": "BUS-01",
+            "OUT-03": "BUS-01",
+        },
+    )
+
+    result = evaluate_service_adjustment_need_v1(
+        context,
+        repeatability_evidence=_repeatability((1, 1, 1)),
+    )
+    proof = result.joint_reduction_evidence
+
+    assert result.technical_evidence.technically_feasible
+    assert proof is not None
+    assert proof.candidate_trip_ids == ("IN-02",)
+    assert proof.selected_jointly_feasible_trip_ids == ()
+    assert proof.search_complete and proof.maximum_proven
+    assert proof.proven_supported_quantity == 0
+    assert result.primary_decision != ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
+    assert "REDUCTION_TECHNICAL_PROTECTION_NOT_SATISFIED" in result.reason_codes
+
+
+def test_joint_reduction_search_proves_non_greedy_pair_is_true_maximum() -> None:
+    result = evaluate_service_adjustment_need_v1(
+        _non_greedy_reduction_context(170),
+        repeatability_evidence=_repeatability((2, 2, 2)),
+    )
+    proof = result.joint_reduction_evidence
+
+    assert proof is not None
+    assert proof.candidate_trip_ids == ("OUT-02", "OUT-03", "IN-02")
+    # The singleton seed accepts OUT-02. Both pairs containing it break the
+    # retained BUS-01 chain, while OUT-03 + IN-02 removes both intermediates.
+    assert proof.selected_jointly_feasible_trip_ids == ("OUT-03", "IN-02")
+    assert proof.requested_upper_bound == 2
+    assert proof.search_state_count == 4
+    assert proof.search_complete and proof.maximum_proven
+    assert proof.proven_supported_quantity == 2
+    assert result.maximum_supported_reduction_quantity == 2
+    assert result.primary_decision == ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
+
+
+def test_joint_reduction_exhausts_quantity_three_before_proving_two() -> None:
+    result = evaluate_service_adjustment_need_v1(
+        _non_greedy_reduction_context(85),
+        repeatability_evidence=_repeatability((3, 3, 3)),
+    )
+    proof = result.joint_reduction_evidence
+
+    assert proof is not None
+    assert proof.requested_upper_bound == 3
+    assert proof.selected_jointly_feasible_trip_ids == ("OUT-03", "IN-02")
+    # One singleton seed, the only triple, and all three deterministic pairs.
+    assert proof.search_state_count == 5
+    assert proof.search_complete and proof.maximum_proven
+    assert proof.proven_supported_quantity == 2
+    assert result.maximum_supported_reduction_quantity == 2
+
+
+def test_joint_reduction_search_limit_never_exposes_lower_bound_as_maximum() -> None:
+    context = _context(_directional_rows((85, 85), (85, 85)))
+    complete = evaluate_service_adjustment_need_v1(
+        context,
+        repeatability_evidence=_repeatability(),
+    )
+    limited = evaluate_service_adjustment_need_v1(
+        context,
+        policy=ServiceAdjustmentPolicyV1(maximum_joint_reduction_search_states=1),
+        repeatability_evidence=_repeatability(),
+    )
+    proof = limited.joint_reduction_evidence
+
+    assert proof is not None
+    assert proof.selected_jointly_feasible_trip_ids == ("OUT-02",)
+    assert proof.proven_supported_quantity == 1
+    assert proof.search_state_count == proof.search_state_limit == 1
+    assert not proof.search_complete
+    assert not proof.maximum_proven
+    assert "JOINT_REDUCTION_SEARCH_LIMIT_REACHED" in proof.issue_codes
+    assert "JOINT_REDUCTION_MAXIMUM_NOT_PROVEN" in limited.reason_codes
+    assert "LOW_LOAD_REVIEW_ONLY" in limited.reason_codes
+    assert limited.maximum_supported_reduction_quantity == 0
+    assert limited.primary_decision != ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
+    assert not limited.heuristic_authorized
+    assert complete.evaluator_fingerprint != limited.evaluator_fingerprint
+
+
+def test_joint_reduction_can_prove_no_positive_feasible_quantity() -> None:
+    context = _context(
+        _directional_rows((0, 85), (0, 85)),
+        outbound_times=(360, 420),
+        inbound_times=(365, 425),
+    )
+
+    result = evaluate_service_adjustment_need_v1(
+        context,
+        repeatability_evidence=_repeatability((2, 2, 2)),
+    )
+    proof = result.joint_reduction_evidence
+
+    assert proof is not None
+    assert proof.candidate_trip_ids == ()
+    assert proof.requested_upper_bound == 0
+    assert proof.search_complete and proof.maximum_proven
+    assert proof.proven_supported_quantity == 0
+    assert result.maximum_supported_reduction_quantity == 0
+    assert result.primary_decision != ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
+    assert "REDUCTION_TECHNICAL_PROTECTION_NOT_SATISFIED" in result.reason_codes
 
 
 def test_locally_deficient_historical_day_does_not_support_reduction() -> None:
@@ -779,6 +925,53 @@ def test_repeatability_change_changes_evaluator_fingerprint() -> None:
     assert first.evaluator_fingerprint != second.evaluator_fingerprint
 
 
+def test_selected_reduction_set_and_maximum_outcome_bind_fingerprint() -> None:
+    rows = (
+        (ContractDirection.COMBINED, 360, 420, 255),
+        (ContractDirection.COMBINED, 420, 480, 170),
+    )
+    constrained = evaluate_service_adjustment_need_v1(
+        _non_greedy_reduction_context(170),
+        repeatability_evidence=_repeatability((2, 2, 2)),
+    )
+    unconstrained = evaluate_service_adjustment_need_v1(
+        _context(
+            rows,
+            outbound_times=(360, 380, 410, 450),
+            inbound_times=(365, 385, 455),
+            fleet_limit=4,
+        ),
+        repeatability_evidence=_repeatability((2, 2, 2)),
+    )
+    rejected = evaluate_service_adjustment_need_v1(
+        _context(
+            _directional_rows((170, 170), (85, 170)),
+            vehicle_assignments={
+                "OUT-01": "BUS-01",
+                "IN-02": "BUS-01",
+                "OUT-03": "BUS-01",
+            },
+        ),
+        repeatability_evidence=_repeatability((1, 1, 1)),
+    )
+
+    assert constrained.joint_reduction_evidence is not None
+    assert unconstrained.joint_reduction_evidence is not None
+    assert rejected.joint_reduction_evidence is not None
+    assert (
+        constrained.joint_reduction_evidence.selected_jointly_feasible_trip_ids
+        != unconstrained.joint_reduction_evidence.selected_jointly_feasible_trip_ids
+    )
+    assert (
+        constrained.joint_reduction_evidence.maximum_proven
+        != rejected.joint_reduction_evidence.maximum_proven
+        or constrained.joint_reduction_evidence.proven_supported_quantity
+        != rejected.joint_reduction_evidence.proven_supported_quantity
+    )
+    assert constrained.evaluator_fingerprint != unconstrained.evaluator_fingerprint
+    assert constrained.evaluator_fingerprint != rejected.evaluator_fingerprint
+
+
 def test_import_time_and_unrelated_source_notes_do_not_change_fingerprint() -> None:
     rows = _directional_rows((170, 170), (170, 170))
     first_context = _context(rows)
@@ -807,11 +1000,15 @@ def test_policy_change_changes_policy_and_evaluator_fingerprints() -> None:
 
 
 def test_context_and_scenario_b_are_not_mutated() -> None:
-    context = _context(_directional_rows((171, 85), (170, 170)))
+    context = _context(_directional_rows((85, 85), (85, 85)))
     before = deepcopy(context)
 
-    evaluate_service_adjustment_need_v1(context)
+    result = evaluate_service_adjustment_need_v1(
+        context,
+        repeatability_evidence=_repeatability(),
+    )
 
+    assert result.primary_decision == ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
     assert context == before
     assert context.normalized_inputs.scenario_b == before.normalized_inputs.scenario_b
     assert context.problem == before.problem
