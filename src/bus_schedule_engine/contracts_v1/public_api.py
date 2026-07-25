@@ -33,6 +33,15 @@ from .models import (
     NormalizedInputBundleV1,
     ObservedDemandInput,
 )
+from .service_adjustment import (
+    RepeatabilityEvidenceV1,
+    ServiceAdjustmentAssessmentV1,
+    ServiceAdjustmentPolicyV1,
+)
+from .service_adjustment import (
+    evaluate_service_adjustment_need_v1 as _evaluate_service_adjustment_need_v1,
+)
+from .solver_models import ScheduleGenerationContextV1
 
 
 def _validate_authoritative_demand_source(
@@ -116,3 +125,16 @@ def evaluate_scenario_b_v1(
         disposition=disposition,
     )
     return replace(result, evaluation=corrected_evaluation)
+
+
+def evaluate_service_adjustment_need_v1(
+    context: ScheduleGenerationContextV1,
+    policy: ServiceAdjustmentPolicyV1 | None = None,
+    repeatability_evidence: RepeatabilityEvidenceV1 | None = None,
+) -> ServiceAdjustmentAssessmentV1:
+    """Return the pure V1-D1 quantitative assessment for authoritative Scenario B."""
+    return _evaluate_service_adjustment_need_v1(
+        context,
+        policy,
+        repeatability_evidence,
+    )
