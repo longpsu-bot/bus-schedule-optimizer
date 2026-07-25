@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import asdict, dataclass, replace
 from enum import Enum, StrEnum
+from itertools import combinations
 from typing import Any
 
 from .demand_coverage import (
@@ -23,7 +24,11 @@ from .evaluation import (
     ScenarioBEvaluationPolicyV1,
     assess_scenario_b_fleet_v1,
 )
-from .fleet_assignment import assign_contract_v1_fleet
+from .fleet_assignment import ContractFleetAssignmentError, assign_contract_v1_fleet
+from .headway_regimes import (
+    ContinuousHeadwayRegimeV1,
+    segment_continuous_headway_regimes_v1,
+)
 from .models import (
     CONTRACT_VERSION,
     ContractDirection,
@@ -33,7 +38,7 @@ from .models import (
     ScenarioBInput,
     TripsByDirection,
 )
-from .serialization import canonical_sha256
+from .serialization import canonical_sha256, scenario_fingerprint
 from .solver_models import (
     BoundaryConvention,
     DirectionTripLockMode,
@@ -66,12 +71,24 @@ NEGATIVE_TERMINAL_STOCK = "NEGATIVE_TERMINAL_STOCK"
 TURNAROUND_MARGIN_NEGATIVE = "TURNAROUND_MARGIN_NEGATIVE"
 CURRENT_SOLVER_CAN_IMPLEMENT = "CURRENT_SOLVER_CAN_IMPLEMENT"
 CURRENT_SOLVER_CAPABILITY_INSUFFICIENT = "CURRENT_SOLVER_CAPABILITY_INSUFFICIENT"
+JOINT_DONOR_CAPACITY_NOT_PROVEN = "JOINT_DONOR_CAPACITY_NOT_PROVEN"
+JOINT_DONOR_SEARCH_LIMIT_REACHED = "JOINT_DONOR_SEARCH_LIMIT_REACHED"
+RESPACE_DIAGNOSTIC_VALIDATION_FAILED = "RESPACE_DIAGNOSTIC_VALIDATION_FAILED"
 
 _DIRECTION_ORDER = {
     ContractDirection.OUTBOUND: 0,
     ContractDirection.INBOUND: 1,
     ContractDirection.COMBINED: 2,
 }
+
+_HeadwayClassificationResult = tuple[
+    float,
+    float | None,
+    float | None,
+    float | None,
+    int,
+    "HeadwayRegularityClassificationV1",
+]
 
 
 class ServiceAdjustmentDecisionV1(StrEnum):
@@ -99,10 +116,15 @@ class ServiceAdjustmentPolicyV1:
     minimum_authoritative_demand_confidence: DemandConfidence = DemandConfidence.MEDIUM
     headway_rounding_tolerance_minutes: int = 1
     required_regular_headway_rate: float = 1.0
+    minimum_sustained_change_intervals: int = 2
+    minimum_material_headway_change_minutes: int = 5
+    minimum_material_service_rate_change_ratio: float = 0.15
+    maximum_headway_regimes_per_direction: int = 6
     minimum_valid_observed_days_for_reduction: int = 3
     minimum_surplus_consistency_rate: float = 0.80
     minimum_residual_surplus_trips_for_reduction: int = 1
     minimum_service_trips_per_direction: int = 1
+    maximum_joint_donor_search_states: int = 10_000
     fixed_resource_solver_adapter: str = HEURISTIC_ADAPTER_ID
     fixed_resource_authorized_decisions: tuple[ServiceAdjustmentDecisionV1, ...] = (
         ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS,
@@ -130,6 +152,14 @@ class ServiceAdjustmentPolicyV1:
             raise ValueError("headway_rounding_tolerance_minutes must be non-negative")
         if not 0 <= self.required_regular_headway_rate <= 1:
             raise ValueError("required_regular_headway_rate must be in [0, 1]")
+        if self.minimum_sustained_change_intervals < 1:
+            raise ValueError("minimum_sustained_change_intervals must be positive")
+        if self.minimum_material_headway_change_minutes < 0:
+            raise ValueError("minimum_material_headway_change_minutes must be non-negative")
+        if not 0 <= self.minimum_material_service_rate_change_ratio <= 1:
+            raise ValueError("minimum material service-rate change must be in [0, 1]")
+        if self.maximum_headway_regimes_per_direction < 1:
+            raise ValueError("maximum_headway_regimes_per_direction must be positive")
         if self.minimum_valid_observed_days_for_reduction < 1:
             raise ValueError("minimum_valid_observed_days_for_reduction must be positive")
         if not 0 < self.minimum_surplus_consistency_rate <= 1:
@@ -138,6 +168,8 @@ class ServiceAdjustmentPolicyV1:
             raise ValueError("minimum_residual_surplus_trips_for_reduction must be positive")
         if self.minimum_service_trips_per_direction < 1:
             raise ValueError("minimum_service_trips_per_direction must be positive")
+        if self.maximum_joint_donor_search_states < 1:
+            raise ValueError("maximum_joint_donor_search_states must be positive")
         if not self.fixed_resource_solver_adapter.strip():
             raise ValueError("fixed_resource_solver_adapter is required")
         if len(set(self.fixed_resource_authorized_decisions)) != len(
@@ -147,53 +179,111 @@ class ServiceAdjustmentPolicyV1:
 
 
 @dataclass(frozen=True, slots=True)
+class RepeatabilityDayEvidenceV1:
+    day_reference: str
+    fully_supported: bool
+    current_daily_trips: int
+    required_daily_trips: int | None
+    shortage_block_count: int
+    no_service_with_demand_block_count: int
+    critical_block_count: int
+    authoritative_evidence_fingerprint: str
+    warning_block_count: int = 0
+
+    def __post_init__(self) -> None:
+        if not self.day_reference.strip():
+            raise ValueError("day_reference is required")
+        if self.current_daily_trips < 0:
+            raise ValueError("current_daily_trips must be non-negative")
+        if self.required_daily_trips is not None and self.required_daily_trips < 0:
+            raise ValueError("required_daily_trips must be non-negative when present")
+        for name, value in (
+            ("shortage_block_count", self.shortage_block_count),
+            ("no_service_with_demand_block_count", self.no_service_with_demand_block_count),
+            ("critical_block_count", self.critical_block_count),
+            ("warning_block_count", self.warning_block_count),
+        ):
+            if value < 0:
+                raise ValueError(f"{name} must be non-negative")
+        if self.fully_supported and self.required_daily_trips is None:
+            raise ValueError("fully supported days require required_daily_trips")
+        if not self.authoritative_evidence_fingerprint.strip():
+            raise ValueError("authoritative_evidence_fingerprint is required")
+
+    @property
+    def daily_surplus_trips(self) -> int:
+        if self.required_daily_trips is None:
+            return 0
+        return max(0, self.current_daily_trips - self.required_daily_trips)
+
+    @property
+    def qualifies_as_surplus_day(self) -> bool:
+        return bool(
+            self.fully_supported
+            and self.required_daily_trips is not None
+            and self.required_daily_trips < self.current_daily_trips
+            and self.shortage_block_count == 0
+            and self.no_service_with_demand_block_count == 0
+            and self.critical_block_count == 0
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class RepeatabilityEvidenceV1:
-    valid_observed_day_count: int
+    days: tuple[RepeatabilityDayEvidenceV1, ...]
     configured_minimum_valid_day_count: int
-    surplus_day_count: int
-    surplus_consistency_rate: float
     configured_minimum_surplus_consistency_rate: float
-    daily_required_trip_sequence: tuple[int, ...]
-    daily_surplus_sequence: tuple[int, ...]
     representative_day_type_or_provenance: str
 
     def __post_init__(self) -> None:
-        if not isinstance(self.daily_required_trip_sequence, tuple) or not isinstance(
-            self.daily_surplus_sequence,
-            tuple,
-        ):
-            raise ValueError("repeatability daily sequences must be immutable tuples")
-        if self.valid_observed_day_count < 0:
-            raise ValueError("valid_observed_day_count must be non-negative")
+        if not isinstance(self.days, tuple):
+            raise ValueError("repeatability days must be an immutable tuple")
         if self.configured_minimum_valid_day_count < 1:
             raise ValueError("configured_minimum_valid_day_count must be positive")
-        if len(self.daily_required_trip_sequence) != self.valid_observed_day_count:
-            raise ValueError("daily_required_trip_sequence length must equal valid day count")
-        if len(self.daily_surplus_sequence) != self.valid_observed_day_count:
-            raise ValueError("daily_surplus_sequence length must equal valid day count")
-        if any(value < 0 for value in self.daily_required_trip_sequence):
-            raise ValueError("daily required trips must be non-negative")
-        if any(value < 0 for value in self.daily_surplus_sequence):
-            raise ValueError("daily surplus values must be non-negative")
-        derived_surplus_days = sum(value > 0 for value in self.daily_surplus_sequence)
-        if self.surplus_day_count != derived_surplus_days:
-            raise ValueError("surplus_day_count must reconcile with daily_surplus_sequence")
-        derived_rate = (
-            derived_surplus_days / self.valid_observed_day_count
-            if self.valid_observed_day_count
-            else 0.0
-        )
-        if not math.isclose(
-            self.surplus_consistency_rate,
-            derived_rate,
-            rel_tol=0,
-            abs_tol=1e-12,
-        ):
-            raise ValueError("surplus_consistency_rate must reconcile with the daily sequence")
         if not 0 < self.configured_minimum_surplus_consistency_rate <= 1:
             raise ValueError("configured minimum surplus consistency must be in (0, 1]")
         if not self.representative_day_type_or_provenance.strip():
             raise ValueError("representative day type or provenance is required")
+        day_references = tuple(day.day_reference for day in self.days)
+        if len(set(day_references)) != len(day_references):
+            raise ValueError("repeatability days may not contain duplicate day references")
+        if day_references != tuple(sorted(day_references)):
+            raise ValueError("repeatability days must use deterministic day-reference order")
+
+    @property
+    def valid_days(self) -> tuple[RepeatabilityDayEvidenceV1, ...]:
+        return tuple(
+            day for day in self.days if day.fully_supported and day.required_daily_trips is not None
+        )
+
+    @property
+    def valid_observed_day_count(self) -> int:
+        return len(self.valid_days)
+
+    @property
+    def surplus_day_count(self) -> int:
+        return sum(day.qualifies_as_surplus_day for day in self.valid_days)
+
+    @property
+    def surplus_consistency_rate(self) -> float:
+        if not self.valid_observed_day_count:
+            return 0.0
+        return self.surplus_day_count / self.valid_observed_day_count
+
+    @property
+    def daily_required_trip_sequence(self) -> tuple[int, ...]:
+        return tuple(
+            day.required_daily_trips
+            for day in self.valid_days
+            if day.required_daily_trips is not None
+        )
+
+    @property
+    def daily_surplus_sequence(self) -> tuple[int, ...]:
+        return tuple(
+            day.daily_surplus_trips if day.qualifies_as_surplus_day else 0
+            for day in self.valid_days
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,7 +305,18 @@ class BlockAdjustmentEvidenceV1:
     source_block_ids: tuple[str, ...]
     donor_eligible: bool
     eligible_donor_trip_ids: tuple[str, ...]
-    maximum_eligible_donor_trips: int
+
+
+@dataclass(frozen=True, slots=True)
+class JointDonorValidationEvidenceV1:
+    direction: ContractDirection
+    shortage_quantity: int
+    candidate_trip_ids: tuple[str, ...]
+    selected_jointly_feasible_trip_ids: tuple[str, ...]
+    proven_joint_capacity: int
+    search_complete: bool
+    search_state_count: int
+    issue_codes: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,6 +351,23 @@ class DirectionalAllocationEvidenceV1:
 
 
 @dataclass(frozen=True, slots=True)
+class RespaceDiagnosticEvidenceV1:
+    diagnostic_scenario_fingerprint: str
+    changed_trip_ids: tuple[str, ...]
+    scenario_validation_issue_codes: tuple[str, ...]
+    operating_lock_issue_codes: tuple[str, ...]
+    runtime_issue_trip_ids: tuple[str, ...]
+    turnaround_or_location_issue_codes: tuple[str, ...]
+    minimum_required_fleet: int
+    available_fleet_limit: int
+    minimum_terminal_stock_terminal_1: int
+    minimum_terminal_stock_terminal_2: int
+    fleet_assignment_vehicle_count: int
+    issue_codes: tuple[str, ...]
+    passed: bool
+
+
+@dataclass(frozen=True, slots=True)
 class HeadwayRegimeEvidenceV1:
     regime_id: str
     direction: ContractDirection
@@ -265,6 +383,7 @@ class HeadwayRegimeEvidenceV1:
     zero_headway_count: int
     regularity_classification: HeadwayRegularityClassificationV1
     respace_technically_possible: bool
+    respace_diagnostic: RespaceDiagnosticEvidenceV1 | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -313,6 +432,7 @@ class ServiceAdjustmentAssessmentV1:
     explanation: str
     evidence: tuple[str, ...]
     block_evidence: tuple[BlockAdjustmentEvidenceV1, ...]
+    joint_donor_evidence: tuple[JointDonorValidationEvidenceV1, ...]
     daily_evidence: DailyAdjustmentEvidenceV1
     allocation_evidence: tuple[DirectionalAllocationEvidenceV1, ...]
     headway_evidence: tuple[HeadwayRegimeEvidenceV1, ...]
@@ -368,6 +488,12 @@ def _policy_payload(policy: ServiceAdjustmentPolicyV1) -> dict[str, object]:
         ),
         "headway_rounding_tolerance_minutes": policy.headway_rounding_tolerance_minutes,
         "required_regular_headway_rate": policy.required_regular_headway_rate,
+        "minimum_sustained_change_intervals": policy.minimum_sustained_change_intervals,
+        "minimum_material_headway_change_minutes": (policy.minimum_material_headway_change_minutes),
+        "minimum_material_service_rate_change_ratio": (
+            policy.minimum_material_service_rate_change_ratio
+        ),
+        "maximum_headway_regimes_per_direction": (policy.maximum_headway_regimes_per_direction),
         "minimum_valid_observed_days_for_reduction": (
             policy.minimum_valid_observed_days_for_reduction
         ),
@@ -376,6 +502,7 @@ def _policy_payload(policy: ServiceAdjustmentPolicyV1) -> dict[str, object]:
             policy.minimum_residual_surplus_trips_for_reduction
         ),
         "minimum_service_trips_per_direction": policy.minimum_service_trips_per_direction,
+        "maximum_joint_donor_search_states": policy.maximum_joint_donor_search_states,
         "fixed_resource_solver_adapter": policy.fixed_resource_solver_adapter,
         "fixed_resource_authorized_decisions": [
             item.value for item in policy.fixed_resource_authorized_decisions
@@ -422,7 +549,6 @@ def _block_evidence(
             source_block_ids=tuple(source_ids.get(plan.block_id, ())),
             donor_eligible=False,
             eligible_donor_trip_ids=(),
-            maximum_eligible_donor_trips=0,
         )
         for plan in context.b_evaluation.b_block_supply
     ]
@@ -514,32 +640,186 @@ def _allocation_evidence(
     return tuple(output)
 
 
-def _balanced_sequence(total_minutes: float, interval_count: int) -> tuple[float, ...]:
-    if interval_count <= 0:
-        return ()
-    if not math.isclose(total_minutes, round(total_minutes), rel_tol=0, abs_tol=1e-12):
-        value = total_minutes / interval_count
-        return tuple(value for _ in range(interval_count))
-    total = int(round(total_minutes))
-    base, remainder = divmod(total, interval_count)
-    accumulator = 0
-    output: list[float] = []
-    for _ in range(interval_count):
-        value = base
-        accumulator += remainder
-        if accumulator >= interval_count:
-            value += 1
-            accumulator -= interval_count
-        output.append(float(value))
-    return tuple(output)
+def _headway_classification(
+    actual: tuple[float, ...],
+    balanced: tuple[float, ...],
+    policy: ServiceAdjustmentPolicyV1,
+) -> _HeadwayClassificationResult:
+    allowed = set(balanced)
+    conforming = sum(
+        any(math.isclose(gap, target, rel_tol=0, abs_tol=1e-12) for target in allowed)
+        for gap in actual
+    )
+    regular_rate = conforming / len(actual) if actual else 1.0
+    minimum = min(actual, default=None)
+    maximum = max(actual, default=None)
+    headway_range = maximum - minimum if minimum is not None and maximum is not None else None
+    zero_count = sum(math.isclose(item, 0.0, rel_tol=0, abs_tol=1e-12) for item in actual)
+    if zero_count:
+        classification = HeadwayRegularityClassificationV1.EXCEPTIONAL
+    elif not actual or (headway_range is not None and math.isclose(headway_range, 0.0)):
+        classification = HeadwayRegularityClassificationV1.REGULAR
+    elif (
+        headway_range is not None
+        and headway_range <= policy.headway_rounding_tolerance_minutes
+        and regular_rate >= policy.required_regular_headway_rate
+    ):
+        classification = HeadwayRegularityClassificationV1.BALANCED_ROUNDING
+    else:
+        classification = HeadwayRegularityClassificationV1.IRREGULAR
+    return regular_rate, minimum, maximum, headway_range, zero_count, classification
+
+
+def _diagnostic_lock_issues(
+    context: ScheduleGenerationContextV1,
+    scenario: ScenarioBInput,
+) -> tuple[str, ...]:
+    from .solver_problem import build_operating_parameter_locks_v1
+
+    problem = context.problem
+    source_fingerprint = problem.source_b_fingerprint
+    core = build_operating_parameter_locks_v1(
+        context.normalized_inputs.scenario_b,
+        source_fingerprint,
+        direction_trip_lock_mode=problem.direction_trip_lock_mode,
+        fleet_constraint_mode=problem.fleet_constraint_mode,
+        initial_fleet_positioning_mode=problem.initial_fleet_positioning_mode,
+    )
+    core_fields = {item.field for item in core}
+    adapter_values = {
+        item.field: item.value
+        for item in problem.operating_parameter_locks
+        if item.field not in core_fields
+    }
+    diagnostic = build_operating_parameter_locks_v1(
+        scenario,
+        source_fingerprint,
+        direction_trip_lock_mode=problem.direction_trip_lock_mode,
+        fleet_constraint_mode=problem.fleet_constraint_mode,
+        initial_fleet_positioning_mode=problem.initial_fleet_positioning_mode,
+        adapter_operating_lock_values=adapter_values,
+    )
+    expected = {item.field: item.value for item in problem.operating_parameter_locks}
+    actual = {item.field: item.value for item in diagnostic}
+    return tuple(
+        f"DIAGNOSTIC_OPERATING_LOCK_MISMATCH:{field}"
+        for field in sorted(set(expected) | set(actual))
+        if expected.get(field) != actual.get(field)
+    )
+
+
+def _respace_diagnostic(
+    context: ScheduleGenerationContextV1,
+    departure_by_trip_id: dict[str, int],
+) -> RespaceDiagnosticEvidenceV1:
+    source = context.normalized_inputs.scenario_b
+    diagnostic_trips = tuple(
+        replace(
+            trip,
+            departure_time=departure_by_trip_id.get(trip.trip_id, trip.departure_time),
+            arrival_time=(
+                departure_by_trip_id.get(trip.trip_id, trip.departure_time)
+                + trip.runtime_minutes * 60
+                if trip.arrival_time is not None
+                else None
+            ),
+        )
+        for trip in source.exact_timetable
+    )
+    diagnostic = replace(source, exact_timetable=diagnostic_trips)
+    changed_ids = tuple(
+        sorted(
+            trip.trip_id
+            for trip in source.exact_timetable
+            if departure_by_trip_id.get(trip.trip_id, trip.departure_time) != trip.departure_time
+        )
+    )
+    validation = validate_scenario_input(diagnostic)
+    scenario_issue_codes = tuple(sorted({item.code for item in validation.issues}))
+    lock_issue_codes = _diagnostic_lock_issues(context, diagnostic)
+    source_by_id = {trip.trip_id: trip for trip in source.exact_timetable}
+    runtime_issues = tuple(
+        sorted(
+            trip.trip_id
+            for trip in diagnostic.exact_timetable
+            if trip.trip_id not in source_by_id
+            or trip.runtime_minutes != source_by_id[trip.trip_id].runtime_minutes
+            or trip.resolved_arrival_time
+            != trip.departure_time + source_by_id[trip.trip_id].runtime_minutes * 60
+        )
+    )
+    fleet = assess_scenario_b_fleet_v1(diagnostic)
+    assignment_error = False
+    try:
+        fleet_assignment = assign_contract_v1_fleet(
+            _raw_b_trips(diagnostic),
+            source.exact_timetable,
+            diagnostic.turnaround_minutes,
+            diagnostic.available_fleet_limit,
+        )
+    except ContractFleetAssignmentError:
+        assignment_error = True
+        fleet_assignment = None
+    _, turnaround_violations, _, turnaround_codes = _assigned_turnaround_evidence(diagnostic)
+    turnaround_or_location_codes = list(turnaround_codes)
+    if turnaround_violations:
+        turnaround_or_location_codes.append(TURNAROUND_MARGIN_NEGATIVE)
+    t1_min = min(
+        (min(item.stock_before, item.stock_after) for item in fleet.terminal_1_events),
+        default=fleet.recommended_initial_fleet_terminal_1,
+    )
+    t2_min = min(
+        (min(item.stock_before, item.stock_after) for item in fleet.terminal_2_events),
+        default=fleet.recommended_initial_fleet_terminal_2,
+    )
+    issue_codes: list[str] = []
+    issue_codes.extend(f"DIAGNOSTIC_SCENARIO_INVALID:{code}" for code in scenario_issue_codes)
+    issue_codes.extend(lock_issue_codes)
+    if runtime_issues:
+        issue_codes.append("DIAGNOSTIC_SOURCE_RUNTIME_INCONSISTENT")
+    issue_codes.extend(f"DIAGNOSTIC_{code}" for code in sorted(set(turnaround_or_location_codes)))
+    if not fleet.feasible:
+        issue_codes.append("DIAGNOSTIC_TERMINAL_STOCK_FLEET_LIMIT_EXCEEDED")
+    if assignment_error:
+        issue_codes.append("DIAGNOSTIC_VEHICLE_ASSIGNMENT_INVALID")
+    elif fleet_assignment is not None and not fleet_assignment.feasible:
+        issue_codes.append("DIAGNOSTIC_VEHICLE_ASSIGNMENT_FLEET_LIMIT_EXCEEDED")
+    if not changed_ids:
+        issue_codes.append("DIAGNOSTIC_RESPACE_NO_CHANGE")
+    normalized_issues = tuple(sorted(set(issue_codes)))
+    return RespaceDiagnosticEvidenceV1(
+        diagnostic_scenario_fingerprint=scenario_fingerprint(diagnostic),
+        changed_trip_ids=changed_ids,
+        scenario_validation_issue_codes=scenario_issue_codes,
+        operating_lock_issue_codes=lock_issue_codes,
+        runtime_issue_trip_ids=runtime_issues,
+        turnaround_or_location_issue_codes=tuple(sorted(set(turnaround_or_location_codes))),
+        minimum_required_fleet=fleet.minimum_required_fleet,
+        available_fleet_limit=fleet.available_fleet_limit,
+        minimum_terminal_stock_terminal_1=t1_min,
+        minimum_terminal_stock_terminal_2=t2_min,
+        fleet_assignment_vehicle_count=(
+            fleet_assignment.vehicle_count if fleet_assignment is not None else 0
+        ),
+        issue_codes=normalized_issues,
+        passed=not normalized_issues,
+    )
 
 
 def _headway_evidence(
-    scenario: ScenarioBInput,
+    context: ScheduleGenerationContextV1,
     policy: ServiceAdjustmentPolicyV1,
-    technical_feasible: bool,
 ) -> tuple[HeadwayRegimeEvidenceV1, ...]:
-    output: list[HeadwayRegimeEvidenceV1] = []
+    scenario = context.normalized_inputs.scenario_b
+    provisional: list[
+        tuple[
+            ContractDirection,
+            int,
+            ContinuousHeadwayRegimeV1,
+            _HeadwayClassificationResult,
+        ]
+    ] = []
+    departure_by_trip_id: dict[str, int] = {}
     for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
         trips = tuple(
             sorted(
@@ -547,58 +827,62 @@ def _headway_evidence(
                 key=lambda item: (item.departure_time, item.trip_id),
             )
         )
-        if not trips:
-            continue
-        actual = tuple(
-            (right.departure_time - left.departure_time) / 60
-            for left, right in zip(trips, trips[1:], strict=False)
-        )
-        balanced = _balanced_sequence(
-            (trips[-1].departure_time - trips[0].departure_time) / 60,
-            len(actual),
-        )
-        allowed = set(balanced)
-        conforming = sum(
-            any(math.isclose(gap, target, rel_tol=0, abs_tol=1e-12) for target in allowed)
-            for gap in actual
-        )
-        regular_rate = conforming / len(actual) if actual else 1.0
-        minimum = min(actual, default=None)
-        maximum = max(actual, default=None)
-        headway_range = maximum - minimum if minimum is not None and maximum is not None else None
-        zero_count = sum(math.isclose(item, 0.0, rel_tol=0, abs_tol=1e-12) for item in actual)
-        if zero_count:
-            classification = HeadwayRegularityClassificationV1.EXCEPTIONAL
-        elif not actual or (headway_range is not None and math.isclose(headway_range, 0.0)):
-            classification = HeadwayRegularityClassificationV1.REGULAR
-        elif (
-            headway_range is not None
-            and headway_range <= policy.headway_rounding_tolerance_minutes
-            and regular_rate >= policy.required_regular_headway_rate
+        for regime_index, regime in enumerate(
+            segment_continuous_headway_regimes_v1(trips, policy),
+            1,
         ):
-            classification = HeadwayRegularityClassificationV1.BALANCED_ROUNDING
-        else:
-            classification = HeadwayRegularityClassificationV1.IRREGULAR
+            classification = _headway_classification(
+                regime.actual_headway_sequence,
+                regime.balanced_headway_sequence,
+                policy,
+            )
+            provisional.append((direction, regime_index, regime, classification))
+            if classification[-1] in {
+                HeadwayRegularityClassificationV1.IRREGULAR,
+                HeadwayRegularityClassificationV1.EXCEPTIONAL,
+            }:
+                departure_by_trip_id.update(
+                    zip(
+                        regime.ordered_trip_ids,
+                        regime.balanced_departure_sequence,
+                        strict=True,
+                    )
+                )
+    needs_diagnostic = bool(departure_by_trip_id)
+    diagnostic = _respace_diagnostic(context, departure_by_trip_id) if needs_diagnostic else None
+    output: list[HeadwayRegimeEvidenceV1] = []
+    for direction, regime_index, regime, classification_values in provisional:
+        (
+            regular_rate,
+            minimum,
+            maximum,
+            headway_range,
+            zero_count,
+            classification,
+        ) = classification_values
+        considered_for_respace = classification in {
+            HeadwayRegularityClassificationV1.IRREGULAR,
+            HeadwayRegularityClassificationV1.EXCEPTIONAL,
+        }
         output.append(
             HeadwayRegimeEvidenceV1(
-                regime_id=f"B-HEADWAY-{direction.value.upper()}",
+                regime_id=f"B-HEADWAY-{direction.value.upper()}-R{regime_index:02d}",
                 direction=direction,
-                ordered_trip_ids=tuple(item.trip_id for item in trips),
-                first_departure=trips[0].departure_time,
-                last_departure=trips[-1].departure_time,
-                actual_headway_sequence=actual,
-                balanced_target_sequence=balanced,
+                ordered_trip_ids=regime.ordered_trip_ids,
+                first_departure=regime.first_departure,
+                last_departure=regime.last_departure,
+                actual_headway_sequence=regime.actual_headway_sequence,
+                balanced_target_sequence=regime.balanced_headway_sequence,
                 minimum_headway=minimum,
                 maximum_headway=maximum,
                 headway_range=headway_range,
                 regular_headway_rate=regular_rate,
                 zero_headway_count=zero_count,
                 regularity_classification=classification,
-                respace_technically_possible=(
-                    technical_feasible
-                    and len(trips) > 2
-                    and trips[0].departure_time < trips[-1].departure_time
+                respace_technically_possible=bool(
+                    considered_for_respace and diagnostic is not None and diagnostic.passed
                 ),
+                respace_diagnostic=diagnostic if considered_for_respace else None,
             )
         )
     return tuple(output)
@@ -884,65 +1168,187 @@ def _scenario_without_trip(
     )
 
 
-def _removal_is_technically_feasible(
+def _scenario_without_trips(
     scenario: ScenarioBInput,
-    trip: ExactTimetableTrip,
+    trip_ids: tuple[str, ...],
+) -> ScenarioBInput:
+    removed = set(trip_ids)
+    timetable = tuple(item for item in scenario.exact_timetable if item.trip_id not in removed)
+    outbound = sum(item.direction == ContractDirection.OUTBOUND for item in timetable)
+    inbound = sum(item.direction == ContractDirection.INBOUND for item in timetable)
+    return replace(
+        scenario,
+        exact_timetable=timetable,
+        total_daily_trips=len(timetable),
+        trips_by_direction=TripsByDirection(outbound=outbound, inbound=inbound),
+    )
+
+
+def _joint_removal_is_technically_feasible(
+    scenario: ScenarioBInput,
+    trip_ids: tuple[str, ...],
+    donor_blocks: tuple[BlockAdjustmentEvidenceV1, ...],
     policy: ServiceAdjustmentPolicyV1,
 ) -> bool:
-    if not _endpoint_preserved_after_removal(scenario, trip):
-        return False
-    trial = _scenario_without_trip(scenario, trip.trip_id)
+    trial = _scenario_without_trips(scenario, trip_ids)
+    for terminal, expected_first, expected_last in (
+        (
+            DepartureTerminal.TERMINAL_1,
+            scenario.first_departures.terminal_1,
+            scenario.last_departures.terminal_1,
+        ),
+        (
+            DepartureTerminal.TERMINAL_2,
+            scenario.first_departures.terminal_2,
+            scenario.last_departures.terminal_2,
+        ),
+    ):
+        times = tuple(
+            trip.departure_time
+            for trip in trial.exact_timetable
+            if trip.departure_terminal == terminal
+        )
+        if not times or min(times) != expected_first or max(times) != expected_last:
+            return False
     if (
         trial.trips_by_direction.outbound < policy.minimum_service_trips_per_direction
         or trial.trips_by_direction.inbound < policy.minimum_service_trips_per_direction
     ):
         return False
+    if any(
+        sum(_trip_in_block(trip, block) for trip in trial.exact_timetable)
+        < block.required_trips_at_planning_ceiling
+        for block in donor_blocks
+    ):
+        return False
     if not validate_scenario_input(trial).passed:
         return False
-    return assess_scenario_b_fleet_v1(trial).feasible
+    if not assess_scenario_b_fleet_v1(trial).feasible:
+        return False
+    assignment = assign_contract_v1_fleet(
+        _raw_b_trips(trial),
+        scenario.exact_timetable,
+        trial.turnaround_minutes,
+        trial.available_fleet_limit,
+    )
+    if not assignment.feasible:
+        return False
+    _, turnaround_violations, _, assignment_codes = _assigned_turnaround_evidence(trial)
+    return not turnaround_violations and not assignment_codes
 
 
-def _with_donor_eligibility(
+def _joint_donor_validation(
     scenario: ScenarioBInput,
     blocks: tuple[BlockAdjustmentEvidenceV1, ...],
     coverage: DemandCoverageAssessmentV1,
     policy: ServiceAdjustmentPolicyV1,
     technical_feasible: bool,
-) -> tuple[BlockAdjustmentEvidenceV1, ...]:
+) -> tuple[
+    tuple[BlockAdjustmentEvidenceV1, ...],
+    tuple[JointDonorValidationEvidenceV1, ...],
+]:
     if not technical_feasible or not coverage.directional_c_generation_supported:
-        return blocks
-    shortage_directions = {
-        item.direction
-        for item in blocks
-        if item.shortage_trips > 0
-        and item.direction in {ContractDirection.OUTBOUND, ContractDirection.INBOUND}
-    }
-    output: list[BlockAdjustmentEvidenceV1] = []
-    for block in blocks:
-        if block.direction not in shortage_directions or block.potential_surplus_trips <= 0:
-            output.append(block)
-            continue
-        candidates = tuple(
+        evidence = tuple(
+            JointDonorValidationEvidenceV1(
+                direction=direction,
+                shortage_quantity=sum(
+                    block.shortage_trips for block in blocks if block.direction == direction
+                ),
+                candidate_trip_ids=(),
+                selected_jointly_feasible_trip_ids=(),
+                proven_joint_capacity=0,
+                search_complete=True,
+                search_state_count=0,
+                issue_codes=(JOINT_DONOR_CAPACITY_NOT_PROVEN,),
+            )
+            for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND)
+        )
+        return blocks, evidence
+
+    joint_evidence: list[JointDonorValidationEvidenceV1] = []
+    selected_by_direction: dict[ContractDirection, tuple[str, ...]] = {}
+    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
+        shortage = sum(block.shortage_trips for block in blocks if block.direction == direction)
+        donor_blocks = tuple(
+            block
+            for block in blocks
+            if block.direction == direction and block.potential_surplus_trips > 0
+        )
+        candidate_trips = tuple(
             sorted(
-                (
-                    trip
+                {
+                    trip.trip_id: trip
+                    for block in donor_blocks
                     for trip in scenario.exact_timetable
                     if _trip_in_block(trip, block)
-                    and _removal_is_technically_feasible(scenario, trip, policy)
-                ),
-                key=lambda item: (item.departure_time, item.trip_id),
+                    and _endpoint_preserved_after_removal(scenario, trip)
+                }.values(),
+                key=lambda trip: (trip.departure_time, trip.trip_id),
             )
         )
-        eligible_ids = tuple(item.trip_id for item in candidates[: block.potential_surplus_trips])
-        output.append(
-            replace(
-                block,
-                donor_eligible=bool(eligible_ids),
-                eligible_donor_trip_ids=eligible_ids,
-                maximum_eligible_donor_trips=len(eligible_ids),
+        candidate_ids = tuple(trip.trip_id for trip in candidate_trips)
+        selected: tuple[str, ...] = ()
+        states = 0
+        limit_reached = False
+        target_proven = shortage == 0
+        if shortage > 0:
+            for quantity in range(1, min(shortage, len(candidate_ids)) + 1):
+                for candidate_set in combinations(candidate_ids, quantity):
+                    if states >= policy.maximum_joint_donor_search_states:
+                        limit_reached = True
+                        break
+                    states += 1
+                    if _joint_removal_is_technically_feasible(
+                        scenario,
+                        candidate_set,
+                        donor_blocks,
+                        policy,
+                    ):
+                        selected = candidate_set
+                        if quantity == shortage:
+                            target_proven = True
+                            break
+                if limit_reached or target_proven:
+                    break
+        search_complete = target_proven or not limit_reached
+        issues: list[str] = []
+        if shortage > len(candidate_ids):
+            issues.append("INSUFFICIENT_JOINT_DONOR_CANDIDATES")
+        if limit_reached and not target_proven:
+            issues.append(JOINT_DONOR_SEARCH_LIMIT_REACHED)
+        if shortage > 0 and not target_proven:
+            issues.append(JOINT_DONOR_CAPACITY_NOT_PROVEN)
+        selected_by_direction[direction] = selected
+        joint_evidence.append(
+            JointDonorValidationEvidenceV1(
+                direction=direction,
+                shortage_quantity=shortage,
+                candidate_trip_ids=candidate_ids,
+                selected_jointly_feasible_trip_ids=selected,
+                proven_joint_capacity=len(selected),
+                search_complete=search_complete,
+                search_state_count=states,
+                issue_codes=tuple(issues),
             )
         )
-    return tuple(output)
+
+    trip_by_id = {trip.trip_id: trip for trip in scenario.exact_timetable}
+    updated_blocks = tuple(
+        replace(
+            block,
+            donor_eligible=bool(selected_ids),
+            eligible_donor_trip_ids=selected_ids,
+        )
+        for block in blocks
+        for selected_ids in (
+            tuple(
+                trip_id
+                for trip_id in selected_by_direction.get(block.direction, ())
+                if _trip_in_block(trip_by_id[trip_id], block)
+            ),
+        )
+    )
+    return updated_blocks, tuple(joint_evidence)
 
 
 def _maximum_repeatably_supported_surplus(
@@ -1040,16 +1446,6 @@ def _repeatability_gate(
     if not policy_matches:
         reasons.extend(("REPEATABILITY_EVIDENCE_POLICY_MISMATCH", LOW_LOAD_REVIEW_ONLY))
         return False, 0, tuple(reasons)
-    if any(
-        max(0, scenario.total_daily_trips - required) != surplus
-        for required, surplus in zip(
-            evidence.daily_required_trip_sequence,
-            evidence.daily_surplus_sequence,
-            strict=True,
-        )
-    ):
-        reasons.extend(("REPEATABILITY_SEQUENCE_INCONSISTENT", LOW_LOAD_REVIEW_ONLY))
-        return False, 0, tuple(reasons)
     if evidence.valid_observed_day_count < policy.minimum_valid_observed_days_for_reduction:
         reasons.extend((INSUFFICIENT_DAYS_FOR_REDUCTION_DECISION, LOW_LOAD_REVIEW_ONLY))
         return False, 0, tuple(reasons)
@@ -1113,6 +1509,7 @@ def _fixed_resource_authorization(
 def _assessment_evidence(
     *,
     blocks: tuple[BlockAdjustmentEvidenceV1, ...],
+    joint_donors: tuple[JointDonorValidationEvidenceV1, ...],
     daily: DailyAdjustmentEvidenceV1,
     allocation: tuple[DirectionalAllocationEvidenceV1, ...],
     headways: tuple[HeadwayRegimeEvidenceV1, ...],
@@ -1135,6 +1532,13 @@ def _assessment_evidence(
         f"potential_surplus_trips={item.potential_surplus_trips},"
         f"donor_eligible={str(item.donor_eligible).lower()}"
         for item in blocks
+    )
+    output.extend(
+        f"donor.{item.direction.value}:shortage={item.shortage_quantity},"
+        f"proven_joint_capacity={item.proven_joint_capacity},"
+        f"selected={list(item.selected_jointly_feasible_trip_ids)},"
+        f"states={item.search_state_count},complete={str(item.search_complete).lower()}"
+        for item in joint_donors
     )
     output.extend(
         f"allocation.{item.direction.value}:mismatch_index={item.allocation_mismatch_index:.12g}"
@@ -1175,6 +1579,9 @@ def _fingerprint_payload(
         "evaluation_policy": _jsonable(asdict(evaluation_policy)),
         "adjustment_policy": _policy_payload(adjustment_policy),
         "block_metrics": _jsonable([asdict(item) for item in assessment.block_evidence]),
+        "joint_donor_evidence": _jsonable(
+            [asdict(item) for item in assessment.joint_donor_evidence]
+        ),
         "daily_evidence": _jsonable(asdict(assessment.daily_evidence)),
         "allocation_evidence": _jsonable([asdict(item) for item in assessment.allocation_evidence]),
         "headway_evidence": _jsonable([asdict(item) for item in assessment.headway_evidence]),
@@ -1208,7 +1615,7 @@ def evaluate_service_adjustment_need_v1(
     coverage = _coverage(context)
     blocks = _block_evidence(context)
     technical = _technical_evidence(context, context_issue_codes)
-    blocks = _with_donor_eligibility(
+    blocks, joint_donors = _joint_donor_validation(
         context.normalized_inputs.scenario_b,
         blocks,
         coverage,
@@ -1226,9 +1633,8 @@ def evaluate_service_adjustment_need_v1(
         coverage,
     )
     headways = _headway_evidence(
-        context.normalized_inputs.scenario_b,
+        context,
         effective_policy,
-        technical.technically_feasible,
     )
 
     reasons: list[str] = []
@@ -1264,8 +1670,11 @@ def evaluate_service_adjustment_need_v1(
         reasons.extend(technical.issue_codes)
     if any(item.shortage_trips > 0 for item in blocks):
         reasons.append(BLOCK_TRIP_SHORTAGE)
-    if any(item.maximum_eligible_donor_trips > 0 for item in blocks):
+    if any(item.proven_joint_capacity > 0 for item in joint_donors):
         reasons.append(ELIGIBLE_DONOR_SUPPLY_AVAILABLE)
+    reasons.extend(
+        code for item in joint_donors if item.shortage_quantity > 0 for code in item.issue_codes
+    )
     if any(item.allocation_mismatch_index > 0 for item in allocation):
         reasons.append(TEMPORAL_TRIP_ALLOCATION_MISMATCH)
     low_load_threshold = effective_policy.low_load_review_threshold
@@ -1284,23 +1693,13 @@ def evaluate_service_adjustment_need_v1(
             reasons.append(REGULAR_HEADWAY_RATE_BELOW_REQUIRED)
         if regime.zero_headway_count:
             reasons.append(ZERO_HEADWAY_EXCEPTION_PRESENT)
+        if regime.respace_diagnostic is not None and not regime.respace_diagnostic.passed:
+            reasons.append(RESPACE_DIAGNOSTIC_VALIDATION_FAILED)
+            reasons.extend(regime.respace_diagnostic.issue_codes)
 
-    shortage_by_direction = {
-        direction: sum(item.shortage_trips for item in blocks if item.direction == direction)
-        for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND)
-    }
-    donor_by_direction = {
-        direction: sum(
-            item.maximum_eligible_donor_trips for item in blocks if item.direction == direction
-        )
-        for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND)
-    }
     donor_capacity_sufficient = bool(
-        sum(shortage_by_direction.values()) > 0
-        and all(
-            donor_by_direction[direction] >= shortage
-            for direction, shortage in shortage_by_direction.items()
-        )
+        sum(item.shortage_quantity for item in joint_donors) > 0
+        and all(item.proven_joint_capacity >= item.shortage_quantity for item in joint_donors)
     )
     irregular_headways = tuple(
         item
@@ -1436,6 +1835,7 @@ def evaluate_service_adjustment_need_v1(
     normalized_limitations = _deduplicate(limitations)
     evidence = _assessment_evidence(
         blocks=blocks,
+        joint_donors=joint_donors,
         daily=daily,
         allocation=allocation,
         headways=headways,
@@ -1455,6 +1855,7 @@ def evaluate_service_adjustment_need_v1(
         explanation=explanation,
         evidence=evidence,
         block_evidence=blocks,
+        joint_donor_evidence=joint_donors,
         daily_evidence=daily,
         allocation_evidence=allocation,
         headway_evidence=headways,
@@ -1487,7 +1888,10 @@ __all__ = [
     "DirectionalAllocationEvidenceV1",
     "HeadwayRegimeEvidenceV1",
     "HeadwayRegularityClassificationV1",
+    "JointDonorValidationEvidenceV1",
+    "RepeatabilityDayEvidenceV1",
     "RepeatabilityEvidenceV1",
+    "RespaceDiagnosticEvidenceV1",
     "ServiceAdjustmentAssessmentV1",
     "ServiceAdjustmentDecisionV1",
     "ServiceAdjustmentPolicyV1",

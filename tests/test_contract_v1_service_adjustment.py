@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -21,6 +20,7 @@ from bus_schedule_engine.contracts_v1 import (
     NormalizedInputBundleV1,
     ObservedDemandInput,
     OperatingDayType,
+    RepeatabilityDayEvidenceV1,
     RepeatabilityEvidenceV1,
     ScenarioAInput,
     ScenarioBEvaluationPolicyV1,
@@ -68,6 +68,7 @@ def _context(
     source_notes: str | None = None,
     observation_notes: str | None = None,
     evaluation_policy: ScenarioBEvaluationPolicyV1 | None = None,
+    vehicle_assignments: dict[str, str] | None = None,
 ):
     source = SourceMetadata(
         source_type=InputSourceType.API,
@@ -84,6 +85,7 @@ def _context(
                 departure_time=_minutes(departure),
                 runtime_minutes=20,
                 arrival_time=_minutes(departure + 20),
+                vehicle_assignment=(vehicle_assignments or {}).get(f"OUT-{index:02d}"),
             )
             for index, departure in enumerate(outbound_times, start=1)
         ]
@@ -95,6 +97,7 @@ def _context(
                 departure_time=_minutes(departure),
                 runtime_minutes=20,
                 arrival_time=_minutes(departure + 20),
+                vehicle_assignment=(vehicle_assignments or {}).get(f"IN-{index:02d}"),
             )
             for index, departure in enumerate(inbound_times, start=1)
         ]
@@ -209,13 +212,21 @@ def _repeatability(
     daily_surplus: tuple[int, ...] = (4, 4, 3),
 ) -> RepeatabilityEvidenceV1:
     return RepeatabilityEvidenceV1(
-        valid_observed_day_count=len(daily_surplus),
+        days=tuple(
+            RepeatabilityDayEvidenceV1(
+                day_reference=f"2026-07-{index:02d}",
+                fully_supported=True,
+                current_daily_trips=8,
+                required_daily_trips=8 - surplus,
+                shortage_block_count=0,
+                no_service_with_demand_block_count=0,
+                critical_block_count=0,
+                authoritative_evidence_fingerprint=f"day-{index:02d}-fingerprint",
+            )
+            for index, surplus in enumerate(daily_surplus, 1)
+        ),
         configured_minimum_valid_day_count=3,
-        surplus_day_count=sum(value > 0 for value in daily_surplus),
-        surplus_consistency_rate=(sum(value > 0 for value in daily_surplus) / len(daily_surplus)),
         configured_minimum_surplus_consistency_rate=0.80,
-        daily_required_trip_sequence=tuple(8 - value for value in daily_surplus),
-        daily_surplus_sequence=daily_surplus,
         representative_day_type_or_provenance="weekday APC sample",
     )
 
@@ -299,7 +310,11 @@ def test_shortage_and_same_direction_eligible_donor_redistributes() -> None:
     )
     assert result.daily_evidence.daily_trip_gap == 0
     assert donor.donor_eligible
-    assert donor.maximum_eligible_donor_trips == 1
+    proof = next(
+        item for item in result.joint_donor_evidence if item.direction == ContractDirection.OUTBOUND
+    )
+    assert proof.proven_joint_capacity == 1
+    assert proof.selected_jointly_feasible_trip_ids == donor.eligible_donor_trip_ids
     assert result.primary_decision == ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
     assert result.heuristic_authorized
     assert result.authorized_generation_action == "fixed_resource_trip_redistribution"
@@ -316,6 +331,83 @@ def test_nominal_surplus_without_endpoint_safe_donor_does_not_redistribute() -> 
 
     assert any(item.potential_surplus_trips == 1 for item in result.block_evidence)
     assert not any(item.donor_eligible for item in result.block_evidence)
+    assert result.primary_decision != ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
+    assert not result.heuristic_authorized
+
+
+def _two_trip_donor_context(*, fleet_limit: int):
+    rows = (
+        (ContractDirection.OUTBOUND, 360, 420, 300),
+        (ContractDirection.OUTBOUND, 420, 480, 85),
+        (ContractDirection.OUTBOUND, 480, 540, 85),
+        (ContractDirection.INBOUND, 360, 420, 170),
+        (ContractDirection.INBOUND, 420, 480, 255),
+        (ContractDirection.INBOUND, 480, 540, 85),
+    )
+    return _context(
+        rows,
+        outbound_times=(360, 390, 420, 435, 450, 480),
+        inbound_times=(380, 410, 445, 460, 475, 500),
+        fleet_limit=fleet_limit,
+    )
+
+
+def test_individually_feasible_donors_are_not_summed_when_pair_is_infeasible() -> None:
+    result = evaluate_service_adjustment_need_v1(_two_trip_donor_context(fleet_limit=4))
+    proof = next(
+        item for item in result.joint_donor_evidence if item.direction == ContractDirection.OUTBOUND
+    )
+
+    assert result.technical_evidence.minimum_required_fleet == 4
+    assert proof.shortage_quantity == 2
+    assert proof.proven_joint_capacity == 1
+    assert proof.search_complete
+    assert "JOINT_DONOR_CAPACITY_NOT_PROVEN" in proof.issue_codes
+    assert result.primary_decision != ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
+    assert not result.heuristic_authorized
+
+
+def test_jointly_feasible_two_trip_donor_set_is_deterministic() -> None:
+    context = _two_trip_donor_context(fleet_limit=5)
+
+    first = evaluate_service_adjustment_need_v1(context)
+    second = evaluate_service_adjustment_need_v1(context)
+    proof = next(
+        item for item in first.joint_donor_evidence if item.direction == ContractDirection.OUTBOUND
+    )
+
+    assert proof.shortage_quantity == 2
+    assert proof.proven_joint_capacity == 2
+    assert proof.selected_jointly_feasible_trip_ids == ("OUT-03", "OUT-04")
+    assert proof == next(
+        item for item in second.joint_donor_evidence if item.direction == ContractDirection.OUTBOUND
+    )
+    assert first.primary_decision == ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
+    assert first.heuristic_authorized
+
+
+def test_cross_direction_donor_capacity_cannot_cover_shortage() -> None:
+    rows = (
+        (ContractDirection.OUTBOUND, 360, 420, 300),
+        (ContractDirection.OUTBOUND, 420, 480, 255),
+        (ContractDirection.OUTBOUND, 480, 540, 85),
+        (ContractDirection.INBOUND, 360, 420, 85),
+        (ContractDirection.INBOUND, 420, 480, 170),
+        (ContractDirection.INBOUND, 480, 540, 85),
+    )
+    result = evaluate_service_adjustment_need_v1(
+        _context(
+            rows,
+            outbound_times=(360, 390, 420, 435, 450, 480),
+            inbound_times=(380, 410, 445, 460, 475, 500),
+            fleet_limit=5,
+        )
+    )
+    proof_by_direction = {item.direction: item for item in result.joint_donor_evidence}
+
+    assert proof_by_direction[ContractDirection.OUTBOUND].shortage_quantity == 2
+    assert proof_by_direction[ContractDirection.OUTBOUND].proven_joint_capacity == 0
+    assert proof_by_direction[ContractDirection.INBOUND].candidate_trip_ids
     assert result.primary_decision != ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
     assert not result.heuristic_authorized
 
@@ -344,6 +436,56 @@ def test_sufficient_repeatability_supports_bounded_reduction() -> None:
     assert result.maximum_supported_reduction_quantity == 3
     assert "STABLE_RESIDUAL_TRIP_SURPLUS" in result.reason_codes
     assert not result.heuristic_authorized
+
+
+def test_locally_deficient_historical_day_does_not_support_reduction() -> None:
+    context = _context(_directional_rows((85, 85), (85, 85)))
+    evidence = RepeatabilityEvidenceV1(
+        days=(
+            RepeatabilityDayEvidenceV1(
+                day_reference="2026-07-01",
+                fully_supported=True,
+                current_daily_trips=8,
+                required_daily_trips=5,
+                shortage_block_count=1,
+                no_service_with_demand_block_count=0,
+                critical_block_count=0,
+                authoritative_evidence_fingerprint="morning-shortage-2-midday-surplus-5",
+            ),
+            RepeatabilityDayEvidenceV1(
+                day_reference="2026-07-02",
+                fully_supported=True,
+                current_daily_trips=8,
+                required_daily_trips=4,
+                shortage_block_count=0,
+                no_service_with_demand_block_count=0,
+                critical_block_count=0,
+                authoritative_evidence_fingerprint="clean-surplus-day-2",
+            ),
+            RepeatabilityDayEvidenceV1(
+                day_reference="2026-07-03",
+                fully_supported=True,
+                current_daily_trips=8,
+                required_daily_trips=4,
+                shortage_block_count=0,
+                no_service_with_demand_block_count=0,
+                critical_block_count=0,
+                authoritative_evidence_fingerprint="clean-surplus-day-3",
+            ),
+        ),
+        configured_minimum_valid_day_count=3,
+        configured_minimum_surplus_consistency_rate=0.80,
+        representative_day_type_or_provenance="weekday block-level replay",
+    )
+
+    result = evaluate_service_adjustment_need_v1(context, repeatability_evidence=evidence)
+
+    assert evidence.days[0].daily_surplus_trips == 3
+    assert not evidence.days[0].qualifies_as_surplus_day
+    assert evidence.daily_surplus_sequence == (0, 4, 4)
+    assert evidence.surplus_day_count == 2
+    assert result.primary_decision != ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
+    assert result.maximum_supported_reduction_quantity == 0
 
 
 def test_insufficient_repeatability_days_cannot_support_reduction() -> None:
@@ -404,6 +546,64 @@ def test_balanced_22_23_sequence_is_conforming() -> None:
     assert result.primary_decision == ServiceAdjustmentDecisionV1.KEEP_CURRENT_TIMETABLE
 
 
+def test_peak_offpeak_peak_pattern_is_three_regular_continuous_regimes() -> None:
+    outbound_times = (
+        *range(360, 541, 15),
+        *range(570, 961, 30),
+        *range(975, 1141, 15),
+    )
+    inbound_times = tuple(value + 5 for value in outbound_times)
+    rows = tuple(
+        (
+            direction,
+            start,
+            end,
+            85 * sum(start <= departure < end for departure in times),
+        )
+        for direction, times in (
+            (ContractDirection.OUTBOUND, outbound_times),
+            (ContractDirection.INBOUND, inbound_times),
+        )
+        for start, end in zip(range(360, 1200, 120), range(480, 1201, 120), strict=True)
+    )
+
+    result = evaluate_service_adjustment_need_v1(
+        _context(
+            rows,
+            outbound_times=outbound_times,
+            inbound_times=inbound_times,
+            fleet_limit=4,
+        )
+    )
+    outbound = tuple(
+        regime
+        for regime in result.headway_evidence
+        if regime.direction == ContractDirection.OUTBOUND
+    )
+
+    assert len(outbound) == 3
+    assert [set(regime.actual_headway_sequence) for regime in outbound] == [
+        {15},
+        {30},
+        {15},
+    ]
+    assert all(
+        regime.regularity_classification == HeadwayRegularityClassificationV1.REGULAR
+        for regime in outbound
+    )
+    assert result.primary_decision == ServiceAdjustmentDecisionV1.KEEP_CURRENT_TIMETABLE
+
+
+def test_demand_block_boundaries_do_not_split_uniform_headway_regime() -> None:
+    result = evaluate_service_adjustment_need_v1(
+        _context(_directional_rows((170, 170), (170, 170)))
+    )
+
+    assert len(result.block_evidence) == 4
+    assert len(result.headway_evidence) == 2
+    assert all(regime.actual_headway_sequence == (30, 30, 30) for regime in result.headway_evidence)
+
+
 def test_irregular_adequate_headways_require_departure_redistribution() -> None:
     context = _context(
         _directional_rows((170, 170), (170, 170)),
@@ -418,6 +618,38 @@ def test_irregular_adequate_headways_require_departure_redistribution() -> None:
     )
     assert result.primary_decision == ServiceAdjustmentDecisionV1.REDISTRIBUTE_DEPARTURE_TIMES
     assert result.heuristic_authorized
+
+
+def test_infeasible_balanced_respace_retains_diagnostic_and_is_not_authorized() -> None:
+    context = _context(
+        _directional_rows((85, 170), (85, 85)),
+        outbound_times=(360, 420, 450),
+        inbound_times=(390, 450),
+        fleet_limit=2,
+        vehicle_assignments={
+            "OUT-01": "BUS-01",
+            "IN-01": "BUS-01",
+            "OUT-02": "BUS-01",
+            "IN-02": "BUS-01",
+            "OUT-03": "BUS-02",
+        },
+    )
+
+    result = evaluate_service_adjustment_need_v1(context)
+    outbound = next(
+        regime
+        for regime in result.headway_evidence
+        if regime.direction == ContractDirection.OUTBOUND
+    )
+
+    assert result.technical_evidence.technically_feasible
+    assert outbound.actual_headway_sequence == (60, 30)
+    assert outbound.respace_diagnostic is not None
+    assert not outbound.respace_diagnostic.passed
+    assert not outbound.respace_technically_possible
+    assert "DIAGNOSTIC_TURNAROUND_MARGIN_NEGATIVE" in (outbound.respace_diagnostic.issue_codes)
+    assert result.primary_decision != ServiceAdjustmentDecisionV1.REDISTRIBUTE_DEPARTURE_TIMES
+    assert not result.heuristic_authorized
 
 
 def test_zero_headway_remains_exact_and_exceptional() -> None:
@@ -585,6 +817,11 @@ def test_context_and_scenario_b_are_not_mutated() -> None:
     assert context.problem == before.problem
 
 
-def test_repeatability_evidence_validates_derived_counts_and_rate() -> None:
-    with pytest.raises(ValueError, match="surplus_day_count"):
-        replace(_repeatability(), surplus_day_count=2)
+def test_repeatability_evidence_derives_counts_and_rate() -> None:
+    evidence = _repeatability((4, 0, 3))
+
+    assert evidence.valid_observed_day_count == 3
+    assert evidence.surplus_day_count == 2
+    assert evidence.surplus_consistency_rate == pytest.approx(2 / 3)
+    assert evidence.daily_required_trip_sequence == (4, 8, 5)
+    assert evidence.daily_surplus_sequence == (4, 0, 3)
