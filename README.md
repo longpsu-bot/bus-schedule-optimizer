@@ -47,8 +47,12 @@ feasibility adapter remains an objective-free satisfaction model. Demand protect
 highest optimization priority. The service-quality adapter then protects positive-demand service
 gaps, aligns fixed directional trips with passenger demand, and balances adjacent headways inside
 sustained service regimes; different legitimate demand regimes may use different headway levels.
-All three adapters use canonical request builders and the independent validator. Streamlit and the
-unified `SolverChoice.OR_TOOLS` / `BOTH` selections do not use them yet.
+All three adapters use canonical request builders and the independent validator. The unified
+application service now supports explicit `SolverChoice.HEURISTIC`, `OR_TOOLS`, and `BOTH` for
+fixed-resource actions, while the default remains `HEURISTIC`. `OR_TOOLS` selects the 15-stage
+service-quality adapter. `BOTH` independently validates both outcomes, recomputes the same
+transparent lexicographic objective vector for accepted solutions, and recommends one outcome
+without a weighted score. Streamlit does not yet expose this selection.
 
 ## Supported today
 
@@ -69,20 +73,22 @@ unified `SolverChoice.OR_TOOLS` / `BOTH` selections do not use them yet.
   covering no-service and overload protection before provisional B-preservation shift tie-breaks.
 - Separate OR-Tools fixed-resource service-quality solving for positive-demand gaps, proportional
   directional-demand alignment, and regular headways within derived sustained service regimes.
+- Unified fixed-resource solver selection with heuristic-only continuity by default, explicit
+  15-stage OR-Tools service-quality solving, and transparent `BOTH` comparison of independently
+  validated accepted solutions.
 
 ## Not supported yet
 
 - Contract V1 execution through the Streamlit application.
-- OR-Tools selection through Streamlit or unified `SolverChoice.OR_TOOLS` / `BOTH`.
+- Solver selection through Streamlit.
 - OR-Tools fleet-minimization objectives.
 - A globally optimal timetable or a proof of infeasibility from the legacy heuristic.
-- A unified comparison of heuristic and CP-SAT objective vectors.
-- An anonymized real-route regression corpus and heuristic-versus-CP-SAT comparison.
+- An anonymized real-route regression corpus; route-corpus work remains pending.
 - Variable-trip-count optimization.
 - Production implementation of the deferred V1-A1 structural demand-response workflow.
 - Mixed fleets, multi-route interlining, deadhead, driver duties, depot pull-in/out, maintenance,
   or mature cross-midnight optimization.
-- Contract V1-based charts or the target Contract V1 XLSX workbook.
+- Charts and XLSX do not yet consume unified Contract V1 optimization results.
 
 ## Target pipeline
 
@@ -102,11 +108,9 @@ Only an independently validated candidate may be presented as authoritative Scen
 
 ## Near-term roadmap
 
-1. Create one unified application service over the Contract V1 boundary.
-2. Integrate the legacy heuristic through `ScheduleProblemV1` and the independent validator.
-3. Extend the one-route, fixed-resource CP-SAT adapter beyond hard feasibility.
-4. Add fixed-resource demand/headway objectives and an anonymized real-route regression corpus.
-5. Cut the UI and XLSX over after side-by-side validation.
+1. Add the approved anonymized real-route regression corpus.
+2. Run side-by-side UI, chart, and XLSX validation against unified results.
+3. Cut the UI and XLSX over only after that validation is approved.
 
 Variable-trip-count optimization and structural demand-response scenarios are optional later
 stages. See [Migration Roadmap to OR-Tools](docs/engine/MIGRATION_ROADMAP_TO_OR_TOOLS.md).

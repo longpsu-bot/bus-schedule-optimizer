@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, replace
-from decimal import Decimal, InvalidOperation
 from typing import ClassVar
 
 import ortools
@@ -23,9 +22,21 @@ from .ortools_solver import (
     _map_cp_sat_status,
     _ordered_directional_trips,
     _previous_headways,
-    _recompute_demand_objective_vector_v1,
     _regularity_status,
     _solver_controls,
+)
+from .service_quality_metrics import (
+    SERVICE_QUALITY_OBJECTIVE_NAMES_V1 as _QUALITY_OBJECTIVE_NAMES,
+)
+from .service_quality_metrics import (
+    _derive_sustained_service_regimes,
+    _QualityModelError,
+    _regime_for_departure,
+    _scaled_directional_demand,
+    _SustainedServiceRegime,
+)
+from .service_quality_metrics import (
+    recompute_service_quality_objective_vector_v1 as _recompute_service_quality_objective_vector_v1,
 )
 from .solver_fingerprints import candidate_fingerprint
 from .solver_models import (
@@ -55,50 +66,6 @@ ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY = (
 )
 _QUALITY_BOUNDARY_REASON = "SUSTAINED_DIRECTIONAL_SERVICE_RATE"
 _SINGLETON_TARGET_HEADWAY_MINUTES = 1.0
-_MAX_DEMAND_DECIMAL_PLACES = 6
-_SAFE_CP_SAT_INTEGER = (1 << 62) - 1
-_QUALITY_OBJECTIVE_NAMES = (
-    "no_service_block_count",
-    "critical_block_count",
-    "total_critical_shortage_trips",
-    "planning_warning_block_count",
-    "total_planning_shortage_trips",
-    "maximum_positive_demand_headway_minutes",
-    "total_positive_demand_block_max_gap_minutes",
-    "directional_demand_alignment_error",
-    "maximum_within_regime_headway_change_minutes",
-    "total_within_regime_headway_change_minutes",
-    "maximum_regime_transition_headway_jump_minutes",
-    "total_regime_transition_headway_jump_minutes",
-    "shifted_trip_count",
-    "total_shift_minutes",
-    "maximum_shift_minutes",
-)
-
-
-class _QualityModelError(ValueError):
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
-
-
-@dataclass(frozen=True, slots=True)
-class _ScaledDirectionalDemand:
-    scale: int
-    weight_by_block_id: dict[str, int]
-    total_by_direction: dict[ContractDirection, int]
-    total_alignment_upper_bound: int
-
-
-@dataclass(frozen=True, slots=True)
-class _SustainedServiceRegime:
-    regime_id: str
-    direction: ContractDirection
-    block_ids: tuple[str, ...]
-    start_time: int
-    end_time: int
-    duration_minutes: int
-    required_trips_85: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,134 +73,6 @@ class _QualityCpSatModelBundle:
     demand: _DemandCpSatModelBundle
     regimes: tuple[_SustainedServiceRegime, ...]
     stages: tuple[_DemandObjectiveStage, ...]
-
-
-def _decimal_places(value: Decimal) -> int:
-    return max(0, -value.as_tuple().exponent)
-
-
-def _scaled_directional_demand(
-    problem: ScheduleProblemV1,
-) -> _ScaledDirectionalDemand:
-    decimal_by_block: dict[str, Decimal] = {}
-    decimal_places = 0
-    for requirement in problem.block_requirements:
-        try:
-            value = Decimal(str(requirement.passenger_demand))
-        except (InvalidOperation, ValueError) as exc:
-            raise _QualityModelError("ORTOOLS_QUALITY_DEMAND_DECIMAL_INVALID") from exc
-        if not value.is_finite() or value < 0:
-            raise _QualityModelError("ORTOOLS_QUALITY_DEMAND_DECIMAL_INVALID")
-        places = _decimal_places(value)
-        if places > _MAX_DEMAND_DECIMAL_PLACES:
-            raise _QualityModelError("ORTOOLS_QUALITY_DEMAND_PRECISION_UNSUPPORTED")
-        decimal_places = max(decimal_places, places)
-        decimal_by_block[requirement.block_id] = value
-
-    scale = 10**decimal_places
-    weight_by_block_id: dict[str, int] = {}
-    for block_id, value in decimal_by_block.items():
-        scaled = value * scale
-        if scaled != scaled.to_integral_value():
-            raise _QualityModelError("ORTOOLS_QUALITY_DEMAND_PRECISION_UNSUPPORTED")
-        weight = int(scaled)
-        if weight < 0 or weight > _SAFE_CP_SAT_INTEGER:
-            raise _QualityModelError("ORTOOLS_QUALITY_DEMAND_INTEGER_UNSAFE")
-        weight_by_block_id[block_id] = weight
-
-    total_by_direction: dict[ContractDirection, int] = {}
-    total_alignment_upper_bound = 0
-    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
-        directional_weights = [
-            weight_by_block_id[block.block_id]
-            for block in problem.analysis_blocks
-            if block.direction == direction
-        ]
-        total_weight = sum(directional_weights)
-        trip_count = (
-            problem.scenario_b.trips_by_direction.outbound
-            if direction == ContractDirection.OUTBOUND
-            else problem.scenario_b.trips_by_direction.inbound
-        )
-        cross_product = trip_count * total_weight
-        directional_bound = 2 * cross_product
-        if (
-            total_weight > _SAFE_CP_SAT_INTEGER
-            or cross_product > _SAFE_CP_SAT_INTEGER
-            or directional_bound > _SAFE_CP_SAT_INTEGER
-            or total_alignment_upper_bound + directional_bound > _SAFE_CP_SAT_INTEGER
-        ):
-            raise _QualityModelError("ORTOOLS_QUALITY_DEMAND_INTEGER_UNSAFE")
-        if any(trip_count * weight > _SAFE_CP_SAT_INTEGER for weight in directional_weights):
-            raise _QualityModelError("ORTOOLS_QUALITY_DEMAND_INTEGER_UNSAFE")
-        total_by_direction[direction] = total_weight
-        total_alignment_upper_bound += directional_bound
-    return _ScaledDirectionalDemand(
-        scale=scale,
-        weight_by_block_id=weight_by_block_id,
-        total_by_direction=total_by_direction,
-        total_alignment_upper_bound=total_alignment_upper_bound,
-    )
-
-
-def _derive_sustained_service_regimes(
-    problem: ScheduleProblemV1,
-) -> tuple[_SustainedServiceRegime, ...]:
-    requirements = {item.block_id: item for item in problem.block_requirements}
-    directional_trips = _ordered_directional_trips(problem)
-    output: list[_SustainedServiceRegime] = []
-    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
-        blocks = tuple(
-            sorted(
-                (block for block in problem.analysis_blocks if block.direction == direction),
-                key=lambda item: (item.start_time, item.end_time, item.block_id),
-            )
-        )
-        trips = directional_trips[direction]
-        if not blocks or not trips:
-            raise _QualityModelError("ORTOOLS_QUALITY_DIRECTIONAL_COVERAGE_INCOMPLETE")
-        if blocks[0].start_time > trips[0].departure_time or (
-            blocks[-1].end_time <= trips[-1].departure_time
-        ):
-            raise _QualityModelError("ORTOOLS_QUALITY_DIRECTIONAL_COVERAGE_INCOMPLETE")
-        for earlier, later in zip(blocks, blocks[1:], strict=False):
-            if earlier.end_time > later.start_time:
-                raise _QualityModelError("ORTOOLS_QUALITY_BLOCKS_OVERLAP")
-            if earlier.end_time != later.start_time:
-                raise _QualityModelError("ORTOOLS_QUALITY_DIRECTIONAL_COVERAGE_INCOMPLETE")
-
-        groups: list[list[object]] = []
-        for block in blocks:
-            requirement = requirements[block.block_id]
-            if not groups:
-                groups.append([block])
-                continue
-            previous = groups[-1][-1]
-            previous_requirement = requirements[previous.block_id]
-            equal_rate = (
-                previous_requirement.required_trips_85 * requirement.duration_minutes
-                == requirement.required_trips_85 * previous_requirement.duration_minutes
-            )
-            if previous.end_time == block.start_time and equal_rate:
-                groups[-1].append(block)
-            else:
-                groups.append([block])
-
-        for index, group in enumerate(groups, start=1):
-            typed_group = tuple(group)
-            group_requirements = tuple(requirements[item.block_id] for item in typed_group)
-            output.append(
-                _SustainedServiceRegime(
-                    regime_id=f"ORTOOLS-QUALITY-{direction.value.upper()}-{index:04d}",
-                    direction=direction,
-                    block_ids=tuple(item.block_id for item in typed_group),
-                    start_time=typed_group[0].start_time,
-                    end_time=typed_group[-1].end_time,
-                    duration_minutes=sum(item.duration_minutes for item in group_requirements),
-                    required_trips_85=sum(item.required_trips_85 for item in group_requirements),
-                )
-            )
-    return tuple(output)
 
 
 def _quality_problem_authority_issues(problem: ScheduleProblemV1) -> tuple[str, ...]:
@@ -665,28 +504,6 @@ def _build_quality_cp_sat_model(problem: ScheduleProblemV1) -> _QualityCpSatMode
     )
 
 
-def _regime_for_departure(
-    problem: ScheduleProblemV1,
-    regimes: tuple[_SustainedServiceRegime, ...],
-    direction: ContractDirection,
-    departure_time: int,
-) -> _SustainedServiceRegime:
-    blocks = {
-        block.block_id: block
-        for block in problem.analysis_blocks
-        if block.direction == direction and block.start_time <= departure_time < block.end_time
-    }
-    matches = [
-        regime
-        for regime in regimes
-        if regime.direction == direction
-        and any(block_id in blocks for block_id in regime.block_ids)
-    ]
-    if len(matches) != 1:
-        raise ValueError("Candidate trip does not have exactly one sustained service regime")
-    return matches[0]
-
-
 def _quality_solver_limitations(problem: ScheduleProblemV1) -> tuple[str, ...]:
     time_limit, worker_count, random_seed = _solver_controls(problem)
     configured_time_limit = "none" if time_limit is None else f"{time_limit:g} seconds"
@@ -904,138 +721,6 @@ def _quality_non_candidate_result(
             f"{', '.join(f'{name}={value}' for name, value in proven) if proven else 'none'}.",
         ),
         limitations=_quality_solver_limitations(problem),
-    )
-
-
-def _directional_candidate_trips(
-    candidate: RawScheduleCandidateV1,
-) -> dict[ContractDirection, tuple[RawCandidateTripV1, ...]]:
-    return {
-        direction: tuple(
-            sorted(
-                (trip for trip in candidate.exact_timetable if trip.direction == direction),
-                key=lambda item: (item.c_departure_time, item.c_trip_id),
-            )
-        )
-        for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND)
-    }
-
-
-def _recompute_service_quality_objective_vector_v1(
-    problem: ScheduleProblemV1,
-    candidate: RawScheduleCandidateV1,
-) -> tuple[int, ...]:
-    """Recompute all 15 stages from only the canonical problem and raw candidate."""
-
-    demand_vector = _recompute_demand_objective_vector_v1(problem, candidate)
-    requirements = {item.block_id: item for item in problem.block_requirements}
-    scaled = _scaled_directional_demand(problem)
-    regimes = _derive_sustained_service_regimes(problem)
-    directional = _directional_candidate_trips(candidate)
-
-    maximum_positive_headway = 0
-    for direction, trips in directional.items():
-        positive_blocks = tuple(
-            block
-            for block in problem.analysis_blocks
-            if block.direction == direction and requirements[block.block_id].passenger_demand > 0
-        )
-        for earlier, later in zip(trips, trips[1:], strict=False):
-            gap_seconds = later.c_departure_time - earlier.c_departure_time
-            if gap_seconds <= 0 or gap_seconds % 60:
-                raise ValueError("Candidate directional headway is not a positive whole minute")
-            if any(
-                earlier.c_departure_time < block.end_time
-                and later.c_departure_time > block.start_time
-                for block in positive_blocks
-            ):
-                maximum_positive_headway = max(
-                    maximum_positive_headway,
-                    gap_seconds // 60,
-                )
-
-    total_positive_block_max_gap = 0
-    count_by_block_id = {block.block_id: 0 for block in problem.analysis_blocks}
-    for block in problem.analysis_blocks:
-        members = tuple(
-            trip
-            for trip in directional[block.direction]
-            if block.start_time <= trip.c_departure_time < block.end_time
-        )
-        count_by_block_id[block.block_id] = len(members)
-        if requirements[block.block_id].passenger_demand <= 0:
-            continue
-        if not members:
-            total_positive_block_max_gap += (block.end_time - block.start_time) // 60
-            continue
-        gaps_seconds = (
-            members[0].c_departure_time - block.start_time,
-            *(
-                later.c_departure_time - earlier.c_departure_time
-                for earlier, later in zip(members, members[1:], strict=False)
-            ),
-            block.end_time - members[-1].c_departure_time,
-        )
-        if any(gap < 0 or gap % 60 for gap in gaps_seconds):
-            raise ValueError("Candidate block coverage gap is not a non-negative whole minute")
-        total_positive_block_max_gap += max(gaps_seconds) // 60
-
-    alignment_error = 0
-    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
-        total_weight = scaled.total_by_direction[direction]
-        trip_count = len(directional[direction])
-        if total_weight == 0:
-            continue
-        alignment_error += sum(
-            abs(
-                count_by_block_id[block.block_id] * total_weight
-                - trip_count * scaled.weight_by_block_id[block.block_id]
-            )
-            for block in problem.analysis_blocks
-            if block.direction == direction
-        )
-
-    regime_by_trip_id = {
-        trip.c_trip_id: _regime_for_departure(
-            problem,
-            regimes,
-            trip.direction,
-            trip.c_departure_time,
-        ).regime_id
-        for trip in candidate.exact_timetable
-    }
-    within_changes: list[int] = []
-    transition_jumps: list[int] = []
-    for trips in directional.values():
-        for previous, current, following in zip(
-            trips,
-            trips[1:],
-            trips[2:],
-            strict=False,
-        ):
-            previous_headway = (current.c_departure_time - previous.c_departure_time) // 60
-            next_headway = (following.c_departure_time - current.c_departure_time) // 60
-            change = abs(next_headway - previous_headway)
-            regime_ids = {
-                regime_by_trip_id[previous.c_trip_id],
-                regime_by_trip_id[current.c_trip_id],
-                regime_by_trip_id[following.c_trip_id],
-            }
-            if len(regime_ids) == 1:
-                within_changes.append(change)
-            else:
-                transition_jumps.append(change)
-
-    return (
-        *demand_vector[:5],
-        maximum_positive_headway,
-        total_positive_block_max_gap,
-        alignment_error,
-        max(within_changes, default=0),
-        sum(within_changes),
-        max(transition_jumps, default=0),
-        sum(transition_jumps),
-        *demand_vector[5:],
     )
 
 

@@ -1184,12 +1184,10 @@ def test_no_ui_chart_xlsx_schema_or_phase_b_integration() -> None:
     assert "OrchestrationEnvelope" not in source
 
 
-def test_optimization_service_and_solver_choices_remain_unintegrated() -> None:
+def test_optimization_service_integrates_only_the_canonical_quality_builder() -> None:
     source = Path(optimization_service.__file__).read_text(encoding="utf-8")
 
     assert "OrToolsCpSatServiceQualitySolver" not in source
-    assert "build_ortools_service_quality_request_v1" not in source
-    with pytest.raises(NotImplementedError):
-        optimization_service._validate_solver_choice(SolverChoice.OR_TOOLS)
-    with pytest.raises(NotImplementedError):
-        optimization_service._validate_solver_choice(SolverChoice.BOTH)
+    assert "build_ortools_service_quality_request_v1" in source
+    optimization_service._validate_solver_choice(SolverChoice.OR_TOOLS)
+    optimization_service._validate_solver_choice(SolverChoice.BOTH)

@@ -18,6 +18,9 @@ from .models import (
     NormalizedInputBundleV1,
 )
 from .problem_validation import validate_schedule_problem_v1
+from .service_quality_metrics import (
+    _recompute_demand_objective_vector_v1 as _recompute_solver_neutral_demand_vector_v1,
+)
 from .solver_fingerprints import candidate_fingerprint
 from .solver_models import (
     BoundaryConvention,
@@ -956,65 +959,7 @@ def _recompute_demand_objective_vector_v1(
     candidate: RawScheduleCandidateV1,
 ) -> tuple[int, int, int, int, int, int, int, int]:
     """Recompute the 4A1 vector without using CP-SAT variables or solver values."""
-
-    blocks = {block.block_id: block for block in problem.analysis_blocks}
-    requirements = {item.block_id: item for item in problem.block_requirements}
-    counts = {block_id: 0 for block_id in blocks}
-    source_by_id = {trip.trip_id: trip for trip in problem.scenario_b.exact_timetable}
-    if {trip.source_b_trip_id for trip in candidate.exact_timetable} != set(source_by_id):
-        raise ValueError("Candidate source mapping does not match ScheduleProblemV1")
-
-    shifts: list[int] = []
-    for trip in candidate.exact_timetable:
-        memberships = [
-            block_id
-            for block_id, block in blocks.items()
-            if block.direction == trip.direction
-            and block.start_time <= trip.c_departure_time < block.end_time
-        ]
-        if len(memberships) != 1:
-            raise ValueError(
-                f"Candidate trip {trip.c_trip_id} does not have exactly one demand block"
-            )
-        counts[memberships[0]] += 1
-        source = source_by_id[trip.source_b_trip_id]
-        delta_seconds = abs(trip.c_departure_time - source.departure_time)
-        if delta_seconds % 60:
-            raise ValueError("Candidate departure shift is not a whole number of minutes")
-        shifts.append(delta_seconds // 60)
-
-    no_service = sum(
-        requirements[block_id].passenger_demand > 0 and count == 0
-        for block_id, count in counts.items()
-    )
-    critical_blocks = sum(
-        requirements[block_id].required_trips_90 > 0
-        and count < requirements[block_id].required_trips_90
-        for block_id, count in counts.items()
-    )
-    critical_shortage = sum(
-        max(0, requirements[block_id].required_trips_90 - count)
-        for block_id, count in counts.items()
-    )
-    planning_warning_blocks = sum(
-        requirements[block_id].required_trips_85 > 0
-        and count < requirements[block_id].required_trips_85
-        for block_id, count in counts.items()
-    )
-    planning_shortage = sum(
-        max(0, requirements[block_id].required_trips_85 - count)
-        for block_id, count in counts.items()
-    )
-    return (
-        no_service,
-        critical_blocks,
-        critical_shortage,
-        planning_warning_blocks,
-        planning_shortage,
-        sum(shift > 0 for shift in shifts),
-        sum(shifts),
-        max(shifts, default=0),
-    )
+    return _recompute_solver_neutral_demand_vector_v1(problem, candidate)
 
 
 def _demand_candidate_explanation(
