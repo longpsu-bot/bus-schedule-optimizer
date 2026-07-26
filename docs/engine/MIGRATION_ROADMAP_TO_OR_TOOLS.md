@@ -1,93 +1,167 @@
 # Migration Roadmap to OR-Tools
 
-This roadmap implements [Engine Contract V1](ENGINE_CONTRACT_V1.md) incrementally. Each stage preserves the current runtime until its exit gate is approved.
+**Status:** Active roadmap
 
-## Stage 0 — Contract freeze
+**Governing direction:** [Project Direction Reset](PROJECT_DIRECTION_RESET.md)
 
-Approve the canonical contract, draft schemas, terminology, unresolved decisions, diagram wireframes, workbook sheet contract, fixtures, and benchmark machine/targets.
+This roadmap moves the current dual stack to one practical application pipeline. It preserves the
+legacy runtime until each replacement boundary is validated and keeps solver behavior behind the
+canonical problem, raw-candidate, and independent-validator contracts.
 
-**Exit gate:** Contract V1 review sign-off; schemas/examples validated; no unresolved decision capable of changing hard solver constraints.
+## Milestone 1 — Documentation reset and unified application service
 
-## Stage 1 — Domain normalization
+Establish the active direction and design one application service that owns:
 
-Introduce normalized A/B/demand inputs, required available fleet limit, optional approved fleet metadata, fleet constraint/initial-positioning modes, source metadata, operating-day semantics, adapters, and business validators. Keep current Excel/UI behavior through compatibility adapters.
+```text
+normalize
+-> evaluate B
+-> quantify adjustment need
+-> build ScheduleProblemV1 when solving is appropriate
+-> select solver
+-> independently validate
+-> compare
+-> return presentation/export data
+```
 
-**Exit gate:** legacy fixtures normalize deterministically; no source workbook mutation; A/B exact timetables and fingerprints reconcile.
+The service uses ordinary typed function calls and configuration. It does not require capability
+routing, authorization profiles, legacy projections, authorized-problem requests, orchestration
+envelopes, or an internal authorization fingerprint chain.
 
-## Stage 2 — Authoritative evaluation
+During this milestone:
 
-Implement source-resolution detection, native/adaptive/manual block builder, variable-duration rates, one-sided LF statuses/objectives, dimensioned B evaluation, and authoritative A/B block supply rows.
+- keep the current Streamlit/runtime path working;
+- retain V1-D2 Phase A as the quantitative pre-problem evaluator;
+- define a transparent solver-comparison objective vector;
+- identify one authoritative owner for fleet limits, demand authority, and outcome status; and
+- add characterization tests for current legacy application behavior.
 
-**Exit gate:** resolution/LF/B-disposition suites pass; remove symmetric LF scoring from authoritative decisions; UI/export can consume evaluation rows without recalculation.
+**Exit gate:** one reviewed service API and integration plan; legacy behavior characterized;
+documentation agrees that the UI is still legacy and OR-Tools is not implemented.
 
-## Stage 3 — Solver interface
+## Milestone 2 — Heuristic integration through the canonical boundary
 
-Add `ScheduleProblemV1`, `ScheduleSolver`, raw candidate, independent validator, and `ScheduleSolutionV1`. Wrap the existing heuristic as a temporary adapter without claiming solver proof.
+Make the existing deterministic heuristic the first solver behind:
 
-**Exit gate:** heuristic output crosses the new boundary, passes independent validation, and produces a full solution fingerprint; existing runtime remains behaviorally equivalent.
+```text
+ScheduleProblemV1
+-> ScheduleSolver
+-> raw candidate
+-> independent domain validator
+-> ScheduleGenerationOutcomeV1
+```
 
-## Stage 3A — Structural-change demand boundary
+Do not rewrite the heuristic algorithm in this milestone. Adapt its inputs and outputs, preserve
+exact source runtimes, validate terminal-specific turnaround independently, and remove any
+application assumption that a heuristic candidate is authoritative before validation.
 
-Implement Amendment V1-A1: schema/domain version `1.1.0`, derived total/directional/local service-change metrics, support classifications, unresolved-demand disposition/result, scenario catalogue/provenance, UI selection workflow, scenario-aware visualization/XLSX, and monitoring contract.
+The legacy weighted score may remain visible for compatibility, but solver comparison and
+acceptance use hard feasibility plus the transparent objective vector.
 
-Hard-constraint OR-Tools feasibility work may proceed in parallel. Production-conforming demand allocation for structural-change cases is blocked until Stage 3A exits.
+**Exit gate:** the heuristic application path produces the same operational result through the
+canonical boundary; deliberately corrupted candidates are rejected; no UI/export cutover is
+required yet.
 
-**Exit gate:** extreme/coarse-resolution fixtures prove no fabricated departure-level demand; scenario assumptions are fully traceable; UI/export distinguish observed demand from scenarios; unresolved cases cannot return binary demand suitability or authoritative demand-optimized C.
+## Milestone 3 — OR-Tools hard-feasibility solver
 
-## Stage 4 — OR-Tools feasibility solver
+Implement `OrToolsCpSatScheduleSolver` for the first fixed-resource target:
 
-Implement only hard constraints: counts, direction mode, endpoints/windows, order, runtime/turnaround, solver-determined or explicit initial terminal positioning, continuous event-level terminal stock, available fleet upper bound, minimum service, and block reconciliation. Report any feasible C or prove infeasibility for the encoded problem.
+- one route and two terminals;
+- fixed total and directional trip counts;
+- exact source-trip runtimes;
+- terminal-specific turnaround;
+- locked first and last departures;
+- strict chronological order and B-to-C traceability;
+- available-fleet upper bound;
+- solver-determined initial terminal positioning;
+- continuous non-negative terminal stock; and
+- independent post-solve validation.
 
-**Exit gate:** tiny proof cases, initial-position reconciliation, non-negative stock, fleet-margin, and turnaround invariants pass; V1 solver statuses are accurately surfaced.
+The first CP-SAT pull request contains no demand objective. It reports native statuses honestly:
+`OPTIMAL`, `FEASIBLE`, `INFEASIBLE`, `MODEL_INVALID`, and `UNKNOWN`.
 
-## Stage 5 — OR-Tools demand allocation
+Build 4-12-trip hand-solvable fixtures for one chain, unavoidable second vehicle, initial split,
+terminal imbalance, equal-time ready/departure ordering, tight fleet, endpoint locks, and
+infeasibility. Compare with exhaustive enumeration where practical.
 
-Add Level 1 block allocation and lexicographic no-service/90%/85% overload stages. Keep static demand limitations explicit. Structural-change cases require completed Stage 3A scenario/calibration support and MUST NOT optimize against coarse A demand as if it were fine-grained B demand.
+**Exit gate:** every hard-feasibility proof passes; the independent validator accepts valid
+candidates and rejects corrupted ones; no result relabels `FEASIBLE` as optimal or `UNKNOWN` as
+infeasible.
 
-**Exit gate:** one-sided objective tests and demand-allocation regression suite pass; no higher-priority degradation between stages.
+## Milestone 4 — Fixed-resource demand/headway optimization and route corpus
 
-## Stage 6 — Timetable regularity
+After hard feasibility is stable, add lexicographic objectives in this order:
 
-Add exact-time refinement, continuous regimes, balanced headways, gap/regime objectives, stable-B preservation, and shift minimization.
+1. no-service demand blocks;
+2. critical blocks and overload above 90%;
+3. overload above 85%;
+4. excessive service gaps;
+5. sustained-demand alignment;
+6. headway regularity and transition control;
+7. stable B preservation;
+8. shifted-trip count, total shift, and maximum shift; and
+9. fleet only as a late tie-breaker.
 
-**Exit gate:** planned/actual blocks reconcile; regularity and traceability suites pass; first/last and fleet remain hard.
+Use authoritative demand grain and never fabricate directional or finer-resolution demand.
+Compare the heuristic and CP-SAT with the same objective vector and validation result.
 
-## Stage 7 — Parallel validation
+Build an anonymized route corpus with balanced/asymmetric directions, tight/loose fleet, difficult
+headway patterns, unequal terminal turnaround, and feasible/infeasible cases. Add Route 61-8 and
+Route 61-4 when anonymized source data and provenance are available.
 
-Run current heuristic, CP-SAT, and expert-reviewed timetables over the approved corpus. Produce comparable objective vectors, feasibility evidence, explanations, and performance reports.
+**Exit gate:** heuristic/CP-SAT differential tests and route-corpus regressions pass; higher
+priority objectives never degrade for a lower-priority improvement; benchmark results and solver
+controls are recorded.
 
-**Exit gate:** no CP-SAT hard-rule regressions; agreed quality/performance thresholds met; exceptions signed and documented.
+## Milestone 5 — UI/XLSX cutover and side-by-side validation
 
-## Stage 8 — Cutover
+Run the unified service beside the legacy application path over the approved corpus. Reconcile:
 
-Switch the production solver adapter behind a controlled feature flag. Update primary diagrams and XLSX to consume `ScheduleSolutionV1`. Retain rollback and the heuristic adapter during a defined observation window.
+- B evaluation;
+- generation outcome and solver status;
+- hard-feasibility evidence;
+- objective vector;
+- exact timetable and B-to-C trace;
+- fleet and initial positioning;
+- charts; and
+- editable XLSX values and fingerprints.
 
-**Exit gate:** monitoring clean, exported fingerprints consistent, operational sign-off complete. Retire the heuristic only after the regression and benchmark gates pass.
+Then make the unified Contract V1 service authoritative for Streamlit, diagrams, and XLSX. Remove
+presentation-layer recomputation and retain a time-bounded rollback path during operational
+review.
+
+**Exit gate:** UI and exporters consume the same authoritative outcome/solution; source workbooks
+are never overwritten; side-by-side differences are approved; the legacy path can be retired
+without losing required capabilities.
 
 ## Dependency sequence
 
 ```mermaid
 flowchart LR
-  S0["0 Contract freeze"] --> S1["1 Normalize"] --> S2["2 Evaluate"] --> S3["3 Solver interface"]
-  S3 --> S3A["3A Structural-change demand boundary"]
-  S3 --> S4["4 Feasibility"]
-  S3A --> S5["5 Demand allocation"]
-  S4 --> S5 --> S6["6 Regularity"]
-  S6 --> S7["7 Parallel validation"] --> S8["8 Cutover"]
+  M1["1 Unified service"] --> M2["2 Heuristic integration"]
+  M2 --> M3["3 CP-SAT hard feasibility"]
+  M3 --> M4["4 Objectives and route corpus"]
+  M4 --> M5["5 UI/XLSX cutover"]
 ```
+
+## Later optional work
+
+The following are explicitly outside the five required milestones:
+
+- variable-trip-count increase or reduction;
+- redistribution of total trips between directions;
+- structural demand-response scenarios and calibrated ridership response;
+- V1-A1 scenario selection, UI, export, and monitoring;
+- mixed fleets, multi-route interlining, deadhead, driver duties, depot, and maintenance.
+
+These may begin only after fixed-resource hard feasibility and the active route corpus are stable.
+V1-A1 does not block Milestone 3.
 
 ## Rollback and compatibility
 
-Stages 1–3 are additive and keep legacy adapters. Stages 4–7 run side by side and never overwrite the source. Every comparison stores problem, source, configuration, and solution fingerprints. A failed domain validation or unacceptable solver status falls back to a clearly labeled legacy result or no result according to approved policy; it never fabricates C.
+Milestones 1-4 keep the current application available for comparison and never overwrite the
+source workbook. A failed solver run or failed domain validation produces an explicit
+non-accepted outcome; it never fabricates Scenario C or silently substitutes B.
 
-## First implementation backlog after approval
-
-1. Resolve Contract V1 §17 business decisions.
-2. Promote schemas from draft and generate typed domain models.
-3. Build normalization and independent validation fixtures.
-4. Implement authoritative demand blocks and B disposition.
-5. Introduce solver interface/heuristic adapter.
-6. Implement V1-A1 service-change classification, scenario workflow, and `1.1.0` contracts.
-7. Benchmark event-balance/reservoir and connection-graph fleet formulations on tiny and 40–80 trip cases.
-8. Implement CP-SAT hard feasibility in parallel with V1-A1; add demand allocation only after both gates pass.
-9. Complete visualization/export cutover only after solution and scenario reconciliation are stable.
+Persisted/cached inputs, problems, candidates, solutions, and outcomes may use fingerprints for
+identity and reconciliation. Fingerprints do not authorize calls between internal Python
+functions.

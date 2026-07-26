@@ -1,67 +1,238 @@
 # Current-State Gap Analysis
 
-Audit date: 2026-07-22. The target rules are in [Engine Contract V1](ENGINE_CONTRACT_V1.md), including [Amendment V1-A1](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md). This report describes the inspected workspace without changing runtime code.
+**Audit date:** 2026-07-26
 
-## Inspected structure
+**Audited merged main:** `bb9b4837edac5303e754225ca04cbde900cdcd1c`
 
-- Entry/UI: `streamlit_app.py`, five pages under `app_pages/`.
-- Core package: `src/bus_schedule_engine/` with models, importer, validator, demand evaluation, block supply, heuristic C generators, fleet assignment, scoring, service orchestration, diagrams, fingerprints, and two exporters.
-- Configuration: `config/scoring.json`.
-- Tests: 74 tests collected across 9 files.
-- Existing docs: `README.md` and `docs/KIEN_TRUC_MVP.md`.
-- Workbook input: `Schedule template.xlsx`; generated samples live under `outputs/`.
+**Governing direction:** [Project Direction Reset](PROJECT_DIRECTION_RESET.md)
 
-## Current flow
+This audit describes the actual merged main branch. It replaces the 22 July baseline audit and
+does not treat unmerged Phase B commit `bc391e1967957fd530b51755331ce92da0bfdea8` as repository
+state.
 
-The workbook importer requires `THONG_SO_B` and `BIEU_DO_B`; A, demand, and configuration are optional. `service.py` validates/evaluates B, infers a fleet count, calls the deterministic heuristic generator, validates C, builds fingerprints, then UI/diagram/export adapters serialize the bundle.
+## Executive finding
 
-## Component classification
+The repository is a dual stack:
 
-| Component | Current behavior | Classification | Contract V1 gap/action |
-|---|---|---|---|
-| `models.py` | useful dataclasses for scenarios, trips, blocks, regimes, traces | reusable after refactor | add normalized A/B/demand envelopes, required available upper bound, optional approved metadata, positioning/stock records, resolution/lock/problem/solution records, normative statuses |
-| `importer.py` | Excel adapter; capacity may parse as missing then validator blocks; average-day fields retained | reusable after refactor | A is optional; no declared directional trip totals/fleet fields/operating-day/source metadata; demand lacks source type/resolution/confidence |
-| `validator.py` | totals, terminals, first/last, runtime, assigned vehicle chains, regulatory turnaround | reusable after refactor | explicitly hard-codes block size to 30/60; no separate parameter-consistency result or declared directional totals/fleet mode |
-| `demand.py` | correctly normalizes multi-day totals and classifies LF one-sided at 85/90 | reusable after refactor | evaluates source rows directly; no adaptive/manual resolution, rate/confidence/provenance-rich blocks or V1 status vocabulary |
-| `comparator.py` | scores valid scenarios | conflicts with Contract V1 | uses `abs(load_factor - target_load_factor)`, symmetrically penalizing low LF; replace demand-fit scoring |
-| `block_supply.py` | reconciles B/C counts and calculates comparison rows | reusable after refactor | may re-grid to fixed `time_block_minutes` and recomputes requirements/LF/status; move authoritative calculations upstream, add A/planned/rates/confidence |
-| `c_config.py` | fixed-direction locks and regularity controls | reusable after refactor | only `fixed_by_direction`; no fleet lock mode or explicit authorization evidence |
-| `c_generator.py` | deterministic B copy, one-to-one trace, parameter/count/endpoint locks, balanced regimes, validator/fleet gates, mostly one-sided objective | replace as production optimizer; retain as temporary adapter | no explicit Level 1 block plan; candidate heuristic is not globally proving feasibility/optimality; no solver status; generation begins with exact times |
-| `generator.py` | orchestrates C and optional expanded `C2` | reusable only as migration shell | `C2` changes trip totals as a separate scenario; policy is outside C V1 and needs explicit product decision; legacy per-block generation exists here |
-| `fleet.py` | deterministic greedy two-terminal assignment with runtime/turnaround/location | reusable after refactor/validator oracle | not a proof-oriented global solver; does not expose solver-determined initial terminal stock profiles under an input available upper bound |
-| `service.py` | protects B immutability and asserts strong C locks/fingerprint | reusable after refactor | current MVP conflates inferred minimum/declared IDs into an exact active-fleet equality; lacks required available limit, optional approved metadata, B disposition, and solver interface |
-| `fingerprint.py` | stable timetable hash | reusable after refactor | solution fingerprint must include parameters, locks, plans, assignments, solver/config/version and canonicalization spec |
-| `diagram.py` | Plotly primary combo plus exact-departure diagnostic | replace primary analytical views | primary uses equal-width category X, stacked demand bars, absolute/block units, and one selected direction; not area polygons, six B/C directional lines, rate toggle, or A/B/C small multiples |
-| `excel_exporter.py` | input template and general result workbook | reusable after substantial refactor | sheet contract differs and output is not the V1 authoritative workbook shape |
-| `comparison_exporter.py` | B/C trace, regimes, fleet, warnings, fingerprints | reusable after refactor | second workbook and legacy sheets; consumes/recalculates some comparison aggregates rather than a full `ScheduleSolutionV1` |
-| `ui_utils.py`, `app_pages/` | thin Streamlit presentation over bundle | reusable after refactor | current frames calculate some display summaries; require V1 statuses, controls, two diagrams, and explicit solver/limitation presentation |
-| tests | strong MVP regression coverage for locks, demand normalization, diagrams, fleet, runtime | reusable and extend | no schema, adaptive/manual blocks, solver proofs/statuses, performance tiers, V1 workbook, or full fingerprint tests |
+- the Streamlit application still runs the legacy MVP pipeline; and
+- `contracts_v1` is a substantial, separately tested target domain and solver boundary.
 
-## Major conflicts and defects
+The two paths are not integrated. The legacy heuristic has a Contract V1 compatibility adapter,
+but the application service, UI, charts, and exporters do not call that boundary. No OR-Tools
+dependency, CP-SAT model, or CP-SAT adapter exists.
 
-1. **Hard-coded resolution:** `ScenarioParameters.time_block_minutes` defaults to 60 and the validator accepts only 30 or 60. Legacy generators/re-gridding also use it. This directly conflicts with source-derived resolution.
-2. **Symmetric LF scoring:** `comparator.py` calculates `abs(block.load_factor - parameters.target_load_factor)`. Low LF therefore lowers the demand-fit score, prohibited by Contract V1 §6.
-3. **No explicit supply-planning layer:** heuristic C candidate times are produced before a durable `BlockSupplyPlan`; exact times and inferred block allocation are coupled.
-4. **Fleet constraint conflict:** available fleet limit is not an input field. `service.py` derives an “active” count from calculated minimum and declared vehicle IDs, then requires C to retain it. This is the superseded MVP behavior; Contract V1 instead uses a required upper bound, optional approved metadata, and solver-determined initial terminal positioning.
-5. **Incomplete normalized inputs:** no required trips-by-direction fields, operating-day type, source metadata, demand source resolution/type/confidence, or demand-response mode.
-6. **B status model:** technical/demand statuses exist, but the five V1 B dispositions and parameter-level feasibility decision do not.
-7. **Visualization mismatch:** primary chart uses a categorical axis and stacked bars; it does not preserve proportional block widths, use demand polygons, show all three service lines per scenario simultaneously, or provide the required A/B/C panel diagram.
-8. **Presentation calculations:** `block_supply.py` and diagram helpers count/re-grid/aggregate trips; exporter/UI helpers calculate summaries. These should consume an authoritative planning/evaluation dataset.
-9. **Export mismatch:** current workbooks do not match the 17-sheet target contract, even though formatting, no-source-overwrite behavior, traces, warnings, and fingerprints are valuable.
-10. **No solver abstraction/CP-SAT:** no `ScheduleProblemV1`, `ScheduleSolver`, candidate/independent-solution boundary, solver proof status, or benchmark harness.
+The next work is integration and hard-feasibility solving, not another internal authorization or
+workflow-contract layer.
 
-No evidence was found that C itself silently changes B operating parameters: current assertions preserve parameter object equality, total/directional counts, endpoints, per-trip runtime, active fleet IDs/count, and B→C identity. The active-fleet equality is current MVP behavior and conflicts with the amended target contract; it must remain untouched until the staged migration. The separate `C2` expansion is visibly labeled, but it is not part of the Contract V1 C definition and needs a future product decision.
+## Actual runtime paths
 
-## Reusable strengths
+### Legacy application runtime
 
-Multi-day demand normalization, blocking capacity validation, regulatory turnaround defaults, terminal-aware vehicle readiness, immutable B checks, one-to-one trip tracing, coordinated balanced headway regimes, deterministic behavior, shared C timetable fingerprint checks, exact-departure diagnostics, Vietnamese Excel formatting, and the existing regression suite provide useful migration assets.
+The executable application path is:
 
-## Known scope limitations
+```text
+streamlit_app.py
+-> app_pages/
+-> importer.py
+-> service.py::run_analysis()
+-> validator.py / demand.py / fleet.py / comparator.py
+-> generator.py / c_generator.py
+-> diagram.py
+-> excel_exporter.py / comparison_exporter.py
+```
 
-The current README explicitly excludes mixed fleet optimization, multi-route operations, deadhead, driver duties, maintenance, mature cross-midnight optimization, and global optimality. These remain outside Contract V1 unless separately approved.
+`service.py::run_analysis()` validates and evaluates B, derives an active fleet value, invokes the
+legacy deterministic generator, evaluates returned scenarios, asserts B immutability and B-to-C
+locks, and returns an `AnalysisBundle`.
 
-## V1-A1 implementation gap
+No non-Contract V1 runtime module imports `contracts_v1`. Therefore Contract V1 does not power the
+current Streamlit UI or its exports.
 
-Runtime `1.0.0` does not yet derive total/directional/local service-change metrics, classify structural changes, evaluate temporal/frequency/response support, run a scenario-selection workflow, return unresolved-demand statuses, or export scenario/monitoring records. It may therefore overstate demand suitability when A demand is coarse and B service changes substantially.
+### Contract V1 target path
 
-This is a documented migration gap, not permission to infer fine-grained or induced demand. The next contract implementation PR must add `1.1.0` schemas/models/validators before OR-Tools demand allocation is considered conforming. Hard technical feasibility work remains separable and may continue.
+The separately tested target path is:
+
+```text
+contracts_v1/adapters.py
+-> normalized models and validation
+-> authoritative B evaluation and demand coverage
+-> ScheduleProblemV1
+-> ScheduleSolver
+-> heuristic compatibility adapter
+-> raw candidate
+-> independent solution validator
+-> ScheduleGenerationOutcomeV1 / ScheduleSolutionV1
+```
+
+The active public pre-problem path in `contracts_v1/public_api.py` is:
+
+```text
+normalized bundle
+-> evaluate_scenario_b_v1()
+-> build_service_adjustment_evaluation_context_v1()
+-> evaluate_service_adjustment_need_v1()
+```
+
+This Phase A quantitative separation is useful. It has no application-runtime caller on main.
+
+## Useful completed work on main
+
+The following work is reusable and should not be rebuilt:
+
+- normalized Scenario A, Scenario B, observed-demand, source-metadata, fleet-limit, and exact
+  timetable models;
+- legacy workbook-to-Contract V1 normalization adapters;
+- schema, serialization, and validation coverage for the current Contract V1 shapes;
+- native/adaptive/manual demand-resolution primitives;
+- authoritative B evaluation and one-sided load-factor/block-supply rules;
+- temporal and directional demand-coverage authority;
+- exact source-trip runtime and arrival-terminal turnaround hardening;
+- terminal-aware fleet assessment and continuous-stock validation;
+- canonical `ScheduleProblemV1`, operating locks, problem serialization, fingerprints, and
+  independent problem validation;
+- solver-neutral `ScheduleSolver`, raw candidate, solution, outcome, and native-status contracts;
+- a legacy-heuristic compatibility context and adapter;
+- independent candidate validation before accepted-solution construction;
+- quantitative service-adjustment decisions and Phase A pre-problem evaluation context;
+- legacy B immutability, B-to-C one-to-one traceability, deterministic ordering, and workbook
+  no-overwrite behavior; and
+- substantial synthetic regression coverage for both the legacy MVP and Contract V1 boundary.
+
+## Unintegrated components
+
+These components exist but are not wired into the running application:
+
+- normalized Contract V1 inputs and authoritative B evaluation;
+- the Phase A adjustment-need evaluator;
+- `ScheduleProblemV1` construction;
+- the Contract V1 heuristic adapter;
+- raw-candidate and independent-solution validation;
+- Contract V1 generation outcomes and accepted solutions; and
+- Contract V1 serializers and target workbook/visualization semantics.
+
+The current `build_heuristic_schedule_request_v1()` remains a library/test composition helper. It
+constructs the compatibility context and canonical problem, but `service.py::run_analysis()` does
+not call it.
+
+## No OR-Tools implementation
+
+`pyproject.toml` contains no OR-Tools dependency. Repository searches find no `cp_model` import,
+CP-SAT model builder, solver adapter, or CP-SAT tests. References to an OR-Tools adapter occur only
+in documentation, schemas, examples, and schema-test placeholder strings.
+
+The legacy heuristic reports only candidate-search behavior. It cannot prove global optimality or
+infeasibility.
+
+## Current conflicts and gaps
+
+### Scoring
+
+`comparator.py` rewards closeness to `target_load_factor` with
+`abs(load_factor - target_load_factor)`. This symmetrically penalizes low load and conflicts with
+Contract V1's one-sided capacity objective. The comparator also collapses demand, headway, fleet
+utilization, and coverage into a weighted scalar, while the target comparison must expose an
+ordered objective vector and preserve hard-feasibility precedence.
+
+This scoring remains legacy runtime behavior and must not become the authoritative Contract V1
+solver objective.
+
+### Fleet semantics
+
+The legacy application derives `available_fleet_b` as the maximum of B's calculated minimum fleet
+and the count of declared vehicle IDs. It then records that derived value as an exact active fleet,
+copies active IDs from B to C, and asserts equal active-vehicle count.
+
+The Contract V1 target instead requires:
+
+- an explicit `available_fleet_limit` upper bound;
+- independently calculated `minimum_required_fleet`;
+- solver-determined initial terminal positioning by default; and
+- no requirement that every available or approved vehicle operate.
+
+The two semantics must be reconciled in the unified application service. The legacy exact-active
+fleet behavior must not be copied into CP-SAT.
+
+### Combined demand
+
+The legacy evaluator correctly warns that combined demand cannot support a directional conclusion.
+However, legacy generation falls back to combined records for each direction, and the older
+variable-trip path allocates combined demand using Scenario B's directional trip share as an
+assumption.
+
+Contract V1 correctly preserves combined demand as aggregate evidence and requires directional
+support for demand-guided directional optimization. The unified service must enforce that
+authority before invoking either solver.
+
+### Supply planning and objectives
+
+The legacy heuristic generates exact times and then derives/evaluates supply. It does not make the
+Contract V1 `BlockSupplyPlan` the canonical planning input to exact-time optimization. It uses a
+bounded deterministic candidate search rather than a proof-oriented hard-feasibility model.
+
+The initial CP-SAT milestone should therefore implement the exact fixed-resource technical problem
+first. Demand/headway objectives should follow only after the problem, candidate, and validator
+boundary is proven.
+
+### Export and presentation
+
+The legacy runtime produces a general result workbook and a separate B-C comparison workbook with
+legacy sheet names and shapes. Presentation/export helpers calculate or re-grid some summaries.
+They do not consume a complete Contract V1 accepted solution or generation outcome.
+
+The target is one authoritative domain result consumed by charts and editable XLSX without
+re-running allocation, validation, or optimization. UI/XLSX cutover must wait until heuristic and
+CP-SAT results reconcile through the same service and solution fingerprint.
+
+### Adjustment/orchestration direction
+
+Phase A on merged main successfully separates quantitative adjustment assessment from the solver
+problem. V1-D2 Phases B-E would add capability routing, authorization profiles, legacy
+projections, authorized requests, orchestration envelopes, and a long internal fingerprint chain.
+That direction is cancelled by the project reset and is not an implementation dependency.
+
+## Test and fixture gaps
+
+Main has broad synthetic unit and integration coverage, including Contract V1 normalization,
+evaluation, demand coverage, service adjustment, canonical problems, solver orchestration, and
+independent validation. Important gaps remain:
+
+- no CP-SAT tiny feasibility proofs;
+- no exhaustive-enumeration oracle for CP-SAT fixtures;
+- no heuristic-versus-CP-SAT differential suite;
+- no side-by-side application-service integration test;
+- no anonymized real-route corpus;
+- no difficult real-route fixtures for terminal imbalance, tight fleet, asymmetric runtime or
+  turnaround, endpoint locks, and irregular headways;
+- no Route 61-8 or Route 61-4 fixture;
+- no production-sized CP-SAT benchmark tiers;
+- no Contract V1-driven Streamlit upload/download test; and
+- no authoritative accepted-solution-to-chart/XLSX reconciliation test.
+
+Route 61-8 and Route 61-4 should be added only when anonymized source data is available and its
+provenance, operating day, exact runtimes, turnaround, fleet limit, and demand grain can be
+documented.
+
+## Exact recommended next steps
+
+1. Keep this documentation reset on a documentation-only branch and do not merge Phase B commit
+   `bc391e1967957fd530b51755331ce92da0bfdea8`.
+2. Define one unified application-service API over normalization, B evaluation, Phase A adjustment
+   assessment, canonical problem construction, solver selection, independent validation,
+   comparison, and presentation outputs.
+3. Add a characterization test proving current legacy behavior before changing `service.py`.
+4. Route the existing heuristic through `ScheduleProblemV1`, raw candidate, and the independent
+   validator; keep its algorithm and legacy UI behavior unchanged during this milestone.
+5. Define a transparent comparison vector covering hard feasibility, no-service blocks, overload
+   above 90%, overload above 85%, service gaps, regularity, shifted trips/minutes, and fleet as a
+   late tie-breaker. Do not reuse the legacy weighted scalar as authority.
+6. Implement an OR-Tools CP-SAT adapter for fixed total/directional trips, exact source runtimes,
+   terminal-specific turnaround, endpoint locks, available-fleet upper bound, solver-determined
+   initial positioning, continuous terminal stock, and independent validation. Include no demand
+   objective in the first feasibility pull request.
+7. Add 4-12-trip proof fixtures and heuristic/CP-SAT differential tests, then add anonymized
+   difficult route fixtures, including 61-8 and 61-4 when their source data is available.
+8. Add fixed-resource demand/headway objectives only after the hard-feasibility suite is green.
+9. Cut the UI, charts, and XLSX over to the unified authoritative result with side-by-side
+   validation and no presentation-layer recalculation.
+10. Consider variable-trip-count and V1-A1 structural demand-response work only as later optional
+    milestones.

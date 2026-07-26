@@ -8,6 +8,21 @@
 
 **Scope:** business rules, normalized domain contracts, scenario evaluation, Scenario C generation, fleet feasibility, output reconciliation, and solver boundaries
 
+## Active implementation-direction note
+
+[Project Direction Reset](PROJECT_DIRECTION_RESET.md) governs the active implementation roadmap.
+No new internal authorization, capability-routing, legacy-projection, authorized-request, or
+orchestration-envelope contracts are required between ordinary Python functions.
+
+The canonical solver flow remains:
+
+> `ScheduleProblemV1` → `ScheduleSolver` → raw candidate → independent domain validator →
+> `ScheduleGenerationOutcomeV1` with an accepted solution only when validation passes.
+
+Amendment V1-A1 is deferred and does not block fixed-resource hard feasibility. This direction
+changes sequencing only; it does not weaken any runtime, turnaround, fleet, demand-coverage,
+load-factor, headway, traceability, or validation rule in this contract.
+
 ## 0. Conformance and interpretation
 
 The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, **SHOULD NOT**, and **MAY** are normative. Contract V1 governs the future rebuilt engine even where the current MVP differs. A conflict with this contract is a migration gap, not permission to reinterpret the rule.

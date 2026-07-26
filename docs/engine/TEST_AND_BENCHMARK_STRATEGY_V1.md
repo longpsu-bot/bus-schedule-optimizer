@@ -1,123 +1,286 @@
 # Test and Benchmark Strategy V1
 
-The acceptance rules come from [Engine Contract V1](ENGINE_CONTRACT_V1.md) and [Amendment V1-A1](EXTREME_SERVICE_CHANGE_AND_DEMAND_SCENARIO_AMENDMENT_V1.md). This strategy is for later implementation; no OR-Tools tests are introduced by the documentation task.
+**Status:** Active strategy
 
-## Test layers
+**Governing direction:** [Project Direction Reset](PROJECT_DIRECTION_RESET.md)
 
-1. Schema examples and invalid-contract fixtures.
-2. Pure domain unit tests for normalization, demand blocks, LF, headways, locks, service-change metrics, support classification, and scenario assumptions.
-3. Validator property/invariant tests.
-4. Solver-adapter tests with tiny provable instances.
-5. Cross-adapter integration tests from workbook/UI normalization to solution or unresolved-demand outcome.
-6. Visualization/XLSX reconciliation and golden-structure tests.
-7. Regression corpus and performance benchmarks.
+The immediate purpose of this strategy is to prove a fixed-resource one-route solver boundary
+before adding demand objectives or cutting over the UI. Tests must establish correctness with
+small explainable cases, then differential behavior, then real-route evidence.
 
-## Required fixture families
+## Priority order
 
-### Input and normalization
+1. Tiny hard-feasibility proofs.
+2. Heuristic-versus-CP-SAT differential tests through the same problem and validator boundary.
+3. Anonymized real-route fixtures, especially difficult headway, terminal-balance, turnaround,
+   and fleet cases.
+4. Fixed-resource demand/headway objective tests.
+5. Application-service, chart, and XLSX reconciliation.
+6. Performance benchmarks.
 
-Missing A/B fields, blocking missing capacity, required positive available fleet limit, optional/nullable approved fleet metadata, invalid times/directions, duplicate IDs, multi-day totals, average-day data, combined vs directional demand, source-resolution detection, irregular/timestamp/trip-level data, and unsupported finer-than-source splitting.
+V1-A1 structural demand-response scenarios and monitoring tests are deferred. They do not block
+hard-feasibility work.
 
-Trip-count fixtures MUST prove that total trips are across both directions and that actual directional counts remain authoritative. Include symmetric examples such as 80 total = 40/40 and 40 total = 20/20, plus asymmetric examples such as 41/39 that MUST NOT be replaced by an even split. Headway assertions use exact departures separately by direction.
+## 1. Tiny feasibility proofs
 
-### B evaluation
+Maintain hand-solvable instances with 4-12 trips. The first CP-SAT pull request must cover:
 
-Declared total mismatch, directional mismatch, first/last mismatch, turnaround/location violation, insufficient fleet, demand-unsuitable but technically feasible B, technically invalid B whose parameter set is feasible, parameter-level infeasibility, and technically feasible structural changes whose demand response is unresolved.
+- one vehicle operating one feasible alternating chain;
+- an unavoidable second vehicle;
+- solver-determined initial positioning at both terminals;
+- terminal imbalance requiring a specific initial split;
+- exact runtime inherited from each source trip;
+- unequal terminal-specific turnaround;
+- a ready event and departure at the same timestamp, with ready processed first;
+- locked first and last departures;
+- fixed total and directional trip counts;
+- a feasible schedule exactly at the available-fleet limit;
+- infeasibility below the minimum required fleet;
+- negative terminal-stock rejection;
+- a deliberately corrupted raw candidate rejected by the independent validator; and
+- honest mapping of `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`, `MODEL_INVALID`, and `UNKNOWN`.
 
-### Structural service change and scenario analysis
+Compare CP-SAT results with exhaustive enumeration where practical. A solver-native feasible
+status is insufficient unless the independent validator accepts the candidate.
 
-Required fixtures include:
+The first feasibility suite includes no demand objective. It must not depend on V1-A1 scenario
+selection.
 
-- routine changes below a review signal with source-supported demand;
-- material but supportable changes with high-resolution demand;
-- 10-to-40 and 20-to-80 total-trip structural changes under symmetric and asymmetric directions;
-- a small whole-day change concentrated into one interval and therefore structural locally;
-- coarse 60/120/150-minute demand intervals containing several B departures;
-- major directional headway compression from a low-frequency baseline;
-- operating-span extension and contraction;
-- combined demand that remains combined under all scenarios;
-- no demand dataset, which permits technical results and passenger thresholds only;
-- calibrated-model available versus scenario-analysis-required paths.
+## 2. Canonical boundary and invariant tests
 
-Assertions require:
+Property and regression tests must prove:
 
-- no fabricated passenger value per proposed departure;
-- deterministic total/directional/local change metrics;
-- classification from multiple signals rather than one fixed percentage;
-- correct `demand_temporal_support`, `frequency_change_support`, and `demand_response_support`;
-- unresolved structural cases cannot return binary demand suitability;
-- target disposition `B_TECHNICALLY_FEASIBLE_DEMAND_RESPONSE_UNRESOLVED`;
-- target generation result `C_NOT_GENERATED_DEMAND_RESPONSE_UNRESOLVED` with `NOT_RUN`, null solver fields, zero duration, and null solution;
-- technical/fleet results remain invariant across demand scenarios when the timetable is unchanged;
-- scenario assumptions, units, provenance, confidence, and selection fingerprints are complete;
-- post-implementation monitoring requirements are present.
+- normalization preserves exact source values and never mutates the source workbook;
+- total trips are across both directions;
+- actual directional counts remain authoritative, including asymmetric examples such as 41/39;
+- `ScheduleProblemV1` carries the exact fixed-resource facts used by the solver;
+- C total and directional trips equal B in `fixed_by_direction`;
+- every accepted C trip maps one-to-one to a source B trip;
+- first/last departures remain locked;
+- per-trip runtime remains exact;
+- turnaround is applied at the arrival terminal;
+- minimum required fleet does not exceed the available upper bound;
+- recommended initial terminal counts sum to minimum required fleet;
+- terminal stock remains non-negative over the continuous event timeline;
+- demand-block boundaries do not reset fleet or headway chronology;
+- solver candidates are non-authoritative before validation;
+- non-accepted outcomes contain no fabricated Scenario C; and
+- problem, candidate, solution, and outcome fingerprints change when their persisted/cached
+  authoritative payload changes.
 
-### C invariants
+Fingerprints are tested for reproducible identity and reconciliation, not internal authorization.
 
-Property tests assert all locked parameters equal B; total trips equal B; default directional totals equal B; default `available_upper_bound`; default solver-determined initial positioning; fixed/bounded configuration validity; first/last locks; one-to-one trace; exact timetable/block-plan reconciliation; and independent validation rejection of a deliberately corrupted solver candidate.
+## 3. Heuristic versus CP-SAT differential tests
 
-A structural-change case without an approved scenario or calibrated model MUST NOT produce an authoritative demand-optimized C. Hard-feasibility candidates, if tested, remain explicitly technical/non-authoritative.
+Run the existing heuristic adapter and CP-SAT adapter from the same canonical problem. Validate
+both raw candidates independently and compare:
 
-### Fleet and terminal stock
+- candidate accepted/rejected state;
+- hard-constraint issue codes;
+- total and directional trip locks;
+- endpoint locks;
+- runtime and turnaround evidence;
+- minimum required fleet and initial positioning;
+- terminal-stock profile;
+- no-service blocks;
+- overload above 90%;
+- overload above 85%;
+- excessive gaps;
+- headway regularity;
+- shifted-trip count;
+- total and maximum shift; and
+- native solver status and limitations.
 
-Test `minimum_required_fleet` below, equal to, and above the available limit; correct fleet margin; initial terminal counts summing to the calculated minimum; fixed mode requiring both values; bounded mode honoring both terminal ranges; ready-before-departure ordering at equal timestamps; negative-stock rejection; and continuity across demand-block boundaries. Verify unused available/approved vehicles need not perform trips and fleet minimization is only a late tie-breaker.
+The comparison is a transparent ordered vector, not the legacy weighted scalar score. A solver may
+win a lower-priority metric only when all higher-priority metrics are equal. The heuristic must
+never pass when a hard rule fails and must never claim proof of infeasibility or optimality.
 
-### Load factor
+Include cases where:
 
-Boundary cases at 0, below 85%, exactly 85%, between ceilings, exactly 90%, above 90%, and demand/no trips. A metamorphic test adds surplus trips in a low-LF period and verifies that no symmetric-to-85 penalty makes the result worse. Static/code-policy tests reject `abs(load_factor - 0.85)` or equivalent objective construction in authoritative planning.
+- both solvers find the same canonical timetable;
+- both find different but equally feasible timetables;
+- CP-SAT finds a feasible timetable missed by the heuristic;
+- the heuristic finds a candidate used as a CP-SAT hint;
+- a candidate from either solver is corrupted before validation; and
+- a time-limited CP-SAT run returns `UNKNOWN` without being called infeasible.
 
-For scenario analysis, calculate LF only at authoritative source-demand grain. A metamorphic test increases the number of B departures inside a coarse source interval and proves the engine changes aggregate interval supply without inventing a finer demand series.
+## 4. Real-route fixture corpus
 
-### Demand blocks
+Build versioned anonymized fixtures from actual route data. Each fixture must document:
 
-Native 15/30/60, daily-only, adaptive sustained changes, insignificant fluctuation merging, no unsupported split, variable duration/rate calculations, critical/no-service preservation, direction divergence, manual boundary validation, and proof that a block boundary does not create a headway regime boundary.
+- anonymized route ID and provenance;
+- operating-day type;
+- exact directional timetable;
+- exact source-trip runtimes;
+- terminal-specific turnaround;
+- vehicle capacity and available-fleet limit;
+- demand source grain, direction availability, confidence, and observation-day handling;
+- expected expert-reviewed constraints or outcome; and
+- any redaction or limitation.
 
-Add cross-grain fixtures where B has multiple departures per source interval. The demand total/rate and source IDs remain unchanged while A/B trip counts and supply rates change.
+The corpus must include:
 
-### Diagrams and UI workflow
+- balanced and asymmetric directional counts;
+- tight and loose fleet limits;
+- difficult terminal imbalance;
+- short turnaround and long runtime combinations;
+- endpoint-lock pressure;
+- irregular and near-balanced headway sequences;
+- feasible and infeasible variants;
+- demand with coarse, directional, and combined-only grain; and
+- schedules near the intended interactive trip-count tier.
 
-Combined one-polygon case; directional envelope/components without double count; outbound/inbound/total trip lines; B/C six-line compare; non-vehicle terminology; proportional interval widths; default normalized rates; reference lines; hover completeness; A/B/C small-multiple reconciliation; and exact-departure trace count.
+Add Route 61-8 and Route 61-4 when anonymized source data is available. Do not invent these
+fixtures from route names or public summaries; require exact timetable and operating facts with
+reviewable provenance.
 
-Structural-change acceptance adds total versus actual directional counts, per-direction A/B headways, trigger metrics, support classifications, scenario cards, observed-versus-assumed visual distinction, assumptions/provenance, unresolved-demand language, and post-implementation monitoring notice. The base workflow MUST NOT require re-entry of passenger rows.
+For every approved route fixture, compare the legacy runtime where possible, the canonical
+heuristic, CP-SAT, and any expert-reviewed timetable.
 
-### XLSX
+## 5. Fixed-resource demand and headway objectives
 
-Required sheet names/order, Vietnamese headings, frozen/filterable headers, time/percentage formats, source not overwritten, fingerprints consistent, no missing/duplicate C trace, and values equal authoritative domain rows.
+Add these tests only after the hard-feasibility gate is green.
 
-The `1.1.0` target additionally validates `KICH_BAN_NHU_CAU` and `KE_HOACH_HAU_KIEM`, scenario provenance, observed-versus-assumed labels, actual directional reconciliation, unresolved-demand statuses, and absence of fabricated trip-level demand or C rows.
+### Demand authority and load factor
 
-## Tiny solver proofs
+Test:
 
-Maintain hand-solvable cases with 4–12 trips for: one feasible chain; unavoidable second vehicle; solver-determined initial split; fixed/bounded split; terminal imbalance; exact first/last locks; no-service priority; overload tradeoff; regularity tie; and infeasible available fleet limit. Compare CP-SAT status/objective to exhaustive enumeration where practical.
+- 0, below 85%, exactly 85%, between 85% and 90%, exactly 90%, above 90%, and demand with no
+  service;
+- one-sided penalties only;
+- no `abs(load_factor - 0.85)` or equivalent authoritative objective;
+- no reduction of service merely to raise low load factor;
+- native 15/30/60-minute and irregular source intervals;
+- no unsupported split finer than source demand;
+- combined demand remaining combined;
+- directional conclusions only from authoritative directional evidence; and
+- exact planned/actual block reconciliation.
 
-Hard-feasibility proofs are independent of demand-response scenario selection. Demand-allocation proofs run only after Stage 3A contracts and fixtures are green.
+### Lexicographic objectives
 
-## Regression and differential validation
+Fixtures must prove this order:
 
-For every approved route fixture, compare current heuristic C, CP-SAT C, and expert-reviewed timetable on feasibility, lock invariants, overload vector, gaps, regularity, shift metrics, fleet, and explanation. The heuristic may be better on a lower-priority metric but must never pass when a hard rule fails.
+1. prevent demand intervals with no service;
+2. reduce critical intervals and overload above 90%;
+3. reduce overload above 85%;
+4. reduce excessive gaps;
+5. improve sustained-demand alignment;
+6. improve regularity;
+7. preserve stable B sections;
+8. minimize shifted trips, total shift, and maximum shift; and
+9. use fleet only as a late tie-breaker.
 
-Structural-change fixtures compare technical results across scenario selections and demand results across configured assumptions. Reports MUST distinguish observed A evidence, sensitivity scenarios, calibrated forecasts, and post-implementation B evidence.
+Fix each prior-stage optimum before solving the next stage, or prove a mathematically safe
+lexicographic encoding. A lower-priority improvement must never degrade a higher-priority result.
 
-## Performance matrix
+### Headway
 
-Use 40–80, 150, 300, and 400–500 trip tiers. Each tier includes balanced and asymmetric directions, uniform and peaky demand, tight/loose fleet, and feasible/infeasible variants. Report the metrics and targets in the OR-Tools design document.
+Include:
 
-Add extreme service-change cases whose A and B trip totals differ materially. Runtime reporting separates deterministic technical computation from scenario-count-dependent demand evaluation.
+- exact regular sequences;
+- balanced floor/ceiling sequences such as `22,23,22,23`;
+- irregular sequences;
+- zero-headway exceptions;
+- regimes crossing demand-block boundaries;
+- endpoint locks;
+- stable-B preservation; and
+- coordinated local re-spacing rather than isolated trip movement.
 
-Run at least five warm repetitions plus one cold start on a pinned machine. Store median, p95, maximum memory, solver version, Python version, CPU, worker count, seed, and commit. Retain instance/problem fingerprints.
+## 6. Unified application service
 
-## Determinism and flake policy
+Before UI cutover, run legacy and unified services side by side and reconcile:
 
-Run identical cases repeatedly. Optimal cases require identical objective and canonical solution fingerprints. Time-limited cases require identical validity and higher-priority objectives in deterministic mode; production parallel mode records allowed variance. No test may pass by increasing timeouts without a benchmark review.
+- imported/normalized inputs;
+- B validation and evaluation;
+- adjustment decision;
+- solver invocation/no-run decision;
+- generation outcome;
+- accepted timetable;
+- objective vector;
+- fleet and stock evidence; and
+- limitations.
 
-Scenario catalogues and selections require deterministic assumption and evaluation fingerprints. Generated timestamps and solve durations are excluded from identity hashes where the governing contract excludes them.
+Tests must prove that a no-run, infeasible, unknown, model-invalid, or validator-rejected result
+does not produce Scenario C rows.
+
+## 7. Charts and XLSX
+
+For one accepted solution and outcome identity, verify:
+
+- chart and workbook totals equal authoritative A/B/C totals;
+- C directional totals equal B in `fixed_by_direction`;
+- C planned block counts equal exact departures under the boundary convention;
+- combined demand is not double-counted or fabricated into directions;
+- UI, diagrams, and XLSX show the same solver status and limitations;
+- exact-departure traces contain no missing or duplicate C trip;
+- editable XLSX values come from domain rows rather than recalculation;
+- expected Vietnamese headings, filters, frozen headers, time formats, and percentage formats are
+  present;
+- the source workbook is never overwritten; and
+- a non-accepted outcome creates an explicit status without fake C rows.
+
+Retain legacy exporter tests until the Contract V1 cutover is complete.
+
+## 8. Performance matrix
+
+Benchmark only after functional proof tests are stable.
+
+| Daily trips | First feasible target | Total staged solve target | Peak memory target | Use |
+|---:|---:|---:|---|---|
+| 40-80 | <= 1 s | <= 5 s | <= 512 MB | interactive baseline |
+| 150 | <= 5 s | <= 30 s | <= 1 GB | normal large route |
+| 300 | <= 15 s | <= 120 s | <= 2 GB | large-case acceptance |
+| 400-500 | <= 60 s | <= 300 s | <= 4 GB | stress |
+
+Each tier should include balanced/asymmetric directions, tight/loose fleet, and
+feasible/infeasible variants. Once demand objectives exist, add uniform and peaky demand variants.
+
+Run at least five warm repetitions plus one cold start on a pinned machine. Record:
+
+- model-build time;
+- first-feasible and total time;
+- variables and constraints by family;
+- native status, objective vector, and best bound;
+- branches and conflicts;
+- peak memory;
+- OR-Tools and Python versions;
+- CPU, worker count, seed, and deterministic controls;
+- commit SHA; and
+- problem, candidate, solution, and outcome fingerprints.
+
+## 9. Determinism and flake policy
+
+Optimal cases require the same objective vector and canonical solution fingerprint for identical
+inputs and deterministic controls. Time-limited cases require valid status and invariant behavior;
+`UNKNOWN` is acceptable and is not infeasibility.
+
+Run single-worker deterministic benchmarks separately from production parallel benchmarks. Do not
+make a failing test pass by increasing its timeout without benchmark review.
+
+## 10. Deferred V1-A1 scenario and monitoring tests
+
+The following are deferred until fixed-resource feasibility, objectives, and the route corpus are
+stable:
+
+- structural service-change classification;
+- 10-to-40 and 20-to-80 trip response scenarios;
+- temporal/frequency/response-support classifications;
+- sensitivity-scenario catalogue and selection;
+- calibrated demand-response provenance;
+- unresolved-demand dispositions and result statuses;
+- observed-versus-assumed UI and XLSX presentation; and
+- post-implementation monitoring plans.
+
+When resumed, these tests must prove that coarse A demand is not fabricated into B
+departure-level demand and that scenario assumptions are never presented as observations.
 
 ## Stage gates
 
-- Domain cutover: normalization and evaluator contract suite green.
-- Structural-change boundary: V1-A1 schema/domain/fixture/UI/export suite green.
-- Solver feasibility: all hard-invariant/proof cases green.
-- Allocation: no-service/overload priority suite green and structural-change boundary complete.
-- Regularity: headway and traceability suite green.
-- Export/UI: reconciliation and fingerprint suite green.
-- Final cutover: regression corpus approved and all performance tiers meet agreed gates or carry signed exceptions.
+- **Heuristic boundary:** legacy heuristic crosses the canonical problem/candidate/validator path
+  with behavior parity.
+- **CP-SAT feasibility:** all tiny hard-invariant proofs pass.
+- **Differential:** heuristic and CP-SAT comparison suite passes.
+- **Route corpus:** difficult anonymized real-route fixtures are approved.
+- **Objectives:** one-sided demand and lexicographic headway/shift suites pass.
+- **UI/XLSX:** unified-service reconciliation and no-fake-C tests pass.
+- **Performance:** agreed benchmark tiers pass or carry documented exceptions.

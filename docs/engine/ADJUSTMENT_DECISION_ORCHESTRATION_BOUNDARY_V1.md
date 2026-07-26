@@ -1,6 +1,20 @@
 # Contract V1 Adjustment Decision Orchestration and Capability Routing Boundary
 
-**Status:** Proposed implementation design
+## SUPERSEDED FOR IMPLEMENTATION
+
+**Status:** Retained as architectural history; not an active implementation plan
+
+[Project Direction Reset](PROJECT_DIRECTION_RESET.md) governs the active roadmap. The only part
+retained for implementation is the Phase A separation of quantitative pre-problem evaluation:
+decide whether adjustment is needed before building a solver problem.
+
+V1-D2 Phases B through E are cancelled. Do not implement the capability router, authorization
+request or profile, legacy assessment projection, orchestration envelope, or phase-by-phase
+fingerprint-chain design described below. Unmerged commit
+`bc391e1967957fd530b51755331ce92da0bfdea8` must not be merged, cherry-picked, or copied.
+
+The remaining content is preserved unchanged as the historical design record that led to this
+reset.
 
 **Design ID:** `V1-D2`
 
