@@ -825,15 +825,13 @@ def test_feasibility_only_explanation_never_claims_best_timetable() -> None:
     context, solver, _ = _one_vehicle_request()
 
     run = solver.solve(context.problem)
+    feasibility_model = ortools_solver_module._build_cp_sat_model(context.problem).model
 
     assert run.solver_status == NativeSolverStatus.OPTIMAL
     assert run.candidate is not None
     assert "no service-quality objective was optimized" in run.candidate.explanation
     assert "best timetable" not in run.candidate.explanation.lower()
-    assert all(
-        term not in Path(ortools_solver_module.__file__).read_text(encoding="utf-8").lower()
-        for term in ("model.minimize", "model.maximize")
-    )
+    assert not feasibility_model.proto.objective.vars
 
 
 def test_headway_regimes_cover_each_direction_and_report_exact_sequences() -> None:
