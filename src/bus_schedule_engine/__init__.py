@@ -12,6 +12,7 @@ from .optimization_service import (
     BusScheduleOptimizationResult,
     OptimizationAction,
     SolverChoice,
+    SolverComparisonV1,
     analyze_and_optimize_schedule_v1,
     select_optimization_action,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "OptimizationAction",
     "RouteType",
     "ScenarioParameters",
+    "SolverComparisonV1",
     "SolverChoice",
     "Trip",
     "analyze_and_optimize_schedule_v1",

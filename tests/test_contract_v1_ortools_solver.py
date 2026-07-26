@@ -703,14 +703,13 @@ def test_ortools_adapter_never_imports_or_calls_the_heuristic_generator() -> Non
     assert "c_generator" not in source
 
 
-def test_optimization_service_remains_unintegrated_and_solver_choices_unavailable() -> None:
+def test_optimization_service_does_not_use_the_feasibility_only_adapter() -> None:
     source = Path(optimization_service.__file__).read_text(encoding="utf-8")
 
     assert "build_ortools_schedule_request_v1" not in source
     assert "OrToolsCpSatScheduleSolver" not in source
     for solver_choice in (SolverChoice.OR_TOOLS, SolverChoice.BOTH):
-        with pytest.raises(NotImplementedError):
-            optimization_service._validate_solver_choice(solver_choice)
+        optimization_service._validate_solver_choice(solver_choice)
 
 
 def test_supplied_solver_controls_are_applied_and_disclosed(

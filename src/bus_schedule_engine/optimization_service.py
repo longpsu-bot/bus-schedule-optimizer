@@ -19,6 +19,7 @@ from .contracts_v1 import (
     ServiceAdjustmentEvaluationContextV1,
     SolverPolicyV1,
     build_heuristic_schedule_request_v1,
+    build_ortools_service_quality_request_v1,
     build_service_adjustment_evaluation_context_v1,
     evaluate_scenario_b_v1,
     evaluate_service_adjustment_need_v1,
@@ -26,6 +27,11 @@ from .contracts_v1 import (
     run_schedule_solver_v1,
 )
 from .importer import ImportedWorkbook
+from .optimization_comparison import (
+    SolverComparisonV1,
+    compare_solver_outcomes_v1,
+    comparison_proof_limitations_v1,
+)
 
 
 class OptimizationAction(StrEnum):
@@ -54,6 +60,8 @@ class BusScheduleOptimizationResult:
     solver_choice: SolverChoice
     solver_attempted: bool
     heuristic_outcome: ScheduleGenerationOutcomeV1 | None
+    ortools_outcome: ScheduleGenerationOutcomeV1 | None
+    comparison: SolverComparisonV1 | None
     recommended_outcome: ScheduleGenerationOutcomeV1 | None
     explanations: tuple[str, ...]
     limitations: tuple[str, ...]
@@ -86,6 +94,11 @@ _DIRECTIONAL_SOLVING_UNAVAILABLE = (
     "Authoritative directional solving is unavailable because H3 demand coverage "
     "does not fully support both directional streams."
 )
+_BOTH_SOLVER_BUDGET_LIMITATION = (
+    "BOTH applies SolverPolicyV1.time_limit_seconds unchanged as a per-solver "
+    "invocation budget; total wall-clock execution may be up to approximately "
+    "two solver budgets plus application overhead."
+)
 
 
 def select_optimization_action(
@@ -98,10 +111,6 @@ def select_optimization_action(
 def _validate_solver_choice(solver_choice: SolverChoice) -> None:
     if not isinstance(solver_choice, SolverChoice):
         raise TypeError("solver_choice must be a SolverChoice")
-    if solver_choice != SolverChoice.HEURISTIC:
-        raise NotImplementedError(
-            f"{solver_choice.value} is unavailable: OR-Tools CP-SAT is not implemented yet."
-        )
 
 
 def _default_decision_policy(
@@ -140,12 +149,18 @@ def _result(
     adjustment_assessment: ServiceAdjustmentAssessmentV1,
     selected_action: OptimizationAction,
     solver_choice: SolverChoice,
-    solver_attempted: bool = False,
-    heuristic_outcome: ScheduleGenerationOutcomeV1 | None = None,
+    solver_attempted: bool,
+    heuristic_outcome: ScheduleGenerationOutcomeV1 | None,
+    ortools_outcome: ScheduleGenerationOutcomeV1 | None,
+    comparison: SolverComparisonV1 | None,
+    recommended_outcome: ScheduleGenerationOutcomeV1 | None,
     extra_limitations: tuple[str, ...] = (),
 ) -> BusScheduleOptimizationResult:
-    outcome_explanations = heuristic_outcome.explanations if heuristic_outcome is not None else ()
-    outcome_limitations = heuristic_outcome.limitations if heuristic_outcome is not None else ()
+    heuristic_explanations = heuristic_outcome.explanations if heuristic_outcome is not None else ()
+    ortools_explanations = ortools_outcome.explanations if ortools_outcome is not None else ()
+    comparison_explanations = (comparison.explanation,) if comparison is not None else ()
+    heuristic_limitations = heuristic_outcome.limitations if heuristic_outcome is not None else ()
+    ortools_limitations = ortools_outcome.limitations if ortools_outcome is not None else ()
     return BusScheduleOptimizationResult(
         normalized_inputs=normalized_inputs,
         b_evaluation=b_evaluation,
@@ -155,13 +170,23 @@ def _result(
         solver_choice=solver_choice,
         solver_attempted=solver_attempted,
         heuristic_outcome=heuristic_outcome,
-        recommended_outcome=heuristic_outcome,
-        explanations=_deduplicate((adjustment_assessment.explanation, *outcome_explanations)),
+        ortools_outcome=ortools_outcome,
+        comparison=comparison,
+        recommended_outcome=recommended_outcome,
+        explanations=_deduplicate(
+            (
+                adjustment_assessment.explanation,
+                *heuristic_explanations,
+                *ortools_explanations,
+                *comparison_explanations,
+            )
+        ),
         limitations=_deduplicate(
             (
                 *adjustment_assessment.limitations,
+                *heuristic_limitations,
+                *ortools_limitations,
                 *extra_limitations,
-                *outcome_limitations,
             )
         ),
     )
@@ -178,7 +203,7 @@ def analyze_and_optimize_schedule_v1(
     heuristic_config: ScenarioCConfig | None = None,
     solver_policy: SolverPolicyV1 | None = None,
 ) -> BusScheduleOptimizationResult:
-    """Normalize, assess, and conditionally run the canonical heuristic boundary."""
+    """Normalize, assess, and conditionally run the selected canonical solver boundary."""
     _validate_solver_choice(solver_choice)
     normalized_inputs = normalize_imported_workbook_v1(imported, normalization_options)
     effective_evaluation_policy = evaluation_policy or ScenarioBEvaluationPolicyV1()
@@ -208,18 +233,77 @@ def analyze_and_optimize_schedule_v1(
         "solver_choice": solver_choice,
     }
     if selected_action not in _FIXED_RESOURCE_ACTIONS:
-        return _result(**result_arguments)
+        return _result(
+            **result_arguments,
+            solver_attempted=False,
+            heuristic_outcome=None,
+            ortools_outcome=None,
+            comparison=None,
+            recommended_outcome=None,
+        )
 
     if not _directional_generation_supported(b_evaluation):
         return _result(
             **result_arguments,
+            solver_attempted=False,
+            heuristic_outcome=None,
+            ortools_outcome=None,
+            comparison=None,
+            recommended_outcome=None,
             extra_limitations=(_DIRECTIONAL_SOLVING_UNAVAILABLE,),
+        )
+
+    if solver_choice == SolverChoice.HEURISTIC:
+        effective_heuristic_config = heuristic_config or ScenarioCConfig.from_mapping(
+            imported.configuration
+        )
+        heuristic_context, heuristic_solver = build_heuristic_schedule_request_v1(
+            normalized_inputs,
+            b_evaluation,
+            imported.parameters_b,
+            imported.trips_b,
+            imported.demand,
+            effective_heuristic_config,
+            evaluation_policy=effective_evaluation_policy,
+            solver_policy=solver_policy,
+        )
+        heuristic_outcome = run_schedule_solver_v1(
+            heuristic_context,
+            heuristic_solver,
+        )
+        return _result(
+            **result_arguments,
+            solver_attempted=True,
+            heuristic_outcome=heuristic_outcome,
+            ortools_outcome=None,
+            comparison=None,
+            recommended_outcome=heuristic_outcome,
+        )
+
+    if solver_choice == SolverChoice.OR_TOOLS:
+        ortools_context, ortools_solver = build_ortools_service_quality_request_v1(
+            normalized_inputs,
+            b_evaluation,
+            evaluation_policy=effective_evaluation_policy,
+            solver_policy=solver_policy,
+        )
+        ortools_outcome = run_schedule_solver_v1(
+            ortools_context,
+            ortools_solver,
+        )
+        return _result(
+            **result_arguments,
+            solver_attempted=True,
+            heuristic_outcome=None,
+            ortools_outcome=ortools_outcome,
+            comparison=None,
+            recommended_outcome=ortools_outcome,
         )
 
     effective_heuristic_config = heuristic_config or ScenarioCConfig.from_mapping(
         imported.configuration
     )
-    generation_context, heuristic_solver = build_heuristic_schedule_request_v1(
+    heuristic_context, heuristic_solver = build_heuristic_schedule_request_v1(
         normalized_inputs,
         b_evaluation,
         imported.parameters_b,
@@ -229,20 +313,48 @@ def analyze_and_optimize_schedule_v1(
         evaluation_policy=effective_evaluation_policy,
         solver_policy=solver_policy,
     )
+    ortools_context, ortools_solver = build_ortools_service_quality_request_v1(
+        normalized_inputs,
+        b_evaluation,
+        evaluation_policy=effective_evaluation_policy,
+        solver_policy=solver_policy,
+    )
     heuristic_outcome = run_schedule_solver_v1(
-        generation_context,
+        heuristic_context,
         heuristic_solver,
     )
+    ortools_outcome = run_schedule_solver_v1(
+        ortools_context,
+        ortools_solver,
+    )
+    comparison = compare_solver_outcomes_v1(
+        ortools_context.problem,
+        heuristic_outcome,
+        ortools_outcome,
+    )
+    recommended_outcome = {
+        SolverChoice.HEURISTIC: heuristic_outcome,
+        SolverChoice.OR_TOOLS: ortools_outcome,
+        None: None,
+    }[comparison.recommended_solver]
     return _result(
         **result_arguments,
         solver_attempted=True,
         heuristic_outcome=heuristic_outcome,
+        ortools_outcome=ortools_outcome,
+        comparison=comparison,
+        recommended_outcome=recommended_outcome,
+        extra_limitations=(
+            _BOTH_SOLVER_BUDGET_LIMITATION,
+            *comparison_proof_limitations_v1(comparison, ortools_outcome),
+        ),
     )
 
 
 __all__ = [
     "BusScheduleOptimizationResult",
     "OptimizationAction",
+    "SolverComparisonV1",
     "SolverChoice",
     "analyze_and_optimize_schedule_v1",
     "select_optimization_action",

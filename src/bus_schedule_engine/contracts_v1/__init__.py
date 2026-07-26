@@ -121,6 +121,10 @@ from .service_adjustment import (
     TechnicalAdjustmentEvidenceV1,
     TechnicalEventEvidenceV1,
 )
+from .service_quality_metrics import (
+    SERVICE_QUALITY_OBJECTIVE_NAMES_V1,
+    recompute_service_quality_objective_vector_v1,
+)
 from .solver_adapter import (
     HeuristicCompatibilityContextV1,
     HeuristicScheduleSolverAdapter,
@@ -255,6 +259,7 @@ __all__ = [
     "ScenarioBEvaluationError",
     "ScenarioBEvaluationPolicyV1",
     "ScenarioId",
+    "SERVICE_QUALITY_OBJECTIVE_NAMES_V1",
     "ServiceAdjustmentAssessmentV1",
     "ServiceAdjustmentDecisionPolicyV1",
     "ServiceAdjustmentDecisionV1",
@@ -311,6 +316,7 @@ __all__ = [
     "normalize_imported_workbook_v1",
     "observed_demand_fingerprint",
     "project_service_adjustment_decision_policy_v1",
+    "recompute_service_quality_objective_vector_v1",
     "run_schedule_solver_v1",
     "scenario_fingerprint",
     "scenario_to_contract_dict",

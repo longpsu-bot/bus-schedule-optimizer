@@ -394,6 +394,8 @@ def test_no_solver_actions_construct_no_problem_and_invoke_no_solver(
     assert result.selected_action == EXPECTED_ACTIONS[decision]
     assert result.solver_attempted is False
     assert result.heuristic_outcome is None
+    assert result.ortools_outcome is None
+    assert result.comparison is None
     assert result.recommended_outcome is None
     assert result.explanations == (result.adjustment_assessment.explanation,)
     assert result.limitations == result.adjustment_assessment.limitations
@@ -559,6 +561,8 @@ def test_canonical_respace_path_executes_and_accepts_an_independently_validated_
     assert validation_calls == 1
     assert result.solver_attempted is True
     assert result.heuristic_outcome is result.recommended_outcome
+    assert result.ortools_outcome is None
+    assert result.comparison is None
     assert result.heuristic_outcome is not None
     assert (
         result.heuristic_outcome.result_status != GenerationResultStatus.C_NOT_REQUIRED_B_SUITABLE
@@ -588,6 +592,8 @@ def test_canonical_redistribute_trips_path_invokes_the_real_solver() -> None:
     assert result.selected_action == OptimizationAction.FIXED_RESOURCE_REDISTRIBUTION
     assert result.solver_attempted is True
     assert result.heuristic_outcome is result.recommended_outcome
+    assert result.ortools_outcome is None
+    assert result.comparison is None
     assert result.heuristic_outcome is not None
     assert result.heuristic_outcome.execution_status == SolverExecutionStatus.COMPLETED
     assert result.heuristic_outcome.solver_status == NativeSolverStatus.UNKNOWN
@@ -1053,33 +1059,11 @@ def test_unified_module_has_no_direct_generator_or_cancelled_phase_b_dependency(
     assert {"run_analysis", "score_scenario", "generate_scenario_c"}.isdisjoint(called_names)
 
 
-@pytest.mark.parametrize("solver_choice", (SolverChoice.OR_TOOLS, SolverChoice.BOTH))
-def test_unimplemented_solver_choices_fail_before_normalization_without_fallback(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("solver_choice", tuple(SolverChoice))
+def test_every_declared_solver_choice_is_accepted_by_validation(
     solver_choice: SolverChoice,
 ) -> None:
-    imported, options = _fixture()
-    normalization_called = False
-
-    def forbidden_normalization(*args, **kwargs):
-        nonlocal normalization_called
-        normalization_called = True
-        raise AssertionError("Unsupported solver choice must fail immediately")
-
-    monkeypatch.setattr(
-        optimization_service,
-        "normalize_imported_workbook_v1",
-        forbidden_normalization,
-    )
-
-    with pytest.raises(NotImplementedError, match="CP-SAT is not implemented yet"):
-        analyze_and_optimize_schedule_v1(
-            imported,
-            options,
-            solver_choice=solver_choice,
-        )
-
-    assert normalization_called is False
+    optimization_service._validate_solver_choice(solver_choice)
 
 
 def test_invalid_solver_choice_type_fails_before_normalization(

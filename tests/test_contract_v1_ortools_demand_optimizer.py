@@ -862,15 +862,14 @@ def test_prohibited_future_objectives_and_heuristic_import_are_absent(forbidden)
     assert forbidden not in source
 
 
-def test_optimization_service_remains_unchanged_and_solver_choices_unavailable() -> None:
+def test_optimization_service_does_not_use_the_demand_only_adapter() -> None:
     service_path = Path(optimization_service.__file__)
     source = service_path.read_text(encoding="utf-8")
 
     assert "OrToolsCpSatDemandOptimizationSolver" not in source
-    with pytest.raises(NotImplementedError):
-        optimization_service._validate_solver_choice(SolverChoice.OR_TOOLS)
-    with pytest.raises(NotImplementedError):
-        optimization_service._validate_solver_choice(SolverChoice.BOTH)
+    assert "build_ortools_demand_optimization_request_v1" not in source
+    optimization_service._validate_solver_choice(SolverChoice.OR_TOOLS)
+    optimization_service._validate_solver_choice(SolverChoice.BOTH)
 
 
 def test_model_uses_exact_membership_and_eight_unweighted_stages() -> None:
