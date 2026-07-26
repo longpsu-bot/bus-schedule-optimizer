@@ -18,10 +18,12 @@ from bus_schedule_engine import (
 )
 from bus_schedule_engine.c_config import ScenarioCConfig
 from bus_schedule_engine.contracts_v1 import (
+    BDisposition,
     ContractDirection,
     ContractValidationError,
     DemandConfidence,
     GenerationResultStatus,
+    HeuristicScheduleSolverAdapter,
     NativeSolverStatus,
     NormalizationOptions,
     OperatingDayType,
@@ -44,7 +46,8 @@ from bus_schedule_engine.contracts_v1 import (
 from bus_schedule_engine.contracts_v1 import (
     run_schedule_solver_v1 as canonical_solver_runner,
 )
-from bus_schedule_engine.importer import ImportedWorkbook
+from bus_schedule_engine.excel_exporter import create_input_template
+from bus_schedule_engine.importer import ImportedWorkbook, import_workbook
 from bus_schedule_engine.models import (
     DemandRecord,
     Direction,
@@ -158,6 +161,89 @@ def _fixture(
     )
     options = NormalizationOptions(
         source_id="optimization-service-fixture",
+        imported_at=datetime(2026, 7, 26, 8, 0, tzinfo=UTC),
+        operating_day_type_a=OperatingDayType.WEEKDAY,
+        operating_day_type_b=OperatingDayType.WEEKDAY,
+        available_fleet_limit_a=4,
+        available_fleet_limit_b=4,
+        demand_confidence=DemandConfidence.HIGH,
+    )
+    return imported, options
+
+
+def _small_fixed_resource_fixture(
+    *,
+    irregular_timetable: bool,
+    demand_profile: tuple[int, int],
+) -> tuple[ImportedWorkbook, NormalizationOptions]:
+    parameters = ScenarioParameters(
+        route_id="OPT-SERVICE-SMALL",
+        route_name="Canonical fixed-resource service fixture",
+        route_type=RouteType.INTRA_PROVINCIAL,
+        trip_runtime_minutes=20,
+        total_daily_trips=8,
+        terminal_1_name="Terminal One",
+        terminal_1_first_departure=6 * 3600,
+        terminal_1_last_departure=7 * 3600 + 30 * 60,
+        terminal_2_name="Terminal Two",
+        terminal_2_first_departure=6 * 3600 + 5 * 60,
+        terminal_2_last_departure=7 * 3600 + 35 * 60,
+        vehicle_capacity_passengers=100,
+        target_load_factor=0.85,
+        maximum_load_factor=0.90,
+        time_block_minutes=60,
+        minimum_layover_minutes=5,
+    )
+    outbound_times = (360, 375, 420, 450) if irregular_timetable else (360, 390, 420, 450)
+    inbound_times = (365, 395, 425, 455)
+    trips = [
+        Trip(
+            scenario="B",
+            trip_id=f"B-{direction.value}-{index + 1:02d}",
+            departure_terminal=parameters.terminal_for_direction(direction),
+            direction=direction,
+            departure_seconds=departure_minutes * 60,
+            arrival_seconds=(departure_minutes + 20) * 60,
+        )
+        for direction, departures in (
+            (Direction.TERMINAL_1_TO_2, outbound_times),
+            (Direction.TERMINAL_2_TO_1, inbound_times),
+        )
+        for index, departure_minutes in enumerate(departures)
+    ]
+    demand = [
+        DemandRecord(
+            period_start=date(2026, 7, 1),
+            period_end=date(2026, 7, 7),
+            observation_days=1,
+            block_start_seconds=block_start * 60,
+            block_end_seconds=(block_start + 60) * 60,
+            direction=direction,
+            passenger_volume=passenger_volume,
+            volume_type=VolumeType.AVERAGE_DAY,
+        )
+        for direction in (
+            Direction.TERMINAL_1_TO_2,
+            Direction.TERMINAL_2_TO_1,
+        )
+        for block_start, passenger_volume in zip(
+            (360, 420),
+            demand_profile,
+            strict=True,
+        )
+    ]
+    imported = ImportedWorkbook(
+        parameters_a=replace(parameters),
+        trips_a=[
+            replace(trip, scenario="A", trip_id=trip.trip_id.replace("B-", "A-")) for trip in trips
+        ],
+        parameters_b=parameters,
+        trips_b=trips,
+        demand=demand,
+        configuration={},
+    )
+    options = NormalizationOptions(
+        source_id="canonical-fixed-resource-fixture",
         imported_at=datetime(2026, 7, 26, 8, 0, tzinfo=UTC),
         operating_day_type_a=OperatingDayType.WEEKDAY,
         operating_day_type_b=OperatingDayType.WEEKDAY,
@@ -313,6 +399,66 @@ def test_no_solver_actions_construct_no_problem_and_invoke_no_solver(
     assert result.limitations == result.adjustment_assessment.limitations
 
 
+def test_canonical_insufficient_data_decision_stops_before_problem_construction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _fixture(demand_mode="none")
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("The service must own the insufficient-data business gate")
+
+    monkeypatch.setattr(
+        optimization_service,
+        "build_heuristic_schedule_request_v1",
+        forbidden,
+    )
+    monkeypatch.setattr(
+        optimization_service,
+        "run_schedule_solver_v1",
+        forbidden,
+    )
+
+    result = analyze_and_optimize_schedule_v1(imported, options)
+
+    assert result.b_evaluation.evaluation.disposition == BDisposition.INSUFFICIENT_DATA
+    assert (
+        result.adjustment_assessment.primary_decision
+        == ServiceAdjustmentDecisionV1.INSUFFICIENT_DATA
+    )
+    assert result.selected_action == OptimizationAction.INSUFFICIENT_DATA
+    assert result.solver_attempted is False
+    assert result.heuristic_outcome is None
+    assert result.recommended_outcome is None
+
+
+def test_canonical_regular_demand_suitable_timetable_stops_at_no_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _small_fixed_resource_fixture(
+        irregular_timetable=False,
+        demand_profile=(170, 170),
+    )
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("A no-change service decision must not invoke the solver")
+
+    monkeypatch.setattr(optimization_service, "run_schedule_solver_v1", forbidden)
+
+    result = analyze_and_optimize_schedule_v1(imported, options)
+
+    assert (
+        result.b_evaluation.evaluation.disposition
+        == BDisposition.TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE
+    )
+    assert (
+        result.adjustment_assessment.primary_decision
+        == ServiceAdjustmentDecisionV1.KEEP_CURRENT_TIMETABLE
+    )
+    assert result.selected_action == OptimizationAction.NO_CHANGE
+    assert result.solver_attempted is False
+    assert result.heuristic_outcome is None
+
+
 @pytest.mark.parametrize(
     "decision",
     (
@@ -367,6 +513,89 @@ def test_fixed_resource_actions_use_the_same_canonical_composition_boundary(
     assert result.solver_attempted is True
     assert result.heuristic_outcome is outcome
     assert result.recommended_outcome is outcome
+
+
+def test_canonical_respace_path_executes_and_accepts_an_independently_validated_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _small_fixed_resource_fixture(
+        irregular_timetable=True,
+        demand_profile=(170, 170),
+    )
+    solver_calls = 0
+    validation_calls = 0
+    real_solve = HeuristicScheduleSolverAdapter.solve
+    real_validator = solver_orchestration.validate_and_build_solution_v1
+
+    def recording_solve(self, problem):
+        nonlocal solver_calls
+        solver_calls += 1
+        return real_solve(self, problem)
+
+    def recording_validator(context, candidate):
+        nonlocal validation_calls
+        validation_calls += 1
+        return real_validator(context, candidate)
+
+    monkeypatch.setattr(HeuristicScheduleSolverAdapter, "solve", recording_solve)
+    monkeypatch.setattr(
+        solver_orchestration,
+        "validate_and_build_solution_v1",
+        recording_validator,
+    )
+
+    result = analyze_and_optimize_schedule_v1(imported, options)
+
+    assert (
+        result.b_evaluation.evaluation.disposition
+        == BDisposition.TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE
+    )
+    assert (
+        result.adjustment_assessment.primary_decision
+        == ServiceAdjustmentDecisionV1.REDISTRIBUTE_DEPARTURE_TIMES
+    )
+    assert result.selected_action == OptimizationAction.FIXED_RESOURCE_RESPACE
+    assert solver_calls == 1
+    assert validation_calls == 1
+    assert result.solver_attempted is True
+    assert result.heuristic_outcome is result.recommended_outcome
+    assert result.heuristic_outcome is not None
+    assert (
+        result.heuristic_outcome.result_status != GenerationResultStatus.C_NOT_REQUIRED_B_SUITABLE
+    )
+    assert result.heuristic_outcome.result_status == GenerationResultStatus.SOLUTION_ACCEPTED
+    assert result.heuristic_outcome.execution_status == SolverExecutionStatus.COMPLETED
+    assert result.heuristic_outcome.solver_status == NativeSolverStatus.FEASIBLE
+    assert result.heuristic_outcome.solution is not None
+
+
+def test_canonical_redistribute_trips_path_invokes_the_real_solver() -> None:
+    imported, options = _small_fixed_resource_fixture(
+        irregular_timetable=False,
+        demand_profile=(255, 85),
+    )
+
+    result = analyze_and_optimize_schedule_v1(imported, options)
+
+    assert (
+        result.b_evaluation.evaluation.disposition
+        == BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE
+    )
+    assert (
+        result.adjustment_assessment.primary_decision
+        == ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
+    )
+    assert result.selected_action == OptimizationAction.FIXED_RESOURCE_REDISTRIBUTION
+    assert result.solver_attempted is True
+    assert result.heuristic_outcome is result.recommended_outcome
+    assert result.heuristic_outcome is not None
+    assert result.heuristic_outcome.execution_status == SolverExecutionStatus.COMPLETED
+    assert result.heuristic_outcome.solver_status == NativeSolverStatus.UNKNOWN
+    assert (
+        result.heuristic_outcome.result_status
+        == GenerationResultStatus.C_NOT_FOUND_WITHIN_SOLVE_LIMIT
+    )
+    assert result.heuristic_outcome.solution is None
 
 
 def test_valid_heuristic_candidate_is_accepted_only_through_independent_validation(
@@ -708,6 +937,34 @@ def test_normalization_receives_the_exact_supplied_options(
     assert captured == {"imported": imported, "options": options}
     assert captured["imported"] is imported
     assert captured["options"] is options
+
+
+def test_xlsx_importer_output_runs_through_the_unified_service(
+    tmp_path: Path,
+) -> None:
+    workbook_path = create_input_template(tmp_path / "canonical-input.xlsx")
+    imported = import_workbook(workbook_path)
+    options = NormalizationOptions(
+        source_id="xlsx-importer-unified-service",
+        imported_at=datetime(2026, 7, 26, 8, 0, tzinfo=UTC),
+        operating_day_type_a=OperatingDayType.WEEKDAY,
+        operating_day_type_b=OperatingDayType.WEEKDAY,
+        available_fleet_limit_a=4,
+        available_fleet_limit_b=4,
+        demand_confidence=DemandConfidence.HIGH,
+    )
+
+    result = analyze_and_optimize_schedule_v1(imported, options)
+
+    assert result.normalized_inputs.scenario_b.route_id == imported.parameters_b.route_id
+    assert len(result.normalized_inputs.scenario_b.exact_timetable) == len(imported.trips_b)
+    assert (
+        result.adjustment_assessment.primary_decision
+        == ServiceAdjustmentDecisionV1.INCREASE_TOTAL_TRIPS
+    )
+    assert result.selected_action == OptimizationAction.TRIP_INCREASE_RECOMMENDED
+    assert result.solver_attempted is False
+    assert result.heuristic_outcome is None
 
 
 def test_imported_workbook_and_scenario_b_exact_timetable_remain_unchanged(
