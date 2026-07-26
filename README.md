@@ -41,8 +41,12 @@ The repository currently contains two separate paths.
 The two paths are not yet integrated. The Streamlit application does not call the Contract V1
 public boundary, and Contract V1 does not yet power the UI, charts, or XLSX exports.
 
-OR-Tools is not installed or implemented. There is no CP-SAT model or solver adapter in the
-repository.
+Contract V1 now includes an OR-Tools v9.15 CP-SAT adapter for one-route, fixed-resource hard
+feasibility. It is a satisfaction model only: it does not optimize demand, headway, service
+quality, shifts, or fleet size, and it must not be described as producing a recommended or
+service-quality-optimal timetable. The adapter is exercised through its canonical request builder
+and independent validator; Streamlit and the unified `SolverChoice.OR_TOOLS` / `BOTH` selections
+do not use it yet.
 
 ## Supported today
 
@@ -57,11 +61,14 @@ repository.
 - Separately tested Contract V1 normalization, B evaluation, demand authority, canonical problem,
   heuristic adapter, raw-candidate validation, solution/outcome, and quantitative adjustment
   assessment.
+- OR-Tools v9.15 hard-feasibility solving through the Contract V1 adapter and independent
+  validator.
 
 ## Not supported yet
 
 - Contract V1 execution through the Streamlit application.
-- OR-Tools CP-SAT feasibility or optimization.
+- OR-Tools selection through Streamlit or unified `SolverChoice.OR_TOOLS` / `BOTH`.
+- OR-Tools demand, headway, service-quality, shift, or fleet-minimization objectives.
 - A globally optimal timetable or a proof of infeasibility from the legacy heuristic.
 - A unified comparison of heuristic and CP-SAT objective vectors.
 - Variable-trip-count optimization.
@@ -90,7 +97,7 @@ Only an independently validated candidate may be presented as authoritative Scen
 
 1. Create one unified application service over the Contract V1 boundary.
 2. Integrate the legacy heuristic through `ScheduleProblemV1` and the independent validator.
-3. Implement one-route, fixed-resource CP-SAT hard feasibility.
+3. Extend the one-route, fixed-resource CP-SAT adapter beyond hard feasibility.
 4. Add fixed-resource demand/headway objectives and an anonymized real-route regression corpus.
 5. Cut the UI and XLSX over after side-by-side validation.
 

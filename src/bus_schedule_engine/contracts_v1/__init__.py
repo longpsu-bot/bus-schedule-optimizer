@@ -72,6 +72,10 @@ from .models import (
     TurnaroundMinutes,
     VolumeClassification,
 )
+from .ortools_solver import (
+    OrToolsCpSatScheduleSolver,
+    build_ortools_schedule_request_v1,
+)
 from .problem_serialization import schedule_problem_to_contract_dict
 from .problem_validation import (
     ScheduleProblemValidationIssueV1,
@@ -227,6 +231,7 @@ __all__ = [
     "ObservedDemandInput",
     "OperatingDayType",
     "OperatingParameterLockV1",
+    "OrToolsCpSatScheduleSolver",
     "RawCandidateTripV1",
     "RawHeadwayRegimeV1",
     "RawScheduleCandidateV1",
@@ -281,6 +286,7 @@ __all__ = [
     "build_service_adjustment_evaluation_context_v1",
     "build_heuristic_compatibility_context_v1",
     "build_heuristic_schedule_request_v1",
+    "build_ortools_schedule_request_v1",
     "build_schedule_generation_context_v1",
     "build_schedule_problem_v1",
     "demand_analysis_block_to_contract_dict",
