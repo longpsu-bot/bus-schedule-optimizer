@@ -1,0 +1,249 @@
+"""Unified application service for Contract V1 bus-schedule optimization."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import StrEnum
+
+from .c_config import ScenarioCConfig
+from .contracts_v1 import (
+    NormalizationOptions,
+    NormalizedInputBundleV1,
+    RepeatabilityEvidenceV1,
+    ScenarioBEvaluationBundleV1,
+    ScenarioBEvaluationPolicyV1,
+    ScheduleGenerationOutcomeV1,
+    ServiceAdjustmentAssessmentV1,
+    ServiceAdjustmentDecisionPolicyV1,
+    ServiceAdjustmentDecisionV1,
+    ServiceAdjustmentEvaluationContextV1,
+    SolverPolicyV1,
+    build_heuristic_schedule_request_v1,
+    build_service_adjustment_evaluation_context_v1,
+    evaluate_scenario_b_v1,
+    evaluate_service_adjustment_need_v1,
+    normalize_imported_workbook_v1,
+    run_schedule_solver_v1,
+)
+from .importer import ImportedWorkbook
+
+
+class OptimizationAction(StrEnum):
+    NO_CHANGE = "NO_CHANGE"
+    FIXED_RESOURCE_REDISTRIBUTION = "FIXED_RESOURCE_REDISTRIBUTION"
+    FIXED_RESOURCE_RESPACE = "FIXED_RESOURCE_RESPACE"
+    TRIP_INCREASE_RECOMMENDED = "TRIP_INCREASE_RECOMMENDED"
+    TRIP_REDUCTION_RECOMMENDED = "TRIP_REDUCTION_RECOMMENDED"
+    TECHNICAL_CORRECTION_REQUIRED = "TECHNICAL_CORRECTION_REQUIRED"
+    INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+
+
+class SolverChoice(StrEnum):
+    HEURISTIC = "HEURISTIC"
+    OR_TOOLS = "OR_TOOLS"
+    BOTH = "BOTH"
+
+
+@dataclass(frozen=True, slots=True)
+class BusScheduleOptimizationResult:
+    normalized_inputs: NormalizedInputBundleV1
+    b_evaluation: ScenarioBEvaluationBundleV1
+    adjustment_context: ServiceAdjustmentEvaluationContextV1
+    adjustment_assessment: ServiceAdjustmentAssessmentV1
+    selected_action: OptimizationAction
+    solver_choice: SolverChoice
+    solver_attempted: bool
+    heuristic_outcome: ScheduleGenerationOutcomeV1 | None
+    recommended_outcome: ScheduleGenerationOutcomeV1 | None
+    explanations: tuple[str, ...]
+    limitations: tuple[str, ...]
+
+
+_ACTION_BY_DECISION = {
+    ServiceAdjustmentDecisionV1.INSUFFICIENT_DATA: OptimizationAction.INSUFFICIENT_DATA,
+    ServiceAdjustmentDecisionV1.TECHNICAL_ADJUSTMENT_REQUIRED: (
+        OptimizationAction.TECHNICAL_CORRECTION_REQUIRED
+    ),
+    ServiceAdjustmentDecisionV1.INCREASE_TOTAL_TRIPS: (
+        OptimizationAction.TRIP_INCREASE_RECOMMENDED
+    ),
+    ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS: (
+        OptimizationAction.FIXED_RESOURCE_REDISTRIBUTION
+    ),
+    ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS: (OptimizationAction.TRIP_REDUCTION_RECOMMENDED),
+    ServiceAdjustmentDecisionV1.REDISTRIBUTE_DEPARTURE_TIMES: (
+        OptimizationAction.FIXED_RESOURCE_RESPACE
+    ),
+    ServiceAdjustmentDecisionV1.KEEP_CURRENT_TIMETABLE: OptimizationAction.NO_CHANGE,
+}
+
+_FIXED_RESOURCE_ACTIONS = {
+    OptimizationAction.FIXED_RESOURCE_REDISTRIBUTION,
+    OptimizationAction.FIXED_RESOURCE_RESPACE,
+}
+
+_DIRECTIONAL_SOLVING_UNAVAILABLE = (
+    "Authoritative directional solving is unavailable because H3 demand coverage "
+    "does not fully support both directional streams."
+)
+
+
+def select_optimization_action(
+    assessment: ServiceAdjustmentAssessmentV1,
+) -> OptimizationAction:
+    """Map the canonical adjustment decision without considering solver availability."""
+    return _ACTION_BY_DECISION[assessment.primary_decision]
+
+
+def _validate_solver_choice(solver_choice: SolverChoice) -> None:
+    if not isinstance(solver_choice, SolverChoice):
+        raise TypeError("solver_choice must be a SolverChoice")
+    if solver_choice != SolverChoice.HEURISTIC:
+        raise NotImplementedError(
+            f"{solver_choice.value} is unavailable: OR-Tools CP-SAT is not implemented yet."
+        )
+
+
+def _default_decision_policy(
+    evaluation_policy: ScenarioBEvaluationPolicyV1,
+) -> ServiceAdjustmentDecisionPolicyV1:
+    return ServiceAdjustmentDecisionPolicyV1(
+        planning_load_factor_ceiling=evaluation_policy.planning_load_factor_ceiling,
+        critical_load_factor_ceiling=evaluation_policy.critical_load_factor_ceiling,
+        low_load_review_threshold=evaluation_policy.low_load_review_threshold,
+        minimum_authoritative_demand_confidence=(
+            evaluation_policy.minimum_authoritative_demand_confidence
+        ),
+    )
+
+
+def _directional_generation_supported(
+    evaluation: ScenarioBEvaluationBundleV1,
+) -> bool:
+    resolution = evaluation.demand_resolution
+    return bool(
+        resolution is not None
+        and resolution.coverage_assessment is not None
+        and resolution.coverage_assessment.directional_c_generation_supported
+    )
+
+
+def _deduplicate(values: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(values))
+
+
+def _result(
+    *,
+    normalized_inputs: NormalizedInputBundleV1,
+    b_evaluation: ScenarioBEvaluationBundleV1,
+    adjustment_context: ServiceAdjustmentEvaluationContextV1,
+    adjustment_assessment: ServiceAdjustmentAssessmentV1,
+    selected_action: OptimizationAction,
+    solver_choice: SolverChoice,
+    solver_attempted: bool = False,
+    heuristic_outcome: ScheduleGenerationOutcomeV1 | None = None,
+    extra_limitations: tuple[str, ...] = (),
+) -> BusScheduleOptimizationResult:
+    outcome_explanations = heuristic_outcome.explanations if heuristic_outcome is not None else ()
+    outcome_limitations = heuristic_outcome.limitations if heuristic_outcome is not None else ()
+    return BusScheduleOptimizationResult(
+        normalized_inputs=normalized_inputs,
+        b_evaluation=b_evaluation,
+        adjustment_context=adjustment_context,
+        adjustment_assessment=adjustment_assessment,
+        selected_action=selected_action,
+        solver_choice=solver_choice,
+        solver_attempted=solver_attempted,
+        heuristic_outcome=heuristic_outcome,
+        recommended_outcome=heuristic_outcome,
+        explanations=_deduplicate((adjustment_assessment.explanation, *outcome_explanations)),
+        limitations=_deduplicate(
+            (
+                *adjustment_assessment.limitations,
+                *extra_limitations,
+                *outcome_limitations,
+            )
+        ),
+    )
+
+
+def analyze_and_optimize_schedule_v1(
+    imported: ImportedWorkbook,
+    normalization_options: NormalizationOptions,
+    *,
+    solver_choice: SolverChoice = SolverChoice.HEURISTIC,
+    evaluation_policy: ScenarioBEvaluationPolicyV1 | None = None,
+    decision_policy: ServiceAdjustmentDecisionPolicyV1 | None = None,
+    repeatability_evidence: RepeatabilityEvidenceV1 | None = None,
+    heuristic_config: ScenarioCConfig | None = None,
+    solver_policy: SolverPolicyV1 | None = None,
+) -> BusScheduleOptimizationResult:
+    """Normalize, assess, and conditionally run the canonical heuristic boundary."""
+    _validate_solver_choice(solver_choice)
+    normalized_inputs = normalize_imported_workbook_v1(imported, normalization_options)
+    effective_evaluation_policy = evaluation_policy or ScenarioBEvaluationPolicyV1()
+    b_evaluation = evaluate_scenario_b_v1(
+        normalized_inputs,
+        effective_evaluation_policy,
+    )
+    effective_decision_policy = decision_policy or _default_decision_policy(
+        effective_evaluation_policy
+    )
+    adjustment_context = build_service_adjustment_evaluation_context_v1(
+        normalized_inputs,
+        effective_evaluation_policy,
+        effective_decision_policy,
+        repeatability_evidence,
+        b_evaluation,
+    )
+    adjustment_assessment = evaluate_service_adjustment_need_v1(adjustment_context)
+    selected_action = select_optimization_action(adjustment_assessment)
+
+    result_arguments = {
+        "normalized_inputs": normalized_inputs,
+        "b_evaluation": b_evaluation,
+        "adjustment_context": adjustment_context,
+        "adjustment_assessment": adjustment_assessment,
+        "selected_action": selected_action,
+        "solver_choice": solver_choice,
+    }
+    if selected_action not in _FIXED_RESOURCE_ACTIONS:
+        return _result(**result_arguments)
+
+    if not _directional_generation_supported(b_evaluation):
+        return _result(
+            **result_arguments,
+            extra_limitations=(_DIRECTIONAL_SOLVING_UNAVAILABLE,),
+        )
+
+    effective_heuristic_config = heuristic_config or ScenarioCConfig.from_mapping(
+        imported.configuration
+    )
+    generation_context, heuristic_solver = build_heuristic_schedule_request_v1(
+        normalized_inputs,
+        b_evaluation,
+        imported.parameters_b,
+        imported.trips_b,
+        imported.demand,
+        effective_heuristic_config,
+        evaluation_policy=effective_evaluation_policy,
+        solver_policy=solver_policy,
+    )
+    heuristic_outcome = run_schedule_solver_v1(
+        generation_context,
+        heuristic_solver,
+    )
+    return _result(
+        **result_arguments,
+        solver_attempted=True,
+        heuristic_outcome=heuristic_outcome,
+    )
+
+
+__all__ = [
+    "BusScheduleOptimizationResult",
+    "OptimizationAction",
+    "SolverChoice",
+    "analyze_and_optimize_schedule_v1",
+    "select_optimization_action",
+]
