@@ -72,6 +72,10 @@ from .models import (
     TurnaroundMinutes,
     VolumeClassification,
 )
+from .ortools_quality_solver import (
+    OrToolsCpSatServiceQualitySolver,
+    build_ortools_service_quality_request_v1,
+)
 from .ortools_solver import (
     OrToolsCpSatDemandOptimizationSolver,
     OrToolsCpSatScheduleSolver,
@@ -235,6 +239,7 @@ __all__ = [
     "OperatingParameterLockV1",
     "OrToolsCpSatDemandOptimizationSolver",
     "OrToolsCpSatScheduleSolver",
+    "OrToolsCpSatServiceQualitySolver",
     "RawCandidateTripV1",
     "RawHeadwayRegimeV1",
     "RawScheduleCandidateV1",
@@ -291,6 +296,7 @@ __all__ = [
     "build_heuristic_schedule_request_v1",
     "build_ortools_demand_optimization_request_v1",
     "build_ortools_schedule_request_v1",
+    "build_ortools_service_quality_request_v1",
     "build_schedule_generation_context_v1",
     "build_schedule_problem_v1",
     "demand_analysis_block_to_contract_dict",
