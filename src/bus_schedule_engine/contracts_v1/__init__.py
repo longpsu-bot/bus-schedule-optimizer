@@ -73,7 +73,9 @@ from .models import (
     VolumeClassification,
 )
 from .ortools_solver import (
+    OrToolsCpSatDemandOptimizationSolver,
     OrToolsCpSatScheduleSolver,
+    build_ortools_demand_optimization_request_v1,
     build_ortools_schedule_request_v1,
 )
 from .problem_serialization import schedule_problem_to_contract_dict
@@ -231,6 +233,7 @@ __all__ = [
     "ObservedDemandInput",
     "OperatingDayType",
     "OperatingParameterLockV1",
+    "OrToolsCpSatDemandOptimizationSolver",
     "OrToolsCpSatScheduleSolver",
     "RawCandidateTripV1",
     "RawHeadwayRegimeV1",
@@ -286,6 +289,7 @@ __all__ = [
     "build_service_adjustment_evaluation_context_v1",
     "build_heuristic_compatibility_context_v1",
     "build_heuristic_schedule_request_v1",
+    "build_ortools_demand_optimization_request_v1",
     "build_ortools_schedule_request_v1",
     "build_schedule_generation_context_v1",
     "build_schedule_problem_v1",

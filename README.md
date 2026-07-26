@@ -41,12 +41,13 @@ The repository currently contains two separate paths.
 The two paths are not yet integrated. The Streamlit application does not call the Contract V1
 public boundary, and Contract V1 does not yet power the UI, charts, or XLSX exports.
 
-Contract V1 now includes an OR-Tools v9.15 CP-SAT adapter for one-route, fixed-resource hard
-feasibility. It is a satisfaction model only: it does not optimize demand, headway, service
-quality, shifts, or fleet size, and it must not be described as producing a recommended or
-service-quality-optimal timetable. The adapter is exercised through its canonical request builder
-and independent validator; Streamlit and the unified `SolverChoice.OR_TOOLS` / `BOTH` selections
-do not use it yet.
+Contract V1 includes separate OR-Tools v9.15 CP-SAT adapters for one-route, fixed-resource hard
+feasibility and directional demand-priority optimization. The feasibility adapter remains an
+objective-free satisfaction model. The demand adapter lexicographically protects demand blocks
+from no service and one-sided overload before provisional shifted-trip tie-breaks. It does not
+yet optimize service gaps, sustained-demand allocation, or headway regularity. Both adapters are
+exercised through canonical request builders and the independent validator; Streamlit and the
+unified `SolverChoice.OR_TOOLS` / `BOTH` selections do not use them yet.
 
 ## Supported today
 
@@ -63,12 +64,15 @@ do not use it yet.
   assessment.
 - OR-Tools v9.15 hard-feasibility solving through the Contract V1 adapter and independent
   validator.
+- Separate OR-Tools fixed-resource demand-priority solving for authoritative directional demand,
+  covering no-service and overload protection before provisional B-preservation shift tie-breaks.
 
 ## Not supported yet
 
 - Contract V1 execution through the Streamlit application.
 - OR-Tools selection through Streamlit or unified `SolverChoice.OR_TOOLS` / `BOTH`.
-- OR-Tools demand, headway, service-quality, shift, or fleet-minimization objectives.
+- OR-Tools service-gap, sustained-demand-allocation, headway-regularity, or fleet-minimization
+  objectives.
 - A globally optimal timetable or a proof of infeasibility from the legacy heuristic.
 - A unified comparison of heuristic and CP-SAT objective vectors.
 - Variable-trip-count optimization.
