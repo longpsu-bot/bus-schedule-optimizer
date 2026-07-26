@@ -1,0 +1,2463 @@
+{
+  "anonymization_profile": {
+    "date_shift_days": -365,
+    "excluded_private_fields": [
+      "absolute_source_path",
+      "free_text_historical_conclusions",
+      "operator_or_organization_identity",
+      "private_route_identity",
+      "private_terminal_identity",
+      "vehicle_identifiers",
+      "workbook_author_metadata"
+    ],
+    "profile_id": "route_corpus_v1_relative_terminal_redaction",
+    "route_name": "Anonymized Route Alpha",
+    "terminal_1_name": "Terminal 1",
+    "terminal_2_name": "Terminal 2"
+  },
+  "configuration": {
+    "combined_direction_policy": "do_not_infer",
+    "final_service_block_minutes": 90,
+    "generator_mode": "deterministic"
+  },
+  "corpus_version": "1",
+  "demand_observations": {
+    "departure_hour_proxy_v1": {
+      "blocks": [
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-04",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "04:00",
+          "passenger_volume": 264,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 1,
+          "source_trip_ids": [
+            "A-001"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "05:00",
+          "time_block_start": "04:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-05",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "05:00",
+          "passenger_volume": 351,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-002",
+            "A-003"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "06:00",
+          "time_block_start": "05:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-05",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "05:00",
+          "passenger_volume": 146,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 1,
+          "source_trip_ids": [
+            "A-027"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "06:00",
+          "time_block_start": "05:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-06",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "06:00",
+          "passenger_volume": 975,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 3,
+          "source_trip_ids": [
+            "A-004",
+            "A-005",
+            "A-006"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "07:00",
+          "time_block_start": "06:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-06",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "06:00",
+          "passenger_volume": 310,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-028",
+            "A-029"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "07:00",
+          "time_block_start": "06:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-07",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "07:00",
+          "passenger_volume": 633,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-007",
+            "A-008"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "08:00",
+          "time_block_start": "07:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-07",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "07:00",
+          "passenger_volume": 375,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-030",
+            "A-031"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "08:00",
+          "time_block_start": "07:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-08",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "08:00",
+          "passenger_volume": 438,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-009",
+            "A-010"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "09:00",
+          "time_block_start": "08:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-08",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "08:00",
+          "passenger_volume": 313,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-032",
+            "A-033"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "09:00",
+          "time_block_start": "08:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-09",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "09:00",
+          "passenger_volume": 168,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 1,
+          "source_trip_ids": [
+            "A-011"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "10:00",
+          "time_block_start": "09:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-09",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "09:00",
+          "passenger_volume": 491,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-034",
+            "A-035"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "10:00",
+          "time_block_start": "09:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-10",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "10:00",
+          "passenger_volume": 491,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-012",
+            "A-013"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "11:00",
+          "time_block_start": "10:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-10",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "10:00",
+          "passenger_volume": 402,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-036",
+            "A-037"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "11:00",
+          "time_block_start": "10:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-11",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "11:00",
+          "passenger_volume": 220,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 1,
+          "source_trip_ids": [
+            "A-014"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "12:00",
+          "time_block_start": "11:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-11",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "11:00",
+          "passenger_volume": 296,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 1,
+          "source_trip_ids": [
+            "A-038"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "12:00",
+          "time_block_start": "11:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-12",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "12:00",
+          "passenger_volume": 342,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-015",
+            "A-016"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "13:00",
+          "time_block_start": "12:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-12",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "12:00",
+          "passenger_volume": 625,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-039",
+            "A-040"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "13:00",
+          "time_block_start": "12:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-13",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "13:00",
+          "passenger_volume": 363,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-017",
+            "A-018"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "14:00",
+          "time_block_start": "13:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-13",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "13:00",
+          "passenger_volume": 255,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 1,
+          "source_trip_ids": [
+            "A-041"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "14:00",
+          "time_block_start": "13:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-14",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "14:00",
+          "passenger_volume": 331,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-019",
+            "A-020"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "15:00",
+          "time_block_start": "14:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-14",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "14:00",
+          "passenger_volume": 408,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-042",
+            "A-043"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "15:00",
+          "time_block_start": "14:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-15",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "15:00",
+          "passenger_volume": 124,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 1,
+          "source_trip_ids": [
+            "A-021"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "16:00",
+          "time_block_start": "15:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-15",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "15:00",
+          "passenger_volume": 623,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-044",
+            "A-045"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "16:00",
+          "time_block_start": "15:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-16",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "16:00",
+          "passenger_volume": 404,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-022",
+            "A-023"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "17:00",
+          "time_block_start": "16:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-16",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "16:00",
+          "passenger_volume": 502,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-046",
+            "A-047"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "17:00",
+          "time_block_start": "16:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-17",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "17:00",
+          "passenger_volume": 427,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-024",
+            "A-025"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "18:00",
+          "time_block_start": "17:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-17",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "17:00",
+          "passenger_volume": 643,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-048",
+            "A-049"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "18:00",
+          "time_block_start": "17:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-18",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "observed_departure_hour_start": "18:00",
+          "passenger_volume": 176,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 1,
+          "source_trip_ids": [
+            "A-026"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "19:00",
+          "time_block_start": "18:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-18",
+          "coverage_extension_minutes": 0,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "18:00",
+          "passenger_volume": 254,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 1,
+          "source_trip_ids": [
+            "A-050"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "19:00",
+          "time_block_start": "18:00",
+          "volume_type": "average_day"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_2_TO_1-19",
+          "coverage_extension_minutes": 60,
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "observed_departure_hour_start": "19:00",
+          "passenger_volume": 348,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 2,
+          "source_trip_ids": [
+            "A-051",
+            "A-052"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "21:00",
+          "time_block_start": "19:00",
+          "volume_type": "average_day"
+        }
+      ],
+      "classification": "derived_proxy_dataset",
+      "contract_v1_demand_interval_eligible": true,
+      "contract_v1_weight_interpretation": "unscaled_15_day_observation_total_used_as_sensitivity_weight",
+      "dataset_id": "CORPUS-ALPHA-80:departure_hour_proxy_v1",
+      "demand_confidence": "LOW",
+      "limitations": [
+        "This proxy groups raw trip passenger observations by Scenario A departure hour.",
+        "A nonempty observed-hour block may extend to the next observed hour or through the Scenario B endpoint to maintain contiguous solver coverage without fabricating an empty zero-demand block.",
+        "Contract V1 receives the exactly conserved 15-day totals as unscaled proxy weights via its average_day transport classification; these are not observed average-day passenger counts.",
+        "It is sensitivity evidence only and is not an observed hourly demand series.",
+        "It must never be presented as an approved operational demand baseline."
+      ],
+      "proxy_method": "departure_hour_proxy_v1"
+    },
+    "raw_trip_observations": {
+      "classification": "raw_trip_observation_evidence",
+      "contract_v1_demand_interval_eligible": false,
+      "dataset_id": "CORPUS-ALPHA-80:raw_trip_observations",
+      "overlap_documentation": {
+        "adjacent_overlap_pair_count": 50,
+        "maximum_overlap_minutes": 40,
+        "minimum_overlap_minutes": 20,
+        "overlaps_preserved": true,
+        "reason": "Raw intervals equal Scenario A trip departure-to-arrival spans and are preserved as evidence, not interpreted as Contract V1 demand intervals."
+      },
+      "rows": [
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 264,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "05:25",
+          "raw_interval_start": "04:30",
+          "source_trip_id": "A-001",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 118,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "06:00",
+          "raw_interval_start": "05:00",
+          "source_trip_id": "A-002",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 233,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "06:30",
+          "raw_interval_start": "05:30",
+          "source_trip_id": "A-003",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 303,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "07:00",
+          "raw_interval_start": "06:00",
+          "source_trip_id": "A-004",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 377,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "07:30",
+          "raw_interval_start": "06:25",
+          "source_trip_id": "A-005",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 295,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "07:55",
+          "raw_interval_start": "06:50",
+          "source_trip_id": "A-006",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 320,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "08:25",
+          "raw_interval_start": "07:20",
+          "source_trip_id": "A-007",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 313,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "08:55",
+          "raw_interval_start": "07:55",
+          "source_trip_id": "A-008",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 246,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "09:35",
+          "raw_interval_start": "08:30",
+          "source_trip_id": "A-009",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 192,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "10:00",
+          "raw_interval_start": "08:55",
+          "source_trip_id": "A-010",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 168,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "10:25",
+          "raw_interval_start": "09:20",
+          "source_trip_id": "A-011",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 276,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "11:00",
+          "raw_interval_start": "10:00",
+          "source_trip_id": "A-012",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 215,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "11:40",
+          "raw_interval_start": "10:40",
+          "source_trip_id": "A-013",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 220,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "12:20",
+          "raw_interval_start": "11:20",
+          "source_trip_id": "A-014",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 189,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "13:00",
+          "raw_interval_start": "12:00",
+          "source_trip_id": "A-015",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 153,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "13:40",
+          "raw_interval_start": "12:40",
+          "source_trip_id": "A-016",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 160,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "14:20",
+          "raw_interval_start": "13:20",
+          "source_trip_id": "A-017",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 203,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "14:55",
+          "raw_interval_start": "13:55",
+          "source_trip_id": "A-018",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 158,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "15:30",
+          "raw_interval_start": "14:30",
+          "source_trip_id": "A-019",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 173,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "15:55",
+          "raw_interval_start": "14:55",
+          "source_trip_id": "A-020",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 124,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "16:25",
+          "raw_interval_start": "15:25",
+          "source_trip_id": "A-021",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 238,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "17:05",
+          "raw_interval_start": "16:00",
+          "source_trip_id": "A-022",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 166,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "17:30",
+          "raw_interval_start": "16:25",
+          "source_trip_id": "A-023",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 215,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "18:05",
+          "raw_interval_start": "17:00",
+          "source_trip_id": "A-024",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 212,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "18:45",
+          "raw_interval_start": "17:45",
+          "source_trip_id": "A-025",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_1_to_2",
+          "observation_days": 15,
+          "passenger_volume": 176,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "19:25",
+          "raw_interval_start": "18:25",
+          "source_trip_id": "A-026",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 146,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "06:35",
+          "raw_interval_start": "05:35",
+          "source_trip_id": "A-027",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 161,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "07:10",
+          "raw_interval_start": "06:10",
+          "source_trip_id": "A-028",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 149,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "07:45",
+          "raw_interval_start": "06:40",
+          "source_trip_id": "A-029",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 242,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "08:20",
+          "raw_interval_start": "07:15",
+          "source_trip_id": "A-030",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 133,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "08:40",
+          "raw_interval_start": "07:40",
+          "source_trip_id": "A-031",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 130,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "09:05",
+          "raw_interval_start": "08:05",
+          "source_trip_id": "A-032",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 183,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "09:35",
+          "raw_interval_start": "08:35",
+          "source_trip_id": "A-033",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 216,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "10:05",
+          "raw_interval_start": "09:05",
+          "source_trip_id": "A-034",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 275,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "10:45",
+          "raw_interval_start": "09:45",
+          "source_trip_id": "A-035",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 217,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "11:15",
+          "raw_interval_start": "10:15",
+          "source_trip_id": "A-036",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 185,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "11:40",
+          "raw_interval_start": "10:40",
+          "source_trip_id": "A-037",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 296,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "12:20",
+          "raw_interval_start": "11:20",
+          "source_trip_id": "A-038",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 310,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "13:00",
+          "raw_interval_start": "12:00",
+          "source_trip_id": "A-039",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 315,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "13:40",
+          "raw_interval_start": "12:40",
+          "source_trip_id": "A-040",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 255,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "14:20",
+          "raw_interval_start": "13:20",
+          "source_trip_id": "A-041",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 199,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "15:00",
+          "raw_interval_start": "14:00",
+          "source_trip_id": "A-042",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 209,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "15:35",
+          "raw_interval_start": "14:35",
+          "source_trip_id": "A-043",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 308,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "16:10",
+          "raw_interval_start": "15:10",
+          "source_trip_id": "A-044",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 315,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "16:45",
+          "raw_interval_start": "15:45",
+          "source_trip_id": "A-045",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 212,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "17:15",
+          "raw_interval_start": "16:10",
+          "source_trip_id": "A-046",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 290,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "17:45",
+          "raw_interval_start": "16:40",
+          "source_trip_id": "A-047",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 375,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "18:25",
+          "raw_interval_start": "17:20",
+          "source_trip_id": "A-048",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 268,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "18:50",
+          "raw_interval_start": "17:50",
+          "source_trip_id": "A-049",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 254,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "19:25",
+          "raw_interval_start": "18:25",
+          "source_trip_id": "A-050",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 194,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "20:00",
+          "raw_interval_start": "19:00",
+          "source_trip_id": "A-051",
+          "volume_type": "total_observation_period"
+        },
+        {
+          "direction": "terminal_2_to_1",
+          "observation_days": 15,
+          "passenger_volume": 154,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "raw_interval_end": "20:40",
+          "raw_interval_start": "19:40",
+          "source_trip_id": "A-052",
+          "volume_type": "total_observation_period"
+        }
+      ]
+    }
+  },
+  "excluded_source_sheets": [
+    "DANH_GIA_TOI_UU",
+    "PHAN_BO_THEO_GIO",
+    "BIEU_DO_TOI_UU"
+  ],
+  "fixture_id": "CORPUS-ALPHA-80",
+  "limitations": [
+    "Fleet limits are corpus assumptions, not operator-declared source facts.",
+    "The LOW-confidence departure-hour proxy is sensitivity evidence only.",
+    "Raw trip observations are never supplied as Contract V1 demand intervals.",
+    "Historical optimized sheets are excluded from corpus truth.",
+    "No generated timetable in Milestone 4C1 is operationally approved."
+  ],
+  "normalization_options": {
+    "available_fleet_limit_a": 5,
+    "available_fleet_limit_b": 8,
+    "demand_confidence": "LOW",
+    "demand_dataset_id": "CORPUS-ALPHA-80:departure_hour_proxy_v1",
+    "imported_at": "2025-07-16T00:00:00+00:00",
+    "operating_day_type_a": "WEEKDAY",
+    "operating_day_type_b": "WEEKDAY",
+    "source_id": "CORPUS-ALPHA-80",
+    "source_notes": "Anonymized real-route-derived fixture using departure_hour_proxy_v1."
+  },
+  "scenario_a": {
+    "exact_trips": [
+      {
+        "arrival_time": "05:25",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "04:30",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 55,
+        "scenario": "A",
+        "trip_id": "A-001"
+      },
+      {
+        "arrival_time": "06:00",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "05:00",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-002"
+      },
+      {
+        "arrival_time": "06:30",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "05:30",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-003"
+      },
+      {
+        "arrival_time": "06:35",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "05:35",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-027"
+      },
+      {
+        "arrival_time": "07:00",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "06:00",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-004"
+      },
+      {
+        "arrival_time": "07:10",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "06:10",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-028"
+      },
+      {
+        "arrival_time": "07:30",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "06:25",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-005"
+      },
+      {
+        "arrival_time": "07:45",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "06:40",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-029"
+      },
+      {
+        "arrival_time": "07:55",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "06:50",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-006"
+      },
+      {
+        "arrival_time": "08:20",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "07:15",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-030"
+      },
+      {
+        "arrival_time": "08:25",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "07:20",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-007"
+      },
+      {
+        "arrival_time": "08:40",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "07:40",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-031"
+      },
+      {
+        "arrival_time": "08:55",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "07:55",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-008"
+      },
+      {
+        "arrival_time": "09:05",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "08:05",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-032"
+      },
+      {
+        "arrival_time": "09:35",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "08:30",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-009"
+      },
+      {
+        "arrival_time": "09:35",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "08:35",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-033"
+      },
+      {
+        "arrival_time": "10:00",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "08:55",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-010"
+      },
+      {
+        "arrival_time": "10:05",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "09:05",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-034"
+      },
+      {
+        "arrival_time": "10:25",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "09:20",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-011"
+      },
+      {
+        "arrival_time": "10:45",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "09:45",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-035"
+      },
+      {
+        "arrival_time": "11:00",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "10:00",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-012"
+      },
+      {
+        "arrival_time": "11:15",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "10:15",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-036"
+      },
+      {
+        "arrival_time": "11:40",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "10:40",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-013"
+      },
+      {
+        "arrival_time": "11:40",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "10:40",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-037"
+      },
+      {
+        "arrival_time": "12:20",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "11:20",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-014"
+      },
+      {
+        "arrival_time": "12:20",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "11:20",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-038"
+      },
+      {
+        "arrival_time": "13:00",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "12:00",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-015"
+      },
+      {
+        "arrival_time": "13:00",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "12:00",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-039"
+      },
+      {
+        "arrival_time": "13:40",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "12:40",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-016"
+      },
+      {
+        "arrival_time": "13:40",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "12:40",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-040"
+      },
+      {
+        "arrival_time": "14:20",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "13:20",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-017"
+      },
+      {
+        "arrival_time": "14:20",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "13:20",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-041"
+      },
+      {
+        "arrival_time": "14:55",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "13:55",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-018"
+      },
+      {
+        "arrival_time": "15:00",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "14:00",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-042"
+      },
+      {
+        "arrival_time": "15:30",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "14:30",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-019"
+      },
+      {
+        "arrival_time": "15:35",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "14:35",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-043"
+      },
+      {
+        "arrival_time": "15:55",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "14:55",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-020"
+      },
+      {
+        "arrival_time": "16:10",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "15:10",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-044"
+      },
+      {
+        "arrival_time": "16:25",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "15:25",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-021"
+      },
+      {
+        "arrival_time": "16:45",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "15:45",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-045"
+      },
+      {
+        "arrival_time": "17:05",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "16:00",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-022"
+      },
+      {
+        "arrival_time": "17:15",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "16:10",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-046"
+      },
+      {
+        "arrival_time": "17:30",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "16:25",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-023"
+      },
+      {
+        "arrival_time": "17:45",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "16:40",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-047"
+      },
+      {
+        "arrival_time": "18:05",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "17:00",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-024"
+      },
+      {
+        "arrival_time": "18:25",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "17:20",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "A",
+        "trip_id": "A-048"
+      },
+      {
+        "arrival_time": "18:45",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "17:45",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-025"
+      },
+      {
+        "arrival_time": "18:50",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "17:50",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-049"
+      },
+      {
+        "arrival_time": "19:25",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "18:25",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-026"
+      },
+      {
+        "arrival_time": "19:25",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "18:25",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-050"
+      },
+      {
+        "arrival_time": "20:00",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "19:00",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-051"
+      },
+      {
+        "arrival_time": "20:40",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "19:40",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "A",
+        "trip_id": "A-052"
+      }
+    ],
+    "parameters": {
+      "allowed_trip_runtime_minutes": [
+        55,
+        65
+      ],
+      "maximum_load_factor": 0.9,
+      "minimum_layover_minutes": 5,
+      "route_id": "CORPUS-ALPHA-80",
+      "route_name": "Anonymized Route Alpha",
+      "route_type": "intra_provincial",
+      "target_load_factor": 0.85,
+      "terminal_1_first_departure": "04:30",
+      "terminal_1_last_departure": "18:25",
+      "terminal_1_name": "Terminal 1",
+      "terminal_2_first_departure": "05:35",
+      "terminal_2_last_departure": "19:40",
+      "terminal_2_name": "Terminal 2",
+      "time_block_minutes": 60,
+      "total_daily_trips": 52,
+      "trip_runtime_minutes": 65,
+      "vehicle_capacity_passengers": 28
+    }
+  },
+  "scenario_b": {
+    "exact_trips": [
+      {
+        "arrival_time": "05:25",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "04:30",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 55,
+        "scenario": "B",
+        "trip_id": "B-001"
+      },
+      {
+        "arrival_time": "05:50",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "04:55",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 55,
+        "scenario": "B",
+        "trip_id": "B-002"
+      },
+      {
+        "arrival_time": "06:10",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "05:10",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-003"
+      },
+      {
+        "arrival_time": "06:30",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "05:30",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-004"
+      },
+      {
+        "arrival_time": "06:35",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "05:35",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-041"
+      },
+      {
+        "arrival_time": "06:45",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "05:45",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-005"
+      },
+      {
+        "arrival_time": "07:00",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "06:00",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-006"
+      },
+      {
+        "arrival_time": "07:00",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "06:00",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-042"
+      },
+      {
+        "arrival_time": "07:20",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "06:15",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-007"
+      },
+      {
+        "arrival_time": "07:25",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "06:20",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-043"
+      },
+      {
+        "arrival_time": "07:35",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "06:30",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-008"
+      },
+      {
+        "arrival_time": "07:45",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "06:40",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-044"
+      },
+      {
+        "arrival_time": "07:55",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "06:50",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-009"
+      },
+      {
+        "arrival_time": "08:05",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "07:00",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-045"
+      },
+      {
+        "arrival_time": "08:15",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "07:10",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-010"
+      },
+      {
+        "arrival_time": "08:20",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "07:20",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-046"
+      },
+      {
+        "arrival_time": "08:40",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "07:35",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-011"
+      },
+      {
+        "arrival_time": "08:40",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "07:40",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-047"
+      },
+      {
+        "arrival_time": "08:55",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "07:55",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-012"
+      },
+      {
+        "arrival_time": "09:00",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "08:00",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-048"
+      },
+      {
+        "arrival_time": "09:15",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "08:15",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-013"
+      },
+      {
+        "arrival_time": "09:25",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "08:25",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-049"
+      },
+      {
+        "arrival_time": "09:35",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "08:35",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-014"
+      },
+      {
+        "arrival_time": "09:50",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "08:50",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-050"
+      },
+      {
+        "arrival_time": "10:00",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "09:00",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-015"
+      },
+      {
+        "arrival_time": "10:15",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "09:15",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-051"
+      },
+      {
+        "arrival_time": "10:25",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "09:25",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-016"
+      },
+      {
+        "arrival_time": "10:30",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "09:30",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-052"
+      },
+      {
+        "arrival_time": "10:45",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "09:45",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-053"
+      },
+      {
+        "arrival_time": "10:50",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "09:50",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-017"
+      },
+      {
+        "arrival_time": "11:00",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "10:00",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-054"
+      },
+      {
+        "arrival_time": "11:15",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "10:15",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-018"
+      },
+      {
+        "arrival_time": "11:20",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "10:20",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-055"
+      },
+      {
+        "arrival_time": "11:40",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "10:40",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-019"
+      },
+      {
+        "arrival_time": "11:45",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "10:45",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-056"
+      },
+      {
+        "arrival_time": "12:05",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "11:05",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-020"
+      },
+      {
+        "arrival_time": "12:10",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "11:10",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-057"
+      },
+      {
+        "arrival_time": "12:30",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "11:30",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-058"
+      },
+      {
+        "arrival_time": "12:40",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "11:40",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-021"
+      },
+      {
+        "arrival_time": "12:50",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "11:50",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-059"
+      },
+      {
+        "arrival_time": "13:10",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "12:10",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-022"
+      },
+      {
+        "arrival_time": "13:15",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "12:15",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-060"
+      },
+      {
+        "arrival_time": "13:40",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "12:40",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-023"
+      },
+      {
+        "arrival_time": "13:50",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "12:50",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-061"
+      },
+      {
+        "arrival_time": "14:10",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "13:10",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-024"
+      },
+      {
+        "arrival_time": "14:20",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "13:20",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-062"
+      },
+      {
+        "arrival_time": "14:40",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "13:40",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-025"
+      },
+      {
+        "arrival_time": "14:55",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "13:50",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-063"
+      },
+      {
+        "arrival_time": "15:00",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "14:00",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-026"
+      },
+      {
+        "arrival_time": "15:20",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "14:20",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-027"
+      },
+      {
+        "arrival_time": "15:25",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "14:20",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-064"
+      },
+      {
+        "arrival_time": "15:40",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "14:40",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-028"
+      },
+      {
+        "arrival_time": "15:55",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "14:50",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-065"
+      },
+      {
+        "arrival_time": "16:00",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "15:00",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-029"
+      },
+      {
+        "arrival_time": "16:15",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "15:15",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-066"
+      },
+      {
+        "arrival_time": "16:20",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "15:20",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-030"
+      },
+      {
+        "arrival_time": "16:35",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "15:35",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-031"
+      },
+      {
+        "arrival_time": "16:35",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "15:35",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-067"
+      },
+      {
+        "arrival_time": "16:50",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "15:50",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-032"
+      },
+      {
+        "arrival_time": "16:55",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "15:55",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-068"
+      },
+      {
+        "arrival_time": "17:10",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "16:05",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-033"
+      },
+      {
+        "arrival_time": "17:20",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "16:15",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-069"
+      },
+      {
+        "arrival_time": "17:30",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "16:25",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-034"
+      },
+      {
+        "arrival_time": "17:35",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "16:30",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-070"
+      },
+      {
+        "arrival_time": "17:50",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "16:45",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-035"
+      },
+      {
+        "arrival_time": "17:50",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "16:45",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-071"
+      },
+      {
+        "arrival_time": "18:05",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "17:00",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-072"
+      },
+      {
+        "arrival_time": "18:10",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "17:05",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-036"
+      },
+      {
+        "arrival_time": "18:20",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "17:20",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-073"
+      },
+      {
+        "arrival_time": "18:35",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "17:30",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 65,
+        "scenario": "B",
+        "trip_id": "B-037"
+      },
+      {
+        "arrival_time": "18:40",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "17:40",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-074"
+      },
+      {
+        "arrival_time": "18:50",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "17:50",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-038"
+      },
+      {
+        "arrival_time": "19:00",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "18:00",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-075"
+      },
+      {
+        "arrival_time": "19:10",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "18:10",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-039"
+      },
+      {
+        "arrival_time": "19:20",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "18:20",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-076"
+      },
+      {
+        "arrival_time": "19:30",
+        "departure_terminal": "Terminal 1",
+        "departure_time": "18:30",
+        "direction": "terminal_1_to_2",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-040"
+      },
+      {
+        "arrival_time": "19:45",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "18:45",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-077"
+      },
+      {
+        "arrival_time": "20:10",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "19:10",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-078"
+      },
+      {
+        "arrival_time": "20:35",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "19:35",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-079"
+      },
+      {
+        "arrival_time": "21:00",
+        "departure_terminal": "Terminal 2",
+        "departure_time": "20:00",
+        "direction": "terminal_2_to_1",
+        "runtime_minutes": 60,
+        "scenario": "B",
+        "trip_id": "B-080"
+      }
+    ],
+    "parameters": {
+      "allowed_trip_runtime_minutes": [
+        55,
+        65
+      ],
+      "maximum_load_factor": 0.9,
+      "minimum_layover_minutes": 5,
+      "route_id": "CORPUS-ALPHA-80",
+      "route_name": "Anonymized Route Alpha",
+      "route_type": "intra_provincial",
+      "target_load_factor": 0.85,
+      "terminal_1_first_departure": "04:30",
+      "terminal_1_last_departure": "18:30",
+      "terminal_1_name": "Terminal 1",
+      "terminal_2_first_departure": "05:35",
+      "terminal_2_last_departure": "20:00",
+      "terminal_2_name": "Terminal 2",
+      "time_block_minutes": 60,
+      "total_daily_trips": 80,
+      "trip_runtime_minutes": 65,
+      "vehicle_capacity_passengers": 28
+    }
+  },
+  "source_audit_codes": [
+    "A_TOTAL_FROM_EXACT_TIMETABLE",
+    "DEPARTURE_HOUR_PROXY_V1_DERIVED",
+    "EXACT_TIMETABLE_ROWS_AUTHORITATIVE",
+    "HISTORICAL_OUTPUT_SHEETS_EXCLUDED",
+    "RAW_TRIP_OBSERVATION_OVERLAPS_PRESERVED"
+  ],
+  "source_sha256": "085608bc9a326b1fe68e41aa9488c8382d27e2a83307b1d97fb66953c4b30c3f"
+}

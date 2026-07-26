@@ -1,0 +1,312 @@
+{
+  "anonymization_profile_id": "route_corpus_v1_relative_terminal_redaction",
+  "corpus_version": "1",
+  "date_shift_days": -365,
+  "fixtures": [
+    {
+      "corrections": [
+        {
+          "approved_for_corpus_construction": true,
+          "classification": "exact_timetable_derived_correction",
+          "correction_code": "A_TOTAL_FROM_EXACT_TIMETABLE",
+          "evidence_row_count": 52,
+          "evidence_trip_ids": [
+            "A-001",
+            "A-002",
+            "A-003",
+            "A-004",
+            "A-005",
+            "A-006",
+            "A-007",
+            "A-008",
+            "A-009",
+            "A-010",
+            "A-011",
+            "A-012",
+            "A-013",
+            "A-014",
+            "A-015",
+            "A-016",
+            "A-017",
+            "A-018",
+            "A-019",
+            "A-020",
+            "A-021",
+            "A-022",
+            "A-023",
+            "A-024",
+            "A-025",
+            "A-026",
+            "A-027",
+            "A-028",
+            "A-029",
+            "A-030",
+            "A-031",
+            "A-032",
+            "A-033",
+            "A-034",
+            "A-035",
+            "A-036",
+            "A-037",
+            "A-038",
+            "A-039",
+            "A-040",
+            "A-041",
+            "A-042",
+            "A-043",
+            "A-044",
+            "A-045",
+            "A-046",
+            "A-047",
+            "A-048",
+            "A-049",
+            "A-050",
+            "A-051",
+            "A-052"
+          ],
+          "exact_timetable_derived_value": 52,
+          "explanation": "Scenario A total is reconciled to the authoritative exact timetable rows.",
+          "fixture_id": "CORPUS-ALPHA-80",
+          "source_field": "total_daily_trips",
+          "source_scenario": "A",
+          "source_sheet": "THONG_SO_A",
+          "source_value": 80
+        }
+      ],
+      "derived_datasets": [
+        {
+          "classification": "derived_proxy_dataset",
+          "confidence": "LOW",
+          "dataset_id": "CORPUS-ALPHA-80:departure_hour_proxy_v1",
+          "method": "departure_hour_proxy_v1",
+          "proxy_fingerprint": "0f06d827c0070b129eee0927345d9b39c4e343863f10314f4283ead4b69be999",
+          "source_dataset_id": "CORPUS-ALPHA-80:raw_trip_observations",
+          "status": "PROXY_SENSITIVITY_ONLY"
+        }
+      ],
+      "fixture_file": "corpus_alpha_80.json",
+      "fixture_id": "CORPUS-ALPHA-80",
+      "observed_source_facts": [
+        {
+          "classification": "observed_source_fact",
+          "code": "EXACT_SCENARIO_A_TIMETABLE",
+          "directional_trip_counts": [
+            26,
+            26
+          ],
+          "total_trip_count": 52
+        },
+        {
+          "classification": "observed_source_fact",
+          "code": "EXACT_SCENARIO_B_TIMETABLE",
+          "directional_trip_counts": [
+            40,
+            40
+          ],
+          "runtime_range_minutes": [
+            55,
+            65
+          ],
+          "total_trip_count": 80
+        },
+        {
+          "classification": "observed_source_fact",
+          "code": "RAW_TRIP_OBSERVATIONS",
+          "overlap_pair_count": 50,
+          "raw_fingerprint": "5dd01b800a8fa76a8d9c411830ea519dfccb9d1f80a9fa31d0bfdbb4b8e25f44",
+          "row_count": 52
+        },
+        {
+          "classification": "observed_source_fact",
+          "code": "OPERATING_PARAMETERS",
+          "maximum_load_factor": 0.9,
+          "minimum_layover_minutes": 5,
+          "route_type": "intra_provincial",
+          "target_load_factor": 0.85,
+          "vehicle_capacity_passengers": 28
+        }
+      ],
+      "scenario_assumptions": [
+        {
+          "classification": "corpus_scenario_assumption",
+          "field": "available_fleet_limit_a",
+          "value": 5
+        },
+        {
+          "classification": "corpus_scenario_assumption",
+          "field": "available_fleet_limit_b",
+          "value": 8
+        },
+        {
+          "classification": "corpus_scenario_assumption",
+          "field": "operating_day_type_a",
+          "value": "WEEKDAY"
+        },
+        {
+          "classification": "corpus_scenario_assumption",
+          "field": "operating_day_type_b",
+          "value": "WEEKDAY"
+        },
+        {
+          "classification": "corpus_scenario_assumption",
+          "field": "demand_confidence",
+          "value": "LOW"
+        }
+      ],
+      "source_label": "APPROVED_PRIVATE_SOURCE_ALPHA",
+      "source_sha256": "085608bc9a326b1fe68e41aa9488c8382d27e2a83307b1d97fb66953c4b30c3f"
+    },
+    {
+      "corrections": [
+        {
+          "approved_for_corpus_construction": true,
+          "classification": "exact_timetable_derived_correction",
+          "correction_code": "A_ENDPOINT_FROM_EXACT_TIMETABLE",
+          "evidence_row_count": 1,
+          "evidence_trip_ids": [
+            "A-001"
+          ],
+          "exact_timetable_derived_value": "05:30",
+          "explanation": "Scenario A Terminal 1 first departure is reconciled to exact trip A-001.",
+          "fixture_id": "CORPUS-BETA-46",
+          "source_field": "terminal_1_first_departure",
+          "source_scenario": "A",
+          "source_sheet": "THONG_SO_A",
+          "source_value": "04:30"
+        },
+        {
+          "approved_for_corpus_construction": true,
+          "classification": "exact_timetable_derived_correction",
+          "correction_code": "A_ENDPOINT_FROM_EXACT_TIMETABLE",
+          "evidence_row_count": 1,
+          "evidence_trip_ids": [
+            "A-013"
+          ],
+          "exact_timetable_derived_value": "18:15",
+          "explanation": "Scenario A Terminal 1 last departure is reconciled to exact trip A-013.",
+          "fixture_id": "CORPUS-BETA-46",
+          "source_field": "terminal_1_last_departure",
+          "source_scenario": "A",
+          "source_sheet": "THONG_SO_A",
+          "source_value": "18:25"
+        },
+        {
+          "approved_for_corpus_construction": true,
+          "classification": "exact_timetable_derived_correction",
+          "correction_code": "A_ENDPOINT_FROM_EXACT_TIMETABLE",
+          "evidence_row_count": 1,
+          "evidence_trip_ids": [
+            "A-014"
+          ],
+          "exact_timetable_derived_value": "05:30",
+          "explanation": "Scenario A Terminal 2 first departure is reconciled to exact trip A-014.",
+          "fixture_id": "CORPUS-BETA-46",
+          "source_field": "terminal_2_first_departure",
+          "source_scenario": "A",
+          "source_sheet": "THONG_SO_A",
+          "source_value": "05:35"
+        },
+        {
+          "approved_for_corpus_construction": true,
+          "classification": "exact_timetable_derived_correction",
+          "correction_code": "A_ENDPOINT_FROM_EXACT_TIMETABLE",
+          "evidence_row_count": 1,
+          "evidence_trip_ids": [
+            "A-026"
+          ],
+          "exact_timetable_derived_value": "17:20",
+          "explanation": "Scenario A Terminal 2 last departure is reconciled to exact trip A-026.",
+          "fixture_id": "CORPUS-BETA-46",
+          "source_field": "terminal_2_last_departure",
+          "source_scenario": "A",
+          "source_sheet": "THONG_SO_A",
+          "source_value": "19:40"
+        }
+      ],
+      "derived_datasets": [
+        {
+          "classification": "derived_proxy_dataset",
+          "confidence": "LOW",
+          "dataset_id": "CORPUS-BETA-46:departure_hour_proxy_v1",
+          "method": "departure_hour_proxy_v1",
+          "proxy_fingerprint": "e687cdd43f197c4d9b6fba929ad6f0b52b9a18aa8d887362f619dd50c114f0d6",
+          "source_dataset_id": "CORPUS-BETA-46:raw_trip_observations",
+          "status": "PROXY_SENSITIVITY_ONLY"
+        }
+      ],
+      "fixture_file": "corpus_beta_46.json",
+      "fixture_id": "CORPUS-BETA-46",
+      "observed_source_facts": [
+        {
+          "classification": "observed_source_fact",
+          "code": "EXACT_SCENARIO_A_TIMETABLE",
+          "directional_trip_counts": [
+            13,
+            13
+          ],
+          "total_trip_count": 26
+        },
+        {
+          "classification": "observed_source_fact",
+          "code": "EXACT_SCENARIO_B_TIMETABLE",
+          "directional_trip_counts": [
+            23,
+            23
+          ],
+          "runtime_range_minutes": [
+            100,
+            100
+          ],
+          "total_trip_count": 46
+        },
+        {
+          "classification": "observed_source_fact",
+          "code": "RAW_TRIP_OBSERVATIONS",
+          "overlap_pair_count": 24,
+          "raw_fingerprint": "53850c642f73a843e2a622816eb5f27c22180f7bb7c009382174ca896b07f8e6",
+          "row_count": 26
+        },
+        {
+          "classification": "observed_source_fact",
+          "code": "OPERATING_PARAMETERS",
+          "maximum_load_factor": 0.9,
+          "minimum_layover_minutes": 5,
+          "route_type": "intra_provincial",
+          "target_load_factor": 0.85,
+          "vehicle_capacity_passengers": 28
+        }
+      ],
+      "scenario_assumptions": [
+        {
+          "classification": "corpus_scenario_assumption",
+          "field": "available_fleet_limit_a",
+          "value": 4
+        },
+        {
+          "classification": "corpus_scenario_assumption",
+          "field": "available_fleet_limit_b",
+          "value": 7
+        },
+        {
+          "classification": "corpus_scenario_assumption",
+          "field": "operating_day_type_a",
+          "value": "WEEKDAY"
+        },
+        {
+          "classification": "corpus_scenario_assumption",
+          "field": "operating_day_type_b",
+          "value": "WEEKDAY"
+        },
+        {
+          "classification": "corpus_scenario_assumption",
+          "field": "demand_confidence",
+          "value": "LOW"
+        }
+      ],
+      "source_label": "APPROVED_PRIVATE_SOURCE_BETA",
+      "source_sha256": "0b886ad7670eeb47bda53690ae905d473a1b0397fc4817ca0c674675650fd159"
+    }
+  ],
+  "historical_source_sheet_policy": "HISTORICAL_NON_AUTHORITATIVE_REFERENCE",
+  "proxy_policy": "PROXY_SENSITIVITY_ONLY"
+}

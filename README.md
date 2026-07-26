@@ -83,7 +83,7 @@ without a weighted score. Streamlit does not yet expose this selection.
 - Solver selection through Streamlit.
 - OR-Tools fleet-minimization objectives.
 - A globally optimal timetable or a proof of infeasibility from the legacy heuristic.
-- An anonymized real-route regression corpus; route-corpus work remains pending.
+- Approval of the draft anonymized real-route corpus as a permanent regression baseline.
 - Variable-trip-count optimization.
 - Production implementation of the deferred V1-A1 structural demand-response workflow.
 - Mixed fleets, multi-route interlining, deadhead, driver duties, depot pull-in/out, maintenance,
@@ -108,9 +108,20 @@ Only an independently validated candidate may be presented as authoritative Scen
 
 ## Near-term roadmap
 
-1. Add the approved anonymized real-route regression corpus.
+1. Obtain expert approval for the draft anonymized real-route corpus characterization.
 2. Run side-by-side UI, chart, and XLSX validation against unified results.
 3. Cut the UI and XLSX over only after that validation is approved.
+
+## Draft anonymized route corpus
+
+Milestone 4C1 now includes two versioned, anonymized, real-route-derived fixtures under
+`tests/fixtures/route_corpus/v1/`. The private source workbooks remain external and uncommitted.
+Overlapping raw trip-observation evidence is preserved separately from a LOW-confidence,
+departure-hour sensitivity proxy used by Contract V1.
+
+The corpus and solver characterization are drafts, not approved operational timetables or frozen
+solver regression expectations. UI, chart, and XLSX cutover remains blocked on corpus review and
+approval.
 
 Variable-trip-count optimization and structural demand-response scenarios are optional later
 stages. See [Migration Roadmap to OR-Tools](docs/engine/MIGRATION_ROADMAP_TO_OR_TOOLS.md).
