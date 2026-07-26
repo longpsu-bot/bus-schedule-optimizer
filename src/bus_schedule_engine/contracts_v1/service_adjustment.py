@@ -12,6 +12,7 @@ from .adjustment_context import (
     ServiceAdjustmentDecisionPolicyV1,
     ServiceAdjustmentEvaluationContextV1,
     ensure_valid_service_adjustment_evaluation_context_v1,
+    validate_service_adjustment_evaluation_context_v1,
 )
 from .demand_coverage import (
     COMBINED_DEMAND_DIRECTIONAL_SUPPORT_UNAVAILABLE,
@@ -45,7 +46,13 @@ from .models import (
     TripsByDirection,
 )
 from .serialization import canonical_sha256, scenario_fingerprint
-from .validation import validate_scenario_input
+from .validation import (
+    ContractValidationError,
+    ContractValidationIssue,
+    ContractValidationResult,
+    ContractValidationSeverity,
+    validate_scenario_input,
+)
 
 EVALUATOR_FINGERPRINT_PROFILE = "contract_v1_d2a_service_adjustment"
 HEURISTIC_ADAPTER_ID = "legacy_heuristic_v1"
@@ -1634,12 +1641,223 @@ def _fingerprint_payload(
             else None
         ),
         "maximum_supported_reduction_quantity": (assessment.maximum_supported_reduction_quantity),
-        "primary_decision": assessment.primary_decision.value,
+        "primary_decision": _jsonable(assessment.primary_decision),
         "reason_codes": list(assessment.reason_codes),
         "explanation": assessment.explanation,
         "evidence": list(assessment.evidence),
         "limitations": list(assessment.limitations),
     }
+
+
+def calculate_service_adjustment_assessment_fingerprint_v1(
+    assessment: ServiceAdjustmentAssessmentV1,
+) -> str:
+    """Recompute the canonical Phase A assessment fingerprint."""
+    return canonical_sha256(_fingerprint_payload(assessment))
+
+
+def _assessment_validation_issue(
+    code: str,
+    path: str,
+    message: str,
+) -> ContractValidationIssue:
+    return ContractValidationIssue(code=code, path=path, message=message)
+
+
+def validate_service_adjustment_assessment_v1(
+    assessment: ServiceAdjustmentAssessmentV1,
+    authoritative_context: ServiceAdjustmentEvaluationContextV1,
+) -> ContractValidationResult:
+    """Validate a canonical assessment and its exact Phase A authority."""
+    if type(assessment) is not ServiceAdjustmentAssessmentV1:
+        return ContractValidationResult(
+            (
+                _assessment_validation_issue(
+                    "SERVICE_ADJUSTMENT_ASSESSMENT_TYPE_INVALID",
+                    "assessment",
+                    "Routing requires the exact canonical ServiceAdjustmentAssessmentV1 type.",
+                ),
+            )
+        )
+
+    if type(authoritative_context) is not ServiceAdjustmentEvaluationContextV1:
+        return ContractValidationResult(
+            (
+                _assessment_validation_issue(
+                    "SERVICE_ADJUSTMENT_ASSESSMENT_CONTEXT_TYPE_INVALID",
+                    "authoritative_context",
+                    "Assessment validation requires the exact Phase A context type.",
+                ),
+            )
+        )
+
+    context_validation = validate_service_adjustment_evaluation_context_v1(authoritative_context)
+    issues = [
+        issue
+        for issue in context_validation.issues
+        if issue.severity == ContractValidationSeverity.ERROR
+    ]
+    if assessment.evaluator_fingerprint_profile != EVALUATOR_FINGERPRINT_PROFILE:
+        issues.append(
+            _assessment_validation_issue(
+                "SERVICE_ADJUSTMENT_ASSESSMENT_PROFILE_MISMATCH",
+                "assessment.evaluator_fingerprint_profile",
+                "Assessment fingerprint profile does not match the canonical Phase A profile.",
+            )
+        )
+
+    if type(assessment.primary_decision) is not ServiceAdjustmentDecisionV1:
+        issues.append(
+            _assessment_validation_issue(
+                "SERVICE_ADJUSTMENT_ASSESSMENT_DECISION_TYPE_INVALID",
+                "assessment.primary_decision",
+                "Assessment decision must be one of the seven closed V1 values.",
+            )
+        )
+    tuple_fields = (
+        "reason_codes",
+        "evidence",
+        "block_evidence",
+        "joint_donor_evidence",
+        "allocation_evidence",
+        "headway_evidence",
+        "limitations",
+    )
+    tuples_valid = all(isinstance(getattr(assessment, name), tuple) for name in tuple_fields)
+    if not tuples_valid:
+        issues.append(
+            _assessment_validation_issue(
+                "SERVICE_ADJUSTMENT_ASSESSMENT_COLLECTION_NOT_IMMUTABLE",
+                "assessment",
+                "Canonical assessment collections must be immutable tuples.",
+            )
+        )
+    nested_types_valid = bool(
+        tuples_valid
+        and type(assessment.daily_evidence) is DailyAdjustmentEvidenceV1
+        and type(assessment.technical_evidence) is TechnicalAdjustmentEvidenceV1
+        and all(type(item) is BlockAdjustmentEvidenceV1 for item in assessment.block_evidence)
+        and all(
+            type(item) is JointDonorValidationEvidenceV1 for item in assessment.joint_donor_evidence
+        )
+        and all(
+            type(item) is DirectionalAllocationEvidenceV1 for item in assessment.allocation_evidence
+        )
+        and all(type(item) is HeadwayRegimeEvidenceV1 for item in assessment.headway_evidence)
+        and (
+            assessment.repeatability_evidence is None
+            or type(assessment.repeatability_evidence) is RepeatabilityEvidenceV1
+        )
+        and (
+            assessment.joint_reduction_evidence is None
+            or type(assessment.joint_reduction_evidence) is JointReductionValidationEvidenceV1
+        )
+    )
+    if not nested_types_valid:
+        issues.append(
+            _assessment_validation_issue(
+                "SERVICE_ADJUSTMENT_ASSESSMENT_EVIDENCE_TYPE_INVALID",
+                "assessment",
+                "Assessment evidence must use the exact canonical Phase A types.",
+            )
+        )
+    if (
+        not isinstance(assessment.explanation, str)
+        or isinstance(assessment.maximum_supported_reduction_quantity, bool)
+        or not isinstance(assessment.maximum_supported_reduction_quantity, int)
+        or assessment.maximum_supported_reduction_quantity < 0
+    ):
+        issues.append(
+            _assessment_validation_issue(
+                "SERVICE_ADJUSTMENT_ASSESSMENT_VALUE_INVALID",
+                "assessment",
+                "Assessment explanation and reduction quantity are invalid.",
+            )
+        )
+
+    identity_pairs = (
+        (
+            "SERVICE_ADJUSTMENT_ASSESSMENT_CONTEXT_MISMATCH",
+            "assessment.source_evaluation_context_fingerprint",
+            assessment.source_evaluation_context_fingerprint,
+            authoritative_context.context_fingerprint,
+        ),
+        (
+            "SERVICE_ADJUSTMENT_ASSESSMENT_SOURCE_B_MISMATCH",
+            "assessment.source_b_fingerprint",
+            assessment.source_b_fingerprint,
+            authoritative_context.source_b_fingerprint,
+        ),
+        (
+            "SERVICE_ADJUSTMENT_ASSESSMENT_DEMAND_MISMATCH",
+            "assessment.observed_demand_fingerprint",
+            assessment.observed_demand_fingerprint,
+            authoritative_context.observed_demand_fingerprint,
+        ),
+        (
+            "SERVICE_ADJUSTMENT_ASSESSMENT_B_EVALUATION_MISMATCH",
+            "assessment.authoritative_b_evaluation_fingerprint",
+            assessment.authoritative_b_evaluation_fingerprint,
+            authoritative_context.authoritative_b_evaluation_fingerprint,
+        ),
+        (
+            "SERVICE_ADJUSTMENT_ASSESSMENT_DECISION_POLICY_MISMATCH",
+            "assessment.adjustment_decision_policy_fingerprint",
+            assessment.adjustment_decision_policy_fingerprint,
+            authoritative_context.adjustment_decision_policy_fingerprint,
+        ),
+    )
+    for code, path, declared, expected in identity_pairs:
+        if declared != expected:
+            issues.append(
+                _assessment_validation_issue(
+                    code,
+                    path,
+                    f"Declared {path} does not match the supplied authoritative context.",
+                )
+            )
+
+    fingerprint_payload_valid = bool(
+        type(assessment.primary_decision) is ServiceAdjustmentDecisionV1 and nested_types_valid
+    )
+    if fingerprint_payload_valid:
+        expected_fingerprint = calculate_service_adjustment_assessment_fingerprint_v1(assessment)
+        if assessment.evaluator_fingerprint != expected_fingerprint:
+            issues.append(
+                _assessment_validation_issue(
+                    "SERVICE_ADJUSTMENT_ASSESSMENT_FINGERPRINT_MISMATCH",
+                    "assessment.evaluator_fingerprint",
+                    "Assessment fingerprint does not match the complete canonical Phase A payload.",
+                )
+            )
+        expected_id = f"ADJUSTMENT-{expected_fingerprint[:16].upper()}"
+        if assessment.assessment_id != expected_id:
+            issues.append(
+                _assessment_validation_issue(
+                    "SERVICE_ADJUSTMENT_ASSESSMENT_ID_MISMATCH",
+                    "assessment.assessment_id",
+                    "Assessment ID is not derived from the recomputed assessment fingerprint.",
+                )
+            )
+    return ContractValidationResult(tuple(issues))
+
+
+def ensure_valid_service_adjustment_assessment_v1(
+    assessment: ServiceAdjustmentAssessmentV1,
+    authoritative_context: ServiceAdjustmentEvaluationContextV1,
+) -> None:
+    validation = validate_service_adjustment_assessment_v1(
+        assessment,
+        authoritative_context,
+    )
+    if not validation.passed:
+        raise ContractValidationError(
+            tuple(
+                issue
+                for issue in validation.issues
+                if issue.severity == ContractValidationSeverity.ERROR
+            )
+        )
 
 
 def evaluate_service_adjustment_need_v1(
@@ -1862,7 +2080,7 @@ def evaluate_service_adjustment_need_v1(
         maximum_supported_reduction_quantity=maximum_reduction,
         limitations=normalized_limitations,
     )
-    fingerprint = canonical_sha256(_fingerprint_payload(assessment))
+    fingerprint = calculate_service_adjustment_assessment_fingerprint_v1(assessment)
     return replace(
         assessment,
         assessment_id=f"ADJUSTMENT-{fingerprint[:16].upper()}",
@@ -1888,5 +2106,8 @@ __all__ = [
     "ServiceAdjustmentPolicyV1",
     "TechnicalAdjustmentEvidenceV1",
     "TechnicalEventEvidenceV1",
+    "calculate_service_adjustment_assessment_fingerprint_v1",
+    "ensure_valid_service_adjustment_assessment_v1",
     "evaluate_service_adjustment_need_v1",
+    "validate_service_adjustment_assessment_v1",
 ]

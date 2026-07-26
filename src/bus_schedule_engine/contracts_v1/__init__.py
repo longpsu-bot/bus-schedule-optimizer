@@ -12,6 +12,12 @@ from .adjustment_context import (
     ServiceAdjustmentDecisionPolicyV1,
     ServiceAdjustmentEvaluationContextV1,
 )
+from .adjustment_routing import (
+    AdjustmentCapabilityRoutingPolicyV1,
+    AdjustmentCapabilityRoutingV1,
+    AdjustmentCapabilityV1,
+    FixedResourceAuthorizationProfileV1,
+)
 from .demand_resolution import (
     AggregationMethod,
     BlockBoundaryReason,
@@ -80,6 +86,8 @@ from .problem_validation import (
     validate_schedule_problem_v1,
 )
 from .public_api import (
+    build_adjustment_capability_routing_policy_v1,
+    build_current_fixed_resource_authorization_profile_v1,
     build_demand_analysis_blocks_v1,
     build_service_adjustment_evaluation_context_v1,
     detect_demand_resolution_v1,
@@ -87,6 +95,7 @@ from .public_api import (
     evaluate_service_adjustment_need_from_generation_context_v1,
     evaluate_service_adjustment_need_v1,
     project_service_adjustment_decision_policy_v1,
+    route_adjustment_capability_v1,
 )
 from .serialization import (
     demand_to_contract_dict,
@@ -171,6 +180,9 @@ from .validation import (
 __all__ = [
     "CONTRACT_VERSION",
     "AggregationMethod",
+    "AdjustmentCapabilityRoutingPolicyV1",
+    "AdjustmentCapabilityRoutingV1",
+    "AdjustmentCapabilityV1",
     "BDisposition",
     "BoundaryConvention",
     "BlockBoundaryReason",
@@ -209,6 +221,7 @@ __all__ = [
     "FleetAssessmentV1",
     "FleetAssignmentV1",
     "FleetConstraintMode",
+    "FixedResourceAuthorizationProfileV1",
     "GenerationResultStatus",
     "HeadwayRegimeEvidenceV1",
     "HeadwayRegularityClassificationV1",
@@ -276,7 +289,9 @@ __all__ = [
     "BlockAllocationShareV1",
     "EVALUATOR_FINGERPRINT_PROFILE",
     "block_supply_plan_to_contract_dict",
+    "build_adjustment_capability_routing_policy_v1",
     "build_block_supply_plans_v1",
+    "build_current_fixed_resource_authorization_profile_v1",
     "build_demand_analysis_blocks_v1",
     "build_service_adjustment_evaluation_context_v1",
     "build_heuristic_compatibility_context_v1",
@@ -295,6 +310,7 @@ __all__ = [
     "normalize_imported_workbook_v1",
     "observed_demand_fingerprint",
     "project_service_adjustment_decision_policy_v1",
+    "route_adjustment_capability_v1",
     "run_schedule_solver_v1",
     "scenario_fingerprint",
     "scenario_to_contract_dict",

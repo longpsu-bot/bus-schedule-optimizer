@@ -8,6 +8,21 @@ from .adjustment_context import (
     ServiceAdjustmentEvaluationContextV1,
     _build_service_adjustment_evaluation_context_core_v1,
 )
+from .adjustment_routing import (
+    AdjustmentCapabilityRoutingPolicyV1,
+    AdjustmentCapabilityRoutingV1,
+    AdjustmentCapabilityV1,
+    FixedResourceAuthorizationProfileV1,
+)
+from .adjustment_routing import (
+    build_adjustment_capability_routing_policy_v1 as _build_adjustment_capability_routing_policy_v1,
+)
+from .adjustment_routing import (
+    build_current_fixed_resource_authorization_profile_v1 as _build_current_fixed_resource_authorization_profile_v1,
+)
+from .adjustment_routing import (
+    route_adjustment_capability_v1 as _route_adjustment_capability_v1,
+)
 from .authoritative_evaluation import (
     evaluate_authoritative_scenario_b_v1,
     validate_authoritative_demand_source_v1,
@@ -32,6 +47,7 @@ from .models import (
     ObservedDemandInput,
 )
 from .service_adjustment import (
+    HEURISTIC_ADAPTER_ID,
     ServiceAdjustmentAssessmentV1,
     ServiceAdjustmentPolicyV1,
 )
@@ -140,6 +156,43 @@ def evaluate_service_adjustment_need_v1(
 ) -> ServiceAdjustmentAssessmentV1:
     """Return the canonical problem-free quantitative assessment."""
     return _evaluate_service_adjustment_need_v1(context)
+
+
+def build_current_fixed_resource_authorization_profile_v1() -> FixedResourceAuthorizationProfileV1:
+    """Return the exact currently supported fixed-resource lock profile."""
+    return _build_current_fixed_resource_authorization_profile_v1()
+
+
+def build_adjustment_capability_routing_policy_v1(
+    configured_capabilities: tuple[AdjustmentCapabilityV1, ...] = (
+        AdjustmentCapabilityV1.FIXED_RESOURCE_TRIP_REDISTRIBUTION,
+        AdjustmentCapabilityV1.FIXED_RESOURCE_DEPARTURE_RESPACE,
+    ),
+    *,
+    solver_adapter_id: str = HEURISTIC_ADAPTER_ID,
+    available_adapter_ids: tuple[str, ...] = (HEURISTIC_ADAPTER_ID,),
+    fixed_resource_profile: FixedResourceAuthorizationProfileV1 | None = None,
+) -> AdjustmentCapabilityRoutingPolicyV1:
+    """Build an immutable closed capability-routing policy."""
+    return _build_adjustment_capability_routing_policy_v1(
+        configured_capabilities,
+        solver_adapter_id=solver_adapter_id,
+        available_adapter_ids=available_adapter_ids,
+        fixed_resource_profile=fixed_resource_profile,
+    )
+
+
+def route_adjustment_capability_v1(
+    assessment: ServiceAdjustmentAssessmentV1,
+    authoritative_context: ServiceAdjustmentEvaluationContextV1,
+    routing_policy: AdjustmentCapabilityRoutingPolicyV1,
+) -> AdjustmentCapabilityRoutingV1:
+    """Route a validated canonical assessment without constructing a problem."""
+    return _route_adjustment_capability_v1(
+        assessment,
+        authoritative_context,
+        routing_policy,
+    )
 
 
 def _effective_legacy_service_adjustment_policy_v1(
