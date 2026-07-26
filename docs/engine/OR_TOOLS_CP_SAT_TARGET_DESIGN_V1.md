@@ -2,6 +2,27 @@
 
 This is a future implementation design, not solver code. Hard rules and objective priority come from [Engine Contract V1 §§3–4 and §§8–12](ENGINE_CONTRACT_V1.md), with top-level result behavior defined by [Schedule Generation Outcome Contract V1](RESULT_ENVELOPE_CONTRACT_V1.md).
 
+## First implementation target
+
+The first CP-SAT pull request is a hard-feasibility adapter with this exact scope:
+
+- one route;
+- two terminals;
+- fixed total trips;
+- fixed outbound and inbound trip counts;
+- exact runtime inherited from each source B trip;
+- terminal-specific minimum turnaround at the arrival terminal;
+- locked first and last departure in each direction;
+- B's available-fleet upper bound;
+- solver-determined initial fleet positioning at the two terminals;
+- continuous non-negative terminal stock; and
+- independent domain validation after the solve.
+
+The first feasibility pull request has no demand objective, load-factor objective, block-allocation
+objective, headway-quality objective, or shift-minimization objective. It proves only whether the
+fixed-resource technical problem is feasible and returns a raw candidate for independent
+validation. Demand and headway optimization belong to the following milestone.
+
 ## Why CP-SAT
 
 The target problem combines integer departure minutes, integer block allocations, Boolean change/exception indicators, fixed trip counts, fleet/location constraints, turnaround, and lexicographic objectives. CP-SAT supports integer/Boolean modeling, reified constraints, hints, staged solves, and proof statuses appropriate to that structure.
@@ -42,7 +63,7 @@ Multiplication/division involving LF should be converted to scaled integer capac
 ## Hard constraints
 
 - total C trips equal B; direction totals equal B in `fixed_by_direction`;
-- `total_only` only when authorization/confidence preconditions are already validated;
+- the first implementation supports only `fixed_by_direction`; `total_only` is out of scope;
 - `minimum_required_fleet <= available_fleet_limit` and any explicit fleet/positioning mode;
 - initial terminal counts satisfy fixed/bounded rules when configured;
 - terminal stock remains non-negative on the continuous event timeline;
@@ -66,7 +87,8 @@ The chosen formulation must independently report minimum required fleet and reco
 
 ## Lexicographic solve stages
 
-Run staged solves or a mathematically safe lexicographic encoding:
+The first feasibility pull request implements only Stage 1. After that gate passes, later
+fixed-resource optimization may run staged solves or a mathematically safe lexicographic encoding:
 
 1. find technical feasibility;
 2. minimize demand blocks with no service;
@@ -116,4 +138,7 @@ For an optimal result, repeated runs with identical input/configuration must pro
 
 ## Non-goals for the first adapter
 
-Mixed fleets, multi-route interlining, deadhead, driver duties, depot pull-in/out, maintenance, and calibrated demand elasticity remain outside V1 unless separately contracted.
+Demand allocation, headway optimization, variable trip counts, redistribution between
+directions, structural demand-response scenarios, mixed fleets, multi-route interlining,
+deadhead, driver duties, depot pull-in/out, maintenance, and calibrated demand elasticity are not
+part of the first hard-feasibility adapter.
