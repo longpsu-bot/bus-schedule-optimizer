@@ -9,6 +9,7 @@ import pytest
 from jsonschema import Draft202012Validator, FormatChecker
 from referencing import Registry, Resource
 
+import bus_schedule_engine.contracts_v1.solver_orchestration as solver_orchestration_module
 from bus_schedule_engine.c_config import ScenarioCConfig
 from bus_schedule_engine.c_generator import generate_scenario_c
 from bus_schedule_engine.contracts_v1 import (
@@ -751,8 +752,10 @@ class _StaticSolver:
     def __init__(self, run: SolverRunResultV1):
         self._run = run
         self.adapter_id = run.solver_adapter
+        self.call_count = 0
 
     def solve(self, problem):
+        self.call_count += 1
         return self._run
 
 
@@ -1027,22 +1030,43 @@ def test_problem_rejects_legacy_parameter_drift() -> None:
         )
 
 
-def test_suitable_b_returns_not_run_without_duplicate_c() -> None:
+def test_runner_executes_valid_problem_when_b_is_demand_suitable() -> None:
     problem, *_ = _problem(low_demand=True)
     assert (
         problem.b_evaluation.evaluation.disposition
         == BDisposition.TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE
     )
+    solver = _StaticSolver(
+        SolverRunResultV1(
+            execution_status=SolverExecutionStatus.COMPLETED,
+            solver_status=NativeSolverStatus.UNKNOWN,
+            solver_adapter=problem.problem.solver_adapter,
+            solve_duration_seconds=0.01,
+            candidate=None,
+            explanations=("Execution-focused runner invoked the solver.",),
+            limitations=(),
+        )
+    )
 
-    outcome = run_schedule_solver_v1(problem, _BombSolver())
+    outcome = run_schedule_solver_v1(problem, solver)
 
-    assert outcome.result_status == GenerationResultStatus.C_NOT_REQUIRED_B_SUITABLE
-    assert outcome.execution_status == SolverExecutionStatus.NOT_RUN
-    assert outcome.solver_status is None
+    assert solver.call_count == 1
+    assert outcome.result_status == GenerationResultStatus.C_NOT_FOUND_WITHIN_SOLVE_LIMIT
+    assert outcome.execution_status == SolverExecutionStatus.COMPLETED
+    assert outcome.solver_status == NativeSolverStatus.UNKNOWN
     assert outcome.solution is None
 
 
-def test_insufficient_data_returns_not_run_without_fabricated_c() -> None:
+def test_runner_module_contains_no_upstream_business_no_run_gates() -> None:
+    source = Path(solver_orchestration_module.__file__).read_text(encoding="utf-8")
+
+    assert "BDisposition" not in source
+    assert "assess_demand_coverage_v1" not in source
+    assert "SolverExecutionStatus.NOT_RUN" not in source
+    assert "C_NOT_REQUIRED_B_SUITABLE" not in source
+
+
+def test_runner_executes_valid_problem_without_demand_business_authority() -> None:
     parameters, trips, _, fleet_limit = _fixture()
     imported = ImportedWorkbook(
         parameters_a=None,
@@ -1070,15 +1094,28 @@ def test_insufficient_data_returns_not_run_without_fabricated_c() -> None:
         [],
         ScenarioCConfig(),
     )
+    solver = _StaticSolver(
+        SolverRunResultV1(
+            execution_status=SolverExecutionStatus.COMPLETED,
+            solver_status=NativeSolverStatus.UNKNOWN,
+            solver_adapter=problem.problem.solver_adapter,
+            solve_duration_seconds=0.01,
+            candidate=None,
+            explanations=("Execution-focused runner invoked the solver.",),
+            limitations=(),
+        )
+    )
 
-    outcome = run_schedule_solver_v1(problem, _BombSolver())
+    outcome = run_schedule_solver_v1(problem, solver)
 
-    assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_INSUFFICIENT_DATA
-    assert outcome.execution_status == SolverExecutionStatus.NOT_RUN
+    assert solver.call_count == 1
+    assert outcome.result_status == GenerationResultStatus.C_NOT_FOUND_WITHIN_SOLVE_LIMIT
+    assert outcome.execution_status == SolverExecutionStatus.COMPLETED
+    assert outcome.solver_status == NativeSolverStatus.UNKNOWN
     assert outcome.solution is None
 
 
-def test_case_12_and_23_combined_unsuitable_b_returns_sanitized_no_run() -> None:
+def test_runner_does_not_apply_combined_demand_business_gate() -> None:
     parameters, trips, _, fleet_limit = _fixture()
     combined_demand = [
         DemandRecord(
@@ -1108,25 +1145,33 @@ def test_case_12_and_23_combined_unsuitable_b_returns_sanitized_no_run() -> None
         combined_demand,
         ScenarioCConfig(),
     )
+    solver = _StaticSolver(
+        SolverRunResultV1(
+            execution_status=SolverExecutionStatus.COMPLETED,
+            solver_status=NativeSolverStatus.UNKNOWN,
+            solver_adapter=problem.problem.solver_adapter,
+            solve_duration_seconds=0.01,
+            candidate=None,
+            explanations=("Execution-focused runner invoked the solver.",),
+            limitations=(),
+        )
+    )
 
-    outcome = run_schedule_solver_v1(problem, _BombSolver())
+    outcome = run_schedule_solver_v1(problem, solver)
 
     assert (
         evaluation.evaluation.disposition == BDisposition.TECHNICALLY_FEASIBLE_BUT_DEMAND_UNSUITABLE
     )
-    assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_INSUFFICIENT_DATA
-    assert outcome.execution_status == SolverExecutionStatus.NOT_RUN
-    assert outcome.solver_status is None
-    assert outcome.solver_adapter is None
-    assert outcome.solve_duration_seconds == 0
+    assert solver.call_count == 1
+    assert outcome.result_status == GenerationResultStatus.C_NOT_FOUND_WITHIN_SOLVE_LIMIT
+    assert outcome.execution_status == SolverExecutionStatus.COMPLETED
+    assert outcome.solver_status == NativeSolverStatus.UNKNOWN
+    assert outcome.solver_adapter == problem.problem.solver_adapter
     assert outcome.solution is None
     assert outcome.diagnostic_candidate is None
-    assert any(
-        "COMBINED_DEMAND_UNSUPPORTED_FOR_DIRECTIONAL_C" in item for item in outcome.limitations
-    )
 
 
-def test_case_24_technically_infeasible_b_with_incomplete_coverage_does_not_run() -> None:
+def test_runner_maps_native_infeasible_without_a_disposition_business_gate() -> None:
     parameters, trips, _, _ = _fixture()
     normalized = _normalized(parameters, trips, [], 1)
     evaluation = evaluate_scenario_b_v1(normalized)
@@ -1138,15 +1183,28 @@ def test_case_24_technically_infeasible_b_with_incomplete_coverage_does_not_run(
         [],
         ScenarioCConfig(),
     )
+    solver = _StaticSolver(
+        SolverRunResultV1(
+            execution_status=SolverExecutionStatus.COMPLETED,
+            solver_status=NativeSolverStatus.INFEASIBLE,
+            solver_adapter=problem.problem.solver_adapter,
+            solve_duration_seconds=0.01,
+            candidate=None,
+            explanations=("Solver proved the encoded problem infeasible.",),
+            limitations=(),
+        )
+    )
 
-    outcome = run_schedule_solver_v1(problem, _BombSolver())
+    outcome = run_schedule_solver_v1(problem, solver)
 
     assert (
         evaluation.evaluation.disposition
         == BDisposition.TECHNICALLY_INFEASIBLE_BUT_PARAMETERS_MAY_ALLOW_REDISTRIBUTION
     )
-    assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_INSUFFICIENT_DATA
-    assert outcome.execution_status == SolverExecutionStatus.NOT_RUN
+    assert solver.call_count == 1
+    assert outcome.result_status == GenerationResultStatus.NO_FEASIBLE_C_WITH_B_PARAMETERS
+    assert outcome.execution_status == SolverExecutionStatus.COMPLETED
+    assert outcome.solver_status == NativeSolverStatus.INFEASIBLE
 
 
 def test_case_25_unbound_fixed_parameter_proof_is_model_invalid() -> None:
@@ -2101,8 +2159,23 @@ def test_h4_daily_total_demand_has_resolution_without_intraday_blocks() -> None:
     assert payload["demand_resolution"]["source_resolution_type"] == ("daily_total")
     assert payload["analysis_blocks"] == []
     assert payload["block_requirements"] == []
-    outcome = run_schedule_solver_v1(context, _BombSolver())
-    assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_INSUFFICIENT_DATA
+    solver = _StaticSolver(
+        SolverRunResultV1(
+            execution_status=SolverExecutionStatus.COMPLETED,
+            solver_status=NativeSolverStatus.UNKNOWN,
+            solver_adapter=context.problem.solver_adapter,
+            solve_duration_seconds=0.01,
+            candidate=None,
+            explanations=("Execution-focused runner invoked the solver.",),
+            limitations=(),
+        )
+    )
+
+    outcome = run_schedule_solver_v1(context, solver)
+
+    assert solver.call_count == 1
+    assert outcome.result_status == GenerationResultStatus.C_NOT_FOUND_WITHIN_SOLVE_LIMIT
+    assert outcome.execution_status == SolverExecutionStatus.COMPLETED
 
 
 def test_h4_scenario_a_object_and_fingerprint_are_nullable_together() -> None:

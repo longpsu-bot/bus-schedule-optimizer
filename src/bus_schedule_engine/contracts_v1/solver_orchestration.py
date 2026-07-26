@@ -3,11 +3,6 @@ from __future__ import annotations
 import time
 from dataclasses import replace
 
-from .demand_coverage import (
-    DEMAND_COVERAGE_INCOMPLETE_FOR_C_GENERATION,
-    assess_demand_coverage_v1,
-)
-from .evaluation import BDisposition
 from .problem_validation import validate_schedule_generation_context_v1
 from .serialization import canonical_sha256
 from .solver_fingerprints import outcome_fingerprint_payload
@@ -35,30 +30,6 @@ def _finalize_outcome(
                 outcome,
                 problem_fingerprint=problem.problem_fingerprint,
             )
-        ),
-    )
-
-
-def _not_run_outcome(
-    problem: ScheduleProblemV1,
-    result_status: GenerationResultStatus,
-    explanation: str,
-    limitations: tuple[str, ...] = (),
-) -> ScheduleGenerationOutcomeV1:
-    return _finalize_outcome(
-        problem,
-        ScheduleGenerationOutcomeV1(
-            result_status=result_status,
-            execution_status=SolverExecutionStatus.NOT_RUN,
-            solver_status=None,
-            solver_adapter=None,
-            solve_duration_seconds=0.0,
-            outcome_fingerprint="",
-            source_b_fingerprint=problem.source_b_fingerprint,
-            solution=None,
-            diagnostic_candidate=None,
-            explanations=(explanation,),
-            limitations=limitations,
         ),
     )
 
@@ -111,33 +82,6 @@ def run_schedule_solver_v1(
                 "MODEL_INVALID identifies a problem/context integration defect, "
                 "not route, demand, timetable, fleet, or parameter infeasibility.",
             ),
-        )
-    disposition = context.b_evaluation.evaluation.disposition
-    if disposition == BDisposition.PARAMETERS_INFEASIBLE:
-        return _not_run_outcome(
-            problem,
-            GenerationResultStatus.NO_FEASIBLE_C_WITH_B_PARAMETERS,
-            "B's locked parameters were proven infeasible before solver invocation.",
-        )
-    if disposition == BDisposition.TECHNICALLY_FEASIBLE_AND_DEMAND_SUITABLE:
-        return _not_run_outcome(
-            problem,
-            GenerationResultStatus.C_NOT_REQUIRED_B_SUITABLE,
-            "Scenario B is feasible and demand-suitable; no duplicate C is generated.",
-        )
-    coverage = assess_demand_coverage_v1(
-        context.normalized_inputs,
-        minimum_confidence=(context.evaluation_policy.minimum_authoritative_demand_confidence),
-    )
-    if not coverage.directional_c_generation_supported:
-        return _not_run_outcome(
-            problem,
-            GenerationResultStatus.C_NOT_GENERATED_INSUFFICIENT_DATA,
-            (
-                f"{DEMAND_COVERAGE_INCOMPLETE_FOR_C_GENERATION}: "
-                "Demand evidence is insufficient for authoritative directional C generation."
-            ),
-            limitations=coverage.limitations,
         )
     if solver.adapter_id != problem.solver_adapter:
         return _completed_without_solution(
