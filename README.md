@@ -42,11 +42,12 @@ The two paths are not yet integrated. The Streamlit application does not call th
 public boundary, and Contract V1 does not yet power the UI, charts, or XLSX exports.
 
 Contract V1 includes separate OR-Tools v9.15 CP-SAT adapters for one-route, fixed-resource hard
-feasibility and directional demand-priority optimization. The feasibility adapter remains an
-objective-free satisfaction model. The demand adapter lexicographically protects demand blocks
-from no service and one-sided overload before provisional shifted-trip tie-breaks. It does not
-yet optimize service gaps, sustained-demand allocation, or headway regularity. Both adapters are
-exercised through canonical request builders and the independent validator; Streamlit and the
+feasibility, directional demand-priority optimization, and service-quality optimization. The
+feasibility adapter remains an objective-free satisfaction model. Demand protection remains the
+highest optimization priority. The service-quality adapter then protects positive-demand service
+gaps, aligns fixed directional trips with passenger demand, and balances adjacent headways inside
+sustained service regimes; different legitimate demand regimes may use different headway levels.
+All three adapters use canonical request builders and the independent validator. Streamlit and the
 unified `SolverChoice.OR_TOOLS` / `BOTH` selections do not use them yet.
 
 ## Supported today
@@ -66,15 +67,17 @@ unified `SolverChoice.OR_TOOLS` / `BOTH` selections do not use them yet.
   validator.
 - Separate OR-Tools fixed-resource demand-priority solving for authoritative directional demand,
   covering no-service and overload protection before provisional B-preservation shift tie-breaks.
+- Separate OR-Tools fixed-resource service-quality solving for positive-demand gaps, proportional
+  directional-demand alignment, and regular headways within derived sustained service regimes.
 
 ## Not supported yet
 
 - Contract V1 execution through the Streamlit application.
 - OR-Tools selection through Streamlit or unified `SolverChoice.OR_TOOLS` / `BOTH`.
-- OR-Tools service-gap, sustained-demand-allocation, headway-regularity, or fleet-minimization
-  objectives.
+- OR-Tools fleet-minimization objectives.
 - A globally optimal timetable or a proof of infeasibility from the legacy heuristic.
 - A unified comparison of heuristic and CP-SAT objective vectors.
+- An anonymized real-route regression corpus and heuristic-versus-CP-SAT comparison.
 - Variable-trip-count optimization.
 - Production implementation of the deferred V1-A1 structural demand-response workflow.
 - Mixed fleets, multi-route interlining, deadhead, driver duties, depot pull-in/out, maintenance,
