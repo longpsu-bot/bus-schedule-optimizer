@@ -55,6 +55,11 @@ service-quality adapter. `BOTH` independently validates both outcomes, recompute
 transparent lexicographic objective vector for accepted solutions, and recommends one outcome
 without a weighted score. Streamlit does not yet expose this selection.
 
+Fleet feasibility evaluates route-vehicle circulation, turnaround, ready stock, and the total
+available fleet. It does not evaluate physical terminal parking or waiting-bay occupancy:
+`TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED`. No per-terminal physical capacity is supplied or
+enforced, so fleet feasibility must not be interpreted as terminal physical-occupancy feasibility.
+
 ## Supported today
 
 - One route, two terminals, and two timetable directions.
@@ -87,6 +92,8 @@ without a weighted score. Streamlit does not yet expose this selection.
 - A globally optimal timetable or a proof of infeasibility from the legacy heuristic.
 - Approval of the draft anonymized real-route corpus as a permanent regression baseline.
 - Variable-trip-count optimization.
+- Accepted zero-trip or one-trip headway regimes under the current public Contract V1 shape;
+  supporting those cases requires a separately authorized future Contract revision.
 - Production implementation of the deferred V1-A1 structural demand-response workflow.
 - Mixed fleets, multi-route interlining, deadhead, driver duties, depot pull-in/out, maintenance,
   or mature cross-midnight optimization.

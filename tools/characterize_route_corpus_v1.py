@@ -61,6 +61,7 @@ SENSITIVITY_POLICY = ScenarioBEvaluationPolicyV1(
 OPERATIONAL_STATUS = "DRAFT_NOT_OPERATIONALLY_APPROVED"
 SENSITIVITY_STATUS = "PROXY_SENSITIVITY_ONLY"
 NOT_RUN = "NOT_RUN"
+TERMINAL_OCCUPANCY_LIMITATION = "TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED"
 
 
 class RecordingSolver:
@@ -534,6 +535,7 @@ def characterize_fixture(
     if proxy["coverage_status"] == "PROXY_COVERAGE_INCOMPLETE":
         characterization = {
             "fixture_id": fixture["fixture_id"],
+            "limitations": [TERMINAL_OCCUPANCY_LIMITATION],
             "natural_unified_service": natural,
             "operational_status": OPERATIONAL_STATUS,
             "proxy_sensitivity_only": _not_run_sensitivity(
@@ -662,6 +664,7 @@ def characterize_fixture(
 
     characterization = {
         "fixture_id": fixture["fixture_id"],
+        "limitations": [TERMINAL_OCCUPANCY_LIMITATION],
         "natural_unified_service": natural,
         "operational_status": OPERATIONAL_STATUS,
         "proxy_sensitivity_only": {

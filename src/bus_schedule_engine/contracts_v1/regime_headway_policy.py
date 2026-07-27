@@ -14,6 +14,7 @@ from .solver_models import (
 )
 
 _BOUNDARY_REASON = "MATERIAL_FREQUENCY_CHANGE"
+HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1 = "HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1"
 _ScheduleTrip: TypeAlias = RawCandidateTripV1 | SolutionTripV1
 
 
@@ -78,6 +79,14 @@ class _RegimeHeadwayPolicyResult:
 
     def analysis_by_regime_id(self) -> dict[str, _RegimeHeadwayAnalysis]:
         return {analysis.regime.regime_id: analysis for analysis in self.analyses}
+
+
+def _headway_regime_representability_error_codes(
+    policy: _RegimeHeadwayPolicyResult,
+) -> tuple[str, ...]:
+    if any(analysis.status != "UNIFORM" for analysis in policy.analyses):
+        return (HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1,)
+    return ()
 
 
 def _ordered_problem_trips(

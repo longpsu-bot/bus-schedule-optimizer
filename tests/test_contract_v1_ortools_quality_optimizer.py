@@ -132,14 +132,14 @@ def _regularity_fixture():
 def _two_regime_fixture():
     return _quality_request(
         outbound_minutes=(360, 361, 365, 368, 371, 374),
-        inbound_minutes=(362,),
+        inbound_minutes=(362, 363),
         outbound_runtimes=(1, 1, 1, 1, 1, 1),
-        inbound_runtimes=(1,),
-        fleet_limit=7,
+        inbound_runtimes=(1, 1),
+        fleet_limit=8,
         demand=(
             _record(Direction.TERMINAL_1_TO_2, 360, 368, 80),
             _record(Direction.TERMINAL_1_TO_2, 368, 375, 200),
-            _record(Direction.TERMINAL_2_TO_1, 362, 363, 0),
+            _record(Direction.TERMINAL_2_TO_1, 362, 364, 0),
         ),
         route_id="ORTOOLS-QUALITY-TWO-REGIME",
     )
@@ -534,7 +534,7 @@ def test_fixed_total_directional_counts_source_order_and_endpoints() -> None:
     assert len(run.candidate.exact_timetable) == context.problem.scenario_b.total_daily_trips
     for direction, expected in (
         (ContractDirection.OUTBOUND, 6),
-        (ContractDirection.INBOUND, 1),
+        (ContractDirection.INBOUND, 2),
     ):
         source = sorted(
             (
@@ -557,14 +557,14 @@ def test_fixed_total_directional_counts_source_order_and_endpoints() -> None:
 def test_source_runtime_turnaround_and_fleet_limit_remain_hard() -> None:
     context, solver, *_ = _quality_request(
         outbound_minutes=(360, 445),
-        inbound_minutes=(395,),
+        inbound_minutes=(395, 475),
         outbound_runtimes=(30, 25),
-        inbound_runtimes=(30,),
+        inbound_runtimes=(30, 30),
         turnaround=(20, 5),
         fleet_limit=1,
         demand=(
             _record(Direction.TERMINAL_1_TO_2, 360, 446, 0),
-            _record(Direction.TERMINAL_2_TO_1, 395, 396, 0),
+            _record(Direction.TERMINAL_2_TO_1, 395, 476, 0),
         ),
         route_id="ORTOOLS-QUALITY-HARD-RUNTIME",
     )
@@ -589,14 +589,14 @@ def test_source_runtime_turnaround_and_fleet_limit_remain_hard() -> None:
 def test_same_minute_readiness_remains_usable() -> None:
     context, solver, *_ = _quality_request(
         outbound_minutes=(360, 430),
-        inbound_minutes=(395,),
+        inbound_minutes=(395, 465),
         outbound_runtimes=(30, 30),
-        inbound_runtimes=(30,),
+        inbound_runtimes=(30, 30),
         turnaround=(5, 5),
         fleet_limit=1,
         demand=(
             _record(Direction.TERMINAL_1_TO_2, 360, 431, 0),
-            _record(Direction.TERMINAL_2_TO_1, 365, 396, 0),
+            _record(Direction.TERMINAL_2_TO_1, 365, 466, 0),
         ),
         route_id="ORTOOLS-QUALITY-SAME-MINUTE",
     )

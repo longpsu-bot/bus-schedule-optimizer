@@ -184,7 +184,7 @@ def _fixture(
                 )
             )
 
-    volumes = [10] * 7 if low_demand else [150, 150, 30, 30, 150, 150, 0]
+    volumes = [10] * 7 if low_demand else [150, 150, 30, 30, 150, 150, 150]
     demand = [
         DemandRecord(
             period_start=date(2026, 7, 1),
@@ -523,13 +523,13 @@ def _two_trip_turnaround_problem(
         route_name="Arrival-terminal turnaround chain",
         route_type=RouteType.INTRA_PROVINCIAL,
         trip_runtime_minutes=30,
-        total_daily_trips=2,
+        total_daily_trips=4,
         terminal_1_name="Terminal 1",
         terminal_1_first_departure=6 * 3600,
-        terminal_1_last_departure=6 * 3600,
+        terminal_1_last_departure=inbound_departure + 35 * 60,
         terminal_2_name="Terminal 2",
         terminal_2_first_departure=inbound_departure,
-        terminal_2_last_departure=inbound_departure,
+        terminal_2_last_departure=inbound_departure + 85 * 60,
         vehicle_capacity_passengers=60,
         minimum_layover_minutes=5,
     )
@@ -549,6 +549,22 @@ def _two_trip_turnaround_problem(
             direction=Direction.TERMINAL_2_TO_1,
             departure_seconds=inbound_departure,
             arrival_seconds=inbound_departure + 30 * 60,
+        ),
+        Trip(
+            scenario="B",
+            trip_id="B-O-2",
+            departure_terminal=parameters.terminal_1_name,
+            direction=Direction.TERMINAL_1_TO_2,
+            departure_seconds=inbound_departure + 35 * 60,
+            arrival_seconds=inbound_departure + 65 * 60,
+        ),
+        Trip(
+            scenario="B",
+            trip_id="B-I-2",
+            departure_terminal=parameters.terminal_2_name,
+            direction=Direction.TERMINAL_2_TO_1,
+            departure_seconds=inbound_departure + 85 * 60,
+            arrival_seconds=inbound_departure + 115 * 60,
         ),
     ]
     return _contract_problem(
@@ -1288,7 +1304,23 @@ def test_case_28_coverage_change_alters_problem_fingerprint() -> None:
 
 
 def test_heuristic_candidate_matches_legacy_times_but_fails_uniformity_rule() -> None:
-    problem, parameters, trips, demand, fleet_limit = _problem()
+    parameters, trips, demand, fleet_limit = _fixture()
+    demand = [
+        (replace(item, passenger_volume=0) if item.block_start_seconds == 12 * 3600 else item)
+        for item in demand
+    ]
+    normalized = _normalized(parameters, trips, demand, fleet_limit)
+    policy = ScenarioBEvaluationPolicyV1()
+    evaluation = evaluate_scenario_b_v1(normalized, policy)
+    problem = build_schedule_problem_v1(
+        normalized,
+        evaluation,
+        parameters,
+        trips,
+        demand,
+        ScenarioCConfig(),
+        policy,
+    )
     baseline = tuple(trips)
     baseline_fingerprint = timetable_fingerprint(trips)
     scenario_b_before = problem.normalized_inputs.scenario_b

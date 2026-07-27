@@ -91,8 +91,25 @@ within-regime evidence fails closed. Balanced floor/ceiling rounding is not acce
 The internal characterization statuses are `UNIFORM`,
 `SINGLE_TRIP_HEADWAY_NOT_MEASURABLE`, `NO_TRIPS`, and `INVALID_NON_UNIFORM`. The frozen public V1
 schema is unchanged: accepted measurable `UNIFORM` rows serialize through its existing
-`REGULAR` value, while zero/one-trip authority rows remain explicit in raw candidate and
-characterization evidence rather than receiving a fabricated positive target.
+`REGULAR` value. A candidate containing a zero-trip, one-trip, or invalid non-uniform
+authoritative regime is rejected with
+`HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1`; the regime remains explicit in raw candidate
+and characterization evidence and is never silently omitted or assigned a fabricated positive
+target. Supporting accepted zero-trip or one-trip regimes requires a future, separately
+authorized Contract revision.
+
+## Terminal physical-occupancy limitation
+
+TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED
+
+The current fleet model evaluates route-vehicle availability, circulation,
+turnaround and ready stock. It does not evaluate the maximum number of vehicles
+that may be physically present or waiting at either terminal. Fleet feasibility
+must not be interpreted as terminal physical-occupancy feasibility.
+
+This limitation applies to both Alpha and Beta characterization. No per-terminal physical
+occupancy value was supplied or inferred, and no terminal-capacity constraint was enforced. It
+did not cause Alpha's solver statuses or Beta's proxy-coverage gap.
 
 ## Natural unified-service execution
 
@@ -116,17 +133,19 @@ Controls were 30 seconds, one worker, and seed 0 for one cold and two warm repet
 
 | Marker | Solver | Native status | Business result | Accepted | Eligible vector | Seconds |
 |---|---|---|---|---:|---|---:|
-| COLD | HEURISTIC | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 0.023491 |
-| COLD | OR_TOOLS | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 30.475121 |
-| WARM_1 | HEURISTIC | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 0.023433 |
-| WARM_1 | OR_TOOLS | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 23.455264 |
-| WARM_2 | HEURISTIC | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 0.024869 |
-| WARM_2 | OR_TOOLS | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 30.054504 |
+| COLD | HEURISTIC | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 0.010835 |
+| COLD | OR_TOOLS | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 30.035635 |
+| WARM_1 | HEURISTIC | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 0.010841 |
+| WARM_1 | OR_TOOLS | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 30.031709 |
+| WARM_2 | HEURISTIC | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 0.010880 |
+| WARM_2 | OR_TOOLS | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | None | 30.038963 |
 
 Neither solver emitted a candidate. Therefore:
 
 - the heuristic was not accepted and was not validator-rejected on uniformity—there was no
   candidate to validate;
+- no regime representability rejection occurred in the corpus run because there was no
+  candidate;
 - OR-Tools was not accepted, did not prove infeasibility, and did not prove optimality;
 - exact uniformity remains part of the model, but `UNKNOWN` must not be described as caused by
   uniformity alone;

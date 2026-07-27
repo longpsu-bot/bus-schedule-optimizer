@@ -31,7 +31,9 @@ from .models import (
 )
 from .problem_validation import validate_schedule_generation_context_v1
 from .regime_headway_policy import (
+    HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1,
     _analyze_regime_headways,
+    _headway_regime_representability_error_codes,
     _RegimeHeadwayAnalysis,
     _RegimeHeadwayPolicyError,
 )
@@ -269,6 +271,7 @@ def _reconcile_regimes(
     except _RegimeHeadwayPolicyError as exc:
         return (), [exc.code]
     errors.extend(policy.error_codes)
+    errors.extend(_headway_regime_representability_error_codes(policy))
     expected_ids = {regime.regime_id for regime in policy.regimes}
     reported_ids = set(regime_id_counts)
     if reported_ids != expected_ids:
@@ -482,11 +485,6 @@ def _solution_regimes(
         regime = reconciled.raw
         analysis = reconciled.authority
         actual = reconciled.actual_headway_sequence
-        # The frozen public V1 schema requires a positive measurable headway.
-        # Unmeasurable authority rows remain explicit in the raw candidate and
-        # characterization evidence instead of fabricating a positive value.
-        if analysis is not None and not analysis.headway_measurable:
-            continue
         if analysis is None:
             covered = tuple(
                 block.block_id
@@ -520,6 +518,15 @@ def _solution_regimes(
                 )
             )
             continue
+        if (
+            not analysis.headway_measurable
+            or analysis.status != "UNIFORM"
+            or analysis.exact_headway is None
+            or analysis.exact_headway <= 0
+        ):
+            raise AssertionError(
+                "Unrepresentable authoritative regime reached accepted solution construction"
+            )
         transition_headways = tuple(
             value
             for value in (
@@ -528,7 +535,7 @@ def _solution_regimes(
             )
             if value is not None
         )
-        target = float(analysis.exact_headway or 0)
+        target = float(analysis.exact_headway)
         output.append(
             SolutionHeadwayRegimeV1(
                 regime_id=regime.regime_id,
@@ -537,7 +544,7 @@ def _solution_regimes(
                 end_time=regime.end_time,
                 covered_analysis_blocks=analysis.regime.block_ids,
                 trip_count=len(reconciled.members),
-                target_service_rate=(60 / target if target > 0 else 0.0),
+                target_service_rate=60 / target,
                 target_headway=target,
                 actual_headway_sequence=actual,
                 transition_headways=transition_headways,
@@ -551,6 +558,66 @@ def _solution_regimes(
             )
         )
     return tuple(output)
+
+
+def _solution_headway_regime_integrity_errors(
+    solution_trips: tuple[SolutionTripV1, ...],
+    solution_regimes: tuple[SolutionHeadwayRegimeV1, ...],
+    *,
+    authoritative_regime_ids: frozenset[str] | None,
+) -> tuple[str, ...]:
+    errors: set[str] = set()
+    regime_id_counts = Counter(regime.regime_id for regime in solution_regimes)
+    if any(count > 1 for count in regime_id_counts.values()):
+        errors.add("SOLUTION_HEADWAY_REGIME_REFERENCE_DUPLICATE")
+
+    regimes_by_id: dict[str, list[SolutionHeadwayRegimeV1]] = {}
+    for regime in solution_regimes:
+        regimes_by_id.setdefault(regime.regime_id, []).append(regime)
+
+    trips_by_regime_id: dict[str, list[SolutionTripV1]] = {}
+    for trip in solution_trips:
+        trips_by_regime_id.setdefault(trip.headway_regime_id, []).append(trip)
+        matches = regimes_by_id.get(trip.headway_regime_id, [])
+        if not matches:
+            errors.add("SOLUTION_HEADWAY_REGIME_REFERENCE_MISSING")
+            continue
+        if len(matches) > 1:
+            errors.add("SOLUTION_HEADWAY_REGIME_REFERENCE_DUPLICATE")
+            continue
+        if matches[0].direction != trip.direction:
+            errors.add("SOLUTION_HEADWAY_REGIME_DIRECTION_MISMATCH")
+
+    for regime in solution_regimes:
+        members = trips_by_regime_id.get(regime.regime_id, [])
+        if not members:
+            errors.add("SOLUTION_HEADWAY_REGIME_ORPHANED")
+        elif any(member.direction != regime.direction for member in members):
+            errors.add("SOLUTION_HEADWAY_REGIME_DIRECTION_MISMATCH")
+
+    if authoritative_regime_ids is not None:
+        emitted_ids = frozenset(regime_id_counts)
+        referenced_ids = frozenset(trip.headway_regime_id for trip in solution_trips)
+        if emitted_ids != authoritative_regime_ids or referenced_ids != authoritative_regime_ids:
+            errors.add("SOLUTION_HEADWAY_REGIME_AUTHORITY_MISMATCH")
+
+    return tuple(sorted(errors))
+
+
+def _candidate_rejection_summary(rejection_codes: tuple[str, ...]) -> str:
+    if HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1 in rejection_codes:
+        if "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in rejection_codes:
+            return (
+                "Candidate violates exact within-regime uniformity and contains an "
+                "authoritative regime that cannot be represented faithfully in Contract V1."
+            )
+        return (
+            "Candidate contains a zero-trip or one-trip authoritative regime whose "
+            "headway is not measurable and cannot be represented faithfully in Contract V1."
+        )
+    if any(code.startswith("SOLUTION_HEADWAY_REGIME_") for code in rejection_codes):
+        return "Candidate failed accepted-solution headway-regime referential integrity."
+    return "Candidate failed independent Contract V1 validation."
 
 
 def _stock_events(events) -> tuple[StockProfileEventV1, ...]:
@@ -698,7 +765,7 @@ def validate_and_build_solution_v1(
         return CandidateValidationResultV1(
             status=CandidateValidationStatus.REJECTED,
             rejection_codes=codes,
-            summary="Candidate failed independent Contract V1 validation.",
+            summary=_candidate_rejection_summary(codes),
             fleet_assessment=fleet,
             solution=None,
         )
@@ -724,6 +791,29 @@ def validate_and_build_solution_v1(
         for trip in candidate.exact_timetable
     )
     fleet_assignments = assignments.assignments
+    solution_regimes = _solution_regimes(problem, reconciled_regimes)
+    authoritative_regime_ids = (
+        frozenset(
+            reconciled.authority.regime.regime_id
+            for reconciled in reconciled_regimes
+            if reconciled.authority is not None
+        )
+        if any(reconciled.authority is not None for reconciled in reconciled_regimes)
+        else None
+    )
+    integrity_errors = _solution_headway_regime_integrity_errors(
+        solution_trips,
+        solution_regimes,
+        authoritative_regime_ids=authoritative_regime_ids,
+    )
+    if integrity_errors:
+        return CandidateValidationResultV1(
+            status=CandidateValidationStatus.REJECTED,
+            rejection_codes=integrity_errors,
+            summary=_candidate_rejection_summary(integrity_errors),
+            fleet_assessment=fleet,
+            solution=None,
+        )
     block_supply = _candidate_block_supply(context, candidate)
     block_evaluation = tuple(
         BlockEvaluationV1(
@@ -745,7 +835,7 @@ def validate_and_build_solution_v1(
         source_b_fingerprint=problem.source_b_fingerprint,
         operating_parameter_locks=problem.operating_parameter_locks,
         c_block_supply_plan=block_supply,
-        c_headway_regimes=_solution_regimes(problem, reconciled_regimes),
+        c_headway_regimes=solution_regimes,
         c_exact_timetable=solution_trips,
         fleet_assignment=fleet_assignments,
         available_fleet_limit=b.available_fleet_limit,
@@ -780,6 +870,19 @@ def validate_and_build_solution_v1(
             "solver_determined initial positioning only.",
         ),
     )
+    final_integrity_errors = _solution_headway_regime_integrity_errors(
+        provisional.c_exact_timetable,
+        provisional.c_headway_regimes,
+        authoritative_regime_ids=authoritative_regime_ids,
+    )
+    if final_integrity_errors:
+        return CandidateValidationResultV1(
+            status=CandidateValidationStatus.REJECTED,
+            rejection_codes=final_integrity_errors,
+            summary=_candidate_rejection_summary(final_integrity_errors),
+            fleet_assessment=fleet,
+            solution=None,
+        )
     solution = replace(
         provisional,
         solution_fingerprint=canonical_sha256(
