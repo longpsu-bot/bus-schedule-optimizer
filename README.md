@@ -117,7 +117,10 @@ Only an independently validated candidate may be presented as authoritative Scen
 Milestone 4C1 now includes two versioned, anonymized, real-route-derived fixtures under
 `tests/fixtures/route_corpus/v1/`. The private source workbooks remain external and uncommitted.
 Overlapping raw trip-observation evidence is preserved separately from a LOW-confidence,
-departure-hour sensitivity proxy used by Contract V1.
+departure-hour sensitivity proxy. Proxy values retain their exact 15-day
+`total_observation_period` classification, and Contract V1 derives daily demand using the
+15-day observation count. Coverage gaps or unsupported normalized precision prevent the
+diagnostic solvers from running.
 
 The corpus and solver characterization are drafts, not approved operational timetables or frozen
 solver regression expectations. UI, chart, and XLSX cutover remains blocked on corpus review and

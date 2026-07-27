@@ -2,17 +2,15 @@
 
 **DRAFT — NOT AN APPROVED OPERATIONAL TIMETABLE**
 
-**Milestone:** 4C1 source audit, anonymization, corpus construction, structural validation, and
-draft characterization only
+**Milestone:** 4C1 source audit, anonymization, corrected corpus construction, structural
+validation, and draft characterization only
 
-This document reports current behavior. It does not approve a generated timetable, declare an
-operational demand baseline, or freeze solver recommendations as permanent regression
-expectations.
+This document reports current behavior. It does not approve a generated timetable, establish an
+operational demand baseline, or freeze a solver result for Milestone 4C2.
 
 ## Source identity and anonymization
 
-The two approved workbooks remain private, external to the Git worktree, and uncommitted. Public
-identity is limited to:
+The approved workbooks remain private, external to the Git worktree, and uncommitted.
 
 | Fixture | Public route name | Source SHA-256 |
 |---|---|---|
@@ -22,40 +20,82 @@ identity is limited to:
 Private route and terminal identities are replaced with the fixture ID, public route name,
 `Terminal 1`, and `Terminal 2`. Generic `A-###` and `B-###` trip IDs are retained. Workbook
 metadata, organization/operator identity, vehicle identity, local paths, and historical free-text
-conclusions are excluded. Observation dates use one deterministic −365-day shift, from the
-private 15-day period to 2025-07-01 through 2025-07-15.
+conclusions are excluded. Both fixtures use a deterministic −365-day date shift, preserving the
+15-day observation period as 2025-07-01 through 2025-07-15.
 
-The historical diagnostic, hourly-allocation, and optimized-timetable sheets are excluded from
-corpus truth. They are not engine input or exact solver oracles.
+Historical diagnostic, hourly-allocation, and optimized-timetable sheets remain
+`HISTORICAL_NON_AUTHORITATIVE_REFERENCE`. They are excluded from corpus truth, engine input, and
+exact regression expectations.
 
-## Raw trip-observation evidence and proxy
+## Raw trip-observation evidence
 
-The private `SAN_LUONG` rows are not non-overlapping demand blocks. Every row maps one-to-one to a
-Scenario A trip and its interval exactly equals that trip's departure-to-arrival span. The corpus
-therefore preserves these rows as `raw_trip_observations`, including their overlaps, but never
-supplies them to Contract V1 demand normalization.
+Every private `SAN_LUONG` row maps one-to-one to a Scenario A trip. Its raw interval exactly
+equals that trip's departure-to-arrival span. Those intervals overlap because they are
+trip-observation evidence, not non-overlapping demand blocks.
 
-`departure_hour_proxy_v1` is a separate derived dataset:
+The corpus preserves every row, passenger total, direction, source trip ID, observation day,
+volume classification, shifted date, and overlap as `raw_trip_observations`.
+`contract_v1_demand_interval_eligible` is false, and test support never supplies these raw
+intervals to Contract V1.
 
-- passenger volumes are grouped by direction and Scenario A departure hour;
-- every block lists all contributing Scenario A trip IDs;
-- directional and total 15-day passenger volumes are conserved exactly;
-- blocks are contiguous and non-overlapping;
-- no empty hour is fabricated as zero demand; and
-- a nonempty block may extend to the next observed departure hour or through the Scenario B
-  endpoint to provide complete fixed-resource solver coverage.
+## Corrected `departure_hour_proxy_v1`
 
-The proxy has LOW confidence and status `PROXY_SENSITIVITY_ONLY`. To avoid rounding repeating
-15-day-to-daily fractions, Contract V1 receives the exactly conserved 15-day totals as unscaled
-proxy weights through the existing `average_day` transport classification. The original
-`total_observation_period` classification remains on every raw row and is also recorded as
-`source_volume_type` on derived blocks. These weights are not observed average-day passenger
-counts.
+The separate proxy groups raw passenger totals by direction and the clock hour containing each
+Scenario A departure. Every derived block records all contributing source trip IDs.
+
+Each proxy block retains:
+
+```text
+passenger_volume = exact sum of source 15-day totals
+volume_type = TOTAL_OBSERVATION_PERIOD
+observation_days = 15
+source_volume_type = TOTAL_OBSERVATION_PERIOD
+```
+
+Contract V1 therefore computes:
+
+```text
+average_daily_passenger_count = passenger_volume / observation_days
+```
+
+The normalization authority receives `observation_days=15` for every proxy block.
+For example, Alpha block `PROXY-TERMINAL_1_TO_2-04` retains 264 passengers and normalizes to
+264 / 15 = 17.6 passengers per average day. Alpha block
+`PROXY-TERMINAL_2_TO_1-05` retains 146 and normalizes to 146 / 15 =
+9.733333333333… . The source-period values are not rounded, truncated, multiplied, rescaled, or
+relabeled as daily observations.
+
+### Boundary method
+
+- An ordinary observed hour H uses `[H:00, H+1:00)`.
+- The first block starts at the later of H:00 and the exact Scenario B first departure.
+- The final block ends one minute after the exact Scenario B last departure, so the locked final
+  departure belongs to the half-open interval.
+- A populated block never extends to the next observed hour.
+- An unobserved interior hour is not filled, interpolated, or absorbed by a neighboring block.
+
+Exact corrected boundaries are:
+
+| Fixture | Direction | First block | Final block | Coverage |
+|---|---|---|---|---|
+| Alpha | Terminal 1→2 | `04:30–05:00` | `18:00–18:31` | `COMPLETE` |
+| Alpha | Terminal 2→1 | `05:35–06:00` | `19:00–20:01` | `COMPLETE` |
+| Beta | Terminal 1→2 | `05:30–06:00` | `18:00–18:26` | `PROXY_COVERAGE_INCOMPLETE` |
+| Beta | Terminal 2→1 | `05:00–06:00` | `17:00–18:11` | `COMPLETE` |
+
+The only interior coverage issue is:
+
+| Fixture | Direction | Missing interval | Surrounding observed hours | Code |
+|---|---|---|---|---|
+| Beta | Terminal 1→2 | `17:00–18:00` | `16:00`, `18:00` | `PROXY_INTERIOR_HOUR_UNOBSERVED` |
+
+No zero-demand row represents this hour, and no populated block crosses it. Beta's overall proxy
+status is `PROXY_COVERAGE_INCOMPLETE`, so its
+`contract_v1_demand_interval_eligible` value is false. Alpha's overall coverage is complete.
 
 ## Source-audit discrepancies and corrections
 
-Exact timetable rows are authoritative over the following summary cells. No other
-parameter-versus-exact-timetable contradiction was observed.
+Exact timetable rows remain authoritative over the following summary cells:
 
 | Fixture | Sheet and field | Source | Exact-row value | Evidence | Correction |
 |---|---|---:|---:|---|---|
@@ -65,50 +105,42 @@ parameter-versus-exact-timetable contradiction was observed.
 | Beta | `THONG_SO_A.terminal_2_first_departure` | 05:35 | 05:30 | `A-014` | `A_ENDPOINT_FROM_EXACT_TIMETABLE` |
 | Beta | `THONG_SO_A.terminal_2_last_departure` | 19:40 | 17:20 | `A-026` | `A_ENDPOINT_FROM_EXACT_TIMETABLE` |
 
-Each correction is approved for corpus construction only and is classified separately from
-observed source facts and scenario assumptions.
+No other parameter-versus-exact-timetable contradiction was observed. Each correction is
+approved for corpus construction only and remains distinct from observed facts and assumptions.
 
-## Corpus scenario assumptions
+## Corpus assumptions and exact structural facts
 
-The private sources do not declare Contract V1 fleet limits. The following remain explicit corpus
-assumptions:
+Fleet limits are explicit corpus assumptions, not operator-declared facts.
 
-| Fixture | A fleet limit | B fleet limit | A/B day type | Proxy confidence |
+| Fixture | A fleet | B fleet | A/B day type | Proxy confidence |
 |---|---:|---:|---|---|
 | Alpha | 5 | 8 | WEEKDAY | LOW |
 | Beta | 4 | 7 | WEEKDAY | LOW |
-
-The proxy confidence supersedes the earlier proposed MEDIUM value following expert direction. A
-fleet limit is never described as an operator-declared fleet fact.
-
-## Exact structural facts
 
 | Fact | Alpha | Beta |
 |---|---:|---:|
 | Scenario A trips | 52 (26/26) | 26 (13/13) |
 | Scenario B trips | 80 (40/40) | 46 (23/23) |
-| Scenario B runtime | exact 55–65 minutes by trip | exact 100 minutes |
-| Raw trip-observation rows | 52 (26/26) | 26 (13/13) |
+| Scenario B runtime | exact 55–65 minutes | exact 100 minutes |
+| Raw observation rows | 52 (26/26) | 26 (13/13) |
 | Adjacent raw overlap pairs | 50; 20–40 minutes | 24; 10–55 minutes |
 | Proxy blocks | 30 (15/15) | 26 (13/13) |
-| Terminal 1-direction passenger total | 5,707 | 3,052 |
-| Terminal 2-direction passenger total | 5,991 | 2,887 |
-| Overall passenger total | 11,698 | 5,939 |
+| Terminal 1-direction passengers | 5,707 | 3,052 |
+| Terminal 2-direction passengers | 5,991 | 2,887 |
+| Overall passengers | 11,698 | 5,939 |
 | Vehicle capacity | 28 | 28 |
-| Route type | intra-provincial | intra-provincial |
 | Minimum turnaround | 5 minutes | 5 minutes |
 | Load-factor policy | 0.85 / 0.90 | 0.85 / 0.90 |
 
-Alpha's final Terminal 2-direction proxy block extends one additional hour through the Scenario B
-endpoint. Beta has one interior nonempty block extended across the absent departure hour and one
-final block extended through the Scenario B endpoint. No zero-volume row is introduced.
+Directional and overall 15-day passenger totals are exactly conserved.
 
-## Natural unified-service behavior
+## Natural unified-service characterization
 
-The default `ScenarioBEvaluationPolicyV1` requires MEDIUM confidence. Because the proxy is LOW
-confidence, all three solver selections behave identically for both fixtures:
+The default `ScenarioBEvaluationPolicyV1` requires MEDIUM demand confidence. Both proxies remain
+LOW confidence. Executing the normal unified service produces the same authoritative business
+result for every solver selection:
 
-| Fixture | Solver choice | B disposition | Adjustment decision/action | Solver attempted | Outcome/recommendation |
+| Fixture | Solver choice | B disposition | Decision/action | Solver attempted | Recommendation |
 |---|---|---|---|---:|---|
 | Alpha | HEURISTIC | `B_INSUFFICIENT_DATA` | `INSUFFICIENT_DATA` | No | None |
 | Alpha | OR_TOOLS | `B_INSUFFICIENT_DATA` | `INSUFFICIENT_DATA` | No | None |
@@ -117,145 +149,68 @@ confidence, all three solver selections behave identically for both fixtures:
 | Beta | OR_TOOLS | `B_INSUFFICIENT_DATA` | `INSUFFICIENT_DATA` | No | None |
 | Beta | BOTH | `B_INSUFFICIENT_DATA` | `INSUFFICIENT_DATA` | No | None |
 
-The natural business result is therefore no solver run, not a forced fixed-resource timetable.
-The common reason set includes block shortage evidence, unproven joint donor capacity, headway
-imbalance, and `ADJUSTMENT_DECISION_DATA_INSUFFICIENT`.
+No heuristic outcome, OR-Tools outcome, comparison, or recommended outcome is produced.
 
-## `PROXY_SENSITIVITY_ONLY` fixed-resource diagnostic
+## `PROXY_SENSITIVITY_ONLY` readiness
 
-This separate diagnostic lowers only the minimum accepted demand confidence to LOW. It normalizes
-once, evaluates B once, constructs the existing canonical heuristic and OR-Tools
-service-quality requests, runs both through `run_schedule_solver_v1()`, and compares accepted
-solutions under the common quality problem.
+The diagnostic lowers only the minimum accepted confidence to LOW. It runs neither solver unless
+both canonical requests can share a canonical quality problem.
 
-### Alpha
+| Fixture | Coverage gate | Quality builder | Diagnostic | Reason |
+|---|---|---|---|---|
+| Alpha | Passed | Rejected | `NOT_RUN` | `QUALITY_REQUEST_UNREPRESENTABLE_DEMAND_PRECISION` |
+| Beta | Failed | Not attempted | `NOT_RUN` | `PROXY_COVERAGE_INCOMPLETE` |
 
-| Solver | Native status | Generation result | Accepted | Vector eligible | Recommendation |
-|---|---|---|---:|---:|---|
-| Heuristic | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | No | None |
-| OR-Tools | `UNKNOWN` | `C_NOT_FOUND_WITHIN_SOLVE_LIMIT` | No | No | None |
+For Alpha, normalization and LOW-confidence evaluation each ran once. The canonical quality
+builder then returned:
 
-The comparison reason is `NO_ACCEPTED_SOLUTION`. `UNKNOWN` is not infeasibility. No Scenario C,
-fleet recommendation, objective vector, or solver recommendation is reported. The pre-solve B
-fleet assessment is feasible at the assumed limit of 8, with minimum required fleet 8 and an 8/0
-initial split, but that assessment is not a generated-solution result.
+- primary code: `ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY`;
+- exact nested code: `ORTOOLS_QUALITY_DEMAND_PRECISION_UNSUPPORTED`.
 
-### Beta
+The repeating normalized daily values exceed the quality model's current six-decimal exact
+authority. This is a proxy data-representation limitation—not infeasibility, `UNKNOWN`,
+insufficient fleet, or a failed optimization. The heuristic request was not constructed because
+no common quality problem existed.
 
-Both candidates were independently accepted with native `FEASIBLE` status. Neither solver proved
-global optimality.
+For Beta, the explicit `17:00–18:00` gap fails proxy eligibility before normalization for the
+diagnostic. Neither canonical request is constructed.
 
-| Result | Heuristic | OR-Tools |
-|---|---:|---:|
-| Available/minimum fleet | 7 / 7 | 7 / 7 |
-| Initial Terminal 1/2 split | 3 / 4 | 3 / 4 |
-| Shifted trips | 42 | 0 |
-| Total shift minutes | 484 | 0 |
-| Maximum shift minutes | 23 | 0 |
-| Regime count | 5 | 22 |
+Both fixtures therefore have:
 
-The heuristic vector is lexicographically better at stage 6, so the diagnostic comparison reports
-`HEURISTIC_VECTOR_BETTER`. This is a proxy-sensitivity recommendation only.
+```text
+heuristic_outcome = null
+ortools_outcome = null
+comparison = null
+recommendation = null
+benchmark_run_count = 0
+```
 
-| Stage | Objective | Heuristic | OR-Tools |
-|---:|---|---:|---:|
-| 1 | `no_service_block_count` | 0 | 0 |
-| 2 | `critical_block_count` | 26 | 26 |
-| 3 | `total_critical_shortage_trips` | 205 | 205 |
-| 4 | `planning_warning_block_count` | 26 | 26 |
-| 5 | `total_planning_shortage_trips` | 217 | 217 |
-| 6 | `maximum_positive_demand_headway_minutes` | 39 | 40 |
-| 7 | `total_positive_demand_block_max_gap_minutes` | 910 | 920 |
-| 8 | `directional_demand_alignment_error` | 408,920 | 440,920 |
-| 9 | `maximum_within_regime_headway_change_minutes` | 1 | 5 |
-| 10 | `total_within_regime_headway_change_minutes` | 2 | 10 |
-| 11 | `maximum_regime_transition_headway_jump_minutes` | 7 | 15 |
-| 12 | `total_regime_transition_headway_jump_minutes` | 26 | 90 |
-| 13 | `shifted_trip_count` | 42 | 0 |
-| 14 | `total_shift_minutes` | 484 | 0 |
-| 15 | `maximum_shift_minutes` | 23 | 0 |
+No diagnostic solver timing is reported because no diagnostic solver ran.
 
-The comparison stops at the first differing objective. OR-Tools' zero-shift advantage is
-lower-priority and cannot override the heuristic's stage-6 advantage. OR-Tools returned
-`FEASIBLE`, so no optimality claim is available.
+## Invalid earlier characterization discarded
 
-## Repeatability and benchmark controls
+An earlier unmerged characterization transported exact 15-day totals as `AVERAGE_DAY` and
+stretched populated blocks across unobserved or endpoint hours. Its sensitivity outcomes,
+vectors, comparison, shift interpretation, and timings are invalid and have been removed as
+current evidence. They are not candidate baselines and must not be used in Milestone 4C2.
 
-Characterization ran against source tree based on
-`ba2df18a6e20b184776da05f0c4c592b4f266aaf`, using Python 3.13.5 and OR-Tools 9.15.6755 on
-Windows. Ignored machine-readable outputs record the exact Git commit and dirty-worktree marker.
+## Determinism and proof qualifications
 
-Requested controls were one worker, random seed 0, and 30 seconds per solver invocation. The
-OR-Tools adapter applied all three. The canonical heuristic is deterministic but does not
-implement generic worker, seed, or time-limit controls; its effective values are recorded as
-unsupported rather than falsely claimed.
-
-| Fixture | Solver | Cold | Warm 1 | Warm 2 |
-|---|---|---:|---:|---:|
-| Alpha | Heuristic | 0.020 s | 0.019 s | 0.017 s |
-| Alpha | OR-Tools | 26.310 s | 30.264 s | 30.249 s |
-| Beta | Heuristic | 0.105 s | 0.140 s | 0.163 s |
-| Beta | OR-Tools | 30.091 s | 30.048 s | 30.052 s |
-
-Alpha's heuristic and OR-Tools repetitions and Beta's heuristic repetitions agreed on acceptance,
-candidate fingerprint, generation status, native status, objective vector eligibility/value,
-outcome fingerprint, problem fingerprint, and solution fingerprint.
-
-Beta OR-Tools agreed on accepted `FEASIBLE` status, problem fingerprint, candidate fingerprint,
-and the full objective vector in all three runs. Its cold and second warm runs shared solution
-fingerprint
-`3b4f3b3d2903be117075da3eedc137b4d83ef94365f0805171434f5e1d26b69e`
-and outcome fingerprint
-`03856480e4fbf9ae48c86c7f032ce6beeccf8b0813e24ed2afdf5552c438d60e`; the first warm run
-reported solution fingerprint
-`c245db1c97941f310e685d653c308eb48b4d3b56550568c9487e9db1c99aa6fa`
-and outcome fingerprint
-`e86489859923115325735d277332599baa2758620fa5eb8e0c3ebdb703e9de37`.
-The difference is preserved as observed solver nondeterminism even though the public quality
-vector and recommendation were unchanged. Wall-clock duration varied and is not a test
-assertion.
-
-## Historical non-authoritative reference
-
-The private historical optimized sheet was read only as
-`HISTORICAL_NON_AUTHORITATIVE_REFERENCE`. It remains excluded from fixtures and tests.
-
-- Alpha's historical reference contains 80 trips (40/40) and eight vehicle labels, matching the
-  corpus B total/directional counts and assumed fleet limit. Only 22 historical departure times
-  exactly match B within the same direction. A positional, non-authoritative comparison indicates
-  66 changed departures, 780 total shift minutes, and a 25-minute maximum shift. The current
-  proxy sensitivity produced no accepted candidate, so it cannot reproduce or replace that
-  reference.
-- Beta's historical reference contains 46 trips (23/23) and seven vehicle labels. It has 21 exact
-  directional departure-time matches with B; a positional, non-authoritative comparison indicates
-  34 changed departures, 675 total shift minutes, and a 40-minute maximum shift. The current
-  OR-Tools sensitivity candidate retains B exactly, while the heuristic shifts 42 trips by 484
-  minutes in total with a 23-minute maximum.
-
-These comparisons are descriptive only. Historical `OPT-*` rows do not carry the canonical
-one-to-one B trace and were produced under a different expert-assist method, so positional shift
-figures are not regression expectations.
-
-## Status and proof qualifications
-
+- Rebuilding from the unchanged private hashes is byte-identical under `--write` and `--verify`.
+- Raw fact fingerprints remain unchanged; proxy fingerprints change because volume
+  classification and block boundaries were corrected.
 - Default-policy no-run results are valid business decisions under LOW proxy confidence.
-- Heuristic `FEASIBLE` means independently validated feasibility, not optimality.
-- OR-Tools `FEASIBLE` means an independently validated candidate without an optimality proof.
-- `UNKNOWN` means no accepted candidate within the invocation, not infeasibility.
-- Proxy weights, vectors, recommendations, timings, and historical differences are draft
-  characterization evidence only.
-- No result is approved for operation or frozen as a Milestone 4C2 baseline.
+- `PROXY_COVERAGE_INCOMPLETE` is missing evidence, not zero demand.
+- Unsupported decimal precision is a representation limitation, not a solver status.
+- No operational timetable, vector, recommendation, or performance baseline is approved.
 
 ## Questions requiring expert approval
 
-1. Are fleet assumptions 5/8 and 4/7 acceptable for the corpus scenarios?
-2. Are exact timetable rows correctly treated as authority over inconsistent summary cells?
-3. Is LOW confidence appropriate for `departure_hour_proxy_v1`, including its use of conserved
-   15-day totals as unscaled sensitivity weights?
-4. Should the historical optimized sheet remain diagnostic-only?
-5. Are the reported native statuses and eligible Beta vectors acceptable candidates for later
-   regression baselines?
-6. Which outcomes, if any, should be frozen in Milestone 4C2?
-7. Are the measured solve times acceptable for future CI?
-8. Are the documented nonempty block extensions acceptable for contiguous solver coverage without
-   fabricated zero-demand hours?
+1. Are fleet assumptions 5/8 and 4/7 acceptable for corpus scenarios?
+2. Are exact timetable rows correctly authoritative over the inconsistent summary cells?
+3. Is LOW confidence appropriate for `departure_hour_proxy_v1`?
+4. Are the first/final boundary method and explicit Beta interior gap correctly represented?
+5. Should the exact normalized decimal limitation remain a not-run gate until a separately
+   approved precision policy exists?
+6. Should the historical optimized sheet remain diagnostic-only?
+7. Which outcomes, if any, should be designed and approved as Milestone 4C2 baselines?

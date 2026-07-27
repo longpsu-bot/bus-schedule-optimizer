@@ -25,27 +25,10 @@
     "departure_hour_proxy_v1": {
       "blocks": [
         {
-          "block_id": "PROXY-TERMINAL_1_TO_2-05",
-          "coverage_extension_minutes": 0,
-          "direction": "terminal_1_to_2",
-          "observation_days": 15,
-          "observed_departure_hour_start": "05:00",
-          "passenger_volume": 186,
-          "period_end": "2025-07-15",
-          "period_start": "2025-07-01",
-          "source_observation_count": 1,
-          "source_trip_ids": [
-            "A-001"
-          ],
-          "source_volume_type": "total_observation_period",
-          "time_block_end": "06:00",
-          "time_block_start": "05:00",
-          "volume_type": "average_day"
-        },
-        {
           "block_id": "PROXY-TERMINAL_2_TO_1-05",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "first",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "05:00",
           "passenger_volume": 288,
@@ -58,12 +41,32 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "06:00",
           "time_block_start": "05:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
+        },
+        {
+          "block_id": "PROXY-TERMINAL_1_TO_2-05",
+          "boundary_role": "first",
+          "direction": "terminal_1_to_2",
+          "duration_minutes": 30,
+          "observation_days": 15,
+          "observed_departure_hour_start": "05:00",
+          "passenger_volume": 186,
+          "period_end": "2025-07-15",
+          "period_start": "2025-07-01",
+          "source_observation_count": 1,
+          "source_trip_ids": [
+            "A-001"
+          ],
+          "source_volume_type": "total_observation_period",
+          "time_block_end": "06:00",
+          "time_block_start": "05:30",
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-06",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "06:00",
           "passenger_volume": 138,
@@ -76,12 +79,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "07:00",
           "time_block_start": "06:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-06",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "06:00",
           "passenger_volume": 204,
@@ -94,12 +98,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "07:00",
           "time_block_start": "06:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-07",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "07:00",
           "passenger_volume": 160,
@@ -112,12 +117,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "08:00",
           "time_block_start": "07:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-07",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "07:00",
           "passenger_volume": 326,
@@ -130,12 +136,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "08:00",
           "time_block_start": "07:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-08",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "08:00",
           "passenger_volume": 217,
@@ -148,12 +155,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "09:00",
           "time_block_start": "08:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-08",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "08:00",
           "passenger_volume": 248,
@@ -166,12 +174,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "09:00",
           "time_block_start": "08:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-09",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "09:00",
           "passenger_volume": 278,
@@ -184,12 +193,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "10:00",
           "time_block_start": "09:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-09",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "09:00",
           "passenger_volume": 257,
@@ -202,12 +212,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "10:00",
           "time_block_start": "09:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-10",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "10:00",
           "passenger_volume": 262,
@@ -220,12 +231,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "11:00",
           "time_block_start": "10:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-10",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "10:00",
           "passenger_volume": 196,
@@ -238,12 +250,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "11:00",
           "time_block_start": "10:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-11",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "11:00",
           "passenger_volume": 211,
@@ -256,12 +269,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "12:00",
           "time_block_start": "11:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-11",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "11:00",
           "passenger_volume": 154,
@@ -274,12 +288,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "12:00",
           "time_block_start": "11:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-12",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "12:00",
           "passenger_volume": 202,
@@ -292,12 +307,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "13:00",
           "time_block_start": "12:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-12",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "12:00",
           "passenger_volume": 142,
@@ -310,12 +326,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "13:00",
           "time_block_start": "12:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-13",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "13:00",
           "passenger_volume": 304,
@@ -328,12 +345,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "14:00",
           "time_block_start": "13:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-13",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "13:00",
           "passenger_volume": 181,
@@ -346,12 +364,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "14:00",
           "time_block_start": "13:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-14",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "14:00",
           "passenger_volume": 206,
@@ -364,12 +383,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "15:00",
           "time_block_start": "14:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-14",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "14:00",
           "passenger_volume": 268,
@@ -382,12 +402,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "15:00",
           "time_block_start": "14:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-15",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "15:00",
           "passenger_volume": 286,
@@ -400,12 +421,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "16:00",
           "time_block_start": "15:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-15",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "15:00",
           "passenger_volume": 262,
@@ -418,12 +440,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "16:00",
           "time_block_start": "15:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-16",
-          "coverage_extension_minutes": 60,
+          "boundary_role": "ordinary",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "16:00",
           "passenger_volume": 386,
@@ -434,14 +457,15 @@
             "A-012"
           ],
           "source_volume_type": "total_observation_period",
-          "time_block_end": "18:00",
+          "time_block_end": "17:00",
           "time_block_start": "16:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-16",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "ordinary",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 60,
           "observation_days": 15,
           "observed_departure_hour_start": "16:00",
           "passenger_volume": 212,
@@ -454,12 +478,13 @@
           "source_volume_type": "total_observation_period",
           "time_block_end": "17:00",
           "time_block_start": "16:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_2_TO_1-17",
-          "coverage_extension_minutes": 60,
+          "boundary_role": "final",
           "direction": "terminal_2_to_1",
+          "duration_minutes": 71,
           "observation_days": 15,
           "observed_departure_hour_start": "17:00",
           "passenger_volume": 149,
@@ -470,14 +495,15 @@
             "A-026"
           ],
           "source_volume_type": "total_observation_period",
-          "time_block_end": "19:00",
+          "time_block_end": "18:11",
           "time_block_start": "17:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         },
         {
           "block_id": "PROXY-TERMINAL_1_TO_2-18",
-          "coverage_extension_minutes": 0,
+          "boundary_role": "final",
           "direction": "terminal_1_to_2",
+          "duration_minutes": 26,
           "observation_days": 15,
           "observed_departure_hour_start": "18:00",
           "passenger_volume": 216,
@@ -488,24 +514,58 @@
             "A-013"
           ],
           "source_volume_type": "total_observation_period",
-          "time_block_end": "19:00",
+          "time_block_end": "18:26",
           "time_block_start": "18:00",
-          "volume_type": "average_day"
+          "volume_type": "total_observation_period"
         }
       ],
       "classification": "derived_proxy_dataset",
-      "contract_v1_demand_interval_eligible": true,
-      "contract_v1_weight_interpretation": "unscaled_15_day_observation_total_used_as_sensitivity_weight",
+      "contract_v1_demand_interval_eligible": false,
+      "contract_v1_weight_interpretation": "source_period_total_normalized_by_observation_days",
+      "coverage_issues": [
+        {
+          "code": "PROXY_INTERIOR_HOUR_UNOBSERVED",
+          "direction": "terminal_1_to_2",
+          "interval_end": "18:00",
+          "interval_start": "17:00",
+          "reason": "No Scenario A trip departs in this interior clock hour; demand is not fabricated, interpolated, or absorbed into a neighboring block.",
+          "surrounding_observed_hours": [
+            "16:00",
+            "18:00"
+          ]
+        }
+      ],
+      "coverage_status": "PROXY_COVERAGE_INCOMPLETE",
       "dataset_id": "CORPUS-BETA-46:departure_hour_proxy_v1",
       "demand_confidence": "LOW",
+      "directional_coverage": [
+        {
+          "contract_v1_demand_interval_eligible": false,
+          "coverage_issue_count": 1,
+          "coverage_status": "PROXY_COVERAGE_INCOMPLETE",
+          "direction": "terminal_1_to_2",
+          "final_block_end": "18:26",
+          "first_block_start": "05:30"
+        },
+        {
+          "contract_v1_demand_interval_eligible": true,
+          "coverage_issue_count": 0,
+          "coverage_status": "COMPLETE",
+          "direction": "terminal_2_to_1",
+          "final_block_end": "18:11",
+          "first_block_start": "05:00"
+        }
+      ],
       "limitations": [
         "This proxy groups raw trip passenger observations by Scenario A departure hour.",
-        "A nonempty observed-hour block may extend to the next observed hour or through the Scenario B endpoint to maintain contiguous solver coverage without fabricating an empty zero-demand block.",
-        "Contract V1 receives the exactly conserved 15-day totals as unscaled proxy weights via its average_day transport classification; these are not observed average-day passenger counts.",
+        "Contract V1 receives total_observation_period observations and derives average daily demand using observation_days=15.",
+        "Ordinary blocks use exact clock-hour boundaries; first and final blocks are clipped to the exact Scenario B service endpoints.",
+        "Interior hours without Scenario A departures remain explicit temporal gaps.",
         "It is sensitivity evidence only and is not an observed hourly demand series.",
         "It must never be presented as an approved operational demand baseline."
       ],
-      "proxy_method": "departure_hour_proxy_v1"
+      "proxy_method": "departure_hour_proxy_v1",
+      "proxy_status": "PROXY_SENSITIVITY_ONLY"
     },
     "raw_trip_observations": {
       "classification": "raw_trip_observation_evidence",

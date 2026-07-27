@@ -29,17 +29,16 @@ from bus_schedule_engine import (
     SolverChoice,
     analyze_and_optimize_schedule_v1,
 )
-from bus_schedule_engine.c_config import ScenarioCConfig
 from bus_schedule_engine.contracts_v1 import (
     BDisposition,
     DemandConfidence,
     ScenarioBEvaluationPolicyV1,
-    SolverPolicyV1,
-    build_heuristic_schedule_request_v1,
+    ScheduleProblemError,
     build_ortools_service_quality_request_v1,
     evaluate_scenario_b_v1,
 )
 from bus_schedule_engine.importer import import_workbook
+from tools import characterize_route_corpus_v1 as characterizer
 
 EXPECTED = {
     "corpus_alpha_80.json": {
@@ -48,6 +47,13 @@ EXPECTED = {
         "runtime": (55, 65),
         "raw": 52,
         "overlaps": (50, 20, 40),
+        "coverage": "COMPLETE",
+        "eligible": True,
+        "coverage_issues": (),
+        "boundaries": {
+            "terminal_1_to_2": ("04:30", "18:31"),
+            "terminal_2_to_1": ("05:35", "20:01"),
+        },
     },
     "corpus_beta_46.json": {
         "a": (26, 13),
@@ -55,6 +61,21 @@ EXPECTED = {
         "runtime": (100, 100),
         "raw": 26,
         "overlaps": (24, 10, 55),
+        "coverage": "PROXY_COVERAGE_INCOMPLETE",
+        "eligible": False,
+        "coverage_issues": (
+            (
+                "PROXY_INTERIOR_HOUR_UNOBSERVED",
+                "terminal_1_to_2",
+                "17:00",
+                "18:00",
+                ("16:00", "18:00"),
+            ),
+        ),
+        "boundaries": {
+            "terminal_1_to_2": ("05:30", "18:26"),
+            "terminal_2_to_1": ("05:00", "18:11"),
+        },
     },
 }
 HISTORICAL_SHEETS = {
@@ -62,6 +83,9 @@ HISTORICAL_SHEETS = {
     "PHAN_BO_THEO_GIO",
     "BIEU_DO_TOI_UU",
 }
+REPORT_PATH = (
+    Path(__file__).parents[1] / "docs" / "engine" / "ROUTE_CORPUS_CHARACTERIZATION_DRAFT_V1.md"
+)
 
 
 def _private_root() -> Path | None:
@@ -97,12 +121,10 @@ def test_fixture_json_is_structural_and_byte_deterministic(filename: str) -> Non
         ]
         is False
     )
-    assert (
-        fixture["demand_observations"]["departure_hour_proxy_v1"][
-            "contract_v1_demand_interval_eligible"
-        ]
-        is True
-    )
+    proxy = fixture["demand_observations"]["departure_hour_proxy_v1"]
+    assert proxy["proxy_status"] == "PROXY_SENSITIVITY_ONLY"
+    assert proxy["coverage_status"] == EXPECTED[filename]["coverage"]
+    assert proxy["contract_v1_demand_interval_eligible"] is EXPECTED[filename]["eligible"]
 
 
 def test_manifest_hashes_classifications_and_proxy_policy() -> None:
@@ -118,11 +140,16 @@ def test_manifest_hashes_classifications_and_proxy_policy() -> None:
             fact["classification"] == "observed_source_fact"
             for fact in entry["observed_source_facts"]
         )
-        assert all(
-            item["classification"] == "derived_proxy_dataset"
-            and item["status"] == "PROXY_SENSITIVITY_ONLY"
-            for item in entry["derived_datasets"]
-        )
+        for item in entry["derived_datasets"]:
+            expected = next(
+                value
+                for filename, value in EXPECTED.items()
+                if load_corpus_fixture(filename)["fixture_id"] == entry["fixture_id"]
+            )
+            assert item["classification"] == "derived_proxy_dataset"
+            assert item["status"] == "PROXY_SENSITIVITY_ONLY"
+            assert item["coverage_status"] == expected["coverage"]
+            assert item["contract_v1_demand_interval_eligible"] is expected["eligible"]
         assert all(
             correction["classification"] == "exact_timetable_derived_correction"
             and correction["approved_for_corpus_construction"] is True
@@ -279,31 +306,77 @@ def test_raw_overlaps_are_preserved_and_documented(filename: str) -> None:
 
 
 @pytest.mark.parametrize("filename", FIXTURE_FILES)
-def test_proxy_is_directional_contiguous_nonoverlapping_and_fully_provenanced(
+def test_proxy_blocks_use_exact_hour_and_service_endpoint_boundaries(
     filename: str,
 ) -> None:
     fixture = load_corpus_fixture(filename)
     blocks = proxy_demand_blocks(fixture)
-    raw_ids = {row["source_trip_id"] for row in raw_trip_observations(fixture)}
+    raw_by_trip_id = {row["source_trip_id"]: row for row in raw_trip_observations(fixture)}
+    raw_ids = set(raw_by_trip_id)
     proxy_ids: list[str] = []
 
     assert {block["direction"] for block in blocks} == {
         "terminal_1_to_2",
         "terminal_2_to_1",
     }
-    for block in blocks:
-        assert _minutes(block["time_block_end"]) - _minutes(block["time_block_start"]) >= 60
-        assert block["source_trip_ids"]
-        assert block["source_observation_count"] == len(block["source_trip_ids"])
-        proxy_ids.extend(block["source_trip_ids"])
     for direction in ("terminal_1_to_2", "terminal_2_to_1"):
         directional = sorted(
             (block for block in blocks if block["direction"] == direction),
             key=lambda block: block["time_block_start"],
         )
+        scenario_b_departures = [
+            _minutes(trip["departure_time"])
+            for trip in fixture["scenario_b"]["exact_trips"]
+            if trip["direction"] == direction
+        ]
+        first_b = min(scenario_b_departures)
+        last_b = max(scenario_b_departures)
+        first = directional[0]
+        final = directional[-1]
+
+        assert _minutes(first["time_block_start"]) == max(
+            _minutes(first["observed_departure_hour_start"]),
+            first_b,
+        )
+        assert _minutes(final["time_block_end"]) == last_b + 1
+        assert (
+            first["time_block_start"],
+            final["time_block_end"],
+        ) == EXPECTED[filename]["boundaries"][direction]
+        for block in directional:
+            start = _minutes(block["time_block_start"])
+            end = _minutes(block["time_block_end"])
+            observed_hour = _minutes(block["observed_departure_hour_start"])
+            assert block["source_trip_ids"]
+            assert block["source_observation_count"] == len(block["source_trip_ids"])
+            assert block["passenger_volume"] > 0
+            assert block["passenger_volume"] == sum(
+                raw_by_trip_id[trip_id]["passenger_volume"] for trip_id in block["source_trip_ids"]
+            )
+            assert block["duration_minutes"] == end - start
+            assert block["volume_type"] == "total_observation_period"
+            assert block["source_volume_type"] == "total_observation_period"
+            assert block["observation_days"] == 15
+            if block["boundary_role"] == "ordinary":
+                assert start == observed_hour
+                assert end == observed_hour + 60
+                assert end - start == 60
+            elif block["boundary_role"] == "first":
+                assert end == observed_hour + 60
+                assert end - start <= 60
+            else:
+                assert block["boundary_role"] == "final"
+                assert start == observed_hour
+                assert end == last_b + 1
+            proxy_ids.extend(block["source_trip_ids"])
         assert all(
-            earlier["time_block_end"] == later["time_block_start"]
+            _minutes(earlier["time_block_end"]) <= _minutes(later["time_block_start"])
             for earlier, later in zip(directional, directional[1:], strict=False)
+        )
+        assert all(
+            _minutes(block["time_block_end"])
+            == _minutes(block["observed_departure_hour_start"]) + 60
+            for block in directional[:-1]
         )
     assert Counter(proxy_ids) == Counter(raw_ids)
 
@@ -329,19 +402,73 @@ def test_proxy_conserves_directional_and_total_passenger_volumes(filename: str) 
 
 
 @pytest.mark.parametrize("filename", FIXTURE_FILES)
-def test_proxy_fabricates_no_interior_empty_hour(filename: str) -> None:
+def test_contract_normalizes_proxy_total_by_exact_observation_days(filename: str) -> None:
+    fixture = load_corpus_fixture(filename)
+    imported = imported_workbook_from_fixture(fixture)
+    normalized = normalized_bundle_from_fixture(fixture)
+    assert normalized.observed_demand is not None
+    assert normalized.observed_demand.observation_days == 15
+
+    for source, observation in zip(
+        imported.demand,
+        normalized.observed_demand.observations,
+        strict=True,
+    ):
+        assert source.volume_type.value == "total_observation_period"
+        assert observation.volume_classification.value == "total_observation_period"
+        assert observation.passenger_count == source.passenger_volume
+        daily = observation.average_daily_passenger_count(
+            normalized.observed_demand.observation_days
+        )
+        assert daily == pytest.approx(source.passenger_volume / 15)
+        assert daily != pytest.approx(source.passenger_volume * 15)
+
+
+@pytest.mark.parametrize("filename", FIXTURE_FILES)
+def test_proxy_coverage_issues_preserve_unobserved_interior_gaps(filename: str) -> None:
     fixture = load_corpus_fixture(filename)
     trips = fixture["scenario_a"]["exact_trips"]
-    proxy = proxy_demand_blocks(fixture)
+    proxy_dataset = fixture["demand_observations"]["departure_hour_proxy_v1"]
+    proxy = proxy_dataset["blocks"]
 
     for direction in ("terminal_1_to_2", "terminal_2_to_1"):
         source_hours = {
             int(trip["departure_time"][:2]) for trip in trips if trip["direction"] == direction
         }
         proxy_hours = {
-            int(block["time_block_start"][:2]) for block in proxy if block["direction"] == direction
+            int(block["observed_departure_hour_start"][:2])
+            for block in proxy
+            if block["direction"] == direction
         }
         assert proxy_hours == source_hours
+    issues = tuple(
+        (
+            issue["code"],
+            issue["direction"],
+            issue["interval_start"],
+            issue["interval_end"],
+            tuple(issue["surrounding_observed_hours"]),
+        )
+        for issue in proxy_dataset["coverage_issues"]
+    )
+    assert issues == EXPECTED[filename]["coverage_issues"]
+    assert proxy_dataset["coverage_status"] == EXPECTED[filename]["coverage"]
+    assert proxy_dataset["contract_v1_demand_interval_eligible"] is EXPECTED[filename]["eligible"]
+    for issue in proxy_dataset["coverage_issues"]:
+        issue_start = _minutes(issue["interval_start"])
+        issue_end = _minutes(issue["interval_end"])
+        assert not any(
+            _minutes(block["time_block_start"]) < issue_end
+            and _minutes(block["time_block_end"]) > issue_start
+            for block in proxy
+            if block["direction"] == issue["direction"]
+        )
+        assert not any(
+            block["passenger_volume"] == 0
+            and block["time_block_start"] == issue["interval_start"]
+            and block["time_block_end"] == issue["interval_end"]
+            for block in proxy
+        )
 
 
 @pytest.mark.parametrize("filename", FIXTURE_FILES)
@@ -362,7 +489,7 @@ def test_raw_rows_are_never_supplied_to_contract_v1(filename: str) -> None:
         fixture["demand_observations"]["departure_hour_proxy_v1"][
             "contract_v1_demand_interval_eligible"
         ]
-        is True
+        is EXPECTED[filename]["eligible"]
     )
     assert {
         (
@@ -381,15 +508,7 @@ def test_raw_rows_are_never_supplied_to_contract_v1(filename: str) -> None:
         )
         for block in proxy
     }
-    for direction in ("terminal_1_to_2", "terminal_2_to_1"):
-        directional = sorted(
-            (row for row in imported.demand if row.direction.value == direction),
-            key=lambda row: row.block_start_seconds,
-        )
-        assert all(
-            earlier.block_end_seconds == later.block_start_seconds
-            for earlier, later in zip(directional, directional[1:], strict=False)
-        )
+    assert {row.volume_type.value for row in imported.demand} == {"total_observation_period"}
     assert any(
         _minutes(earlier["raw_interval_end"]) > _minutes(later["raw_interval_start"])
         for direction in ("terminal_1_to_2", "terminal_2_to_1")
@@ -466,73 +585,92 @@ def test_natural_default_policy_characterization_attempts_no_solver(
     assert result.comparison is None
 
 
-@pytest.mark.parametrize("filename", FIXTURE_FILES)
-def test_low_confidence_proxy_sensitivity_constructs_canonical_quality_requests(
-    filename: str,
+def test_complete_proxy_precision_rejection_prevents_both_solver_paths(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fixture = load_corpus_fixture(filename)
-    imported = imported_workbook_from_fixture(fixture)
-    normalized = normalized_bundle_from_fixture(fixture)
+    def unexpected(*args, **kwargs):
+        raise AssertionError("No solver or heuristic request may run without a quality problem")
+
+    monkeypatch.setattr(characterizer, "build_heuristic_schedule_request_v1", unexpected)
+    monkeypatch.setattr(characterizer, "run_schedule_solver_v1", unexpected)
+    summary, benchmark_rows = characterizer.characterize_fixture("corpus_alpha_80.json")
+    diagnostic = summary["proxy_sensitivity_only"]
+
+    assert diagnostic["coverage_status"] == "COMPLETE"
+    assert diagnostic["diagnostic_status"] == "NOT_RUN"
+    assert diagnostic["reason_code"] == ("QUALITY_REQUEST_UNREPRESENTABLE_DEMAND_PRECISION")
+    assert diagnostic["quality_request"]["attempted"] is True
+    assert diagnostic["quality_request"]["constructed"] is False
+    assert diagnostic["quality_request"]["builder_error_code"] == (
+        "ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY"
+    )
+    assert (
+        "ORTOOLS_QUALITY_DEMAND_PRECISION_UNSUPPORTED"
+        in (diagnostic["quality_request"]["builder_error_codes"])
+    )
+    assert diagnostic["heuristic_outcome"] is None
+    assert diagnostic["ortools_outcome"] is None
+    assert diagnostic["comparison"] is None
+    assert diagnostic["recommendation"] is None
+    assert benchmark_rows == []
+
+
+def test_incomplete_proxy_prevents_quality_construction_and_solver_invocation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unexpected(*args, **kwargs):
+        raise AssertionError("Incomplete proxy must stop before request construction")
+
+    monkeypatch.setattr(
+        characterizer,
+        "build_ortools_service_quality_request_v1",
+        unexpected,
+    )
+    monkeypatch.setattr(characterizer, "build_heuristic_schedule_request_v1", unexpected)
+    monkeypatch.setattr(characterizer, "run_schedule_solver_v1", unexpected)
+    summary, benchmark_rows = characterizer.characterize_fixture("corpus_beta_46.json")
+    diagnostic = summary["proxy_sensitivity_only"]
+
+    assert diagnostic["coverage_status"] == "PROXY_COVERAGE_INCOMPLETE"
+    assert diagnostic["diagnostic_status"] == "NOT_RUN"
+    assert diagnostic["reason_code"] == "PROXY_COVERAGE_INCOMPLETE"
+    assert diagnostic["quality_request"]["attempted"] is False
+    assert diagnostic["heuristic_outcome"] is None
+    assert diagnostic["ortools_outcome"] is None
+    assert diagnostic["comparison"] is None
+    assert diagnostic["recommendation"] is None
+    assert benchmark_rows == []
+
+
+def test_canonical_quality_builder_exposes_exact_precision_error() -> None:
+    normalized = normalized_bundle_from_fixture(load_corpus_fixture("corpus_alpha_80.json"))
     policy = ScenarioBEvaluationPolicyV1(
         minimum_authoritative_demand_confidence=DemandConfidence.LOW
     )
     evaluation = evaluate_scenario_b_v1(normalized, policy)
-    heuristic_context, heuristic_solver = build_heuristic_schedule_request_v1(
-        normalized,
-        evaluation,
-        imported.parameters_b,
-        imported.trips_b,
-        imported.demand,
-        ScenarioCConfig.from_mapping(imported.configuration),
-        evaluation_policy=policy,
-    )
-    quality_context, quality_solver = build_ortools_service_quality_request_v1(
-        normalized,
-        evaluation,
-        evaluation_policy=policy,
-        solver_policy=SolverPolicyV1(
-            time_limit_seconds=30,
-            worker_count=1,
-            random_seed=0,
-        ),
-    )
 
-    assert heuristic_context.problem.solver_adapter == heuristic_solver.adapter_id
-    assert quality_context.problem.solver_adapter == quality_solver.adapter_id
-    assert (
-        heuristic_context.problem.source_b_fingerprint
-        == quality_context.problem.source_b_fingerprint
-    )
-    assert quality_context.problem.scenario_b.total_daily_trips == (EXPECTED[filename]["b"][0])
+    with pytest.raises(ScheduleProblemError) as caught:
+        build_ortools_service_quality_request_v1(
+            normalized,
+            evaluation,
+            evaluation_policy=policy,
+        )
+
+    assert caught.value.code == "ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY"
+    assert "ORTOOLS_QUALITY_DEMAND_PRECISION_UNSUPPORTED" in caught.value.codes
 
 
 @pytest.mark.parametrize("filename", FIXTURE_FILES)
-def test_problem_and_input_fingerprints_are_deterministic(filename: str) -> None:
+def test_input_fingerprints_are_deterministic_without_quality_problem(filename: str) -> None:
     first_fixture = load_corpus_fixture(filename)
     second_fixture = load_corpus_fixture(filename)
     first = normalized_bundle_from_fixture(first_fixture)
     second = normalized_bundle_from_fixture(second_fixture)
-    policy = ScenarioBEvaluationPolicyV1(
-        minimum_authoritative_demand_confidence=DemandConfidence.LOW
-    )
-    first_evaluation = evaluate_scenario_b_v1(first, policy)
-    second_evaluation = evaluate_scenario_b_v1(second, policy)
-    first_context, _ = build_ortools_service_quality_request_v1(
-        first,
-        first_evaluation,
-        evaluation_policy=policy,
-    )
-    second_context, _ = build_ortools_service_quality_request_v1(
-        second,
-        second_evaluation,
-        evaluation_policy=policy,
-    )
 
     assert fact_fingerprint(first_fixture) == fact_fingerprint(second_fixture)
     assert first.scenario_a_fingerprint == second.scenario_a_fingerprint
     assert first.scenario_b_fingerprint == second.scenario_b_fingerprint
     assert first.observed_demand_fingerprint == second.observed_demand_fingerprint
-    assert first_context.problem.problem_fingerprint == second_context.problem.problem_fingerprint
 
 
 @pytest.mark.parametrize("filename", FIXTURE_FILES)
@@ -553,6 +691,8 @@ def test_temporary_sanitized_xlsx_imports_identical_timetable_and_proxy(
     assert rendered.trips_a == direct.trips_a
     assert rendered.trips_b == direct.trips_b
     assert rendered.demand == direct.demand
+    assert {row.volume_type.value for row in rendered.demand} == {"total_observation_period"}
+    assert all(row.observation_days == 15 for row in rendered.demand)
 
 
 def test_private_source_values_match_raw_evidence_when_available() -> None:
@@ -635,6 +775,18 @@ def test_private_originals_are_external_and_untracked() -> None:
         text=True,
     ).stdout.splitlines()
     assert approved_names.isdisjoint(Path(item).name for item in tracked)
+
+
+def test_draft_report_discards_invalid_average_day_characterization() -> None:
+    report = REPORT_PATH.read_text(encoding="utf-8")
+
+    assert "HEURISTIC_VECTOR_BETTER" not in report
+    assert "408,920" not in report
+    assert "440,920" not in report
+    assert "unscaled proxy weights" not in report
+    assert "unscaled 15-day" not in report
+    assert "TOTAL_OBSERVATION_PERIOD" in report
+    assert "observation_days=15" in report
 
 
 @pytest.mark.parametrize("filename", FIXTURE_FILES)

@@ -19,6 +19,7 @@ from bus_schedule_engine.contracts_v1 import (
     DemandConfidence,
     GenerationResultStatus,
     ScenarioBEvaluationPolicyV1,
+    ScheduleProblemError,
     SolverPolicyV1,
     build_heuristic_schedule_request_v1,
     build_ortools_service_quality_request_v1,
@@ -51,6 +52,8 @@ SENSITIVITY_POLICY = ScenarioBEvaluationPolicyV1(
 )
 OPERATIONAL_STATUS = "DRAFT_NOT_OPERATIONALLY_APPROVED"
 SENSITIVITY_STATUS = "PROXY_SENSITIVITY_ONLY"
+NOT_RUN = "NOT_RUN"
+PRECISION_REASON = "QUALITY_REQUEST_UNREPRESENTABLE_DEMAND_PRECISION"
 
 
 class RecordingSolver:
@@ -318,6 +321,43 @@ def _repeatability(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return by_solver
 
 
+def _not_run_sensitivity(
+    *,
+    proxy: dict[str, Any],
+    reason_code: str,
+    limitations: list[str],
+    quality_request: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "benchmark_run_count": 0,
+        "comparison": None,
+        "comparison_runs": [],
+        "coverage_issues": proxy["coverage_issues"],
+        "coverage_status": proxy["coverage_status"],
+        "demand_confidence": "LOW",
+        "diagnostic_status": NOT_RUN,
+        "heuristic_outcome": None,
+        "heuristic_request": {
+            "attempted": False,
+            "constructed": False,
+            "reason": "A common canonical quality problem was not available.",
+        },
+        "limitations": limitations,
+        "minimum_accepted_confidence": "LOW",
+        "operational_status": OPERATIONAL_STATUS,
+        "ortools_outcome": None,
+        "quality_request": quality_request,
+        "reason_code": reason_code,
+        "recommendation": None,
+        "requested_controls": {
+            "random_seed": 0,
+            "time_limit_seconds": 30,
+            "worker_count": 1,
+        },
+        "status": SENSITIVITY_STATUS,
+    }
+
+
 def characterize_fixture(
     filename: str,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -338,8 +378,87 @@ def characterize_fixture(
                 f"{fixture['fixture_id']} default LOW-confidence path unexpectedly solved"
             )
 
+    proxy = fixture["demand_observations"]["departure_hour_proxy_v1"]
+    if proxy["coverage_status"] == "PROXY_COVERAGE_INCOMPLETE":
+        characterization = {
+            "fixture_id": fixture["fixture_id"],
+            "natural_unified_service": natural,
+            "operational_status": OPERATIONAL_STATUS,
+            "proxy_sensitivity_only": _not_run_sensitivity(
+                proxy=proxy,
+                reason_code="PROXY_COVERAGE_INCOMPLETE",
+                limitations=[
+                    (
+                        "At least one interior Scenario B service-window hour has no Scenario A "
+                        "departure observation."
+                    ),
+                    (
+                        "No demand was fabricated, interpolated, or stretched across the "
+                        "unobserved hour."
+                    ),
+                    "Neither canonical solver request was constructed or executed.",
+                ],
+                quality_request={
+                    "attempted": False,
+                    "builder_error_code": None,
+                    "builder_error_codes": [],
+                    "constructed": False,
+                    "explanation": (
+                        "Proxy coverage eligibility is false, so the canonical quality builder "
+                        "was not invoked."
+                    ),
+                },
+            ),
+            "raw_trip_observation_policy": (
+                "PRESERVED_AS_EVIDENCE_NEVER_SUPPLIED_AS_CONTRACT_V1_DEMAND_INTERVALS"
+            ),
+        }
+        return characterization, []
+
     normalized = normalize_imported_workbook_v1(imported, options)
     evaluation = evaluate_scenario_b_v1(normalized, SENSITIVITY_POLICY)
+    try:
+        quality_context, quality_solver = build_ortools_service_quality_request_v1(
+            normalized,
+            evaluation,
+            evaluation_policy=SENSITIVITY_POLICY,
+            solver_policy=ORTOOLS_POLICY,
+        )
+    except ScheduleProblemError as exc:
+        if "ORTOOLS_QUALITY_DEMAND_PRECISION_UNSUPPORTED" not in exc.codes:
+            raise
+        characterization = {
+            "fixture_id": fixture["fixture_id"],
+            "natural_unified_service": natural,
+            "operational_status": OPERATIONAL_STATUS,
+            "proxy_sensitivity_only": _not_run_sensitivity(
+                proxy=proxy,
+                reason_code=PRECISION_REASON,
+                limitations=[
+                    (
+                        "Exact total_observation_period values normalize to repeating daily "
+                        "decimals beyond the current six-decimal quality authority."
+                    ),
+                    (
+                        "This is a proxy data-representation limitation, not solver "
+                        "infeasibility, UNKNOWN, insufficient fleet, or failed optimization."
+                    ),
+                    "Neither canonical solver request was executed.",
+                ],
+                quality_request={
+                    "attempted": True,
+                    "builder_error_code": exc.code,
+                    "builder_error_codes": list(exc.codes),
+                    "constructed": False,
+                    "explanation": str(exc),
+                },
+            ),
+            "raw_trip_observation_policy": (
+                "PRESERVED_AS_EVIDENCE_NEVER_SUPPLIED_AS_CONTRACT_V1_DEMAND_INTERVALS"
+            ),
+        }
+        return characterization, []
+
     heuristic_context, heuristic_solver = build_heuristic_schedule_request_v1(
         normalized,
         evaluation,
@@ -348,12 +467,6 @@ def characterize_fixture(
         imported.demand,
         ScenarioCConfig.from_mapping(imported.configuration),
         evaluation_policy=SENSITIVITY_POLICY,
-    )
-    quality_context, quality_solver = build_ortools_service_quality_request_v1(
-        normalized,
-        evaluation,
-        evaluation_policy=SENSITIVITY_POLICY,
-        solver_policy=ORTOOLS_POLICY,
     )
 
     benchmark_rows: list[dict[str, Any]] = []
@@ -420,10 +533,23 @@ def characterize_fixture(
         "natural_unified_service": natural,
         "operational_status": OPERATIONAL_STATUS,
         "proxy_sensitivity_only": {
+            "benchmark_run_count": len(benchmark_rows),
             "comparison_runs": comparison_runs,
+            "coverage_issues": proxy["coverage_issues"],
+            "coverage_status": proxy["coverage_status"],
             "demand_confidence": "LOW",
+            "diagnostic_status": "RUN",
+            "heuristic_request": {"attempted": True, "constructed": True},
             "minimum_accepted_confidence": "LOW",
             "operational_status": OPERATIONAL_STATUS,
+            "quality_request": {
+                "attempted": True,
+                "builder_error_code": None,
+                "builder_error_codes": [],
+                "constructed": True,
+                "explanation": None,
+            },
+            "reason_code": "COMPARISON_EXECUTED",
             "repeatability": _repeatability(benchmark_rows),
             "status": SENSITIVITY_STATUS,
         },

@@ -93,6 +93,7 @@ def _trips(payload: list[dict[str, Any]]) -> list[Trip]:
 
 
 def _proxy_demand(payload: list[dict[str, Any]]) -> list[DemandRecord]:
+    """Preserve exact source-period totals; Contract V1 performs daily normalization."""
     return [
         DemandRecord(
             period_start=date.fromisoformat(item["period_start"]),
@@ -206,7 +207,7 @@ def render_sanitized_xlsx(
     fixture: dict[str, Any],
     destination: Path,
 ) -> Path:
-    """Render a test-only importer workbook whose SAN_LUONG sheet is the proxy."""
+    """Render a test-only workbook whose SAN_LUONG sheet retains proxy source totals."""
     workbook = Workbook()
     guide = workbook.active
     guide.title = "HUONG_DAN"
@@ -254,7 +255,7 @@ def render_sanitized_xlsx(
     demand_sheet = workbook.create_sheet("SAN_LUONG")
     _write_table(
         demand_sheet,
-        "LOW-confidence departure_hour_proxy_v1",
+        "LOW-confidence total_observation_period departure_hour_proxy_v1",
         [
             "period_start",
             "period_end",

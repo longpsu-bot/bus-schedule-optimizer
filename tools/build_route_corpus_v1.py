@@ -576,6 +576,8 @@ def _proxy_payload(
     for record, trip in mapping:
         groups[(trip.direction, trip.departure_seconds // 3600)].append((record, trip))
     blocks: list[dict[str, Any]] = []
+    coverage_issues: list[dict[str, Any]] = []
+    directional_coverage: list[dict[str, Any]] = []
     for direction in (
         Direction.TERMINAL_1_TO_2,
         Direction.TERMINAL_2_TO_1,
@@ -588,22 +590,53 @@ def _proxy_payload(
                 "Proxy requires observed Scenario A departures in both directions"
             )
         b_departures = [trip.departure_seconds for trip in trips_b if trip.direction == direction]
-        coverage_start_hour = min(observed_hours[0], min(b_departures) // 3600)
-        coverage_end_hour = max(observed_hours[-1], max(b_departures) // 3600) + 1
+        if not b_departures:
+            raise CorpusBuildError("Proxy requires Scenario B departures in both directions")
+        b_first = min(b_departures)
+        b_last = max(b_departures)
+        direction_issues: list[dict[str, Any]] = []
+        for hour in range(observed_hours[0] + 1, observed_hours[-1]):
+            if hour in observed_hours:
+                continue
+            previous_hour = max(item for item in observed_hours if item < hour)
+            next_hour = min(item for item in observed_hours if item > hour)
+            issue = {
+                "code": "PROXY_INTERIOR_HOUR_UNOBSERVED",
+                "direction": direction.value,
+                "interval_end": _format_time((hour + 1) * 3600),
+                "interval_start": _format_time(hour * 3600),
+                "reason": (
+                    "No Scenario A trip departs in this interior clock hour; demand is not "
+                    "fabricated, interpolated, or absorbed into a neighboring block."
+                ),
+                "surrounding_observed_hours": [
+                    _format_time(previous_hour * 3600),
+                    _format_time(next_hour * 3600),
+                ],
+            }
+            direction_issues.append(issue)
+            coverage_issues.append(issue)
         for index, hour in enumerate(observed_hours):
             rows = groups[(direction, hour)]
             first_record = rows[0][0]
             period_start, period_end = _shifted_dates(first_record)
             source_trip_ids = sorted(trip.trip_id for _, trip in rows)
-            start_hour = coverage_start_hour if index == 0 else hour
-            end_hour = (
-                observed_hours[index + 1] if index + 1 < len(observed_hours) else coverage_end_hour
-            )
+            block_start = max(hour * 3600, b_first) if index == 0 else hour * 3600
+            block_end = b_last + 60 if index == len(observed_hours) - 1 else (hour + 1) * 3600
+            if block_end <= block_start:
+                raise CorpusBuildError("Proxy block boundary is empty or reversed")
             blocks.append(
                 {
+                    "boundary_role": (
+                        "first"
+                        if index == 0
+                        else "final"
+                        if index == len(observed_hours) - 1
+                        else "ordinary"
+                    ),
                     "block_id": f"PROXY-{direction.value.upper()}-{hour:02d}",
-                    "coverage_extension_minutes": max(0, (end_hour - start_hour - 1) * 60),
                     "direction": direction.value,
+                    "duration_minutes": (block_end - block_start) // 60,
                     "observation_days": first_record.observation_days,
                     "observed_departure_hour_start": _format_time(hour * 3600),
                     "passenger_volume": _volume(sum(record.passenger_volume for record, _ in rows)),
@@ -612,11 +645,23 @@ def _proxy_payload(
                     "source_observation_count": len(rows),
                     "source_trip_ids": source_trip_ids,
                     "source_volume_type": first_record.volume_type.value,
-                    "time_block_end": _format_time(end_hour * 3600),
-                    "time_block_start": _format_time(start_hour * 3600),
-                    "volume_type": "average_day",
+                    "time_block_end": _format_time(block_end),
+                    "time_block_start": _format_time(block_start),
+                    "volume_type": first_record.volume_type.value,
                 }
             )
+        directional_coverage.append(
+            {
+                "contract_v1_demand_interval_eligible": not direction_issues,
+                "coverage_issue_count": len(direction_issues),
+                "coverage_status": (
+                    "PROXY_COVERAGE_INCOMPLETE" if direction_issues else "COMPLETE"
+                ),
+                "direction": direction.value,
+                "first_block_start": _format_time(max(observed_hours[0] * 3600, b_first)),
+                "final_block_end": _format_time(b_last + 60),
+            }
+        )
     blocks.sort(
         key=lambda block: (
             block["time_block_start"],
@@ -624,30 +669,32 @@ def _proxy_payload(
             block["block_id"],
         )
     )
+    coverage_status = "PROXY_COVERAGE_INCOMPLETE" if coverage_issues else "COMPLETE"
     return {
         "classification": "derived_proxy_dataset",
-        "contract_v1_weight_interpretation": (
-            "unscaled_15_day_observation_total_used_as_sensitivity_weight"
-        ),
-        "contract_v1_demand_interval_eligible": True,
+        "contract_v1_weight_interpretation": ("source_period_total_normalized_by_observation_days"),
+        "contract_v1_demand_interval_eligible": not coverage_issues,
+        "coverage_issues": coverage_issues,
+        "coverage_status": coverage_status,
         "dataset_id": f"{spec.fixture_id}:departure_hour_proxy_v1",
         "demand_confidence": "LOW",
+        "directional_coverage": directional_coverage,
         "limitations": [
             "This proxy groups raw trip passenger observations by Scenario A departure hour.",
             (
-                "A nonempty observed-hour block may extend to the next observed hour or through "
-                "the Scenario B endpoint to maintain contiguous solver coverage without "
-                "fabricating an empty zero-demand block."
+                "Contract V1 receives total_observation_period observations and derives average "
+                "daily demand using observation_days=15."
             ),
             (
-                "Contract V1 receives the exactly conserved 15-day totals as unscaled proxy "
-                "weights via its average_day transport classification; these are not observed "
-                "average-day passenger counts."
+                "Ordinary blocks use exact clock-hour boundaries; first and final blocks are "
+                "clipped to the exact Scenario B service endpoints."
             ),
+            "Interior hours without Scenario A departures remain explicit temporal gaps.",
             "It is sensitivity evidence only and is not an observed hourly demand series.",
             "It must never be presented as an approved operational demand baseline.",
         ],
         "proxy_method": "departure_hour_proxy_v1",
+        "proxy_status": "PROXY_SENSITIVITY_ONLY",
         "blocks": blocks,
     }
 
@@ -763,7 +810,13 @@ def _manifest_entry(
             {
                 "classification": "derived_proxy_dataset",
                 "confidence": "LOW",
+                "contract_v1_demand_interval_eligible": proxy[
+                    "contract_v1_demand_interval_eligible"
+                ],
+                "coverage_issue_count": len(proxy["coverage_issues"]),
+                "coverage_status": proxy["coverage_status"],
                 "dataset_id": proxy["dataset_id"],
+                "directional_coverage": proxy["directional_coverage"],
                 "method": "departure_hour_proxy_v1",
                 "proxy_fingerprint": _fingerprint(proxy["blocks"]),
                 "source_dataset_id": raw["dataset_id"],

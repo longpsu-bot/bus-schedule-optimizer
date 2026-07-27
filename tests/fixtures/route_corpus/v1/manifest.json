@@ -77,9 +77,30 @@
         {
           "classification": "derived_proxy_dataset",
           "confidence": "LOW",
+          "contract_v1_demand_interval_eligible": true,
+          "coverage_issue_count": 0,
+          "coverage_status": "COMPLETE",
           "dataset_id": "CORPUS-ALPHA-80:departure_hour_proxy_v1",
+          "directional_coverage": [
+            {
+              "contract_v1_demand_interval_eligible": true,
+              "coverage_issue_count": 0,
+              "coverage_status": "COMPLETE",
+              "direction": "terminal_1_to_2",
+              "final_block_end": "18:31",
+              "first_block_start": "04:30"
+            },
+            {
+              "contract_v1_demand_interval_eligible": true,
+              "coverage_issue_count": 0,
+              "coverage_status": "COMPLETE",
+              "direction": "terminal_2_to_1",
+              "final_block_end": "20:01",
+              "first_block_start": "05:35"
+            }
+          ],
           "method": "departure_hour_proxy_v1",
-          "proxy_fingerprint": "0f06d827c0070b129eee0927345d9b39c4e343863f10314f4283ead4b69be999",
+          "proxy_fingerprint": "ed6d3cad87f9b48369f003c05914fb1a0fc7c5b3b1370e1097300fd245d78e81",
           "source_dataset_id": "CORPUS-ALPHA-80:raw_trip_observations",
           "status": "PROXY_SENSITIVITY_ONLY"
         }
@@ -227,9 +248,30 @@
         {
           "classification": "derived_proxy_dataset",
           "confidence": "LOW",
+          "contract_v1_demand_interval_eligible": false,
+          "coverage_issue_count": 1,
+          "coverage_status": "PROXY_COVERAGE_INCOMPLETE",
           "dataset_id": "CORPUS-BETA-46:departure_hour_proxy_v1",
+          "directional_coverage": [
+            {
+              "contract_v1_demand_interval_eligible": false,
+              "coverage_issue_count": 1,
+              "coverage_status": "PROXY_COVERAGE_INCOMPLETE",
+              "direction": "terminal_1_to_2",
+              "final_block_end": "18:26",
+              "first_block_start": "05:30"
+            },
+            {
+              "contract_v1_demand_interval_eligible": true,
+              "coverage_issue_count": 0,
+              "coverage_status": "COMPLETE",
+              "direction": "terminal_2_to_1",
+              "final_block_end": "18:11",
+              "first_block_start": "05:00"
+            }
+          ],
           "method": "departure_hour_proxy_v1",
-          "proxy_fingerprint": "e687cdd43f197c4d9b6fba929ad6f0b52b9a18aa8d887362f619dd50c114f0d6",
+          "proxy_fingerprint": "65e1a072841cfb096e60f467f49ee3cbeceb35876563e3f03ad574089d0dff11",
           "source_dataset_id": "CORPUS-BETA-46:raw_trip_observations",
           "status": "PROXY_SENSITIVITY_ONLY"
         }

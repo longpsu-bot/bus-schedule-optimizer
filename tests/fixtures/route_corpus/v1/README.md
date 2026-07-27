@@ -24,19 +24,21 @@ normalization.
 - groups passenger volumes by direction and Scenario A departure hour;
 - lists every contributing Scenario A trip ID;
 - conserves directional and overall 15-day passenger totals exactly;
-- creates no empty zero-demand hour;
-- uses contiguous, non-overlapping coverage blocks anchored to observed departure hours; and
-- may extend a nonempty block to the next observed hour or through the Scenario B endpoint solely
-  to maintain complete fixed-resource solver coverage.
+- retains `volume_type=total_observation_period` and `observation_days=15`;
+- uses one exact clock-hour block for each ordinary observed departure hour;
+- clips the first block to the exact Scenario B first departure;
+- ends the final block one minute after the exact Scenario B last departure; and
+- leaves an unobserved interior hour as an explicit gap rather than filling or absorbing it.
 
-The conserved 15-day totals are transported through Contract V1 as unscaled proxy weights. They
-are not observed average-day passenger counts and must not be used as an operational demand
-baseline.
+Contract V1 derives average daily demand by dividing each exact source-period total by its
+15-day observation count. The committed passenger values are never relabeled as average-day
+counts, rounded, interpolated, or rescaled.
 
 With the default MEDIUM authority threshold, the LOW-confidence proxy legitimately produces an
 insufficient-data/no-solver result. A separately labeled `PROXY_SENSITIVITY_ONLY` diagnostic may
-lower the threshold to LOW and run the canonical heuristic and OR-Tools quality paths. Those
-results remain characterization evidence only.
+lower the threshold to LOW, but both solvers run only when a complete common canonical quality
+problem can be constructed. Incomplete coverage or unsupported normalized decimal precision
+produces an explicit not-run result.
 
 ## Authority and exclusions
 
