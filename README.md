@@ -38,8 +38,10 @@ The repository currently contains two separate paths.
 - a compatibility adapter for the existing heuristic; and
 - the quantitative pre-problem service-adjustment evaluator from V1-D2 Phase A.
 
-The two paths are not yet integrated. The Streamlit application does not call the Contract V1
-public boundary, and Contract V1 does not yet power the UI, charts, or XLSX exports.
+Milestone 5A1 now runs the two result-producing paths through a deterministic side-by-side
+validation adapter. This creates review evidence without changing application behavior. The
+Streamlit application, charts, and XLSX exports still use the legacy path and do not yet consume
+unified Contract V1 results.
 
 Contract V1 includes separate OR-Tools v9.15 CP-SAT adapters for one-route, fixed-resource hard
 feasibility, directional demand-priority optimization, and service-quality optimization. The
@@ -133,12 +135,16 @@ Only an independently validated candidate may be presented as authoritative Scen
 
 ## Near-term roadmap
 
-Milestone 4C2C is complete. The active next task is **Milestone 5A: side-by-side unified-service
-UI/chart/XLSX validation**.
+Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation is implemented**, but
+Milestone 5 is not complete.
 
-1. Build a side-by-side legacy versus unified result adapter.
-2. Validate charts and XLSX against authoritative unified facts.
-3. Cut over Streamlit only after discrepancies are reviewed.
+1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
+2. Milestone 5A2: validate unified presentation adapters for charts and XLSX.
+3. Cut over Streamlit only after discrepancies are reviewed in a later authorized milestone.
+
+See
+[Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)
+for comparison and Scenario C authority rules.
 
 ## Reviewed anonymized route corpus
 
