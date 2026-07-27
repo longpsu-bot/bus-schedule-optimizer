@@ -500,7 +500,7 @@ def _manual_blocks(
     output: list[DemandAnalysisBlockV1] = []
     for direction in sorted(by_direction, key=lambda item: item.value):
         index = 0
-        for start, end in zip(boundaries, boundaries[1:], strict=True):
+        for start, end in zip(boundaries, boundaries[1:], strict=False):
             selected = [
                 item
                 for item in by_direction[direction]

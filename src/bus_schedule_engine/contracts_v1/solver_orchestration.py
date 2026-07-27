@@ -18,6 +18,27 @@ from .solver_models import (
 )
 from .solver_validation import validate_and_build_solution_v1
 
+_HEADWAY_REGIME_NOT_REPRESENTABLE = "HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1"
+_WITHIN_REGIME_HEADWAY_NOT_UNIFORM = "WITHIN_REGIME_HEADWAY_NOT_UNIFORM"
+
+
+def _validation_rejection_limitations(
+    rejection_codes: tuple[str, ...],
+) -> tuple[str, ...]:
+    limitations: list[str] = []
+    if _HEADWAY_REGIME_NOT_REPRESENTABLE in rejection_codes:
+        limitations.append(
+            "HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1: an authoritative "
+            "zero-trip, one-trip, or invalid non-uniform regime cannot be represented "
+            "faithfully in accepted Contract V1 output; no solution was built."
+        )
+    if _WITHIN_REGIME_HEADWAY_NOT_UNIFORM in rejection_codes:
+        limitations.append(
+            "WITHIN_REGIME_HEADWAY_NOT_UNIFORM: solved adjacent departures within "
+            "at least one authoritative regime do not share one exact headway."
+        )
+    return tuple(limitations)
+
 
 def _finalize_outcome(
     problem: ScheduleProblemV1,
@@ -210,7 +231,14 @@ def run_schedule_solver_v1(
                 solution=None,
                 diagnostic_candidate=diagnostic,
                 explanations=run.explanations,
-                limitations=run.limitations,
+                limitations=tuple(
+                    dict.fromkeys(
+                        (
+                            *run.limitations,
+                            *_validation_rejection_limitations(validation.rejection_codes),
+                        )
+                    )
+                ),
             ),
         )
     return _finalize_outcome(

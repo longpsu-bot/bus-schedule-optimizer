@@ -514,7 +514,7 @@ def test_fixed_resource_actions_use_the_same_canonical_composition_boundary(
     assert calls[1][1] == (generation_context, heuristic_solver)
     assert result.solver_attempted is True
     assert result.heuristic_outcome is outcome
-    assert result.recommended_outcome is outcome
+    assert result.recommended_outcome is None
 
 
 def test_canonical_respace_path_executes_and_accepts_an_independently_validated_candidate(
@@ -560,7 +560,7 @@ def test_canonical_respace_path_executes_and_accepts_an_independently_validated_
     assert solver_calls == 1
     assert validation_calls == 1
     assert result.solver_attempted is True
-    assert result.heuristic_outcome is result.recommended_outcome
+    assert result.recommended_outcome is result.heuristic_outcome
     assert result.ortools_outcome is None
     assert result.comparison is None
     assert result.heuristic_outcome is not None
@@ -591,7 +591,7 @@ def test_canonical_redistribute_trips_path_invokes_the_real_solver() -> None:
     )
     assert result.selected_action == OptimizationAction.FIXED_RESOURCE_REDISTRIBUTION
     assert result.solver_attempted is True
-    assert result.heuristic_outcome is result.recommended_outcome
+    assert result.recommended_outcome is None
     assert result.ortools_outcome is None
     assert result.comparison is None
     assert result.heuristic_outcome is not None
@@ -604,7 +604,7 @@ def test_canonical_redistribute_trips_path_invokes_the_real_solver() -> None:
     assert result.heuristic_outcome.solution is None
 
 
-def test_valid_heuristic_candidate_is_accepted_only_through_independent_validation(
+def test_non_uniform_heuristic_candidate_is_rejected_by_independent_validation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     imported, options = _fixture()
@@ -631,10 +631,17 @@ def test_valid_heuristic_candidate_is_accepted_only_through_independent_validati
 
     assert validation_calls == 1
     assert result.solver_attempted is True
-    assert result.heuristic_outcome is result.recommended_outcome
+    assert result.recommended_outcome is None
     assert result.heuristic_outcome is not None
-    assert result.heuristic_outcome.result_status == GenerationResultStatus.SOLUTION_ACCEPTED
-    assert result.heuristic_outcome.solution is not None
+    assert (
+        result.heuristic_outcome.result_status
+        == GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR
+    )
+    assert result.heuristic_outcome.solution is None
+    assert result.heuristic_outcome.diagnostic_candidate is not None
+    assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in (
+        result.heuristic_outcome.diagnostic_candidate.rejection_codes
+    )
 
 
 def test_heuristic_unknown_remains_unknown_without_an_accepted_solution(
@@ -657,7 +664,7 @@ def test_heuristic_unknown_remains_unknown_without_an_accepted_solution(
     )
 
     assert result.solver_attempted is True
-    assert result.heuristic_outcome is result.recommended_outcome
+    assert result.recommended_outcome is None
     assert result.heuristic_outcome is not None
     assert result.heuristic_outcome.solver_status == NativeSolverStatus.UNKNOWN
     assert (
@@ -711,7 +718,7 @@ def test_corrupted_candidate_is_rejected_by_the_independent_validator(
     result = analyze_and_optimize_schedule_v1(imported, options)
 
     assert result.solver_attempted is True
-    assert result.heuristic_outcome is result.recommended_outcome
+    assert result.recommended_outcome is None
     assert result.heuristic_outcome is not None
     assert (
         result.heuristic_outcome.result_status

@@ -45,14 +45,20 @@ Contract V1 includes separate OR-Tools v9.15 CP-SAT adapters for one-route, fixe
 feasibility, directional demand-priority optimization, and service-quality optimization. The
 feasibility adapter remains an objective-free satisfaction model. Demand protection remains the
 highest optimization priority. The service-quality adapter then protects positive-demand service
-gaps, aligns fixed directional trips with passenger demand, and balances adjacent headways inside
-sustained service regimes; different legitimate demand regimes may use different headway levels.
+gaps, aligns fixed directional trips with exact rational passenger demand, and enforces exactly
+uniform headways inside each demand-derived sustained service regime. Headway remains adaptive
+between regimes; no route-wide fixed headway is imposed.
 All three adapters use canonical request builders and the independent validator. The unified
 application service now supports explicit `SolverChoice.HEURISTIC`, `OR_TOOLS`, and `BOTH` for
 fixed-resource actions, while the default remains `HEURISTIC`. `OR_TOOLS` selects the 15-stage
 service-quality adapter. `BOTH` independently validates both outcomes, recomputes the same
 transparent lexicographic objective vector for accepted solutions, and recommends one outcome
 without a weighted score. Streamlit does not yet expose this selection.
+
+Fleet feasibility evaluates route-vehicle circulation, turnaround, ready stock, and the total
+available fleet. It does not evaluate physical terminal parking or waiting-bay occupancy:
+`TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED`. No per-terminal physical capacity is supplied or
+enforced, so fleet feasibility must not be interpreted as terminal physical-occupancy feasibility.
 
 ## Supported today
 
@@ -71,8 +77,9 @@ without a weighted score. Streamlit does not yet expose this selection.
   validator.
 - Separate OR-Tools fixed-resource demand-priority solving for authoritative directional demand,
   covering no-service and overload protection before provisional B-preservation shift tie-breaks.
-- Separate OR-Tools fixed-resource service-quality solving for positive-demand gaps, proportional
-  directional-demand alignment, and regular headways within derived sustained service regimes.
+- Separate OR-Tools fixed-resource service-quality solving for positive-demand gaps, exact
+  rational directional-demand alignment, and hard uniform headways within derived sustained
+  service regimes, with solver-determined transition headways between regimes.
 - Unified fixed-resource solver selection with heuristic-only continuity by default, explicit
   15-stage OR-Tools service-quality solving, and transparent `BOTH` comparison of independently
   validated accepted solutions.
@@ -85,6 +92,8 @@ without a weighted score. Streamlit does not yet expose this selection.
 - A globally optimal timetable or a proof of infeasibility from the legacy heuristic.
 - Approval of the draft anonymized real-route corpus as a permanent regression baseline.
 - Variable-trip-count optimization.
+- Accepted zero-trip or one-trip headway regimes under the current public Contract V1 shape;
+  supporting those cases requires a separately authorized future Contract revision.
 - Production implementation of the deferred V1-A1 structural demand-response workflow.
 - Mixed fleets, multi-route interlining, deadhead, driver duties, depot pull-in/out, maintenance,
   or mature cross-midnight optimization.
@@ -119,8 +128,9 @@ Milestone 4C1 now includes two versioned, anonymized, real-route-derived fixture
 Overlapping raw trip-observation evidence is preserved separately from a LOW-confidence,
 departure-hour sensitivity proxy. Proxy values retain their exact 15-day
 `total_observation_period` classification, and Contract V1 derives daily demand using the
-15-day observation count. Coverage gaps or unsupported normalized precision prevent the
-diagnostic solvers from running.
+15-day observation count without rounding or truncation. Alpha now reaches real-route-derived
+LOW-confidence sensitivity characterization when the exact canonical request is constructible;
+Beta remains solver-free because its evidence has an unobserved interior hour.
 
 The corpus and solver characterization are drafts, not approved operational timetables or frozen
 solver regression expectations. UI, chart, and XLSX cutover remains blocked on corpus review and

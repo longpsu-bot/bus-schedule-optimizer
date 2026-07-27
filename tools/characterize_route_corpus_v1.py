@@ -19,14 +19,22 @@ from bus_schedule_engine.contracts_v1 import (
     DemandConfidence,
     GenerationResultStatus,
     ScenarioBEvaluationPolicyV1,
-    ScheduleProblemError,
     SolverPolicyV1,
     build_heuristic_schedule_request_v1,
     build_ortools_service_quality_request_v1,
     evaluate_scenario_b_v1,
     normalize_imported_workbook_v1,
-    recompute_service_quality_objective_vector_v1,
     run_schedule_solver_v1,
+)
+from bus_schedule_engine.contracts_v1.exact_demand_authority import (
+    _scale_exact_demand_authority,
+)
+from bus_schedule_engine.contracts_v1.regime_headway_policy import (
+    _analyze_regime_headways,
+    _derive_sustained_service_regimes,
+)
+from bus_schedule_engine.contracts_v1.service_quality_metrics import (
+    _recompute_service_quality_objective_vector_with_authority_v1,
 )
 from bus_schedule_engine.optimization_comparison import compare_solver_outcomes_v1
 
@@ -53,7 +61,7 @@ SENSITIVITY_POLICY = ScenarioBEvaluationPolicyV1(
 OPERATIONAL_STATUS = "DRAFT_NOT_OPERATIONALLY_APPROVED"
 SENSITIVITY_STATUS = "PROXY_SENSITIVITY_ONLY"
 NOT_RUN = "NOT_RUN"
-PRECISION_REASON = "QUALITY_REQUEST_UNREPRESENTABLE_DEMAND_PRECISION"
+TERMINAL_OCCUPANCY_LIMITATION = "TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED"
 
 
 class RecordingSolver:
@@ -172,6 +180,140 @@ def _solution_summary(solution: Any | None) -> dict[str, Any] | None:
     }
 
 
+def _regime_characterization(
+    *,
+    problem: Any,
+    candidate: Any | None,
+    exact_demand_authority: Any,
+    scaled_demand: Any,
+    solution: Any | None,
+) -> dict[str, Any]:
+    if candidate is None:
+        exact_by_block = {block.block_id: block for block in exact_demand_authority.blocks}
+        return {
+            "different_measurable_headways_observed": None,
+            "no_externally_fixed_headway_imposed": True,
+            "regimes": [
+                {
+                    "demand_blocks": [
+                        {
+                            "block_id": block_id,
+                            "denominator": exact_by_block[block_id].denominator,
+                            "numerator": exact_by_block[block_id].numerator,
+                            "scaled_integer_weight": (scaled_demand.weight_by_block_id[block_id]),
+                        }
+                        for block_id in regime.block_ids
+                    ],
+                    "direction": regime.direction.value,
+                    "end_time": regime.end_time,
+                    "endpoint_locks_binding": None,
+                    "fleet_limit_binding": None,
+                    "headway_measurable": None,
+                    "internal_headway_sequence": None,
+                    "maximum_internal_headway": None,
+                    "minimum_internal_headway": None,
+                    "regime_id": regime.regime_id,
+                    "solver_derived_headway": None,
+                    "start_time": regime.start_time,
+                    "status": "NO_SOLVER_CANDIDATE",
+                    "transition_headway_after": None,
+                    "transition_headway_before": None,
+                    "trip_count": None,
+                    "turnaround_binding": None,
+                }
+                for regime in _derive_sustained_service_regimes(problem)
+            ],
+            "uniformity_error_codes": [],
+        }
+
+    policy = _analyze_regime_headways(
+        problem,
+        candidate.exact_timetable,
+        enforce_candidate_labels=True,
+    )
+    exact_by_block = {block.block_id: block for block in exact_demand_authority.blocks}
+    endpoint_ids: dict[str, str] = {}
+    for direction in ("terminal_1_to_2", "terminal_2_to_1"):
+        directional = sorted(
+            (trip for trip in candidate.exact_timetable if trip.direction.value == direction),
+            key=lambda item: (item.c_departure_time, item.c_trip_id),
+        )
+        if directional:
+            endpoint_ids[direction + ":first"] = directional[0].c_trip_id
+            endpoint_ids[direction + ":last"] = directional[-1].c_trip_id
+
+    turnaround_binding_trip_ids: set[str] = set()
+    if solution is not None:
+        assignments_by_vehicle: dict[str, list[Any]] = {}
+        for assignment in solution.fleet_assignment:
+            assignments_by_vehicle.setdefault(assignment.vehicle_id, []).append(assignment)
+        for assignments in assignments_by_vehicle.values():
+            ordered = sorted(
+                assignments,
+                key=lambda item: (item.departure_time, item.c_trip_id),
+            )
+            for earlier, later in zip(ordered, ordered[1:], strict=False):
+                if earlier.ready_time == later.departure_time:
+                    turnaround_binding_trip_ids.update((earlier.c_trip_id, later.c_trip_id))
+
+    rows: list[dict[str, Any]] = []
+    measurable_headways: list[int] = []
+    for analysis in policy.analyses:
+        endpoint_locks = []
+        direction = analysis.regime.direction.value
+        if endpoint_ids.get(direction + ":first") in analysis.trip_ids:
+            endpoint_locks.append("FIRST_DEPARTURE")
+        if endpoint_ids.get(direction + ":last") in analysis.trip_ids:
+            endpoint_locks.append("LAST_DEPARTURE")
+        if analysis.exact_headway is not None:
+            measurable_headways.append(analysis.exact_headway)
+        rows.append(
+            {
+                "demand_blocks": [
+                    {
+                        "block_id": block_id,
+                        "denominator": exact_by_block[block_id].denominator,
+                        "numerator": exact_by_block[block_id].numerator,
+                        "scaled_integer_weight": (scaled_demand.weight_by_block_id[block_id]),
+                    }
+                    for block_id in analysis.regime.block_ids
+                ],
+                "direction": direction,
+                "end_time": analysis.regime.end_time,
+                "endpoint_locks_binding": endpoint_locks,
+                "fleet_limit_binding": (
+                    solution.minimum_required_fleet == solution.available_fleet_limit
+                    if solution is not None
+                    else None
+                ),
+                "headway_measurable": analysis.headway_measurable,
+                "internal_headway_sequence": list(analysis.internal_headways),
+                "maximum_internal_headway": analysis.maximum_internal_headway,
+                "minimum_internal_headway": analysis.minimum_internal_headway,
+                "regime_id": analysis.regime.regime_id,
+                "solver_derived_headway": analysis.exact_headway,
+                "start_time": analysis.regime.start_time,
+                "status": analysis.status,
+                "transition_headway_after": analysis.transition_headway_after,
+                "transition_headway_before": analysis.transition_headway_before,
+                "trip_count": len(analysis.trip_ids),
+                "turnaround_binding": (
+                    any(trip_id in turnaround_binding_trip_ids for trip_id in analysis.trip_ids)
+                    if solution is not None
+                    else None
+                ),
+            }
+        )
+    return {
+        "different_measurable_headways_observed": (
+            len(set(measurable_headways)) > 1 if measurable_headways else None
+        ),
+        "no_externally_fixed_headway_imposed": True,
+        "regimes": rows,
+        "uniformity_error_codes": list(policy.error_codes),
+    }
+
+
 def _benchmark_row(
     *,
     fixture_id: str,
@@ -182,14 +324,17 @@ def _benchmark_row(
     outcome: Any,
     comparison: Any,
     common_quality_problem: Any,
+    exact_demand_authority: Any,
+    scaled_demand: Any,
 ) -> dict[str, Any]:
     run = recorder.last_run
     candidate = run.candidate if run is not None else None
     solution = outcome.solution
     objective_vector = (
-        recompute_service_quality_objective_vector_v1(
+        _recompute_service_quality_objective_vector_with_authority_v1(
             common_quality_problem,
             solution,
+            exact_demand_authority,
         )
         if solution is not None
         and outcome.result_status == GenerationResultStatus.SOLUTION_ACCEPTED
@@ -279,6 +424,14 @@ def _benchmark_row(
             "worker_count": 1,
         },
         "sensitivity_status": SENSITIVITY_STATUS,
+        "exact_demand_authority_fingerprint": (exact_demand_authority.authority_fingerprint),
+        "regime_characterization": _regime_characterization(
+            problem=common_quality_problem,
+            candidate=candidate,
+            exact_demand_authority=exact_demand_authority,
+            scaled_demand=scaled_demand,
+            solution=solution,
+        ),
         "solution": _solution_summary(solution),
         "solution_fingerprint": (solution.solution_fingerprint if solution is not None else None),
         "solve_duration_seconds": outcome.solve_duration_seconds,
@@ -382,6 +535,7 @@ def characterize_fixture(
     if proxy["coverage_status"] == "PROXY_COVERAGE_INCOMPLETE":
         characterization = {
             "fixture_id": fixture["fixture_id"],
+            "limitations": [TERMINAL_OCCUPANCY_LIMITATION],
             "natural_unified_service": natural,
             "operational_status": OPERATIONAL_STATUS,
             "proxy_sensitivity_only": _not_run_sensitivity(
@@ -417,47 +571,12 @@ def characterize_fixture(
 
     normalized = normalize_imported_workbook_v1(imported, options)
     evaluation = evaluate_scenario_b_v1(normalized, SENSITIVITY_POLICY)
-    try:
-        quality_context, quality_solver = build_ortools_service_quality_request_v1(
-            normalized,
-            evaluation,
-            evaluation_policy=SENSITIVITY_POLICY,
-            solver_policy=ORTOOLS_POLICY,
-        )
-    except ScheduleProblemError as exc:
-        if "ORTOOLS_QUALITY_DEMAND_PRECISION_UNSUPPORTED" not in exc.codes:
-            raise
-        characterization = {
-            "fixture_id": fixture["fixture_id"],
-            "natural_unified_service": natural,
-            "operational_status": OPERATIONAL_STATUS,
-            "proxy_sensitivity_only": _not_run_sensitivity(
-                proxy=proxy,
-                reason_code=PRECISION_REASON,
-                limitations=[
-                    (
-                        "Exact total_observation_period values normalize to repeating daily "
-                        "decimals beyond the current six-decimal quality authority."
-                    ),
-                    (
-                        "This is a proxy data-representation limitation, not solver "
-                        "infeasibility, UNKNOWN, insufficient fleet, or failed optimization."
-                    ),
-                    "Neither canonical solver request was executed.",
-                ],
-                quality_request={
-                    "attempted": True,
-                    "builder_error_code": exc.code,
-                    "builder_error_codes": list(exc.codes),
-                    "constructed": False,
-                    "explanation": str(exc),
-                },
-            ),
-            "raw_trip_observation_policy": (
-                "PRESERVED_AS_EVIDENCE_NEVER_SUPPLIED_AS_CONTRACT_V1_DEMAND_INTERVALS"
-            ),
-        }
-        return characterization, []
+    quality_context, quality_solver = build_ortools_service_quality_request_v1(
+        normalized,
+        evaluation,
+        evaluation_policy=SENSITIVITY_POLICY,
+        solver_policy=ORTOOLS_POLICY,
+    )
 
     heuristic_context, heuristic_solver = build_heuristic_schedule_request_v1(
         normalized,
@@ -468,9 +587,19 @@ def characterize_fixture(
         ScenarioCConfig.from_mapping(imported.configuration),
         evaluation_policy=SENSITIVITY_POLICY,
     )
+    exact_demand_authority = quality_solver.exact_demand_authority
+    if exact_demand_authority is None:
+        raise RuntimeError("Canonical quality request omitted exact demand authority")
+    scaled_demand = _scale_exact_demand_authority(
+        exact_demand_authority,
+        quality_context.problem,
+    )
 
     benchmark_rows: list[dict[str, Any]] = []
     comparison_runs: list[dict[str, Any]] = []
+    heuristic_outcome = None
+    quality_outcome = None
+    comparison = None
     for marker in RUN_MARKERS:
         heuristic_recorder = RecordingSolver(heuristic_solver)
         quality_recorder = RecordingSolver(quality_solver)
@@ -486,6 +615,7 @@ def characterize_fixture(
             quality_context.problem,
             heuristic_outcome,
             quality_outcome,
+            exact_demand_authority=exact_demand_authority,
         )
         benchmark_rows.extend(
             (
@@ -498,6 +628,8 @@ def characterize_fixture(
                     outcome=heuristic_outcome,
                     comparison=comparison,
                     common_quality_problem=quality_context.problem,
+                    exact_demand_authority=exact_demand_authority,
+                    scaled_demand=scaled_demand,
                 ),
                 _benchmark_row(
                     fixture_id=fixture["fixture_id"],
@@ -508,6 +640,8 @@ def characterize_fixture(
                     outcome=quality_outcome,
                     comparison=comparison,
                     common_quality_problem=quality_context.problem,
+                    exact_demand_authority=exact_demand_authority,
+                    scaled_demand=scaled_demand,
                 ),
             )
         )
@@ -530,6 +664,7 @@ def characterize_fixture(
 
     characterization = {
         "fixture_id": fixture["fixture_id"],
+        "limitations": [TERMINAL_OCCUPANCY_LIMITATION],
         "natural_unified_service": natural,
         "operational_status": OPERATIONAL_STATUS,
         "proxy_sensitivity_only": {
@@ -539,9 +674,33 @@ def characterize_fixture(
             "coverage_status": proxy["coverage_status"],
             "demand_confidence": "LOW",
             "diagnostic_status": "RUN",
+            "exact_demand_authority": {
+                "blocks": [
+                    [block.block_id, block.numerator, block.denominator]
+                    for block in exact_demand_authority.blocks
+                ],
+                "fingerprint": exact_demand_authority.authority_fingerprint,
+                "problem_adapter_context_fingerprint": (
+                    quality_context.problem.adapter_context_fingerprint
+                ),
+                "scaling": {
+                    "common_denominator": scaled_demand.common_denominator,
+                    "global_reduction_gcd": scaled_demand.reduction_gcd,
+                    "global_weight_by_block_id": dict(
+                        sorted(scaled_demand.weight_by_block_id.items())
+                    ),
+                    "shared_across_both_directions": True,
+                },
+            },
+            "heuristic_outcome": _outcome_summary(heuristic_outcome),
             "heuristic_request": {"attempted": True, "constructed": True},
+            "limitations": [
+                "DRAFT sensitivity evidence only; no timetable is operationally approved.",
+                "No externally fixed headway was imposed.",
+            ],
             "minimum_accepted_confidence": "LOW",
             "operational_status": OPERATIONAL_STATUS,
+            "ortools_outcome": _outcome_summary(quality_outcome),
             "quality_request": {
                 "attempted": True,
                 "builder_error_code": None,
@@ -549,7 +708,16 @@ def characterize_fixture(
                 "constructed": True,
                 "explanation": None,
             },
+            "comparison": comparison_runs[-1],
             "reason_code": "COMPARISON_EXECUTED",
+            "recommendation": {
+                "reason_code": comparison.reason_code,
+                "recommended_solver": (
+                    comparison.recommended_solver.value
+                    if comparison.recommended_solver is not None
+                    else None
+                ),
+            },
             "repeatability": _repeatability(benchmark_rows),
             "status": SENSITIVITY_STATUS,
         },

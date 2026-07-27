@@ -149,7 +149,7 @@ def test_default_solver_remains_heuristic_and_calls_no_ortools_builder(
     assert result.heuristic_outcome is outcome
     assert result.ortools_outcome is None
     assert result.comparison is None
-    assert result.recommended_outcome is outcome
+    assert result.recommended_outcome is None
 
 
 def test_ortools_calls_only_the_quality_builder_and_never_falls_back(
@@ -200,7 +200,7 @@ def test_ortools_calls_only_the_quality_builder_and_never_falls_back(
     assert result.heuristic_outcome is None
     assert result.ortools_outcome is outcome
     assert result.comparison is None
-    assert result.recommended_outcome is outcome
+    assert result.recommended_outcome is None
 
 
 def test_ortools_quality_builder_failure_precedes_solver_invocation(
@@ -653,7 +653,7 @@ def test_first_differing_objective_is_disclosed(
     assert both.ortools_outcome is not None
     assert both.heuristic_outcome.solution is not None
     heuristic_vector = (0, 0, 2, *(0 for _ in range(12)))
-    ortools_vector = (0, 0, 1, *(9 for _ in range(12)))
+    ortools_vector = (0, 0, 1, *(0 for _ in range(12)))
 
     monkeypatch.setattr(
         comparison_module,

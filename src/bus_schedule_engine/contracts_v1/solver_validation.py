@@ -30,6 +30,13 @@ from .models import (
     ScenarioId,
 )
 from .problem_validation import validate_schedule_generation_context_v1
+from .regime_headway_policy import (
+    HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1,
+    _analyze_regime_headways,
+    _headway_regime_representability_error_codes,
+    _RegimeHeadwayAnalysis,
+    _RegimeHeadwayPolicyError,
+)
 from .serialization import canonical_sha256
 from .solver_fingerprints import candidate_fingerprint, solution_fingerprint_payload
 from .solver_models import (
@@ -70,6 +77,7 @@ class _DerivedTripFacts:
 @dataclass(frozen=True, slots=True)
 class _ReconciledRegime:
     raw: RawHeadwayRegimeV1
+    authority: _RegimeHeadwayAnalysis | None
     members: tuple[RawCandidateTripV1, ...]
     actual_headway_sequence: tuple[int, ...]
     regularity_status: str
@@ -155,16 +163,6 @@ def _derive_trip_facts(
     return facts, errors
 
 
-def _regularity_status(actual: tuple[int, ...]) -> str:
-    if any(item == 0 for item in actual):
-        return "EXCEPTIONAL"
-    if not actual or max(actual) == min(actual):
-        return "REGULAR"
-    if max(actual) - min(actual) <= 1:
-        return "BALANCED_ROUNDING"
-    return "EXCEPTIONAL"
-
-
 def _sequence_matches(
     claim: tuple[float, ...],
     expected: tuple[int, ...],
@@ -174,7 +172,17 @@ def _sequence_matches(
     )
 
 
-def _reconcile_regimes(
+def _legacy_regularity_status(actual: tuple[int, ...]) -> str:
+    if any(item == 0 for item in actual):
+        return "EXCEPTIONAL"
+    if not actual or max(actual) == min(actual):
+        return "REGULAR"
+    if max(actual) - min(actual) <= 1:
+        return "BALANCED_ROUNDING"
+    return "EXCEPTIONAL"
+
+
+def _reconcile_legacy_regimes(
     candidate: RawScheduleCandidateV1,
 ) -> tuple[tuple[_ReconciledRegime, ...], list[str]]:
     errors: list[str] = []
@@ -210,7 +218,6 @@ def _reconcile_regimes(
             errors.append("HEADWAY_REGIME_END_MISMATCH")
         if regime.trip_count != len(members):
             errors.append("HEADWAY_REGIME_TRIP_COUNT_MISMATCH")
-
         gaps_seconds = tuple(
             right.c_departure_time - left.c_departure_time
             for left, right in zip(members, members[1:], strict=False)
@@ -229,16 +236,96 @@ def _reconcile_regimes(
             or regime.target_headway <= 0
         ):
             errors.append("INVALID_HEADWAY_REGIME_TARGET")
-
         if whole_minute_sequence:
             reconciled.append(
                 _ReconciledRegime(
                     raw=regime,
+                    authority=None,
                     members=members,
                     actual_headway_sequence=actual,
-                    regularity_status=_regularity_status(actual),
+                    regularity_status=_legacy_regularity_status(actual),
                 )
             )
+    return tuple(reconciled), errors
+
+
+def _reconcile_regimes(
+    problem: ScheduleProblemV1,
+    candidate: RawScheduleCandidateV1,
+) -> tuple[tuple[_ReconciledRegime, ...], list[str]]:
+    if problem.solver_adapter not in {
+        "legacy_heuristic_v1",
+        "ortools_cp_sat_quality_v1",
+    }:
+        return _reconcile_legacy_regimes(candidate)
+    errors: list[str] = []
+    regime_id_counts = Counter(item.regime_id for item in candidate.headway_regimes)
+    if any(count > 1 for count in regime_id_counts.values()):
+        errors.append("DUPLICATE_HEADWAY_REGIME_ID")
+    try:
+        policy = _analyze_regime_headways(
+            problem,
+            candidate.exact_timetable,
+            enforce_candidate_labels=True,
+        )
+    except _RegimeHeadwayPolicyError as exc:
+        return (), [exc.code]
+    errors.extend(policy.error_codes)
+    errors.extend(_headway_regime_representability_error_codes(policy))
+    expected_ids = {regime.regime_id for regime in policy.regimes}
+    reported_ids = set(regime_id_counts)
+    if reported_ids != expected_ids:
+        if expected_ids - reported_ids:
+            errors.append("MISSING_HEADWAY_REGIMES")
+        if reported_ids - expected_ids:
+            errors.append("UNKNOWN_HEADWAY_REGIME_REFERENCE")
+    raw_by_id = {
+        regime.regime_id: regime
+        for regime in candidate.headway_regimes
+        if regime_id_counts[regime.regime_id] == 1
+    }
+    trip_by_id = {trip.c_trip_id: trip for trip in candidate.exact_timetable}
+
+    reconciled: list[_ReconciledRegime] = []
+    for analysis in policy.analyses:
+        regime = raw_by_id.get(analysis.regime.regime_id)
+        if regime is None:
+            continue
+        members = tuple(trip_by_id[trip_id] for trip_id in analysis.trip_ids)
+        if any(item.direction != regime.direction for item in members):
+            errors.append("HEADWAY_REGIME_DIRECTION_MISMATCH")
+        if regime.direction != analysis.regime.direction:
+            errors.append("HEADWAY_REGIME_DIRECTION_MISMATCH")
+        expected_start = members[0].c_departure_time if members else analysis.regime.start_time
+        expected_end = members[-1].c_departure_time if members else analysis.regime.end_time
+        if regime.start_time != expected_start:
+            errors.append("HEADWAY_REGIME_START_MISMATCH")
+        if regime.end_time != expected_end:
+            errors.append("HEADWAY_REGIME_END_MISMATCH")
+        if regime.trip_count != len(members):
+            errors.append("HEADWAY_REGIME_TRIP_COUNT_MISMATCH")
+        actual = analysis.internal_headways
+        if not _sequence_matches(
+            regime.actual_headway_sequence,
+            actual,
+        ):
+            errors.append("HEADWAY_REGIME_SEQUENCE_MISMATCH")
+        expected_target = float(analysis.exact_headway or 0)
+        if not _numeric_matches(regime.target_headway, expected_target):
+            errors.append("INVALID_HEADWAY_REGIME_TARGET")
+        if regime.boundary_reason != "MATERIAL_FREQUENCY_CHANGE":
+            errors.append("HEADWAY_REGIME_BOUNDARY_AUTHORITY_MISMATCH")
+        if regime.legacy_regularity_status != analysis.status:
+            errors.append("HEADWAY_REGIME_STATUS_MISMATCH")
+        reconciled.append(
+            _ReconciledRegime(
+                raw=regime,
+                authority=analysis,
+                members=members,
+                actual_headway_sequence=actual,
+                regularity_status=analysis.status,
+            )
+        )
     return tuple(reconciled), errors
 
 
@@ -393,42 +480,144 @@ def _solution_regimes(
     problem: ScheduleProblemV1,
     reconciled_regimes: tuple[_ReconciledRegime, ...],
 ) -> tuple[SolutionHeadwayRegimeV1, ...]:
-    blocks = problem.analysis_blocks
     output: list[SolutionHeadwayRegimeV1] = []
     for reconciled in reconciled_regimes:
         regime = reconciled.raw
-        covered = tuple(
-            block.block_id
-            for block in blocks
-            if (
-                block.direction == ContractDirection.COMBINED or block.direction == regime.direction
-            )
-            and any(
-                block.start_time <= member.c_departure_time < block.end_time
-                for member in reconciled.members
-            )
-        ) or ("OUTSIDE_DEMAND_COVERAGE",)
+        analysis = reconciled.authority
         actual = reconciled.actual_headway_sequence
+        if analysis is None:
+            covered = tuple(
+                block.block_id
+                for block in problem.analysis_blocks
+                if (
+                    block.direction == ContractDirection.COMBINED
+                    or block.direction == regime.direction
+                )
+                and any(
+                    block.start_time <= member.c_departure_time < block.end_time
+                    for member in reconciled.members
+                )
+            ) or ("OUTSIDE_DEMAND_COVERAGE",)
+            output.append(
+                SolutionHeadwayRegimeV1(
+                    regime_id=regime.regime_id,
+                    direction=regime.direction,
+                    start_time=reconciled.members[0].c_departure_time,
+                    end_time=reconciled.members[-1].c_departure_time,
+                    covered_analysis_blocks=covered,
+                    trip_count=len(reconciled.members),
+                    target_service_rate=60 / regime.target_headway,
+                    target_headway=regime.target_headway,
+                    actual_headway_sequence=actual,
+                    transition_headways=(),
+                    exceptional_headways=(
+                        actual if reconciled.regularity_status == "EXCEPTIONAL" else ()
+                    ),
+                    boundary_reason=regime.boundary_reason,
+                    regularity_status=reconciled.regularity_status,
+                )
+            )
+            continue
+        if (
+            not analysis.headway_measurable
+            or analysis.status != "UNIFORM"
+            or analysis.exact_headway is None
+            or analysis.exact_headway <= 0
+        ):
+            raise AssertionError(
+                "Unrepresentable authoritative regime reached accepted solution construction"
+            )
+        transition_headways = tuple(
+            value
+            for value in (
+                analysis.transition_headway_before,
+                analysis.transition_headway_after,
+            )
+            if value is not None
+        )
+        target = float(analysis.exact_headway)
         output.append(
             SolutionHeadwayRegimeV1(
                 regime_id=regime.regime_id,
                 direction=regime.direction,
-                start_time=reconciled.members[0].c_departure_time,
-                end_time=reconciled.members[-1].c_departure_time,
-                covered_analysis_blocks=covered,
+                start_time=regime.start_time,
+                end_time=regime.end_time,
+                covered_analysis_blocks=analysis.regime.block_ids,
                 trip_count=len(reconciled.members),
-                target_service_rate=60 / regime.target_headway,
-                target_headway=regime.target_headway,
+                target_service_rate=60 / target,
+                target_headway=target,
                 actual_headway_sequence=actual,
-                transition_headways=(),
+                transition_headways=transition_headways,
                 exceptional_headways=(
-                    actual if reconciled.regularity_status == "EXCEPTIONAL" else ()
+                    actual if reconciled.regularity_status == "INVALID_NON_UNIFORM" else ()
                 ),
                 boundary_reason=regime.boundary_reason,
-                regularity_status=reconciled.regularity_status,
+                regularity_status=(
+                    "REGULAR" if reconciled.regularity_status == "UNIFORM" else "TRANSITION"
+                ),
             )
         )
     return tuple(output)
+
+
+def _solution_headway_regime_integrity_errors(
+    solution_trips: tuple[SolutionTripV1, ...],
+    solution_regimes: tuple[SolutionHeadwayRegimeV1, ...],
+    *,
+    authoritative_regime_ids: frozenset[str] | None,
+) -> tuple[str, ...]:
+    errors: set[str] = set()
+    regime_id_counts = Counter(regime.regime_id for regime in solution_regimes)
+    if any(count > 1 for count in regime_id_counts.values()):
+        errors.add("SOLUTION_HEADWAY_REGIME_REFERENCE_DUPLICATE")
+
+    regimes_by_id: dict[str, list[SolutionHeadwayRegimeV1]] = {}
+    for regime in solution_regimes:
+        regimes_by_id.setdefault(regime.regime_id, []).append(regime)
+
+    trips_by_regime_id: dict[str, list[SolutionTripV1]] = {}
+    for trip in solution_trips:
+        trips_by_regime_id.setdefault(trip.headway_regime_id, []).append(trip)
+        matches = regimes_by_id.get(trip.headway_regime_id, [])
+        if not matches:
+            errors.add("SOLUTION_HEADWAY_REGIME_REFERENCE_MISSING")
+            continue
+        if len(matches) > 1:
+            errors.add("SOLUTION_HEADWAY_REGIME_REFERENCE_DUPLICATE")
+            continue
+        if matches[0].direction != trip.direction:
+            errors.add("SOLUTION_HEADWAY_REGIME_DIRECTION_MISMATCH")
+
+    for regime in solution_regimes:
+        members = trips_by_regime_id.get(regime.regime_id, [])
+        if not members:
+            errors.add("SOLUTION_HEADWAY_REGIME_ORPHANED")
+        elif any(member.direction != regime.direction for member in members):
+            errors.add("SOLUTION_HEADWAY_REGIME_DIRECTION_MISMATCH")
+
+    if authoritative_regime_ids is not None:
+        emitted_ids = frozenset(regime_id_counts)
+        referenced_ids = frozenset(trip.headway_regime_id for trip in solution_trips)
+        if emitted_ids != authoritative_regime_ids or referenced_ids != authoritative_regime_ids:
+            errors.add("SOLUTION_HEADWAY_REGIME_AUTHORITY_MISMATCH")
+
+    return tuple(sorted(errors))
+
+
+def _candidate_rejection_summary(rejection_codes: tuple[str, ...]) -> str:
+    if HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1 in rejection_codes:
+        if "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in rejection_codes:
+            return (
+                "Candidate violates exact within-regime uniformity and contains an "
+                "authoritative regime that cannot be represented faithfully in Contract V1."
+            )
+        return (
+            "Candidate contains a zero-trip or one-trip authoritative regime whose "
+            "headway is not measurable and cannot be represented faithfully in Contract V1."
+        )
+    if any(code.startswith("SOLUTION_HEADWAY_REGIME_") for code in rejection_codes):
+        return "Candidate failed accepted-solution headway-regime referential integrity."
+    return "Candidate failed independent Contract V1 validation."
 
 
 def _stock_events(events) -> tuple[StockProfileEventV1, ...]:
@@ -519,7 +708,7 @@ def validate_and_build_solution_v1(
     rejection_codes.extend(_source_lock_errors(problem, candidate))
     derived_trip_facts, trip_fact_errors = _derive_trip_facts(problem, candidate)
     rejection_codes.extend(trip_fact_errors)
-    reconciled_regimes, regime_errors = _reconcile_regimes(candidate)
+    reconciled_regimes, regime_errors = _reconcile_regimes(problem, candidate)
     rejection_codes.extend(regime_errors)
     if candidate.solver_status not in {
         NativeSolverStatus.OPTIMAL,
@@ -576,7 +765,7 @@ def validate_and_build_solution_v1(
         return CandidateValidationResultV1(
             status=CandidateValidationStatus.REJECTED,
             rejection_codes=codes,
-            summary="Candidate failed independent Contract V1 validation.",
+            summary=_candidate_rejection_summary(codes),
             fleet_assessment=fleet,
             solution=None,
         )
@@ -602,6 +791,29 @@ def validate_and_build_solution_v1(
         for trip in candidate.exact_timetable
     )
     fleet_assignments = assignments.assignments
+    solution_regimes = _solution_regimes(problem, reconciled_regimes)
+    authoritative_regime_ids = (
+        frozenset(
+            reconciled.authority.regime.regime_id
+            for reconciled in reconciled_regimes
+            if reconciled.authority is not None
+        )
+        if any(reconciled.authority is not None for reconciled in reconciled_regimes)
+        else None
+    )
+    integrity_errors = _solution_headway_regime_integrity_errors(
+        solution_trips,
+        solution_regimes,
+        authoritative_regime_ids=authoritative_regime_ids,
+    )
+    if integrity_errors:
+        return CandidateValidationResultV1(
+            status=CandidateValidationStatus.REJECTED,
+            rejection_codes=integrity_errors,
+            summary=_candidate_rejection_summary(integrity_errors),
+            fleet_assessment=fleet,
+            solution=None,
+        )
     block_supply = _candidate_block_supply(context, candidate)
     block_evaluation = tuple(
         BlockEvaluationV1(
@@ -623,7 +835,7 @@ def validate_and_build_solution_v1(
         source_b_fingerprint=problem.source_b_fingerprint,
         operating_parameter_locks=problem.operating_parameter_locks,
         c_block_supply_plan=block_supply,
-        c_headway_regimes=_solution_regimes(problem, reconciled_regimes),
+        c_headway_regimes=solution_regimes,
         c_exact_timetable=solution_trips,
         fleet_assignment=fleet_assignments,
         available_fleet_limit=b.available_fleet_limit,
@@ -658,6 +870,19 @@ def validate_and_build_solution_v1(
             "solver_determined initial positioning only.",
         ),
     )
+    final_integrity_errors = _solution_headway_regime_integrity_errors(
+        provisional.c_exact_timetable,
+        provisional.c_headway_regimes,
+        authoritative_regime_ids=authoritative_regime_ids,
+    )
+    if final_integrity_errors:
+        return CandidateValidationResultV1(
+            status=CandidateValidationStatus.REJECTED,
+            rejection_codes=final_integrity_errors,
+            summary=_candidate_rejection_summary(final_integrity_errors),
+            fleet_assessment=fleet,
+            solution=None,
+        )
     solution = replace(
         provisional,
         solution_fingerprint=canonical_sha256(

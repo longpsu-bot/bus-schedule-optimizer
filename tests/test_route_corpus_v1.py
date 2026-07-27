@@ -33,7 +33,7 @@ from bus_schedule_engine.contracts_v1 import (
     BDisposition,
     DemandConfidence,
     ScenarioBEvaluationPolicyV1,
-    ScheduleProblemError,
+    SolverPolicyV1,
     build_ortools_service_quality_request_v1,
     evaluate_scenario_b_v1,
 )
@@ -86,6 +86,8 @@ HISTORICAL_SHEETS = {
 REPORT_PATH = (
     Path(__file__).parents[1] / "docs" / "engine" / "ROUTE_CORPUS_CHARACTERIZATION_DRAFT_V1.md"
 )
+README_PATH = Path(__file__).parents[1] / "README.md"
+TERMINAL_OCCUPANCY_LIMITATION = "TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED"
 
 
 def _private_root() -> Path | None:
@@ -96,6 +98,18 @@ def _private_root() -> Path | None:
 def _minutes(value: str) -> int:
     hour, minute = (int(part) for part in value.split(":"))
     return hour * 60 + minute
+
+
+def _nested_keys(value) -> list[str]:
+    keys: list[str] = []
+    if isinstance(value, dict):
+        for key, item in value.items():
+            keys.append(str(key).lower())
+            keys.extend(_nested_keys(item))
+    elif isinstance(value, list):
+        for item in value:
+            keys.extend(_nested_keys(item))
+    return keys
 
 
 def _canonical_bytes(payload: dict[str, object]) -> bytes:
@@ -585,34 +599,35 @@ def test_natural_default_policy_characterization_attempts_no_solver(
     assert result.comparison is None
 
 
-def test_complete_proxy_precision_rejection_prevents_both_solver_paths(
+def test_complete_proxy_constructs_both_requests_with_exact_authority(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def unexpected(*args, **kwargs):
-        raise AssertionError("No solver or heuristic request may run without a quality problem")
-
-    monkeypatch.setattr(characterizer, "build_heuristic_schedule_request_v1", unexpected)
-    monkeypatch.setattr(characterizer, "run_schedule_solver_v1", unexpected)
+    monkeypatch.setattr(characterizer, "RUN_MARKERS", ("COLD",))
+    monkeypatch.setattr(
+        characterizer,
+        "ORTOOLS_POLICY",
+        SolverPolicyV1(time_limit_seconds=0.01, worker_count=1, random_seed=0),
+    )
     summary, benchmark_rows = characterizer.characterize_fixture("corpus_alpha_80.json")
     diagnostic = summary["proxy_sensitivity_only"]
 
     assert diagnostic["coverage_status"] == "COMPLETE"
-    assert diagnostic["diagnostic_status"] == "NOT_RUN"
-    assert diagnostic["reason_code"] == ("QUALITY_REQUEST_UNREPRESENTABLE_DEMAND_PRECISION")
+    assert diagnostic["diagnostic_status"] == "RUN"
+    assert diagnostic["reason_code"] == "COMPARISON_EXECUTED"
     assert diagnostic["quality_request"]["attempted"] is True
-    assert diagnostic["quality_request"]["constructed"] is False
-    assert diagnostic["quality_request"]["builder_error_code"] == (
-        "ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY"
-    )
-    assert (
-        "ORTOOLS_QUALITY_DEMAND_PRECISION_UNSUPPORTED"
-        in (diagnostic["quality_request"]["builder_error_codes"])
-    )
-    assert diagnostic["heuristic_outcome"] is None
-    assert diagnostic["ortools_outcome"] is None
-    assert diagnostic["comparison"] is None
-    assert diagnostic["recommendation"] is None
-    assert benchmark_rows == []
+    assert diagnostic["quality_request"]["constructed"] is True
+    assert diagnostic["heuristic_request"]["constructed"] is True
+    authority = diagnostic["exact_demand_authority"]
+    assert authority["fingerprint"] == authority["problem_adapter_context_fingerprint"]
+    assert ["DB-INBOUND-0001", 146, 15] in authority["blocks"]
+    assert ["DB-OUTBOUND-0001", 88, 5] in authority["blocks"]
+    assert authority["scaling"]["shared_across_both_directions"] is True
+    assert len(benchmark_rows) == 2
+    assert {row["solver"] for row in benchmark_rows} == {"HEURISTIC", "OR_TOOLS"}
+    assert all("objective_vector" in row for row in benchmark_rows)
+    assert "recommended_solver" in diagnostic["recommendation"]
+    assert summary["limitations"] == [TERMINAL_OCCUPANCY_LIMITATION]
+    assert json.dumps(summary).count(TERMINAL_OCCUPANCY_LIMITATION) == 1
 
 
 def test_incomplete_proxy_prevents_quality_construction_and_solver_invocation(
@@ -640,24 +655,29 @@ def test_incomplete_proxy_prevents_quality_construction_and_solver_invocation(
     assert diagnostic["comparison"] is None
     assert diagnostic["recommendation"] is None
     assert benchmark_rows == []
+    assert summary["limitations"] == [TERMINAL_OCCUPANCY_LIMITATION]
+    assert json.dumps(summary).count(TERMINAL_OCCUPANCY_LIMITATION) == 1
 
 
-def test_canonical_quality_builder_exposes_exact_precision_error() -> None:
+def test_canonical_quality_builder_preserves_repeating_exact_demand() -> None:
     normalized = normalized_bundle_from_fixture(load_corpus_fixture("corpus_alpha_80.json"))
     policy = ScenarioBEvaluationPolicyV1(
         minimum_authoritative_demand_confidence=DemandConfidence.LOW
     )
     evaluation = evaluate_scenario_b_v1(normalized, policy)
 
-    with pytest.raises(ScheduleProblemError) as caught:
-        build_ortools_service_quality_request_v1(
-            normalized,
-            evaluation,
-            evaluation_policy=policy,
-        )
+    context, solver = build_ortools_service_quality_request_v1(
+        normalized,
+        evaluation,
+        evaluation_policy=policy,
+    )
 
-    assert caught.value.code == "ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY"
-    assert "ORTOOLS_QUALITY_DEMAND_PRECISION_UNSUPPORTED" in caught.value.codes
+    assert solver.exact_demand_authority is not None
+    authority = solver.exact_demand_authority
+    exact = {block.block_id: (block.numerator, block.denominator) for block in authority.blocks}
+    assert exact["DB-INBOUND-0001"] == (146, 15)
+    assert exact["DB-OUTBOUND-0001"] == (88, 5)
+    assert context.problem.adapter_context_fingerprint == authority.authority_fingerprint
 
 
 @pytest.mark.parametrize("filename", FIXTURE_FILES)
@@ -787,6 +807,47 @@ def test_draft_report_discards_invalid_average_day_characterization() -> None:
     assert "unscaled 15-day" not in report
     assert "TOTAL_OBSERVATION_PERIOD" in report
     assert "observation_days=15" in report
+
+
+def test_terminal_occupancy_limitation_is_explicit_without_invented_capacity() -> None:
+    report = REPORT_PATH.read_text(encoding="utf-8")
+    readme = README_PATH.read_text(encoding="utf-8")
+    required_explanation = """TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED
+
+The current fleet model evaluates route-vehicle availability, circulation,
+turnaround and ready stock. It does not evaluate the maximum number of vehicles
+that may be physically present or waiting at either terminal. Fleet feasibility
+must not be interpreted as terminal physical-occupancy feasibility."""
+
+    assert required_explanation in report
+    assert TERMINAL_OCCUPANCY_LIMITATION in readme
+    assert "fleet feasibility must not be interpreted as terminal physical-occupancy" in (
+        readme.lower()
+    )
+
+    for filename in FIXTURE_FILES:
+        fixture = load_corpus_fixture(filename)
+        keys = _nested_keys(fixture)
+        assert not any("occupancy" in key for key in keys)
+        assert not any("terminal" in key and "capacity" in key for key in keys)
+
+    public_contract_text = "\n".join(
+        (
+            (
+                Path(__file__).parents[1]
+                / "src"
+                / "bus_schedule_engine"
+                / "contracts_v1"
+                / "solver_models.py"
+            ).read_text(encoding="utf-8"),
+            *(
+                path.read_text(encoding="utf-8")
+                for path in (Path(__file__).parents[1] / "contracts" / "v1").glob("*.json")
+            ),
+        )
+    ).lower()
+    assert "terminal_occupancy" not in public_contract_text
+    assert "terminal_capacity" not in public_contract_text
 
 
 @pytest.mark.parametrize("filename", FIXTURE_FILES)

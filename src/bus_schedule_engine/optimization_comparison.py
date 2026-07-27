@@ -14,6 +14,10 @@ from .contracts_v1 import (
     ScheduleSolutionV1,
     recompute_service_quality_objective_vector_v1,
 )
+from .contracts_v1.exact_demand_authority import _ExactDemandAuthority
+from .contracts_v1.service_quality_metrics import (
+    _recompute_service_quality_objective_vector_with_authority_v1,
+)
 
 if TYPE_CHECKING:
     from .optimization_service import SolverChoice
@@ -60,6 +64,30 @@ def _eligible_solution(
     ):
         return None
     return outcome.solution
+
+
+def _eligible_vector(
+    problem: ScheduleProblemV1,
+    solution: ScheduleSolutionV1 | None,
+    exact_demand_authority: _ExactDemandAuthority | None,
+) -> tuple[int, ...] | None:
+    if solution is None:
+        return None
+    try:
+        vector = (
+            recompute_service_quality_objective_vector_v1(problem, solution)
+            if exact_demand_authority is None
+            else _recompute_service_quality_objective_vector_with_authority_v1(
+                problem,
+                solution,
+                exact_demand_authority,
+            )
+        )
+    except (TypeError, ValueError):
+        return None
+    if vector[8] != 0 or vector[9] != 0:
+        return None
+    return vector
 
 
 def _first_difference(
@@ -116,6 +144,8 @@ def compare_solver_outcomes_v1(
     problem: ScheduleProblemV1,
     heuristic_outcome: ScheduleGenerationOutcomeV1,
     ortools_outcome: ScheduleGenerationOutcomeV1,
+    *,
+    exact_demand_authority: _ExactDemandAuthority | None = None,
 ) -> SolverComparisonV1:
     """Compare eligible accepted solutions under one canonical quality problem."""
 
@@ -128,18 +158,18 @@ def compare_solver_outcomes_v1(
 
     heuristic_solution = _eligible_solution(heuristic_outcome)
     ortools_solution = _eligible_solution(ortools_outcome)
-    heuristic_vector = (
-        recompute_service_quality_objective_vector_v1(problem, heuristic_solution)
-        if heuristic_solution is not None
-        else None
+    heuristic_vector = _eligible_vector(
+        problem,
+        heuristic_solution,
+        exact_demand_authority,
     )
-    ortools_vector = (
-        recompute_service_quality_objective_vector_v1(problem, ortools_solution)
-        if ortools_solution is not None
-        else None
+    ortools_vector = _eligible_vector(
+        problem,
+        ortools_solution,
+        exact_demand_authority,
     )
     ortools_optimality_proven = bool(
-        ortools_solution is not None and ortools_outcome.solver_status == NativeSolverStatus.OPTIMAL
+        ortools_vector is not None and ortools_outcome.solver_status == NativeSolverStatus.OPTIMAL
     )
 
     if heuristic_vector is None and ortools_vector is None:
