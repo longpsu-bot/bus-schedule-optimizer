@@ -10,6 +10,11 @@ import ortools
 from ortools.sat.python import cp_model
 
 from .evaluation import ScenarioBEvaluationBundleV1, ScenarioBEvaluationPolicyV1
+from .exact_demand_authority import (
+    _build_exact_demand_authority,
+    _ExactDemandAuthority,
+    _ExactDemandAuthorityError,
+)
 from .models import ContractDirection, NormalizedInputBundleV1
 from .ortools_solver import (
     _adapter_capability_issues,
@@ -22,21 +27,24 @@ from .ortools_solver import (
     _map_cp_sat_status,
     _ordered_directional_trips,
     _previous_headways,
-    _regularity_status,
     _solver_controls,
+)
+from .regime_headway_policy import (
+    _authoritative_candidate_payload,
+    _derive_sustained_service_regimes,
+    _RegimeHeadwayPolicyError,
+    _SustainedServiceRegime,
 )
 from .service_quality_metrics import (
     SERVICE_QUALITY_OBJECTIVE_NAMES_V1 as _QUALITY_OBJECTIVE_NAMES,
 )
 from .service_quality_metrics import (
-    _derive_sustained_service_regimes,
     _QualityModelError,
-    _regime_for_departure,
+    _recompute_service_quality_objective_vector_with_authority_v1,
     _scaled_directional_demand,
-    _SustainedServiceRegime,
 )
 from .service_quality_metrics import (
-    recompute_service_quality_objective_vector_v1 as _recompute_service_quality_objective_vector_v1,
+    recompute_service_quality_objective_vector_v1 as _recompute_service_quality_objective_vector_v1,  # noqa: F401
 )
 from .solver_fingerprints import candidate_fingerprint
 from .solver_models import (
@@ -46,7 +54,6 @@ from .solver_models import (
     InitialFleetPositioningMode,
     NativeSolverStatus,
     RawCandidateTripV1,
-    RawHeadwayRegimeV1,
     RawScheduleCandidateV1,
     ScheduleGenerationContextV1,
     ScheduleProblemV1,
@@ -58,33 +65,39 @@ from .solver_problem import (
     ScheduleProblemError,
     build_schedule_generation_context_v1,
     build_schedule_problem_v1,
-    empty_adapter_context_fingerprint,
 )
 
 ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY = (
     "ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY"
 )
-_QUALITY_BOUNDARY_REASON = "SUSTAINED_DIRECTIONAL_SERVICE_RATE"
-_SINGLETON_TARGET_HEADWAY_MINUTES = 1.0
+ORTOOLS_QUALITY_EXACT_DEMAND_CONTEXT_MISMATCH = "ORTOOLS_QUALITY_EXACT_DEMAND_CONTEXT_MISMATCH"
 
 
 @dataclass(frozen=True, slots=True)
 class _QualityCpSatModelBundle:
     demand: _DemandCpSatModelBundle
     regimes: tuple[_SustainedServiceRegime, ...]
+    regime_headway_by_id: dict[str, cp_model.IntVar]
+    exact_demand_authority: _ExactDemandAuthority | None
     stages: tuple[_DemandObjectiveStage, ...]
 
 
-def _quality_problem_authority_issues(problem: ScheduleProblemV1) -> tuple[str, ...]:
+def _quality_problem_authority_issues(
+    problem: ScheduleProblemV1,
+    exact_demand_authority: _ExactDemandAuthority | None = None,
+) -> tuple[str, ...]:
     demand_issues = list(_demand_problem_authority_issues(problem))
     if demand_issues and demand_issues[0].endswith("REQUIRES_DIRECTIONAL_AUTHORITY"):
         demand_issues = demand_issues[1:]
     issues = demand_issues
-    for check in (_scaled_directional_demand, _derive_sustained_service_regimes):
-        try:
-            check(problem)
-        except _QualityModelError as exc:
-            issues.append(exc.code)
+    try:
+        _scaled_directional_demand(problem, exact_demand_authority)
+    except _QualityModelError as exc:
+        issues.append(exc.code)
+    try:
+        _derive_sustained_service_regimes(problem)
+    except _RegimeHeadwayPolicyError as exc:
+        issues.append(exc.code)
     deduplicated = tuple(dict.fromkeys(issues))
     if not deduplicated:
         return ()
@@ -161,13 +174,16 @@ def _first_or_last_member(
     return result
 
 
-def _build_quality_cp_sat_model(problem: ScheduleProblemV1) -> _QualityCpSatModelBundle:
+def _build_quality_cp_sat_model(
+    problem: ScheduleProblemV1,
+    exact_demand_authority: _ExactDemandAuthority | None = None,
+) -> _QualityCpSatModelBundle:
     demand = _build_demand_cp_sat_model(problem)
     model = demand.hard.model
     directional = _ordered_directional_trips(problem)
     requirements = {item.block_id: item for item in problem.block_requirements}
     regimes = _derive_sustained_service_regimes(problem)
-    scaled_demand = _scaled_directional_demand(problem)
+    scaled_demand = _scaled_directional_demand(problem, exact_demand_authority)
 
     headway_by_direction: dict[ContractDirection, list[cp_model.IntVar]] = {}
     active_positive_headways: list[cp_model.IntVar] = []
@@ -386,6 +402,39 @@ def _build_quality_cp_sat_model(problem: ScheduleProblemV1) -> _QualityCpSatMode
             )
             regime_membership[(trip.trip_id, regime.regime_id)] = value
 
+    regime_headway_by_id: dict[str, cp_model.IntVar] = {}
+    for direction, trips in directional.items():
+        span = (
+            trips[-1].departure_time // 60 - trips[0].departure_time // 60 if len(trips) > 1 else 1
+        )
+        directional_regimes = tuple(regime for regime in regimes if regime.direction == direction)
+        for regime in directional_regimes:
+            regime_headway_by_id[regime.regime_id] = model.new_int_var(
+                1,
+                max(1, span),
+                f"quality_regime_headway_{regime.regime_id}",
+            )
+        for index, (earlier, later) in enumerate(
+            zip(trips, trips[1:], strict=False),
+            start=1,
+        ):
+            same_regime_values: list[cp_model.IntVar] = []
+            for regime in directional_regimes:
+                same_regime_pair = _equivalent_and(
+                    model,
+                    [
+                        regime_membership[(earlier.trip_id, regime.regime_id)],
+                        regime_membership[(later.trip_id, regime.regime_id)],
+                    ],
+                    name=(f"quality_pair_same_{direction.value}_{index:04d}_{regime.regime_id}"),
+                )
+                model.add(
+                    headway_by_direction[direction][index - 1]
+                    == regime_headway_by_id[regime.regime_id]
+                ).only_enforce_if(same_regime_pair)
+                same_regime_values.append(same_regime_pair)
+            model.add(sum(same_regime_values) <= 1)
+
     within_changes: list[cp_model.IntVar] = []
     transition_jumps: list[cp_model.IntVar] = []
     for direction, trips in directional.items():
@@ -497,6 +546,8 @@ def _build_quality_cp_sat_model(problem: ScheduleProblemV1) -> _QualityCpSatMode
     return _QualityCpSatModelBundle(
         demand=demand,
         regimes=regimes,
+        regime_headway_by_id=regime_headway_by_id,
+        exact_demand_authority=exact_demand_authority,
         stages=tuple(
             _DemandObjectiveStage(name=name, value=value)
             for name, value in zip(_QUALITY_OBJECTIVE_NAMES, stage_values, strict=True)
@@ -576,16 +627,7 @@ def _build_quality_candidate(
         previous_b.update(_previous_headways(trips, b_minutes))
         previous_c.update(_previous_headways(trips, solved_minutes))
 
-    regime_by_source_id = {
-        trip.trip_id: _regime_for_departure(
-            problem,
-            bundle.regimes,
-            trip.direction,
-            solved_minutes[trip.trip_id] * 60,
-        )
-        for trip in source_order
-    }
-    exact_timetable = tuple(
+    unlabeled_timetable = tuple(
         sorted(
             (
                 RawCandidateTripV1(
@@ -600,7 +642,7 @@ def _build_quality_candidate(
                     shift_minutes=float(solved_minutes[trip.trip_id] - b_minutes[trip.trip_id]),
                     previous_b_headway=previous_b[trip.trip_id],
                     previous_c_headway=previous_c[trip.trip_id],
-                    headway_regime_id=regime_by_source_id[trip.trip_id].regime_id,
+                    headway_regime_id="REGIME_PENDING_AUTHORITY",
                     change_reason=(
                         "OR-Tools lexicographic fixed-resource service-quality optimization."
                     ),
@@ -611,51 +653,20 @@ def _build_quality_candidate(
         )
     )
 
-    raw_regimes: list[RawHeadwayRegimeV1] = []
-    extra_limitations: list[str] = []
-    for regime in bundle.regimes:
-        members = tuple(
-            sorted(
-                (trip for trip in exact_timetable if trip.headway_regime_id == regime.regime_id),
-                key=lambda item: (item.c_departure_time, item.c_trip_id),
-            )
+    exact_timetable, regimes, regime_policy = _authoritative_candidate_payload(
+        problem,
+        unlabeled_timetable,
+    )
+    if regime_policy.error_codes:
+        raise ValueError(", ".join(regime_policy.error_codes))
+    extra_limitations = tuple(
+        (
+            f"{analysis.regime.regime_id} has {len(analysis.trip_ids)} solved "
+            "trip(s); no within-regime headway is measurable."
         )
-        if not members:
-            continue
-        headways = tuple(
-            float((later.c_departure_time - earlier.c_departure_time) // 60)
-            for earlier, later in zip(members, members[1:], strict=False)
-        )
-        if len(members) == 1:
-            target = _SINGLETON_TARGET_HEADWAY_MINUTES
-            extra_limitations.append(
-                f"{regime.regime_id} contains one solved trip, so headway is not "
-                f"measurable and the {_SINGLETON_TARGET_HEADWAY_MINUTES:g}-minute "
-                "positive placeholder target is used."
-            )
-        elif regime.required_trips_85 > 0:
-            target = regime.duration_minutes / regime.required_trips_85
-        else:
-            target = _SINGLETON_TARGET_HEADWAY_MINUTES
-            extra_limitations.append(
-                f"{regime.regime_id} has a zero planning service rate; its descriptive "
-                f"target uses the positive {_SINGLETON_TARGET_HEADWAY_MINUTES:g}-minute "
-                "placeholder."
-            )
-        raw_regimes.append(
-            RawHeadwayRegimeV1(
-                regime_id=regime.regime_id,
-                direction=regime.direction,
-                start_time=members[0].c_departure_time,
-                end_time=members[-1].c_departure_time,
-                trip_count=len(members),
-                target_headway=target,
-                actual_headway_sequence=headways,
-                boundary_reason=_QUALITY_BOUNDARY_REASON,
-                legacy_regularity_status=_regularity_status(headways),
-            )
-        )
-    regimes = tuple(raw_regimes)
+        for analysis in regime_policy.analyses
+        if not analysis.headway_measurable
+    )
     provisional = RawScheduleCandidateV1(
         solver_status=status,
         solver_adapter=adapter_id,
@@ -671,7 +682,13 @@ def _build_quality_candidate(
         explanation="Service-quality explanation pending independent recomputation.",
         limitations=(*_quality_solver_limitations(problem), *extra_limitations),
     )
-    vector = _recompute_service_quality_objective_vector_v1(problem, provisional)
+    vector = _recompute_service_quality_objective_vector_with_authority_v1(
+        problem,
+        provisional,
+        bundle.exact_demand_authority,
+    )
+    if vector[8] != 0 or vector[9] != 0:
+        raise ValueError("WITHIN_REGIME_HEADWAY_NOT_UNIFORM")
     for name, proven_value in proven:
         recomputed = vector[_QUALITY_OBJECTIVE_NAMES.index(name)]
         if recomputed != proven_value:
@@ -726,19 +743,37 @@ def _quality_non_candidate_result(
 
 @dataclass(frozen=True, slots=True)
 class OrToolsCpSatServiceQualitySolver:
+    exact_demand_authority: _ExactDemandAuthority | None = None
     adapter_id: ClassVar[str] = "ortools_cp_sat_quality_v1"
 
     def solve(self, problem: ScheduleProblemV1) -> SolverRunResultV1:
         started = time.perf_counter()
+        if (
+            self.exact_demand_authority is not None
+            and problem.adapter_context_fingerprint
+            != self.exact_demand_authority.authority_fingerprint
+        ):
+            return _model_invalid_result(
+                problem,
+                self.adapter_id,
+                started,
+                (ORTOOLS_QUALITY_EXACT_DEMAND_CONTEXT_MISMATCH,),
+            )
         issues = (
             *_adapter_capability_issues(problem, self.adapter_id),
-            *_quality_problem_authority_issues(problem),
+            *_quality_problem_authority_issues(
+                problem,
+                self.exact_demand_authority,
+            ),
         )
         issues = tuple(dict.fromkeys(issues))
         if issues:
             return _model_invalid_result(problem, self.adapter_id, started, issues)
         try:
-            bundle = _build_quality_cp_sat_model(problem)
+            bundle = _build_quality_cp_sat_model(
+                problem,
+                self.exact_demand_authority,
+            )
             model_error = bundle.demand.hard.model.validate()
             if model_error:
                 return _model_invalid_result(
@@ -923,19 +958,38 @@ def build_ortools_service_quality_request_v1(
                 *request_issues,
             ),
         )
+    effective_evaluation_policy = evaluation_policy or ScenarioBEvaluationPolicyV1()
+    try:
+        exact_demand_authority = _build_exact_demand_authority(
+            normalized_inputs,
+            b_evaluation,
+            evaluation_policy=effective_evaluation_policy,
+        )
+    except _ExactDemandAuthorityError as exc:
+        raise ScheduleProblemError(
+            f"{ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY}: {exc}",
+            code=ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY,
+            codes=(
+                ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY,
+                exc.code,
+            ),
+        ) from exc
     problem = build_schedule_problem_v1(
         normalized_inputs,
         b_evaluation,
         solver_adapter=OrToolsCpSatServiceQualitySolver.adapter_id,
-        adapter_context_fingerprint=empty_adapter_context_fingerprint(),
-        evaluation_policy=evaluation_policy,
+        adapter_context_fingerprint=(exact_demand_authority.authority_fingerprint),
+        evaluation_policy=effective_evaluation_policy,
         solver_policy=solver_policy,
         direction_trip_lock_mode=DirectionTripLockMode.FIXED_BY_DIRECTION,
         fleet_constraint_mode=FleetConstraintMode.AVAILABLE_UPPER_BOUND,
         initial_fleet_positioning_mode=InitialFleetPositioningMode.SOLVER_DETERMINED,
         boundary_convention=BoundaryConvention.HALF_OPEN,
     )
-    problem_issues = _quality_problem_authority_issues(problem)
+    problem_issues = _quality_problem_authority_issues(
+        problem,
+        exact_demand_authority,
+    )
     if problem_issues:
         raise ScheduleProblemError(
             f"{ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY}: "
@@ -949,10 +1003,13 @@ def build_ortools_service_quality_request_v1(
         b_evaluation,
         evaluation_policy,
     )
-    return generation_context, OrToolsCpSatServiceQualitySolver()
+    return generation_context, OrToolsCpSatServiceQualitySolver(
+        exact_demand_authority=exact_demand_authority
+    )
 
 
 __all__ = [
     "OrToolsCpSatServiceQualitySolver",
+    "ORTOOLS_QUALITY_EXACT_DEMAND_CONTEXT_MISMATCH",
     "build_ortools_service_quality_request_v1",
 ]

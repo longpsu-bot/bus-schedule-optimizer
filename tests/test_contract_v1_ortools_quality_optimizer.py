@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import inspect
 import itertools
+import math
 from dataclasses import replace
 from decimal import Decimal
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -41,6 +43,9 @@ from bus_schedule_engine.contracts_v1.ortools_quality_solver import (
     _build_quality_cp_sat_model,
     _derive_sustained_service_regimes,
     _recompute_service_quality_objective_vector_v1,
+)
+from bus_schedule_engine.contracts_v1.service_quality_metrics import (
+    _recompute_service_quality_objective_vector_with_authority_v1,
 )
 from bus_schedule_engine.contracts_v1.solver_fingerprints import candidate_fingerprint
 from bus_schedule_engine.models import Direction
@@ -241,15 +246,17 @@ def _independent_vector_for_minutes(problem, solved: dict[str, int]) -> tuple[in
     for rows in directional.values():
         rows.sort(key=lambda item: (item[1], item[0]))
 
-    demand_values = {
-        block_id: Decimal(str(requirement.passenger_demand))
+    exact_demand = {
+        block_id: Fraction(Decimal(str(requirement.passenger_demand)))
         for block_id, requirement in requirements.items()
     }
-    places = max(
-        (max(0, -value.as_tuple().exponent) for value in demand_values.values()), default=0
-    )
-    scale = 10**places
-    weights = {block_id: int(value * scale) for block_id, value in demand_values.items()}
+    common_denominator = math.lcm(*(value.denominator for value in exact_demand.values()))
+    raw_weights = {
+        block_id: value.numerator * (common_denominator // value.denominator)
+        for block_id, value in exact_demand.items()
+    }
+    reduction_gcd = math.gcd(*raw_weights.values()) or 1
+    weights = {block_id: value // reduction_gcd for block_id, value in raw_weights.items()}
 
     max_positive_gap = 0
     for direction, rows in directional.items():
@@ -295,6 +302,16 @@ def _independent_vector_for_minutes(problem, solved: dict[str, int]) -> tuple[in
             )
 
     block_to_regime = _independent_regimes(problem)
+    internal_sequences: dict[str, list[int]] = {}
+    for rows in directional.values():
+        for earlier, later in zip(rows, rows[1:], strict=False):
+            earlier_regime = block_to_regime[block_by_trip[earlier[0]]]
+            later_regime = block_to_regime[block_by_trip[later[0]]]
+            if earlier_regime == later_regime:
+                internal_sequences.setdefault(earlier_regime, []).append(later[1] - earlier[1])
+    if any(len(set(sequence)) > 1 for sequence in internal_sequences.values()):
+        raise ValueError("non-uniform within-regime headway")
+
     within: list[int] = []
     transition: list[int] = []
     for rows in directional.values():
@@ -343,7 +360,7 @@ def _independent_vector_for_minutes(problem, solved: dict[str, int]) -> tuple[in
     )
 
 
-def _enumerated_optimum(problem) -> tuple[int, ...]:
+def _enumerated_optimum(problem) -> tuple[int, ...] | None:
     directional = {
         direction: tuple(
             sorted(
@@ -398,8 +415,7 @@ def _enumerated_optimum(problem) -> tuple[int, ...]:
             vectors.append(_independent_vector_for_minutes(problem, solved))
         except ValueError:
             continue
-    assert vectors
-    return min(vectors)
+    return min(vectors) if vectors else None
 
 
 def test_authoritative_directional_demand_permits_construction() -> None:
@@ -451,24 +467,27 @@ def test_unsupported_demand_authority_is_rejected(demand) -> None:
     assert caught.value.code == ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY
 
 
-def test_demand_precision_beyond_six_decimals_is_rejected() -> None:
-    with pytest.raises(ScheduleProblemError) as caught:
-        _quality_request(
-            outbound_minutes=(360, 380),
-            inbound_minutes=(365,),
-            fleet_limit=3,
-            demand=(
-                _record(Direction.TERMINAL_1_TO_2, 360, 381, 0.1234567),
-                _record(Direction.TERMINAL_2_TO_1, 365, 366, 0),
-            ),
-            route_id="ORTOOLS-QUALITY-PRECISION",
-        )
+def test_demand_precision_beyond_six_decimals_is_exactly_supported() -> None:
+    context, solver, *_ = _quality_request(
+        outbound_minutes=(360, 380),
+        inbound_minutes=(365,),
+        fleet_limit=3,
+        demand=(
+            _record(Direction.TERMINAL_1_TO_2, 360, 381, 0.1234567),
+            _record(Direction.TERMINAL_2_TO_1, 365, 366, 0),
+        ),
+        route_id="ORTOOLS-QUALITY-PRECISION",
+    )
 
-    assert caught.value.code == ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY
-    assert "ORTOOLS_QUALITY_DEMAND_PRECISION_UNSUPPORTED" in caught.value.codes
+    assert context.problem.adapter_context_fingerprint == (
+        solver.exact_demand_authority.authority_fingerprint
+    )
+    assert Fraction(1_234_567, 10_000_000) in {
+        block.fraction for block in solver.exact_demand_authority.blocks
+    }
 
 
-def test_unsafe_demand_integer_scaling_is_rejected() -> None:
+def test_exact_threshold_discrepancy_is_reported_instead_of_silently_changed() -> None:
     with pytest.raises(ScheduleProblemError) as caught:
         _quality_request(
             outbound_minutes=(360, 370, 380),
@@ -481,7 +500,7 @@ def test_unsafe_demand_integer_scaling_is_rejected() -> None:
             route_id="ORTOOLS-QUALITY-UNSAFE-INTEGER",
         )
 
-    assert "ORTOOLS_QUALITY_DEMAND_INTEGER_UNSAFE" in caught.value.codes
+    assert "EXACT_DEMAND_SERVICE_THRESHOLD_MISMATCH" in caught.value.codes
 
 
 def test_direct_unsupported_problem_solve_returns_model_invalid() -> None:
@@ -794,22 +813,21 @@ def test_candidate_regime_sequences_exactly_match_departures() -> None:
             (later.c_departure_time - earlier.c_departure_time) / 60
             for earlier, later in zip(members, members[1:], strict=False)
         )
-        assert regime.target_headway > 0
-        assert regime.boundary_reason == "SUSTAINED_DIRECTIONAL_SERVICE_RATE"
+        if len(members) >= 2:
+            assert regime.target_headway == regime.actual_headway_sequence[0]
+            assert regime.legacy_regularity_status == "UNIFORM"
+        else:
+            assert regime.target_headway == 0
+            assert regime.legacy_regularity_status == "SINGLE_TRIP_HEADWAY_NOT_MEASURABLE"
+        assert regime.boundary_reason == "MATERIAL_FREQUENCY_CHANGE"
 
 
-def test_within_regime_headway_changes_are_balanced() -> None:
+def test_balanced_rounding_is_infeasible_under_hard_uniformity() -> None:
     context, solver, *_ = _regularity_fixture()
     run = solver.solve(context.problem)
-    assert run.candidate is not None
-    vector = _recompute_service_quality_objective_vector_v1(
-        context.problem,
-        run.candidate,
-    )
-
-    assert vector[8] <= 1
-    assert vector[9] <= 2
-    assert vector == _enumerated_optimum(context.problem)
+    assert run.solver_status == NativeSolverStatus.INFEASIBLE
+    assert run.candidate is None
+    assert _enumerated_optimum(context.problem) is None
 
 
 def test_within_maximum_precedes_total_and_transitions_follow() -> None:
@@ -842,9 +860,10 @@ def test_transition_smoothing_does_not_collapse_legitimate_regimes() -> None:
         )
         == 2
     )
-    assert _recompute_service_quality_objective_vector_v1(
+    assert _recompute_service_quality_objective_vector_with_authority_v1(
         context.problem,
         run.candidate,
+        solver.exact_demand_authority,
     ) == _enumerated_optimum(context.problem)
 
 
@@ -905,12 +924,12 @@ def test_reported_vector_equals_independent_recomputation() -> None:
     context, solver, *_ = _two_regime_fixture()
     run = solver.solve(context.problem)
     assert run.candidate is not None
-    vector = _recompute_service_quality_objective_vector_v1(
+    vector = _recompute_service_quality_objective_vector_with_authority_v1(
         context.problem,
         run.candidate,
+        solver.exact_demand_authority,
     )
 
-    assert f"Independently recomputed candidate vector: {vector}" in run.candidate.explanation
     for name, value in zip(_OBJECTIVE_NAMES, vector, strict=True):
         assert f"{name}={value} (proven)" in run.candidate.explanation
 
@@ -919,15 +938,15 @@ def test_independent_recomputation_mismatch_is_sanitized_as_model_invalid(
     monkeypatch,
 ) -> None:
     context, solver, *_ = _cross_block_fixture()
-    real_recompute = quality_module._recompute_service_quality_objective_vector_v1
+    real_recompute = quality_module._recompute_service_quality_objective_vector_with_authority_v1
 
-    def mismatching(problem, candidate):
-        vector = real_recompute(problem, candidate)
+    def mismatching(problem, candidate, authority):
+        vector = real_recompute(problem, candidate, authority)
         return (vector[0] + 1, *vector[1:])
 
     monkeypatch.setattr(
         quality_module,
-        "_recompute_service_quality_objective_vector_v1",
+        "_recompute_service_quality_objective_vector_with_authority_v1",
         mismatching,
     )
 
@@ -1087,12 +1106,20 @@ def test_native_infeasible_and_model_invalid_remain_exact(
 def test_four_tiny_exhaustive_oracles_agree_with_cp_sat(fixture) -> None:
     context, solver, *_ = fixture()
     run = solver.solve(context.problem)
+    enumerated = _enumerated_optimum(context.problem)
+    if fixture is _regularity_fixture:
+        assert enumerated is None
+        assert run.solver_status == NativeSolverStatus.INFEASIBLE
+        assert run.candidate is None
+        return
+
     assert run.solver_status == NativeSolverStatus.OPTIMAL
     assert run.candidate is not None
 
-    cp_vector = _recompute_service_quality_objective_vector_v1(
+    cp_vector = _recompute_service_quality_objective_vector_with_authority_v1(
         context.problem,
         run.candidate,
+        solver.exact_demand_authority,
     )
     independent_vector = _independent_vector_for_minutes(
         context.problem,
@@ -1102,7 +1129,7 @@ def test_four_tiny_exhaustive_oracles_agree_with_cp_sat(fixture) -> None:
         },
     )
 
-    assert cp_vector == independent_vector == _enumerated_optimum(context.problem)
+    assert cp_vector == independent_vector == enumerated
 
 
 def test_repeated_default_solves_are_deterministic() -> None:

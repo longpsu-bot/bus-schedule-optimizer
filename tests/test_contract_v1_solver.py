@@ -29,7 +29,6 @@ from bus_schedule_engine.contracts_v1 import (
     NormalizationOptions,
     OperatingDayType,
     RawCandidateTripV1,
-    RawHeadwayRegimeV1,
     RawScheduleCandidateV1,
     ScenarioBEvaluationPolicyV1,
     ScheduleProblemError,
@@ -57,6 +56,9 @@ from bus_schedule_engine.contracts_v1 import (
     build_schedule_problem_v1 as build_canonical_schedule_problem_v1,
 )
 from bus_schedule_engine.contracts_v1.fleet_assignment import assign_contract_v1_fleet
+from bus_schedule_engine.contracts_v1.regime_headway_policy import (
+    _authoritative_candidate_payload,
+)
 from bus_schedule_engine.contracts_v1.solver_fingerprints import candidate_fingerprint
 from bus_schedule_engine.contracts_v1.solver_problem import (
     HEURISTIC_TURNAROUND_BRIDGE_MODE,
@@ -581,32 +583,15 @@ def _baseline_candidate(problem) -> RawScheduleCandidateV1:
             shift_minutes=0,
             previous_b_headway=previous_b[trip.trip_id],
             previous_c_headway=previous_b[trip.trip_id],
-            headway_regime_id=f"REGIME-{trip.direction.value}",
+            headway_regime_id="REGIME_PENDING_AUTHORITY",
             change_reason="V1-H2 authority fixture",
         )
         for trip in source_rows
     )
-    regimes: list[RawHeadwayRegimeV1] = []
-    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
-        members = [trip for trip in raw_trips if trip.direction == direction]
-        gaps = tuple(
-            (right.c_departure_time - left.c_departure_time) / 60
-            for left, right in zip(members, members[1:], strict=False)
-        )
-        regimes.append(
-            RawHeadwayRegimeV1(
-                regime_id=f"REGIME-{direction.value}",
-                direction=direction,
-                start_time=members[0].c_departure_time,
-                end_time=members[-1].c_departure_time,
-                trip_count=len(members),
-                target_headway=(sum(gaps) / len(gaps) if gaps else 60),
-                actual_headway_sequence=gaps,
-                boundary_reason="FIRST_SERVICE_CONSTRAINT",
-                legacy_regularity_status="REGULAR",
-            )
-        )
-    raw_regimes = tuple(regimes)
+    raw_trips, raw_regimes, _ = _authoritative_candidate_payload(
+        problem.problem,
+        raw_trips,
+    )
     adapter_id = "legacy_heuristic_v1"
     return RawScheduleCandidateV1(
         solver_status=NativeSolverStatus.FEASIBLE,
@@ -757,6 +742,18 @@ class _StaticSolver:
     def solve(self, problem):
         self.call_count += 1
         return self._run
+
+
+def _completed_run_for_candidate(candidate: RawScheduleCandidateV1) -> SolverRunResultV1:
+    return SolverRunResultV1(
+        execution_status=SolverExecutionStatus.COMPLETED,
+        solver_status=candidate.solver_status,
+        solver_adapter=candidate.solver_adapter,
+        solve_duration_seconds=candidate.solve_duration_seconds,
+        candidate=candidate,
+        explanations=("Static accepted-candidate contract fixture.",),
+        limitations=candidate.limitations,
+    )
 
 
 class _RaisingSolver:
@@ -1290,7 +1287,7 @@ def test_case_28_coverage_change_alters_problem_fingerprint() -> None:
     )
 
 
-def test_heuristic_candidate_crosses_boundary_and_matches_legacy_behavior() -> None:
+def test_heuristic_candidate_matches_legacy_times_but_fails_uniformity_rule() -> None:
     problem, parameters, trips, demand, fleet_limit = _problem()
     baseline = tuple(trips)
     baseline_fingerprint = timetable_fingerprint(trips)
@@ -1303,14 +1300,19 @@ def test_heuristic_candidate_crosses_boundary_and_matches_legacy_behavior() -> N
         fleet_limit,
         _heuristic_context(problem).heuristic_config,
     )
-    outcome = run_schedule_solver_v1(problem, HeuristicScheduleSolverAdapter())
+    solver = HeuristicScheduleSolverAdapter()
+    run = solver.solve(problem)
+    outcome = run_schedule_solver_v1(problem, solver)
 
     assert problem.b_evaluation.demand_resolution.coverage_assessment.directional_c_generation_supported
-    assert outcome.result_status == GenerationResultStatus.SOLUTION_ACCEPTED
+    assert run.candidate is not None
+    assert outcome.result_status == GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR
     assert outcome.execution_status == SolverExecutionStatus.COMPLETED
     assert outcome.solver_status == NativeSolverStatus.FEASIBLE
-    assert outcome.solution is not None
-    assert len(outcome.solution.solution_fingerprint) == 64
+    assert outcome.solution is None
+    assert outcome.diagnostic_candidate is not None
+    assert outcome.diagnostic_candidate is not None
+    assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in outcome.diagnostic_candidate.rejection_codes
     assert tuple(trips) == baseline
     assert timetable_fingerprint(trips) == baseline_fingerprint
     assert problem.normalized_inputs.scenario_b == scenario_b_before
@@ -1319,22 +1321,9 @@ def test_heuristic_candidate_crosses_boundary_and_matches_legacy_behavior() -> N
     )
     direct_times = {trip.source_b_trip_id: trip.departure_seconds for trip in direct.trips}
     adapter_times = {
-        trip.source_b_trip_id: trip.c_departure_time for trip in outcome.solution.c_exact_timetable
+        trip.source_b_trip_id: trip.c_departure_time for trip in run.candidate.exact_timetable
     }
     assert adapter_times == direct_times
-    assert (
-        outcome.solution.minimum_required_fleet
-        == outcome.solution.recommended_initial_fleet_terminal_1
-        + outcome.solution.recommended_initial_fleet_terminal_2
-    )
-    assert outcome.solution.minimum_required_fleet <= fleet_limit
-    assert all(
-        event.stock_before >= 0 and event.stock_after >= 0
-        for event in (
-            *outcome.solution.vehicle_stock_profile_terminal_1,
-            *outcome.solution.vehicle_stock_profile_terminal_2,
-        )
-    )
 
 
 def test_heuristic_exhaustion_is_unknown_not_infeasible() -> None:
@@ -1539,10 +1528,10 @@ def test_unknown_headway_regime_reference_is_rejected() -> None:
 
     validation = validate_and_build_solution_v1(problem, tampered)
 
-    assert "UNKNOWN_HEADWAY_REGIME_REFERENCE" in validation.rejection_codes
+    assert "HEADWAY_REGIME_AUTHORITY_MISMATCH" in validation.rejection_codes
 
 
-def test_orphan_headway_regime_is_rejected() -> None:
+def test_extra_headway_regime_is_rejected_as_unknown_authority_reference() -> None:
     problem, *_ = _problem()
     candidate = _candidate(problem)
     orphan = replace(
@@ -1559,7 +1548,7 @@ def test_orphan_headway_regime_is_rejected() -> None:
 
     validation = validate_and_build_solution_v1(problem, tampered)
 
-    assert "ORPHAN_HEADWAY_REGIME" in validation.rejection_codes
+    assert "UNKNOWN_HEADWAY_REGIME_REFERENCE" in validation.rejection_codes
 
 
 def test_headway_regime_direction_mismatch_is_rejected() -> None:
@@ -1675,13 +1664,12 @@ def test_non_positive_headway_regime_target_is_rejected() -> None:
 
 def test_solution_and_outcome_fingerprints_ignore_solve_duration() -> None:
     problem, *_ = _problem()
-    first_run = HeuristicScheduleSolverAdapter().solve(problem)
-    assert first_run.candidate is not None
+    first_candidate = _baseline_candidate(problem)
     second_candidate: RawScheduleCandidateV1 = replace(
-        first_run.candidate,
-        solve_duration_seconds=first_run.candidate.solve_duration_seconds + 9,
+        first_candidate,
+        solve_duration_seconds=first_candidate.solve_duration_seconds + 9,
     )
-    first_validation = validate_and_build_solution_v1(problem, first_run.candidate)
+    first_validation = validate_and_build_solution_v1(problem, first_candidate)
     second_validation = validate_and_build_solution_v1(problem, second_candidate)
     assert first_validation.solution is not None
     assert second_validation.solution is not None
@@ -1762,11 +1750,11 @@ def test_accepted_solution_fingerprint_changes_with_bound_problem_identity() -> 
 
     first = run_schedule_solver_v1(
         first_problem,
-        HeuristicScheduleSolverAdapter(),
+        _StaticSolver(_completed_run_for_candidate(_baseline_candidate(first_problem))),
     )
     second = run_schedule_solver_v1(
         second_problem,
-        HeuristicScheduleSolverAdapter(),
+        _StaticSolver(_completed_run_for_candidate(_baseline_candidate(second_problem))),
     )
 
     assert first.solution is not None
@@ -1827,7 +1815,10 @@ def test_solver_exception_returns_sanitized_model_invalid_envelope() -> None:
 
 def test_accepted_solution_and_outcome_match_json_schemas() -> None:
     problem, *_ = _problem()
-    outcome = run_schedule_solver_v1(problem, HeuristicScheduleSolverAdapter())
+    outcome = run_schedule_solver_v1(
+        problem,
+        _StaticSolver(_completed_run_for_candidate(_baseline_candidate(problem))),
+    )
     assert outcome.solution is not None
 
     solution_payload = schedule_solution_to_contract_dict(outcome.solution)
@@ -1857,12 +1848,12 @@ def test_candidate_fingerprint_tampering_is_rejected() -> None:
 
 def test_outcome_fingerprint_ignores_solve_duration() -> None:
     problem, *_ = _problem()
-    run = HeuristicScheduleSolverAdapter().solve(problem)
-    assert run.candidate is not None
+    candidate = _baseline_candidate(problem)
+    run = _completed_run_for_candidate(candidate)
     first = run_schedule_solver_v1(problem, _StaticSolver(run))
     delayed_candidate = replace(
-        run.candidate,
-        solve_duration_seconds=run.candidate.solve_duration_seconds + 9,
+        candidate,
+        solve_duration_seconds=candidate.solve_duration_seconds + 9,
     )
     delayed_run = replace(
         run,
@@ -1894,48 +1885,19 @@ def test_corrected_schema_allows_zero_regime_headways() -> None:
     }
 
 
-def test_zero_headway_is_derived_preserved_exceptional_and_schema_valid() -> None:
+def test_zero_headway_is_rejected_by_uniform_regime_policy() -> None:
     problem, *_ = _problem(fleet_limit_override=20)
-    candidate, earlier_id, later_id = _zero_headway_candidate(problem)
-    base_run = HeuristicScheduleSolverAdapter().solve(problem)
+    candidate, *_ = _zero_headway_candidate(problem)
     outcome = run_schedule_solver_v1(
         problem,
-        _StaticSolver(replace(base_run, candidate=candidate)),
+        _StaticSolver(_completed_run_for_candidate(candidate)),
     )
 
-    assert outcome.result_status == GenerationResultStatus.SOLUTION_ACCEPTED
-    assert outcome.solution is not None
-    solution = outcome.solution
-    later = next(item for item in solution.c_exact_timetable if item.c_trip_id == later_id)
-    assert later.previous_c_headway == 0
-    zero_regime = next(
-        item for item in solution.c_headway_regimes if 0 in item.actual_headway_sequence
-    )
-    assert zero_regime.regularity_status == "EXCEPTIONAL"
-    assert zero_regime.exceptional_headways == zero_regime.actual_headway_sequence
-    assert 0 in zero_regime.exceptional_headways
-
-    assignment_by_trip = {item.c_trip_id: item for item in solution.fleet_assignment}
-    assert assignment_by_trip[earlier_id].departure_time == (
-        assignment_by_trip[later_id].departure_time
-    )
-    assert assignment_by_trip[earlier_id].vehicle_id != (assignment_by_trip[later_id].vehicle_id)
-    assert solution.minimum_required_fleet <= solution.available_fleet_limit
-    assert all(
-        event.stock_before >= 0 and event.stock_after >= 0
-        for event in (
-            *solution.vehicle_stock_profile_terminal_1,
-            *solution.vehicle_stock_profile_terminal_2,
-        )
-    )
-
-    payload = schedule_solution_to_contract_dict(solution)
-    serialized_regime = next(
-        item for item in payload["c_headway_regimes"] if 0 in item["actual_headway_sequence"]
-    )
-    assert serialized_regime["actual_headway_sequence"] == list(zero_regime.actual_headway_sequence)
-    assert 0 in serialized_regime["actual_headway_sequence"]
-    assert _schema_errors(payload, "schedule_solution.schema.json") == []
+    assert outcome.result_status == GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR
+    assert outcome.solution is None
+    assert outcome.diagnostic_candidate is not None
+    assert "NON_POSITIVE_ADJACENT_HEADWAY" in (outcome.diagnostic_candidate.rejection_codes)
+    assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in (outcome.diagnostic_candidate.rejection_codes)
     assert (
         _schema_errors(
             schedule_outcome_to_contract_dict(outcome),
@@ -2006,7 +1968,8 @@ def test_zero_headway_with_insufficient_fleet_fails_existing_fleet_rules() -> No
 
     assert validation.status == CandidateValidationStatus.REJECTED
     assert "AVAILABLE_FLEET_LIMIT_EXCEEDED" in validation.rejection_codes
-    assert "HEADWAY_REGIME_SEQUENCE_MISMATCH" not in validation.rejection_codes
+    assert "NON_POSITIVE_ADJACENT_HEADWAY" in validation.rejection_codes
+    assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in validation.rejection_codes
     assert "PREVIOUS_C_HEADWAY_MISMATCH" not in validation.rejection_codes
 
 
@@ -2031,7 +1994,10 @@ def test_invalid_execution_state_is_completed_model_invalid_not_not_run() -> Non
 
 def test_solution_reports_modes_locks_and_actual_maximum_vehicle_use() -> None:
     problem, *_ = _problem()
-    outcome = run_schedule_solver_v1(problem, HeuristicScheduleSolverAdapter())
+    outcome = run_schedule_solver_v1(
+        problem,
+        _StaticSolver(_completed_run_for_candidate(_baseline_candidate(problem))),
+    )
     assert outcome.solution is not None
     solution = outcome.solution
     lock_fields = {lock.field for lock in solution.operating_parameter_locks}
@@ -2367,7 +2333,7 @@ def test_h4_accepted_solution_reuses_exact_problem_lock_tuple() -> None:
 
     outcome = run_schedule_solver_v1(
         context,
-        _heuristic_adapter(context),
+        _StaticSolver(_completed_run_for_candidate(_baseline_candidate(context))),
     )
 
     assert outcome.solution is not None

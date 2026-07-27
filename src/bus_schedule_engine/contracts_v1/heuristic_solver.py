@@ -14,11 +14,11 @@ from .heuristic_context import (
     departure_terminal,
     heuristic_context_mismatch_codes,
 )
+from .regime_headway_policy import _authoritative_candidate_payload
 from .solver_fingerprints import candidate_fingerprint
 from .solver_models import (
     NativeSolverStatus,
     RawCandidateTripV1,
-    RawHeadwayRegimeV1,
     RawScheduleCandidateV1,
     ScheduleProblemV1,
     SolverExecutionStatus,
@@ -73,39 +73,14 @@ def _raw_candidate_from_generated(
                 shift_minutes=(trip.departure_seconds - source.departure_time) / 60,
                 previous_b_headway=(trace.original_previous_headway if trace is not None else None),
                 previous_c_headway=(trace.new_previous_headway if trace is not None else None),
-                headway_regime_id=(
-                    trace.headway_regime_id if trace is not None else "REGIME_UNSPECIFIED"
-                ),
+                headway_regime_id="REGIME_PENDING_AUTHORITY",
                 change_reason=(trace.change_reason if trace is not None else generated.reason),
             )
         )
-    raw_trips = tuple(trips)
-    regimes: list[RawHeadwayRegimeV1] = []
-    for regime in generated.headway_regimes:
-        members = sorted(
-            (trip for trip in raw_trips if trip.headway_regime_id == regime.regime_id),
-            key=lambda item: (item.c_departure_time, item.c_trip_id),
-        )
-        if not members:
-            continue
-        actual_headways = tuple(
-            (right.c_departure_time - left.c_departure_time) / 60
-            for left, right in zip(members, members[1:], strict=False)
-        )
-        regimes.append(
-            RawHeadwayRegimeV1(
-                regime_id=regime.regime_id,
-                direction=contract_direction(regime.direction),
-                start_time=members[0].c_departure_time,
-                end_time=members[-1].c_departure_time,
-                trip_count=len(members),
-                target_headway=regime.target_headway_minutes,
-                actual_headway_sequence=actual_headways,
-                boundary_reason=regime.boundary_reason.value,
-                legacy_regularity_status=regime.headway_status,
-            )
-        )
-    raw_regimes = tuple(regimes)
+    raw_trips, raw_regimes, _ = _authoritative_candidate_payload(
+        problem,
+        tuple(trips),
+    )
     return RawScheduleCandidateV1(
         solver_status=NativeSolverStatus.FEASIBLE,
         solver_adapter=adapter_id,

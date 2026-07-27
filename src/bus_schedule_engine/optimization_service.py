@@ -7,6 +7,7 @@ from enum import StrEnum
 
 from .c_config import ScenarioCConfig
 from .contracts_v1 import (
+    GenerationResultStatus,
     NormalizationOptions,
     NormalizedInputBundleV1,
     RepeatabilityEvidenceV1,
@@ -139,6 +140,17 @@ def _directional_generation_supported(
 
 def _deduplicate(values: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(values))
+
+
+def _accepted_outcome(
+    outcome: ScheduleGenerationOutcomeV1,
+) -> ScheduleGenerationOutcomeV1 | None:
+    if (
+        outcome.result_status == GenerationResultStatus.SOLUTION_ACCEPTED
+        and outcome.solution is not None
+    ):
+        return outcome
+    return None
 
 
 def _result(
@@ -277,7 +289,7 @@ def analyze_and_optimize_schedule_v1(
             heuristic_outcome=heuristic_outcome,
             ortools_outcome=None,
             comparison=None,
-            recommended_outcome=heuristic_outcome,
+            recommended_outcome=_accepted_outcome(heuristic_outcome),
         )
 
     if solver_choice == SolverChoice.OR_TOOLS:
@@ -297,7 +309,7 @@ def analyze_and_optimize_schedule_v1(
             heuristic_outcome=None,
             ortools_outcome=ortools_outcome,
             comparison=None,
-            recommended_outcome=ortools_outcome,
+            recommended_outcome=_accepted_outcome(ortools_outcome),
         )
 
     effective_heuristic_config = heuristic_config or ScenarioCConfig.from_mapping(
@@ -327,10 +339,24 @@ def analyze_and_optimize_schedule_v1(
         ortools_context,
         ortools_solver,
     )
-    comparison = compare_solver_outcomes_v1(
-        ortools_context.problem,
-        heuristic_outcome,
-        ortools_outcome,
+    exact_demand_authority = getattr(
+        ortools_solver,
+        "exact_demand_authority",
+        None,
+    )
+    comparison = (
+        compare_solver_outcomes_v1(
+            ortools_context.problem,
+            heuristic_outcome,
+            ortools_outcome,
+            exact_demand_authority=exact_demand_authority,
+        )
+        if exact_demand_authority is not None
+        else compare_solver_outcomes_v1(
+            ortools_context.problem,
+            heuristic_outcome,
+            ortools_outcome,
+        )
     )
     recommended_outcome = {
         SolverChoice.HEURISTIC: heuristic_outcome,

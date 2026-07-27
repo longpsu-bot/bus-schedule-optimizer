@@ -6,7 +6,16 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import TypeAlias
 
-from .models import ContractDirection, ExactTimetableTrip
+from .exact_demand_authority import (
+    _ExactDemandAuthority,
+    _ExactDemandAuthorityError,
+    _scale_exact_demand_authority,
+)
+from .models import ContractDirection
+from .regime_headway_policy import (
+    _analyze_regime_headways,
+    _RegimeHeadwayPolicyError,
+)
 from .solver_models import (
     RawCandidateTripV1,
     RawScheduleCandidateV1,
@@ -52,24 +61,29 @@ class _ScaledDirectionalDemand:
     total_alignment_upper_bound: int
 
 
-@dataclass(frozen=True, slots=True)
-class _SustainedServiceRegime:
-    regime_id: str
-    direction: ContractDirection
-    block_ids: tuple[str, ...]
-    start_time: int
-    end_time: int
-    duration_minutes: int
-    required_trips_85: int
-
-
 def _decimal_places(value: Decimal) -> int:
     return max(0, -value.as_tuple().exponent)
 
 
 def _scaled_directional_demand(
     problem: ScheduleProblemV1,
+    exact_demand_authority: _ExactDemandAuthority | None = None,
 ) -> _ScaledDirectionalDemand:
+    if exact_demand_authority is not None:
+        try:
+            exact = _scale_exact_demand_authority(
+                exact_demand_authority,
+                problem,
+            )
+        except _ExactDemandAuthorityError as exc:
+            raise _QualityModelError(exc.code) from exc
+        return _ScaledDirectionalDemand(
+            scale=exact.scale,
+            weight_by_block_id=exact.weight_by_block_id,
+            total_by_direction=exact.total_by_direction,
+            total_alignment_upper_bound=exact.total_alignment_upper_bound,
+        )
+
     decimal_by_block: dict[str, Decimal] = {}
     decimal_places = 0
     for requirement in problem.block_requirements:
@@ -129,106 +143,6 @@ def _scaled_directional_demand(
         total_by_direction=total_by_direction,
         total_alignment_upper_bound=total_alignment_upper_bound,
     )
-
-
-def _ordered_problem_trips(
-    problem: ScheduleProblemV1,
-) -> dict[ContractDirection, tuple[ExactTimetableTrip, ...]]:
-    return {
-        direction: tuple(
-            sorted(
-                (
-                    trip
-                    for trip in problem.scenario_b.exact_timetable
-                    if trip.direction == direction
-                ),
-                key=lambda item: (item.departure_time, item.trip_id),
-            )
-        )
-        for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND)
-    }
-
-
-def _derive_sustained_service_regimes(
-    problem: ScheduleProblemV1,
-) -> tuple[_SustainedServiceRegime, ...]:
-    requirements = {item.block_id: item for item in problem.block_requirements}
-    directional_trips = _ordered_problem_trips(problem)
-    output: list[_SustainedServiceRegime] = []
-    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
-        blocks = tuple(
-            sorted(
-                (block for block in problem.analysis_blocks if block.direction == direction),
-                key=lambda item: (item.start_time, item.end_time, item.block_id),
-            )
-        )
-        trips = directional_trips[direction]
-        if not blocks or not trips:
-            raise _QualityModelError("ORTOOLS_QUALITY_DIRECTIONAL_COVERAGE_INCOMPLETE")
-        if blocks[0].start_time > trips[0].departure_time or (
-            blocks[-1].end_time <= trips[-1].departure_time
-        ):
-            raise _QualityModelError("ORTOOLS_QUALITY_DIRECTIONAL_COVERAGE_INCOMPLETE")
-        for earlier, later in zip(blocks, blocks[1:], strict=False):
-            if earlier.end_time > later.start_time:
-                raise _QualityModelError("ORTOOLS_QUALITY_BLOCKS_OVERLAP")
-            if earlier.end_time != later.start_time:
-                raise _QualityModelError("ORTOOLS_QUALITY_DIRECTIONAL_COVERAGE_INCOMPLETE")
-
-        groups: list[list[object]] = []
-        for block in blocks:
-            requirement = requirements[block.block_id]
-            if not groups:
-                groups.append([block])
-                continue
-            previous = groups[-1][-1]
-            previous_requirement = requirements[previous.block_id]
-            equal_rate = (
-                previous_requirement.required_trips_85 * requirement.duration_minutes
-                == requirement.required_trips_85 * previous_requirement.duration_minutes
-            )
-            if previous.end_time == block.start_time and equal_rate:
-                groups[-1].append(block)
-            else:
-                groups.append([block])
-
-        for index, group in enumerate(groups, start=1):
-            typed_group = tuple(group)
-            group_requirements = tuple(requirements[item.block_id] for item in typed_group)
-            output.append(
-                _SustainedServiceRegime(
-                    regime_id=f"ORTOOLS-QUALITY-{direction.value.upper()}-{index:04d}",
-                    direction=direction,
-                    block_ids=tuple(item.block_id for item in typed_group),
-                    start_time=typed_group[0].start_time,
-                    end_time=typed_group[-1].end_time,
-                    duration_minutes=sum(item.duration_minutes for item in group_requirements),
-                    required_trips_85=sum(item.required_trips_85 for item in group_requirements),
-                )
-            )
-    return tuple(output)
-
-
-def _regime_for_departure(
-    problem: ScheduleProblemV1,
-    regimes: tuple[_SustainedServiceRegime, ...],
-    direction: ContractDirection,
-    departure_time: int,
-) -> _SustainedServiceRegime:
-    blocks = {
-        block.block_id: block
-        for block in problem.analysis_blocks
-        if block.direction == direction and block.start_time <= departure_time < block.end_time
-    }
-    matches = [
-        regime
-        for regime in regimes
-        if regime.direction == direction
-        and any(block_id in blocks for block_id in regime.block_ids)
-    ]
-    if len(matches) != 1:
-        raise ValueError("Schedule trip does not have exactly one sustained service regime")
-    return matches[0]
 
 
 def _schedule_trips(
@@ -321,17 +235,25 @@ def _recompute_demand_objective_vector_v1(
     )
 
 
-def recompute_service_quality_objective_vector_v1(
+def _recompute_service_quality_objective_vector_with_authority_v1(
     problem: ScheduleProblemV1,
     schedule: RawScheduleCandidateV1 | ScheduleSolutionV1,
+    exact_demand_authority: _ExactDemandAuthority | None,
 ) -> tuple[int, ...]:
-    """Recompute the canonical 15-stage vector without solver variables or reported values."""
-
     demand_vector = _recompute_demand_objective_vector_v1(problem, schedule)
     requirements = {item.block_id: item for item in problem.block_requirements}
-    scaled = _scaled_directional_demand(problem)
-    regimes = _derive_sustained_service_regimes(problem)
+    scaled = _scaled_directional_demand(problem, exact_demand_authority)
     directional = _directional_schedule_trips(schedule)
+    try:
+        regime_policy = _analyze_regime_headways(
+            problem,
+            _schedule_trips(schedule),
+            enforce_candidate_labels=True,
+        )
+    except _RegimeHeadwayPolicyError as exc:
+        raise ValueError(exc.code) from exc
+    if regime_policy.error_codes:
+        raise ValueError(", ".join(regime_policy.error_codes))
 
     maximum_positive_headway = 0
     for direction, trips in directional.items():
@@ -395,15 +317,7 @@ def recompute_service_quality_objective_vector_v1(
             if block.direction == direction
         )
 
-    regime_by_trip_id = {
-        trip.c_trip_id: _regime_for_departure(
-            problem,
-            regimes,
-            trip.direction,
-            trip.c_departure_time,
-        ).regime_id
-        for trip in _schedule_trips(schedule)
-    }
+    regime_by_trip_id = regime_policy.assignment_map()
     within_changes: list[int] = []
     transition_jumps: list[int] = []
     for trips in directional.values():
@@ -436,6 +350,19 @@ def recompute_service_quality_objective_vector_v1(
         max(transition_jumps, default=0),
         sum(transition_jumps),
         *demand_vector[5:],
+    )
+
+
+def recompute_service_quality_objective_vector_v1(
+    problem: ScheduleProblemV1,
+    schedule: RawScheduleCandidateV1 | ScheduleSolutionV1,
+) -> tuple[int, ...]:
+    """Recompute the canonical 15-stage vector without trusting solver variables."""
+
+    return _recompute_service_quality_objective_vector_with_authority_v1(
+        problem,
+        schedule,
+        None,
     )
 
 
