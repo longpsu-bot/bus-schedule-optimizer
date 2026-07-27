@@ -31,6 +31,13 @@ from bus_schedule_engine.contracts_v1 import (
     NormalizationOptions,
     OperatingDayType,
 )
+from bus_schedule_engine.contracts_v1.terminal_occupancy import (
+    TERMINAL_1_OCCUPANCY_CAPACITY_EXCEEDED,
+    TERMINAL_1_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+    TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED,
+    TERMINAL_2_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+    TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+)
 from bus_schedule_engine.importer import ImportedWorkbook
 from bus_schedule_engine.models import (
     DemandRecord,
@@ -121,10 +128,51 @@ def _small_fixed_resource_fixture(
     return imported, options
 
 
+def _with_occupancy_limits(
+    imported: ImportedWorkbook,
+    *,
+    terminal_1: int | None,
+    terminal_2: int | None,
+) -> ImportedWorkbook:
+    return replace(
+        imported,
+        parameters_b=replace(
+            imported.parameters_b,
+            terminal_1_max_occupancy_vehicles=terminal_1,
+            terminal_2_max_occupancy_vehicles=terminal_2,
+        ),
+    )
+
+
 @pytest.fixture(scope="module")
 def accepted_report() -> SideBySideValidationReportV1:
     imported, options = _small_fixed_resource_fixture()
     return run_side_by_side_validation_v1(imported, options)
+
+
+@pytest.fixture(scope="module")
+def occupancy_reports() -> dict[str, SideBySideValidationReportV1]:
+    configurations = {
+        "neither": (None, None),
+        "both_pass": (10, 10),
+        "terminal_1_pass": (10, None),
+        "terminal_2_pass": (None, 10),
+        "terminal_1_fail": (1, None),
+        "terminal_2_fail": (None, 1),
+        "both_fail": (1, 1),
+    }
+    reports: dict[str, SideBySideValidationReportV1] = {}
+    for name, (terminal_1, terminal_2) in configurations.items():
+        imported, options = _small_fixed_resource_fixture()
+        reports[name] = run_side_by_side_validation_v1(
+            _with_occupancy_limits(
+                imported,
+                terminal_1=terminal_1,
+                terminal_2=terminal_2,
+            ),
+            options,
+        )
+    return reports
 
 
 @pytest.fixture(scope="module")
@@ -380,6 +428,7 @@ def test_deliberate_b_source_mismatch_blocks_cutover(
     assert record.disposition == ComparisonDispositionV1.BLOCKS_CUTOVER
     assert record.reason_code in report.blocking_discrepancy_codes
     assert report.has_blocking_discrepancies is True
+    assert report.requires_expert_review is True
 
 
 def test_validation_issue_differences_require_review(
@@ -593,18 +642,197 @@ def test_initial_positioning_remains_unified_only(
 
 
 def test_missing_terminal_occupancy_limits_remain_not_evaluated(
-    accepted_report: SideBySideValidationReportV1,
+    occupancy_reports: dict[str, SideBySideValidationReportV1],
 ) -> None:
-    unified = accepted_report.unified_snapshot
+    unified = occupancy_reports["neither"].unified_snapshot
     assert unified.terminal_occupancy_limits == (
         ("terminal_1", None),
         ("terminal_2", None),
     )
+    assert unified.terminal_occupancy_terminal_statuses == (
+        ("terminal_1", "NOT_EVALUATED"),
+        ("terminal_2", "NOT_EVALUATED"),
+    )
     assert unified.terminal_occupancy_status == "NOT_EVALUATED"
+    assert unified.terminal_occupancy_issue_codes == (TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED,)
     assert unified.terminal_occupancy_limits != (
         ("terminal_1", unified.recommended_initial_fleet_terminal_1),
         ("terminal_2", unified.recommended_initial_fleet_terminal_2),
     )
+
+
+def test_both_terminal_occupancy_limits_must_pass_for_aggregate_pass(
+    occupancy_reports: dict[str, SideBySideValidationReportV1],
+) -> None:
+    unified = occupancy_reports["both_pass"].unified_snapshot
+    assert unified.terminal_occupancy_limits == (
+        ("terminal_1", 10),
+        ("terminal_2", 10),
+    )
+    assert unified.terminal_occupancy_terminal_statuses == (
+        ("terminal_1", "PASS"),
+        ("terminal_2", "PASS"),
+    )
+    assert unified.terminal_occupancy_status == "PASS"
+    assert unified.terminal_occupancy_issue_codes == ()
+
+
+@pytest.mark.parametrize(
+    ("report_name", "failed_terminal", "exceeded_code"),
+    (
+        (
+            "terminal_1_fail",
+            "terminal_1",
+            TERMINAL_1_OCCUPANCY_CAPACITY_EXCEEDED,
+        ),
+        (
+            "terminal_2_fail",
+            "terminal_2",
+            TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED,
+        ),
+        (
+            "both_fail",
+            "terminal_1",
+            TERMINAL_1_OCCUPANCY_CAPACITY_EXCEEDED,
+        ),
+        (
+            "both_fail",
+            "terminal_2",
+            TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED,
+        ),
+    ),
+)
+def test_terminal_occupancy_overflow_produces_terminal_and_aggregate_fail(
+    occupancy_reports: dict[str, SideBySideValidationReportV1],
+    report_name: str,
+    failed_terminal: str,
+    exceeded_code: str,
+) -> None:
+    unified = occupancy_reports[report_name].unified_snapshot
+    statuses = dict(unified.terminal_occupancy_terminal_statuses)
+    assert statuses[failed_terminal] == "FAIL"
+    assert unified.terminal_occupancy_status == "FAIL"
+    assert exceeded_code in unified.terminal_occupancy_issue_codes
+
+
+@pytest.mark.parametrize(
+    (
+        "report_name",
+        "passing_terminal",
+        "missing_terminal",
+        "not_evaluated_code",
+    ),
+    (
+        (
+            "terminal_1_pass",
+            "terminal_1",
+            "terminal_2",
+            TERMINAL_2_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+        ),
+        (
+            "terminal_2_pass",
+            "terminal_2",
+            "terminal_1",
+            TERMINAL_1_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+        ),
+    ),
+)
+def test_partial_terminal_occupancy_is_explicit_and_retains_limitation(
+    occupancy_reports: dict[str, SideBySideValidationReportV1],
+    report_name: str,
+    passing_terminal: str,
+    missing_terminal: str,
+    not_evaluated_code: str,
+) -> None:
+    unified = occupancy_reports[report_name].unified_snapshot
+    statuses = dict(unified.terminal_occupancy_terminal_statuses)
+    assert statuses[passing_terminal] == "PASS"
+    assert statuses[missing_terminal] == "NOT_EVALUATED"
+    assert unified.terminal_occupancy_status == "PARTIALLY_EVALUATED"
+    assert not_evaluated_code in unified.terminal_occupancy_issue_codes
+
+
+@pytest.mark.parametrize(
+    ("report_name", "failed_terminal", "missing_terminal"),
+    (
+        ("terminal_1_fail", "terminal_1", "terminal_2"),
+        ("terminal_2_fail", "terminal_2", "terminal_1"),
+    ),
+)
+def test_partial_terminal_overflow_is_fail_not_partial(
+    occupancy_reports: dict[str, SideBySideValidationReportV1],
+    report_name: str,
+    failed_terminal: str,
+    missing_terminal: str,
+) -> None:
+    unified = occupancy_reports[report_name].unified_snapshot
+    statuses = dict(unified.terminal_occupancy_terminal_statuses)
+    assert statuses[failed_terminal] == "FAIL"
+    assert statuses[missing_terminal] == "NOT_EVALUATED"
+    assert unified.terminal_occupancy_status == "FAIL"
+
+
+def test_no_partial_occupancy_configuration_can_report_pass(
+    occupancy_reports: dict[str, SideBySideValidationReportV1],
+) -> None:
+    partial_names = (
+        "terminal_1_pass",
+        "terminal_2_pass",
+        "terminal_1_fail",
+        "terminal_2_fail",
+    )
+    assert all(
+        occupancy_reports[name].unified_snapshot.terminal_occupancy_status != "PASS"
+        for name in partial_names
+    )
+
+
+def test_occupancy_comparison_evidence_is_explicit_and_deterministic(
+    occupancy_reports: dict[str, SideBySideValidationReportV1],
+) -> None:
+    report = occupancy_reports["terminal_1_pass"]
+    imported, options = _small_fixed_resource_fixture()
+    repeated = run_side_by_side_validation_v1(
+        _with_occupancy_limits(imported, terminal_1=10, terminal_2=None),
+        options,
+    )
+    cross_path = _comparison(report, "SCENARIO_B_TERMINAL_OCCUPANCY_STATUS")
+    by_terminal = _comparison(report, "UNIFIED_TERMINAL_OCCUPANCY_BY_TERMINAL")
+    issue_codes = _comparison(report, "UNIFIED_TERMINAL_OCCUPANCY_ISSUE_CODES")
+
+    assert cross_path.comparison_rule == ComparisonRuleV1.REVIEW_IF_DIFFERENT
+    assert cross_path.disposition == ComparisonDispositionV1.EXPERT_REVIEW_REQUIRED
+    for record in (by_terminal, issue_codes):
+        assert record.comparison_rule == ComparisonRuleV1.NOT_COMPARABLE
+        assert record.comparison_status == ComparisonStatusV1.UNIFIED_ONLY
+        assert record.disposition == ComparisonDispositionV1.INFORMATIONAL
+    assert by_terminal.unified_value == (
+        ("terminal_1", "PASS"),
+        ("terminal_2", "NOT_EVALUATED"),
+    )
+    assert issue_codes.unified_value == (TERMINAL_2_OCCUPANCY_CAPACITY_NOT_EVALUATED,)
+    assert report == repeated
+    assert by_terminal == _comparison(repeated, "UNIFIED_TERMINAL_OCCUPANCY_BY_TERMINAL")
+    assert issue_codes == _comparison(repeated, "UNIFIED_TERMINAL_OCCUPANCY_ISSUE_CODES")
+
+
+def test_per_terminal_occupancy_fields_serialize_deterministically(
+    occupancy_reports: dict[str, SideBySideValidationReportV1],
+) -> None:
+    report = occupancy_reports["terminal_2_pass"]
+    first = side_by_side_report_to_dict(report)
+    second = side_by_side_report_to_dict(report)
+    unified = first["unified_snapshot"]
+
+    assert first == second
+    assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
+    assert unified["terminal_occupancy_terminal_statuses"] == [
+        ["terminal_1", "NOT_EVALUATED"],
+        ["terminal_2", "PASS"],
+    ]
+    assert unified["terminal_occupancy_issue_codes"] == [
+        TERMINAL_1_OCCUPANCY_CAPACITY_NOT_EVALUATED
+    ]
 
 
 def test_alpha_natural_policy_remains_solver_free_and_has_no_unified_c(
@@ -664,3 +892,34 @@ def test_report_has_no_automatic_approval_property(
     assert "readiness_score" not in names
     assert accepted_report.has_blocking_discrepancies is False
     assert accepted_report.requires_expert_review is True
+
+
+@pytest.mark.parametrize(
+    (
+        "blocking_codes",
+        "review_codes",
+        "has_blocking",
+        "requires_review",
+    ),
+    (
+        ((), ("REVIEW_ONLY",), False, True),
+        (("BLOCKING_ONLY",), (), True, True),
+        ((), (), False, False),
+    ),
+)
+def test_blocking_and_expert_review_properties_remain_distinct(
+    accepted_report: SideBySideValidationReportV1,
+    blocking_codes: tuple[str, ...],
+    review_codes: tuple[str, ...],
+    has_blocking: bool,
+    requires_review: bool,
+) -> None:
+    report = replace(
+        accepted_report,
+        blocking_discrepancy_codes=blocking_codes,
+        expert_review_required_codes=review_codes,
+    )
+    assert report.blocking_discrepancy_codes == blocking_codes
+    assert report.expert_review_required_codes == review_codes
+    assert report.has_blocking_discrepancies is has_blocking
+    assert report.requires_expert_review is requires_review

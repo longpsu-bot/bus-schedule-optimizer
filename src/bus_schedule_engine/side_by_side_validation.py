@@ -25,6 +25,13 @@ from .contracts_v1 import (
     ServiceAdjustmentDecisionPolicyV1,
     SolverPolicyV1,
 )
+from .contracts_v1.terminal_occupancy import (
+    TERMINAL_1_OCCUPANCY_CAPACITY_EXCEEDED,
+    TERMINAL_1_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+    TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED,
+    TERMINAL_2_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+    TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+)
 from .importer import ImportedWorkbook
 from .models import (
     AnalysisBundle,
@@ -205,6 +212,8 @@ class UnifiedPathSnapshotV1:
     demand_confidence: str
     headway_concern_codes: tuple[str, ...]
     terminal_occupancy_status: str
+    terminal_occupancy_terminal_statuses: tuple[tuple[str, str], ...]
+    terminal_occupancy_issue_codes: tuple[str, ...]
     demand_authority: DemandAuthoritySnapshotV1
     adjustment_decision: str
     selected_action: str
@@ -268,7 +277,7 @@ class SideBySideValidationReportV1:
 
     @property
     def requires_expert_review(self) -> bool:
-        return bool(self.expert_review_required_codes)
+        return bool(self.blocking_discrepancy_codes or self.expert_review_required_codes)
 
 
 _DIRECTION_ORDER = {"outbound": 0, "inbound": 1, "combined": 2}
@@ -761,6 +770,56 @@ def _validator_rejections(result: BusScheduleOptimizationResult) -> tuple[str, .
     )
 
 
+def _terminal_occupancy_evidence(
+    result: BusScheduleOptimizationResult,
+) -> tuple[str, tuple[tuple[str, str], ...], tuple[str, ...]]:
+    scenario = result.normalized_inputs.scenario_b
+    limits = scenario.terminal_occupancy_limits
+    returned_codes = {
+        *(issue.code for issue in result.b_evaluation.evaluation.technical_feasibility.issues),
+        *result.b_evaluation.evaluation.limitations,
+        *result.limitations,
+    }
+    occupancy_codes = tuple(
+        sorted(
+            returned_codes
+            & {
+                TERMINAL_1_OCCUPANCY_CAPACITY_EXCEEDED,
+                TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED,
+                TERMINAL_1_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+                TERMINAL_2_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+                TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+            }
+        )
+    )
+    terminal_1_limit = limits.terminal_1 if limits is not None else None
+    terminal_2_limit = limits.terminal_2 if limits is not None else None
+    terminal_1_status = (
+        "NOT_EVALUATED"
+        if terminal_1_limit is None
+        else ("FAIL" if TERMINAL_1_OCCUPANCY_CAPACITY_EXCEEDED in occupancy_codes else "PASS")
+    )
+    terminal_2_status = (
+        "NOT_EVALUATED"
+        if terminal_2_limit is None
+        else ("FAIL" if TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED in occupancy_codes else "PASS")
+    )
+    terminal_statuses = (
+        ("terminal_1", terminal_1_status),
+        ("terminal_2", terminal_2_status),
+    )
+    status_values = {terminal_1_status, terminal_2_status}
+    if "FAIL" in status_values:
+        aggregate_status = "FAIL"
+    elif status_values == {"NOT_EVALUATED"}:
+        aggregate_status = "NOT_EVALUATED"
+    elif status_values == {"PASS"}:
+        aggregate_status = "PASS"
+    else:
+        aggregate_status = "PARTIALLY_EVALUATED"
+    return aggregate_status, terminal_statuses, occupancy_codes
+
+
 def _build_unified_snapshot(
     result: BusScheduleOptimizationResult,
 ) -> UnifiedPathSnapshotV1:
@@ -782,16 +841,11 @@ def _build_unified_snapshot(
         else "FAIL"
     )
     terminal_limits = scenario.terminal_occupancy_limits
-    occupancy_issue_codes = {
-        issue.code
-        for issue in evaluation.technical_feasibility.issues
-        if "OCCUPANCY_CAPACITY_EXCEEDED" in issue.code
-    }
-    terminal_occupancy_status = (
-        "NOT_EVALUATED"
-        if terminal_limits is None
-        else ("FAIL" if occupancy_issue_codes else "PASS")
-    )
+    (
+        terminal_occupancy_status,
+        terminal_occupancy_terminal_statuses,
+        terminal_occupancy_issue_codes,
+    ) = _terminal_occupancy_evidence(result)
     comparison = result.comparison
     return UnifiedPathSnapshotV1(
         path_identifier=UNIFIED_PATH_IDENTIFIER,
@@ -836,6 +890,8 @@ def _build_unified_snapshot(
             sorted({issue.code for issue in evaluation.headway_quality.issues})
         ),
         terminal_occupancy_status=terminal_occupancy_status,
+        terminal_occupancy_terminal_statuses=(terminal_occupancy_terminal_statuses),
+        terminal_occupancy_issue_codes=terminal_occupancy_issue_codes,
         demand_authority=_unified_demand_authority(result),
         adjustment_decision=result.adjustment_assessment.primary_decision.value,
         selected_action=result.selected_action.value,
@@ -1522,6 +1578,32 @@ def _build_comparisons(
                 unified_value=unified.recommended_initial_fleet_terminal_2,
                 reason_code="UNIFIED_INITIAL_POSITIONING_ONLY",
                 explanation="Initial Terminal 2 positioning is unified-only authority.",
+                disposition=ComparisonDispositionV1.INFORMATIONAL,
+            ),
+            _fact_record(
+                fact_code="UNIFIED_TERMINAL_OCCUPANCY_BY_TERMINAL",
+                category=ComparisonCategoryV1.FLEET_AND_POSITIONING,
+                rule=ComparisonRuleV1.NOT_COMPARABLE,
+                legacy_value=None,
+                unified_value=unified.terminal_occupancy_terminal_statuses,
+                reason_code="UNIFIED_TERMINAL_OCCUPANCY_BY_TERMINAL_ONLY",
+                explanation=(
+                    "Contract V1 evaluates each supplied terminal capacity independently; "
+                    "a terminal with no supplied limit remains unevaluated."
+                ),
+                disposition=ComparisonDispositionV1.INFORMATIONAL,
+            ),
+            _fact_record(
+                fact_code="UNIFIED_TERMINAL_OCCUPANCY_ISSUE_CODES",
+                category=ComparisonCategoryV1.FLEET_AND_POSITIONING,
+                rule=ComparisonRuleV1.NOT_COMPARABLE,
+                legacy_value=None,
+                unified_value=unified.terminal_occupancy_issue_codes,
+                reason_code="UNIFIED_TERMINAL_OCCUPANCY_ISSUE_CODES_ONLY",
+                explanation=(
+                    "Contract V1 occupancy issue and limitation codes are preserved from "
+                    "returned authority; missing terminal limits remain unevaluated."
+                ),
                 disposition=ComparisonDispositionV1.INFORMATIONAL,
             ),
             _fact_record(
