@@ -10,6 +10,7 @@ from .models import (
     DemandObservation,
     ExactTimetableTrip,
     ObservedDemandInput,
+    ScenarioBInput,
     ScenarioInputV1,
     SourceMetadata,
 )
@@ -41,7 +42,7 @@ def _trip_to_dict(trip: ExactTimetableTrip) -> dict[str, object]:
 
 
 def scenario_to_contract_dict(scenario: ScenarioInputV1) -> dict[str, object]:
-    return {
+    payload: dict[str, object] = {
         "contract_version": scenario.contract_version,
         "scenario_id": scenario.scenario_id.value,
         "route_id": scenario.route_id,
@@ -74,6 +75,17 @@ def scenario_to_contract_dict(scenario: ScenarioInputV1) -> dict[str, object]:
         "exact_timetable": [_trip_to_dict(trip) for trip in scenario.exact_timetable],
         "source_metadata": _source_metadata_to_dict(scenario.source_metadata),
     }
+    if isinstance(scenario, ScenarioBInput) and scenario.terminal_occupancy_limits is not None:
+        limits = scenario.terminal_occupancy_limits
+        payload["terminal_occupancy_limits"] = {
+            field: value
+            for field, value in (
+                ("terminal_1", limits.terminal_1),
+                ("terminal_2", limits.terminal_2),
+            )
+            if value is not None
+        }
+    return payload
 
 
 def _observation_to_dict(observation: DemandObservation) -> dict[str, object]:

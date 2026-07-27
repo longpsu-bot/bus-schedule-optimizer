@@ -45,6 +45,7 @@ from .models import (
     TripsByDirection,
 )
 from .serialization import canonical_sha256, scenario_fingerprint
+from .terminal_occupancy import assess_terminal_occupancy_v1
 from .validation import validate_scenario_input
 
 EVALUATOR_FINGERPRINT_PROFILE = "contract_v1_d2a_service_adjustment"
@@ -922,6 +923,9 @@ def _technical_evidence(
         _assigned_turnaround_evidence(scenario)
     )
     issue_codes: list[str] = list(assignment_codes)
+    issue_codes.extend(
+        issue.code for issue in context.b_evaluation.evaluation.technical_feasibility.issues
+    )
     if not fleet.feasible:
         issue_codes.extend(("AVAILABLE_FLEET_LIMIT_EXCEEDED", FLEET_RATIO_ABOVE_ONE))
     if first_negative is not None:
@@ -1004,6 +1008,18 @@ def _scenario_without_trips(
     )
 
 
+def _trial_terminal_occupancy_is_feasible(
+    trial: ScenarioBInput,
+    fleet: FleetAssessmentV1,
+) -> bool:
+    occupancy = assess_terminal_occupancy_v1(
+        trial,
+        initial_terminal_1=fleet.recommended_initial_fleet_terminal_1,
+        initial_terminal_2=fleet.recommended_initial_fleet_terminal_2,
+    )
+    return not occupancy.issue_codes
+
+
 def _joint_removal_is_technically_feasible(
     scenario: ScenarioBInput,
     trip_ids: tuple[str, ...],
@@ -1043,7 +1059,8 @@ def _joint_removal_is_technically_feasible(
         return False
     if not validate_scenario_input(trial).passed:
         return False
-    if not assess_scenario_b_fleet_v1(trial).feasible:
+    fleet = assess_scenario_b_fleet_v1(trial)
+    if not fleet.feasible or not _trial_terminal_occupancy_is_feasible(trial, fleet):
         return False
     assignment = assign_contract_v1_fleet(
         _raw_b_trips(trial),
@@ -1352,6 +1369,7 @@ def _reduction_set_is_jointly_feasible(
     fleet = assess_scenario_b_fleet_v1(trial)
     return not (
         not fleet.feasible
+        or not _trial_terminal_occupancy_is_feasible(trial, fleet)
         or fleet.minimum_required_fleet > trial.available_fleet_limit
         or any(
             event.stock_before < 0 or event.stock_after < 0

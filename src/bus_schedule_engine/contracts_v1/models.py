@@ -161,7 +161,27 @@ class ScenarioAInput(ScenarioInputV1):
 
 
 @dataclass(frozen=True, slots=True)
+class TerminalOccupancyLimitsV1:
+    terminal_1: int | None = None
+    terminal_2: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.terminal_1 is None and self.terminal_2 is None:
+            raise ValueError("at least one terminal occupancy limit must be supplied")
+        for field_name, value in (
+            ("terminal_1", self.terminal_1),
+            ("terminal_2", self.terminal_2),
+        ):
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 1
+            ):
+                raise ValueError(f"{field_name} occupancy limit must be an integer >= 1")
+
+
+@dataclass(frozen=True, slots=True)
 class ScenarioBInput(ScenarioInputV1):
+    terminal_occupancy_limits: TerminalOccupancyLimitsV1 | None = None
+
     @property
     def scenario_id(self) -> ScenarioId:
         return ScenarioId.B

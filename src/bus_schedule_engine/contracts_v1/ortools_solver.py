@@ -76,6 +76,9 @@ class _CpSatModelBundle:
     departure_by_source_id: dict[str, cp_model.IntVar]
     initial_terminal_1: cp_model.IntVar
     initial_terminal_2: cp_model.IntVar
+    terminal_occupancy_binary_variable_count: int
+    terminal_occupancy_constraint_count: int
+    terminal_occupancy_arrival_event_count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,6 +194,83 @@ def _directional_window_minutes(
     )
 
 
+def _reified_less_than_or_equal(
+    model: cp_model.CpModel,
+    left,
+    right,
+    *,
+    name: str,
+) -> cp_model.IntVar:
+    indicator = model.new_bool_var(name)
+    model.add(left <= right).only_enforce_if(indicator)
+    model.add(left >= right + 1).only_enforce_if(indicator.negated())
+    return indicator
+
+
+def _add_terminal_occupancy_capacity_constraints(
+    model: cp_model.CpModel,
+    *,
+    terminal_name: str,
+    capacity: int | None,
+    initial_occupancy: cp_model.IntVar,
+    arrival_trips: tuple[ExactTimetableTrip, ...],
+    departure_trips: tuple[ExactTimetableTrip, ...],
+    departure_by_source_id: dict[str, cp_model.IntVar],
+) -> tuple[int, int, int]:
+    if capacity is None:
+        return 0, 0, 0
+
+    binary_variables = 0
+    constraints = 0
+    model.add(initial_occupancy <= capacity)
+    constraints += 1
+    arrival_by_trip_id = {
+        trip.trip_id: departure_by_source_id[trip.trip_id] + trip.runtime_minutes
+        for trip in arrival_trips
+    }
+    for arrival_index, arrival_trip in enumerate(arrival_trips, start=1):
+        arrival_time = arrival_by_trip_id[arrival_trip.trip_id]
+        arrivals_at_or_before: list[int | cp_model.IntVar] = [1]
+        for other_index, other_trip in enumerate(arrival_trips, start=1):
+            if other_trip.trip_id == arrival_trip.trip_id:
+                continue
+            indicator = _reified_less_than_or_equal(
+                model,
+                arrival_by_trip_id[other_trip.trip_id],
+                arrival_time,
+                name=(
+                    f"occupancy_{terminal_name}_arrival_"
+                    f"{other_index:04d}_{other_trip.trip_id}_"
+                    f"by_{arrival_index:04d}_{arrival_trip.trip_id}"
+                ),
+            )
+            arrivals_at_or_before.append(indicator)
+            binary_variables += 1
+            constraints += 2
+
+        departures_before: list[cp_model.IntVar] = []
+        for departure_index, departure_trip in enumerate(departure_trips, start=1):
+            indicator = _reified_less_than_or_equal(
+                model,
+                departure_by_source_id[departure_trip.trip_id],
+                arrival_time - 1,
+                name=(
+                    f"occupancy_{terminal_name}_departure_"
+                    f"{departure_index:04d}_{departure_trip.trip_id}_"
+                    f"before_{arrival_index:04d}_{arrival_trip.trip_id}"
+                ),
+            )
+            departures_before.append(indicator)
+            binary_variables += 1
+            constraints += 2
+
+        model.add(
+            initial_occupancy + sum(arrivals_at_or_before) - sum(departures_before) <= capacity
+        )
+        constraints += 1
+    return binary_variables, constraints, len(arrival_trips)
+
+
 def _build_cp_sat_model(problem: ScheduleProblemV1) -> _CpSatModelBundle:
     model = cp_model.CpModel()
     directional = _ordered_directional_trips(problem)
@@ -260,11 +340,33 @@ def _build_cp_sat_model(problem: ScheduleProblemV1) -> _CpSatModelBundle:
             model.add(ready_time >= inbound_departure + 1).only_enforce_if(indicator.negated())
         model.add(initial_terminal_2 + sum(ready_indicators) >= inbound_index)
 
+    limits = problem.scenario_b.terminal_occupancy_limits
+    terminal_1_counts = _add_terminal_occupancy_capacity_constraints(
+        model,
+        terminal_name="terminal_1",
+        capacity=(limits.terminal_1 if limits is not None else None),
+        initial_occupancy=initial_terminal_1,
+        arrival_trips=inbound,
+        departure_trips=outbound,
+        departure_by_source_id=departure_by_source_id,
+    )
+    terminal_2_counts = _add_terminal_occupancy_capacity_constraints(
+        model,
+        terminal_name="terminal_2",
+        capacity=(limits.terminal_2 if limits is not None else None),
+        initial_occupancy=initial_terminal_2,
+        arrival_trips=outbound,
+        departure_trips=inbound,
+        departure_by_source_id=departure_by_source_id,
+    )
     return _CpSatModelBundle(
         model=model,
         departure_by_source_id=departure_by_source_id,
         initial_terminal_1=initial_terminal_1,
         initial_terminal_2=initial_terminal_2,
+        terminal_occupancy_binary_variable_count=(terminal_1_counts[0] + terminal_2_counts[0]),
+        terminal_occupancy_constraint_count=terminal_1_counts[1] + terminal_2_counts[1],
+        terminal_occupancy_arrival_event_count=terminal_1_counts[2] + terminal_2_counts[2],
     )
 
 

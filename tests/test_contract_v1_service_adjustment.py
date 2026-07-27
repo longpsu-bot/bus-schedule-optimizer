@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import bus_schedule_engine.contracts_v1.service_adjustment as service_adjustment_module
 from bus_schedule_engine.contracts_v1 import (
     BlockSupplyStatus,
     ContractDirection,
@@ -37,9 +38,11 @@ from bus_schedule_engine.contracts_v1 import (
     ServiceAdjustmentPolicyV1,
     SourceMetadata,
     TerminalDepartureTimes,
+    TerminalOccupancyLimitsV1,
     TripsByDirection,
     TurnaroundMinutes,
     VolumeClassification,
+    assess_scenario_b_fleet_v1,
     build_schedule_generation_context_v1,
     build_schedule_problem_v1,
     build_service_adjustment_evaluation_context_v1,
@@ -49,9 +52,15 @@ from bus_schedule_engine.contracts_v1 import (
     observed_demand_fingerprint,
     project_service_adjustment_decision_policy_v1,
     scenario_fingerprint,
+    validate_scenario_input,
 )
 from bus_schedule_engine.contracts_v1.adjustment_context import (
     calculate_service_adjustment_decision_policy_fingerprint_v1,
+)
+from bus_schedule_engine.contracts_v1.terminal_occupancy import (
+    TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED,
+    TERMINAL_OCCUPANCY_EVENT_ORDER,
+    assess_terminal_occupancy_v1,
 )
 from bus_schedule_engine.models import RouteType
 
@@ -86,6 +95,9 @@ def _context(
     repeatability_evidence: RepeatabilityEvidenceV1 | None = None,
     generation_context: bool = False,
     vehicle_assignments: dict[str, str] | None = None,
+    runtime_minutes: int = 20,
+    turnaround_minutes: tuple[int, int] = (5, 5),
+    terminal_occupancy_limits: TerminalOccupancyLimitsV1 | None = None,
 ):
     source = SourceMetadata(
         source_type=InputSourceType.API,
@@ -100,8 +112,8 @@ def _context(
                 direction=ContractDirection.OUTBOUND,
                 departure_terminal=DepartureTerminal.TERMINAL_1,
                 departure_time=_minutes(departure),
-                runtime_minutes=20,
-                arrival_time=_minutes(departure + 20),
+                runtime_minutes=runtime_minutes,
+                arrival_time=_minutes(departure + runtime_minutes),
                 vehicle_assignment=(vehicle_assignments or {}).get(f"OUT-{index:02d}"),
             )
             for index, departure in enumerate(outbound_times, start=1)
@@ -112,8 +124,8 @@ def _context(
                 direction=ContractDirection.INBOUND,
                 departure_terminal=DepartureTerminal.TERMINAL_2,
                 departure_time=_minutes(departure),
-                runtime_minutes=20,
-                arrival_time=_minutes(departure + 20),
+                runtime_minutes=runtime_minutes,
+                arrival_time=_minutes(departure + runtime_minutes),
                 vehicle_assignment=(vehicle_assignments or {}).get(f"IN-{index:02d}"),
             )
             for index, departure in enumerate(inbound_times, start=1)
@@ -125,8 +137,11 @@ def _context(
         route_type=RouteType.INTRA_PROVINCIAL,
         terminal_1_name="Terminal 1",
         terminal_2_name="Terminal 2",
-        trip_runtime_minutes=20,
-        turnaround_minutes=TurnaroundMinutes(terminal_1=5, terminal_2=5),
+        trip_runtime_minutes=runtime_minutes,
+        turnaround_minutes=TurnaroundMinutes(
+            terminal_1=turnaround_minutes[0],
+            terminal_2=turnaround_minutes[1],
+        ),
         total_daily_trips=len(trips),
         trips_by_direction=TripsByDirection(
             outbound=len(outbound_times),
@@ -145,6 +160,7 @@ def _context(
         operating_day_type=OperatingDayType.WEEKDAY,
         exact_timetable=trips,
         source_metadata=source,
+        terminal_occupancy_limits=terminal_occupancy_limits,
     )
     scenario_a = ScenarioAInput(
         route_id=scenario.route_id,
@@ -302,6 +318,193 @@ def _repeatability(
         configured_minimum_surplus_consistency_rate=0.80,
         representative_day_type_or_provenance="weekday APC sample",
     )
+
+
+_OCCUPANCY_DONOR_ROWS = (
+    (ContractDirection.OUTBOUND, 0, 21, 255),
+    (ContractDirection.INBOUND, 0, 21, 85),
+    (ContractDirection.INBOUND, 21, 31, 170),
+)
+_OCCUPANCY_REDUCTION_ROWS = (
+    (ContractDirection.OUTBOUND, 0, 21, 255),
+    (ContractDirection.INBOUND, 0, 31, 170),
+)
+
+
+def _occupancy_removal_context(
+    demand_rows: tuple[tuple[ContractDirection, int, int, float], ...],
+    *,
+    limits: TerminalOccupancyLimitsV1 | None,
+):
+    return _context(
+        demand_rows,
+        outbound_times=(0, 10, 20),
+        inbound_times=(0, 20, 30),
+        fleet_limit=4,
+        runtime_minutes=10,
+        turnaround_minutes=(5, 5),
+        terminal_occupancy_limits=limits,
+    )
+
+
+def test_trial_occupancy_helper_rejects_fleet_feasible_arrival_first_overflow() -> None:
+    context = _occupancy_removal_context(
+        _OCCUPANCY_DONOR_ROWS,
+        limits=TerminalOccupancyLimitsV1(terminal_1=2, terminal_2=2),
+    )
+    original = context.normalized_inputs.scenario_b
+    original_fleet = assess_scenario_b_fleet_v1(original)
+    original_occupancy = assess_terminal_occupancy_v1(
+        original,
+        initial_terminal_1=original_fleet.recommended_initial_fleet_terminal_1,
+        initial_terminal_2=original_fleet.recommended_initial_fleet_terminal_2,
+    )
+
+    assert validate_scenario_input(original).passed
+    assert original_fleet.feasible
+    assert not original_occupancy.issue_codes
+    assert original_occupancy.terminal_1.maximum_occupancy == 2
+    assert original_occupancy.terminal_2.maximum_occupancy == 2
+
+    trial = service_adjustment_module._scenario_without_trips(original, ("IN-02",))
+    trial_inbound_times = tuple(
+        trip.departure_time
+        for trip in trial.exact_timetable
+        if trip.direction == ContractDirection.INBOUND
+    )
+    trial_fleet = assess_scenario_b_fleet_v1(trial)
+    trial_occupancy = assess_terminal_occupancy_v1(
+        trial,
+        initial_terminal_1=trial_fleet.recommended_initial_fleet_terminal_1,
+        initial_terminal_2=trial_fleet.recommended_initial_fleet_terminal_2,
+    )
+    violation = trial_occupancy.terminal_2.first_violating_event
+
+    assert trial_inbound_times == (_minutes(0), _minutes(30))
+    assert trial_fleet.feasible
+    assert trial_occupancy.event_order == TERMINAL_OCCUPANCY_EVENT_ORDER
+    assert trial_occupancy.issue_codes == (TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED,)
+    assert violation is not None
+    assert violation.event_time == _minutes(30)
+    assert violation.occupancy_before_arrivals == 2
+    assert violation.arrival_trip_ids == ("OUT-03",)
+    assert violation.occupancy_after_arrivals == 3
+    assert violation.departure_trip_ids == ("IN-03",)
+    assert violation.occupancy_after_departures == 2
+    assert not service_adjustment_module._trial_terminal_occupancy_is_feasible(
+        trial,
+        trial_fleet,
+    )
+
+    capacity_three = replace(
+        trial,
+        terminal_occupancy_limits=TerminalOccupancyLimitsV1(terminal_1=2, terminal_2=3),
+    )
+    capacity_three_fleet = assess_scenario_b_fleet_v1(capacity_three)
+    assert service_adjustment_module._trial_terminal_occupancy_is_feasible(
+        capacity_three,
+        capacity_three_fleet,
+    )
+    unlimited = replace(trial, terminal_occupancy_limits=None)
+    unlimited_fleet = assess_scenario_b_fleet_v1(unlimited)
+    assert service_adjustment_module._trial_terminal_occupancy_is_feasible(
+        unlimited,
+        unlimited_fleet,
+    )
+
+
+def test_donor_proof_excludes_only_candidate_when_retained_trial_overflows() -> None:
+    constrained = evaluate_service_adjustment_need_v1(
+        _occupancy_removal_context(
+            _OCCUPANCY_DONOR_ROWS,
+            limits=TerminalOccupancyLimitsV1(terminal_1=2, terminal_2=2),
+        )
+    )
+    proof = next(
+        item
+        for item in constrained.joint_donor_evidence
+        if item.direction == ContractDirection.INBOUND
+    )
+
+    assert proof.candidate_trip_ids == ("IN-02",)
+    assert proof.selected_jointly_feasible_trip_ids == ()
+    assert proof.proven_joint_capacity == 0
+    assert "JOINT_DONOR_CAPACITY_NOT_PROVEN" in proof.issue_codes
+    assert not any("IN-02" in block.eligible_donor_trip_ids for block in constrained.block_evidence)
+    assert constrained.primary_decision != ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
+
+
+def test_donor_proof_preserves_feasible_and_unspecified_limit_behavior() -> None:
+    capacity_three = evaluate_service_adjustment_need_v1(
+        _occupancy_removal_context(
+            _OCCUPANCY_DONOR_ROWS,
+            limits=TerminalOccupancyLimitsV1(terminal_1=2, terminal_2=3),
+        )
+    )
+    unlimited = evaluate_service_adjustment_need_v1(
+        _occupancy_removal_context(_OCCUPANCY_DONOR_ROWS, limits=None)
+    )
+    for result in (capacity_three, unlimited):
+        proof = next(
+            item
+            for item in result.joint_donor_evidence
+            if item.direction == ContractDirection.INBOUND
+        )
+        assert proof.candidate_trip_ids == ("IN-02",)
+        assert proof.selected_jointly_feasible_trip_ids == ("IN-02",)
+        assert proof.proven_joint_capacity == 1
+        assert any(block.eligible_donor_trip_ids == ("IN-02",) for block in result.block_evidence)
+        assert result.primary_decision == ServiceAdjustmentDecisionV1.REDISTRIBUTE_TRIPS
+
+
+def test_reduction_proof_excludes_only_candidate_when_retained_trial_overflows() -> None:
+    constrained_context = _occupancy_removal_context(
+        _OCCUPANCY_REDUCTION_ROWS,
+        limits=TerminalOccupancyLimitsV1(terminal_1=2, terminal_2=2),
+    )
+    constrained = evaluate_service_adjustment_need_v1(
+        _with_authority(
+            constrained_context,
+            repeatability_evidence=_repeatability((1, 1, 1)),
+        )
+    )
+    proof = constrained.joint_reduction_evidence
+
+    assert proof is not None
+    assert proof.candidate_trip_ids == ("IN-02",)
+    assert proof.selected_jointly_feasible_trip_ids == ()
+    assert proof.proven_supported_quantity == 0
+    assert proof.maximum_proven and proof.search_complete
+    assert constrained.maximum_supported_reduction_quantity == 0
+    assert constrained.primary_decision != ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
+    assert "REDUCTION_TECHNICAL_PROTECTION_NOT_SATISFIED" in constrained.reason_codes
+
+
+def test_reduction_proof_preserves_feasible_and_unspecified_limit_behavior() -> None:
+    results = tuple(
+        evaluate_service_adjustment_need_v1(
+            _with_authority(
+                _occupancy_removal_context(
+                    _OCCUPANCY_REDUCTION_ROWS,
+                    limits=limits,
+                ),
+                repeatability_evidence=_repeatability((1, 1, 1)),
+            )
+        )
+        for limits in (
+            TerminalOccupancyLimitsV1(terminal_1=2, terminal_2=3),
+            None,
+        )
+    )
+    for result in results:
+        proof = result.joint_reduction_evidence
+        assert proof is not None
+        assert proof.candidate_trip_ids == ("IN-02",)
+        assert proof.selected_jointly_feasible_trip_ids == ("IN-02",)
+        assert proof.proven_supported_quantity == 1
+        assert proof.maximum_proven and proof.search_complete
+        assert result.maximum_supported_reduction_quantity == 1
+        assert result.primary_decision == ServiceAdjustmentDecisionV1.REDUCE_TOTAL_TRIPS
 
 
 def _non_greedy_reduction_context(

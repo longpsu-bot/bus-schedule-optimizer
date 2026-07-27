@@ -31,6 +31,7 @@ from .solver_models import (
     ScheduleProblemV1,
     SolverPolicyV1,
 )
+from .terminal_occupancy import TERMINAL_OCCUPANCY_EVENT_ORDER
 
 PROBLEM_FINGERPRINT_PROFILE = "contract_v1_h4_problem"
 EMPTY_ADAPTER_CONTEXT_FINGERPRINT_PROFILE = "contract_v1_h4_empty_adapter_context"
@@ -126,6 +127,13 @@ def build_operating_parameter_locks_v1(
         "direction_trip_lock_mode": direction_trip_lock_mode.value,
         "operating_day_type": scenario_b.operating_day_type.value,
     }
+    if scenario_b.terminal_occupancy_limits is not None:
+        limits = scenario_b.terminal_occupancy_limits
+        values["terminal_occupancy_limits"] = {
+            "terminal_1": limits.terminal_1,
+            "terminal_2": limits.terminal_2,
+        }
+        values["terminal_occupancy_event_order"] = TERMINAL_OCCUPANCY_EVENT_ORDER
     for field, value in (adapter_operating_lock_values or {}).items():
         if field in values:
             raise ScheduleProblemError(
