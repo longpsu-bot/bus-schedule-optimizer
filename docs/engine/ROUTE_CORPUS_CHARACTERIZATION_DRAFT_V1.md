@@ -98,18 +98,19 @@ and characterization evidence and is never silently omitted or assigned a fabric
 target. Supporting accepted zero-trip or one-trip regimes requires a future, separately
 authorized Contract revision.
 
-## Terminal physical-occupancy limitation
+## Terminal physical-occupancy constraint and corpus limitation
 
 TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED
 
-The current fleet model evaluates route-vehicle availability, circulation,
-turnaround and ready stock. It does not evaluate the maximum number of vehicles
-that may be physically present or waiting at either terminal. Fleet feasibility
-must not be interpreted as terminal physical-occupancy feasibility.
+Contract V1 supports optional authoritative per-terminal physical vehicle-occupancy capacities
+in Scenario B. When supplied, arrivals count before same-minute departures and the constraint is
+enforced in Scenario B evaluation, canonical OR-Tools hard models, and independent candidate
+validation. This physical state remains separate from circulation ready stock.
 
 This limitation applies to both Alpha and Beta characterization. No per-terminal physical
-occupancy value was supplied or inferred, and no terminal-capacity constraint was enforced. It
-did not cause Alpha's solver statuses or Beta's proxy-coverage gap.
+occupancy value was supplied or inferred, so terminal-capacity feasibility cannot be claimed for
+either fixture. The missing limits did not cause Alpha's solver statuses or Beta's proxy-coverage
+gap.
 
 ## Natural unified-service execution
 

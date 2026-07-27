@@ -12,6 +12,7 @@ from .models import (
     DepartureTerminal,
     NormalizedInputBundleV1,
     ObservedDemandInput,
+    ScenarioBInput,
     ScenarioInputV1,
 )
 
@@ -178,6 +179,31 @@ def validate_scenario_input(scenario: ScenarioInputV1) -> ContractValidationResu
                     "approved_active_fleet must not exceed available_fleet_limit",
                 )
             )
+
+    if isinstance(scenario, ScenarioBInput) and scenario.terminal_occupancy_limits is not None:
+        limits = scenario.terminal_occupancy_limits
+        if limits.terminal_1 is None and limits.terminal_2 is None:
+            issues.append(
+                _issue(
+                    "EMPTY_TERMINAL_OCCUPANCY_LIMITS",
+                    f"{prefix}.terminal_occupancy_limits",
+                    "at least one terminal occupancy limit must be supplied",
+                )
+            )
+        for terminal_name, value in (
+            ("terminal_1", limits.terminal_1),
+            ("terminal_2", limits.terminal_2),
+        ):
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 1
+            ):
+                issues.append(
+                    _issue(
+                        "INVALID_TERMINAL_OCCUPANCY_LIMIT",
+                        f"{prefix}.terminal_occupancy_limits.{terminal_name}",
+                        "terminal occupancy limits must be integers >= 1",
+                    )
+                )
 
     first_times = (
         scenario.first_departures.terminal_1,

@@ -37,6 +37,16 @@
     "vehicle_capacity": {"type": "integer", "minimum": 1, "description": "Blocking required proposed capacity; never inferred."},
     "approved_active_fleet": {"type": ["integer", "null"], "minimum": 1, "description": "Optional governance metadata; not the default technical equality constraint."},
     "available_fleet_limit": {"type": "integer", "minimum": 1, "description": "Required hard upper bound on vehicles assigned to the route."},
+    "terminal_occupancy_limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "terminal_1": {"type": "integer", "minimum": 1},
+        "terminal_2": {"type": "integer", "minimum": 1}
+      },
+      "description": "Optional authoritative physical vehicle-occupancy capacities; missing terminal values are not inferred."
+    },
     "operating_day_type": {"enum": ["weekday", "saturday", "sunday", "holiday", "special"]},
     "exact_timetable": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/trip"}},
     "source_metadata": {"$ref": "#/$defs/sourceMetadata"}

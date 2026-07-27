@@ -50,7 +50,10 @@
     "scenario_a": {
       "anyOf": [{"$ref": "scenario_a_input.schema.json"}, {"type": "null"}]
     },
-    "scenario_b": {"$ref": "scenario_b_input.schema.json"},
+    "scenario_b": {
+      "$ref": "scenario_b_input.schema.json",
+      "description": "Canonical Scenario B, including optional per-terminal physical occupancy capacities when supplied."
+    },
     "demand_response_mode": {
       "type": ["string", "null"],
       "enum": ["static", "elasticity_scenario", "calibrated", null]

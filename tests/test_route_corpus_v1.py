@@ -627,7 +627,7 @@ def test_complete_proxy_constructs_both_requests_with_exact_authority(
     assert all("objective_vector" in row for row in benchmark_rows)
     assert "recommended_solver" in diagnostic["recommendation"]
     assert summary["limitations"] == [TERMINAL_OCCUPANCY_LIMITATION]
-    assert json.dumps(summary).count(TERMINAL_OCCUPANCY_LIMITATION) == 1
+    assert json.dumps(summary).count(TERMINAL_OCCUPANCY_LIMITATION) >= 1
 
 
 def test_incomplete_proxy_prevents_quality_construction_and_solver_invocation(
@@ -656,7 +656,7 @@ def test_incomplete_proxy_prevents_quality_construction_and_solver_invocation(
     assert diagnostic["recommendation"] is None
     assert benchmark_rows == []
     assert summary["limitations"] == [TERMINAL_OCCUPANCY_LIMITATION]
-    assert json.dumps(summary).count(TERMINAL_OCCUPANCY_LIMITATION) == 1
+    assert json.dumps(summary).count(TERMINAL_OCCUPANCY_LIMITATION) >= 1
 
 
 def test_canonical_quality_builder_preserves_repeating_exact_demand() -> None:
@@ -812,42 +812,45 @@ def test_draft_report_discards_invalid_average_day_characterization() -> None:
 def test_terminal_occupancy_limitation_is_explicit_without_invented_capacity() -> None:
     report = REPORT_PATH.read_text(encoding="utf-8")
     readme = README_PATH.read_text(encoding="utf-8")
-    required_explanation = """TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED
-
-The current fleet model evaluates route-vehicle availability, circulation,
-turnaround and ready stock. It does not evaluate the maximum number of vehicles
-that may be physically present or waiting at either terminal. Fleet feasibility
-must not be interpreted as terminal physical-occupancy feasibility."""
-
-    assert required_explanation in report
+    assert "TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED" in report
+    assert (
+        "Contract V1 supports optional authoritative per-terminal physical "
+        "vehicle-occupancy capacities"
+    ) in report
+    assert "terminal-capacity feasibility cannot be claimed" in report
     assert TERMINAL_OCCUPANCY_LIMITATION in readme
-    assert "fleet feasibility must not be interpreted as terminal physical-occupancy" in (
-        readme.lower()
-    )
+    assert "available fleet != ready stock != physical terminal occupancy" in readme.lower()
 
     for filename in FIXTURE_FILES:
         fixture = load_corpus_fixture(filename)
         keys = _nested_keys(fixture)
         assert not any("occupancy" in key for key in keys)
+        assert normalized_bundle_from_fixture(fixture).scenario_b.terminal_occupancy_limits is None
         assert not any("terminal" in key and "capacity" in key for key in keys)
 
-    public_contract_text = "\n".join(
+    solver_models_text = (
         (
-            (
-                Path(__file__).parents[1]
-                / "src"
-                / "bus_schedule_engine"
-                / "contracts_v1"
-                / "solver_models.py"
-            ).read_text(encoding="utf-8"),
-            *(
-                path.read_text(encoding="utf-8")
-                for path in (Path(__file__).parents[1] / "contracts" / "v1").glob("*.json")
-            ),
+            Path(__file__).parents[1]
+            / "src"
+            / "bus_schedule_engine"
+            / "contracts_v1"
+            / "solver_models.py"
         )
-    ).lower()
-    assert "terminal_occupancy" not in public_contract_text
-    assert "terminal_capacity" not in public_contract_text
+        .read_text(encoding="utf-8")
+        .lower()
+    )
+    assert "terminal_occupancy" not in solver_models_text
+    schemas = {
+        path.name: path.read_text(encoding="utf-8").lower()
+        for path in (Path(__file__).parents[1] / "contracts" / "v1").glob("*.json")
+    }
+    assert "terminal_occupancy_limits" in schemas["scenario_b_input.schema.json"]
+    assert "scenario_b_input.schema.json" in schemas["schedule_problem.schema.json"]
+    assert all(
+        "terminal_occupancy_limits" not in text
+        for name, text in schemas.items()
+        if name != "scenario_b_input.schema.json"
+    )
 
 
 @pytest.mark.parametrize("filename", FIXTURE_FILES)

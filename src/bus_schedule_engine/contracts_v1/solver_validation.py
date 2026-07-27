@@ -57,6 +57,10 @@ from .solver_models import (
 from .solver_problem import (
     NUMERIC_RECONCILIATION_TOLERANCE_MINUTES,
 )
+from .terminal_occupancy import (
+    TERMINAL_OCCUPANCY_EVENT_ORDER,
+    assess_terminal_occupancy_v1,
+)
 from .validation import validate_scenario_input
 
 _CONFIDENCE_RANK = {
@@ -671,6 +675,24 @@ def _maximum_simultaneous_vehicle_use(assignments) -> int:
     return maximum
 
 
+def _accepted_occupancy_explanations(assessment) -> tuple[str, ...]:
+    explanations: list[str] = []
+    for terminal_name, profile in (
+        ("terminal_1", assessment.terminal_1),
+        ("terminal_2", assessment.terminal_2),
+    ):
+        if profile.capacity is None:
+            continue
+        explanations.append(
+            f"Physical terminal occupancy uses {TERMINAL_OCCUPANCY_EVENT_ORDER}; "
+            f"{terminal_name} maximum_occupancy={profile.maximum_occupancy}, "
+            f"capacity={profile.capacity}, "
+            f"remaining_margin={profile.remaining_capacity_margin}, "
+            f"binding={str(profile.limit_binding).lower()}."
+        )
+    return tuple(explanations)
+
+
 def validate_and_build_solution_v1(
     context: ScheduleGenerationContextV1,
     candidate: RawScheduleCandidateV1,
@@ -759,6 +781,13 @@ def validate_and_build_solution_v1(
                 or assignment.ready_time != expected_arrival + expected_turnaround * 60
             ):
                 rejection_codes.append("ARRIVAL_TERMINAL_TURNAROUND_MISMATCH")
+
+    occupancy = assess_terminal_occupancy_v1(
+        candidate_scenario,
+        initial_terminal_1=fleet.recommended_initial_fleet_terminal_1,
+        initial_terminal_2=fleet.recommended_initial_fleet_terminal_2,
+    )
+    rejection_codes.extend(occupancy.issue_codes)
 
     if rejection_codes:
         codes = tuple(sorted(set(rejection_codes)))
@@ -863,12 +892,14 @@ def validate_and_build_solution_v1(
             "arrival-terminal fleet validation.",
             "Accepted arrivals use the locked source B per-trip runtimes and readiness "
             "uses the exact terminal-specific turnaround values.",
+            *_accepted_occupancy_explanations(occupancy),
         ),
         limitations=candidate.limitations
         + (
             "PR-03 supports available_upper_bound fleet constraints and "
             "solver_determined initial positioning only.",
-        ),
+        )
+        + occupancy.limitations,
     )
     final_integrity_errors = _solution_headway_regime_integrity_errors(
         provisional.c_exact_timetable,

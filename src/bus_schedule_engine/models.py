@@ -85,6 +85,8 @@ class ScenarioParameters:
     available_fleet_limit: int | None = None
     approved_active_fleet: int | None = None
     operating_day_type: str | None = None
+    terminal_1_max_occupancy_vehicles: int | None = None
+    terminal_2_max_occupancy_vehicles: int | None = None
 
     @property
     def regulatory_minimum_layover_minutes(self) -> int:

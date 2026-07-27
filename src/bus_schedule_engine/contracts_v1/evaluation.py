@@ -36,6 +36,12 @@ from .models import (
     ScenarioId,
     ScenarioInputV1,
 )
+from .terminal_occupancy import (
+    TERMINAL_1_OCCUPANCY_CAPACITY_EXCEEDED,
+    TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED,
+    _TerminalOccupancyProfileV1,
+    assess_terminal_occupancy_v1,
+)
 from .validation import validate_normalized_bundle
 
 
@@ -467,6 +473,55 @@ def assess_scenario_b_fleet_v1(scenario: ScenarioBInput) -> FleetAssessmentV1:
     )
 
 
+def _occupancy_violation_evidence(
+    profile: _TerminalOccupancyProfileV1,
+) -> tuple[str, ...]:
+    event = profile.first_violating_event
+    if event is None:
+        return (
+            f"configured_capacity={profile.capacity}",
+            f"maximum_physical_occupancy={profile.maximum_occupancy}",
+            "violating_event_time=INITIAL",
+            "arrival_trip_ids=",
+            "departure_trip_ids=",
+            f"occupancy_before_arrivals={profile.initial_physical_occupancy}",
+            f"occupancy_after_arrivals={profile.initial_physical_occupancy}",
+            f"occupancy_after_departures={profile.initial_physical_occupancy}",
+        )
+    return (
+        f"configured_capacity={profile.capacity}",
+        f"maximum_physical_occupancy={profile.maximum_occupancy}",
+        f"violating_event_time={event.event_time}",
+        f"arrival_trip_ids={','.join(event.arrival_trip_ids)}",
+        f"departure_trip_ids={','.join(event.departure_trip_ids)}",
+        f"occupancy_before_arrivals={event.occupancy_before_arrivals}",
+        f"occupancy_after_arrivals={event.occupancy_after_arrivals}",
+        f"occupancy_after_departures={event.occupancy_after_departures}",
+    )
+
+
+def _occupancy_technical_evidence(
+    terminal_name: str,
+    profile: _TerminalOccupancyProfileV1,
+) -> tuple[str, ...]:
+    if profile.capacity is None:
+        return ()
+    summary = (
+        f"{terminal_name}: event_order=ARRIVAL_BEFORE_DEPARTURE, "
+        f"initial_physical_occupancy={profile.initial_physical_occupancy}, "
+        f"maximum_physical_occupancy={profile.maximum_occupancy}, "
+        f"capacity={profile.capacity}, "
+        f"remaining_capacity_margin={profile.remaining_capacity_margin}, "
+        f"binding={str(profile.limit_binding).lower()}"
+    )
+    if not profile.limit_exceeded:
+        return (summary,)
+    return (
+        summary,
+        *(f"{terminal_name}.{item}" for item in _occupancy_violation_evidence(profile)),
+    )
+
+
 def _headway_dimension(
     scenario: ScenarioBInput,
     policy: ScenarioBEvaluationPolicyV1,
@@ -835,17 +890,62 @@ def evaluate_scenario_b_v1(
         issues=fleet_issue,
         evidence=fleet_evidence,
     )
-    technical_feasibility = _dimension(
-        fleet_status,
+    occupancy = assess_terminal_occupancy_v1(
+        bundle.scenario_b,
+        initial_terminal_1=fleet.recommended_initial_fleet_terminal_1,
+        initial_terminal_2=fleet.recommended_initial_fleet_terminal_2,
+    )
+    occupancy_issues: list[EvaluationIssueV1] = []
+    for terminal_name, profile, issue_code in (
         (
-            "The submitted B exact timetable is technically feasible under "
-            "solver-determined initial positioning."
-            if fleet.feasible
-            else "The submitted B exact timetable is technically infeasible under "
-            "the available fleet limit; this does not prove B's locked parameters infeasible."
+            "terminal_1",
+            occupancy.terminal_1,
+            TERMINAL_1_OCCUPANCY_CAPACITY_EXCEEDED,
         ),
-        issues=fleet_issue,
-        evidence=fleet_evidence,
+        (
+            "terminal_2",
+            occupancy.terminal_2,
+            TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED,
+        ),
+    ):
+        if profile.limit_exceeded:
+            occupancy_issues.append(
+                EvaluationIssueV1(
+                    code=issue_code,
+                    severity=EvaluationIssueSeverity.BLOCKING,
+                    message=(
+                        f"Scenario B exceeds the supplied physical occupancy capacity at "
+                        f"{terminal_name} under arrival-before-departure event ordering."
+                    ),
+                    references=(terminal_name, *_occupancy_violation_evidence(profile)),
+                    suggestion=(
+                        "Redistribute departure times without relaxing fleet, runtime, "
+                        "turnaround, or uniform-regime headway locks."
+                    ),
+                )
+            )
+    technical_status = (
+        DimensionStatus.PASS
+        if fleet.feasible and not occupancy.issue_codes
+        else DimensionStatus.FAIL
+    )
+    technical_evidence = (
+        *fleet_evidence,
+        *_occupancy_technical_evidence("terminal_1", occupancy.terminal_1),
+        *_occupancy_technical_evidence("terminal_2", occupancy.terminal_2),
+    )
+    technical_feasibility = _dimension(
+        technical_status,
+        (
+            "The submitted B exact timetable is technically feasible under solver-determined "
+            "minimum initial positioning and every supplied terminal occupancy capacity."
+            if technical_status == DimensionStatus.PASS
+            else "The submitted B exact timetable fails at least one available-fleet or "
+            "physical-terminal-occupancy hard constraint; this does not prove B's locked "
+            "parameters infeasible."
+        ),
+        issues=(*fleet_issue, *occupancy_issues),
+        evidence=technical_evidence,
     )
     headway_quality = _headway_dimension(bundle.scenario_b, policy)
 
@@ -884,7 +984,7 @@ def evaluate_scenario_b_v1(
         )
     demand_suitability = _demand_dimension(b_supply, resolution)
 
-    if not fleet.feasible:
+    if technical_status == DimensionStatus.FAIL:
         disposition = BDisposition.TECHNICALLY_INFEASIBLE_BUT_PARAMETERS_MAY_ALLOW_REDISTRIBUTION
     elif demand_suitability.status == DimensionStatus.INSUFFICIENT_DATA:
         disposition = BDisposition.INSUFFICIENT_DATA
@@ -912,7 +1012,7 @@ def evaluate_scenario_b_v1(
         for dimension in (
             demand_suitability,
             headway_quality,
-            fleet_feasibility,
+            technical_feasibility,
         )
         for issue in dimension.issues
         if issue.severity
@@ -930,6 +1030,7 @@ def evaluate_scenario_b_v1(
     ]
     if resolution is not None:
         limitations.extend(resolution.limitations)
+    limitations.extend(occupancy.limitations)
     if resolution is not None and any(
         block.direction == ContractDirection.COMBINED for block in resolution.blocks
     ):

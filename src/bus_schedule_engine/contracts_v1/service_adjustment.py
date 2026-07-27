@@ -922,6 +922,9 @@ def _technical_evidence(
         _assigned_turnaround_evidence(scenario)
     )
     issue_codes: list[str] = list(assignment_codes)
+    issue_codes.extend(
+        issue.code for issue in context.b_evaluation.evaluation.technical_feasibility.issues
+    )
     if not fleet.feasible:
         issue_codes.extend(("AVAILABLE_FLEET_LIMIT_EXCEEDED", FLEET_RATIO_ABOVE_ONE))
     if first_negative is not None:

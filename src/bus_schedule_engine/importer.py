@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import date, datetime
 from io import BytesIO
+from numbers import Integral, Real
 from pathlib import Path
 from typing import BinaryIO
 
@@ -100,6 +102,27 @@ def _required(mapping: dict[str, object], key: str, sheet_name: str) -> object:
     return value
 
 
+def _optional_positive_integer(
+    value: object | None,
+    *,
+    key: str,
+    sheet_name: str,
+) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise InputDataError(f"{key} trong {sheet_name} phải là số nguyên >= 1")
+    if isinstance(value, Integral) or (
+        isinstance(value, Real) and math.isfinite(float(value)) and float(value).is_integer()
+    ):
+        parsed = int(value)
+    else:
+        raise InputDataError(f"{key} trong {sheet_name} phải là số nguyên >= 1")
+    if parsed < 1:
+        raise InputDataError(f"{key} trong {sheet_name} phải là số nguyên >= 1")
+    return parsed
+
+
 def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
     sheet_name = f"THONG_SO_{scenario}"
     values = _key_value_sheet(frame, sheet_name)
@@ -115,6 +138,8 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
     available_fleet_raw = values.get("available_fleet_limit")
     approved_active_fleet_raw = values.get("approved_active_fleet")
     operating_day_type_raw = values.get("operating_day_type")
+    terminal_1_max_occupancy_raw = values.get("terminal_1_max_occupancy_vehicles")
+    terminal_2_max_occupancy_raw = values.get("terminal_2_max_occupancy_vehicles")
     try:
         runtime_options = parse_runtime_options(
             allowed_runtime_raw
@@ -160,6 +185,24 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
         ),
         operating_day_type=(
             None if operating_day_type_raw is None else str(operating_day_type_raw).strip()
+        ),
+        terminal_1_max_occupancy_vehicles=(
+            _optional_positive_integer(
+                terminal_1_max_occupancy_raw,
+                key="terminal_1_max_occupancy_vehicles",
+                sheet_name=sheet_name,
+            )
+            if scenario == "B"
+            else None
+        ),
+        terminal_2_max_occupancy_vehicles=(
+            _optional_positive_integer(
+                terminal_2_max_occupancy_raw,
+                key="terminal_2_max_occupancy_vehicles",
+                sheet_name=sheet_name,
+            )
+            if scenario == "B"
+            else None
         ),
     )
 

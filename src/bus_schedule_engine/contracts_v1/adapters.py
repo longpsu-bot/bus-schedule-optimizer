@@ -26,6 +26,7 @@ from .models import (
     ScenarioInputV1,
     SourceMetadata,
     TerminalDepartureTimes,
+    TerminalOccupancyLimitsV1,
     TripsByDirection,
     TurnaroundMinutes,
     VolumeClassification,
@@ -52,6 +53,8 @@ class NormalizationOptions:
     operating_day_type_a: OperatingDayType | None = None
     available_fleet_limit_a: int | None = None
     approved_active_fleet_a: int | None = None
+    terminal_1_max_occupancy_vehicles_b: int | None = None
+    terminal_2_max_occupancy_vehicles_b: int | None = None
     source_type: InputSourceType = InputSourceType.XLSX
     source_notes: str | None = None
     demand_dataset_id: str | None = None
@@ -103,6 +106,29 @@ def _approved_active_fleet(
     if parameters.approved_active_fleet is None:
         return None
     return int(parameters.approved_active_fleet)
+
+
+def _terminal_occupancy_limits(
+    parameters: ScenarioParameters,
+    terminal_1_override: int | None,
+    terminal_2_override: int | None,
+) -> TerminalOccupancyLimitsV1 | None:
+    terminal_1 = (
+        terminal_1_override
+        if terminal_1_override is not None
+        else parameters.terminal_1_max_occupancy_vehicles
+    )
+    terminal_2 = (
+        terminal_2_override
+        if terminal_2_override is not None
+        else parameters.terminal_2_max_occupancy_vehicles
+    )
+    if terminal_1 is None and terminal_2 is None:
+        return None
+    try:
+        return TerminalOccupancyLimitsV1(terminal_1=terminal_1, terminal_2=terminal_2)
+    except ValueError as exc:
+        raise NormalizationError(f"Invalid Scenario B terminal occupancy limit: {exc}") from exc
 
 
 def _operating_day_type(
@@ -167,6 +193,7 @@ def _scenario_input(
     operating_day_type: OperatingDayType,
     available_fleet_limit: int,
     approved_active_fleet: int | None,
+    terminal_occupancy_limits: TerminalOccupancyLimitsV1 | None,
 ) -> ScenarioInputV1:
     exact_timetable = tuple(
         sorted(
@@ -207,7 +234,10 @@ def _scenario_input(
     if scenario_id == "A":
         return ScenarioAInput(**common)
     if scenario_id == "B":
-        return ScenarioBInput(**common)
+        return ScenarioBInput(
+            **common,
+            terminal_occupancy_limits=terminal_occupancy_limits,
+        )
     raise NormalizationError(f"Unsupported scenario: {scenario_id}")
 
 
@@ -313,6 +343,7 @@ def normalize_imported_workbook_v1(
                 imported.parameters_a,
                 options.approved_active_fleet_a,
             ),
+            terminal_occupancy_limits=None,
         )
 
     scenario_b = _scenario_input(
@@ -333,6 +364,11 @@ def normalize_imported_workbook_v1(
         approved_active_fleet=_approved_active_fleet(
             imported.parameters_b,
             options.approved_active_fleet_b,
+        ),
+        terminal_occupancy_limits=_terminal_occupancy_limits(
+            imported.parameters_b,
+            options.terminal_1_max_occupancy_vehicles_b,
+            options.terminal_2_max_occupancy_vehicles_b,
         ),
     )
     observed_demand = (

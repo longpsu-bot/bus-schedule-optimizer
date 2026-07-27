@@ -55,10 +55,23 @@ service-quality adapter. `BOTH` independently validates both outcomes, recompute
 transparent lexicographic objective vector for accepted solutions, and recommends one outcome
 without a weighted score. Streamlit does not yet expose this selection.
 
-Fleet feasibility evaluates route-vehicle circulation, turnaround, ready stock, and the total
-available fleet. It does not evaluate physical terminal parking or waiting-bay occupancy:
-`TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED`. No per-terminal physical capacity is supplied or
-enforced, so fleet feasibility must not be interpreted as terminal physical-occupancy feasibility.
+Contract V1 keeps three independent quantities:
+
+- **available fleet** is the hard upper bound on active route vehicles;
+- **ready stock** changes at `arrival + terminal turnaround` and controls whether a vehicle can
+  serve another departure; and
+- **physical terminal occupancy** changes at arrival and departure and includes positioned,
+  unloading, turnaround, ready, waiting, boarding, and departing route vehicles.
+
+Therefore, available fleet != ready stock != physical terminal occupancy. Scenario B may
+optionally supply `terminal_occupancy_limits` for either or both terminals. Scenario B evaluation,
+all three canonical OR-Tools adapters, and independent candidate validation then enforce each
+supplied value as a hard physical-capacity constraint. Arrivals count before departures at the
+same minute. When neither value is supplied, the result retains
+`TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED`; a limit is never inferred from fleet, approved fleet,
+or the timetable. See
+[Contract V1 terminal physical occupancy](docs/engine/TERMINAL_OCCUPANCY_CAPACITY_V1.md) for the
+event equation, CP-SAT model size, and independent reconstruction boundary.
 
 ## Supported today
 
@@ -75,6 +88,8 @@ enforced, so fleet feasibility must not be interpreted as terminal physical-occu
   assessment.
 - OR-Tools v9.15 hard-feasibility solving through the Contract V1 adapter and independent
   validator.
+- Optional authoritative per-terminal physical vehicle-occupancy capacities, reconstructed from
+  grouped arrival/departure events and enforced by every canonical OR-Tools hard model.
 - Separate OR-Tools fixed-resource demand-priority solving for authoritative directional demand,
   covering no-service and overload protection before provisional B-preservation shift tie-breaks.
 - Separate OR-Tools fixed-resource service-quality solving for positive-demand gaps, exact
@@ -183,6 +198,9 @@ Optional sheets are:
 `total_daily_trips` is the total across both directions.
 `vehicle_capacity_passengers` is required. Times use `HH:mm`; dates use `dd/mm/yyyy`.
 `allowed_trip_runtime_minutes` accepts an inclusive integer range such as `55,65` or `55;65`.
+`THONG_SO_B` may optionally include `terminal_1_max_occupancy_vehicles` and
+`terminal_2_max_occupancy_vehicles`; each supplied value must be an integer of at least one.
+Either key may be omitted, and no current workbook is required to contain either key.
 Combined demand remains combined and must not be fabricated into directional demand.
 
 The current exporters create new workbooks and do not overwrite `Schedule template.xlsx`.
