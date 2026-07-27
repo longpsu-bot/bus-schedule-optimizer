@@ -1,0 +1,150 @@
+{
+  "approved_policy": {
+    "alpha_disposition": {
+      "canonical_request_eligibility": [
+        "HEURISTIC",
+        "OR_TOOLS_QUALITY"
+      ],
+      "coverage_status": "COMPLETE",
+      "independent_validation_required_for_any_candidate": true,
+      "longer_solve_required_for_review": false,
+      "solver_observations_policy": "HISTORICAL_DIAGNOSTIC_ONLY"
+    },
+    "beta_disposition": {
+      "canonical_request_eligible": false,
+      "coverage_gap": {
+        "code": "PROXY_INTERIOR_HOUR_UNOBSERVED",
+        "direction": "terminal_1_to_2",
+        "interval_end": "18:00",
+        "interval_start": "17:00"
+      },
+      "coverage_status": "PROXY_COVERAGE_INCOMPLETE",
+      "recommendation_eligible": false,
+      "solver_execution_eligible": false,
+      "vector_eligible": false
+    },
+    "boundary_policy": {
+      "final_block_end": "ONE_MINUTE_AFTER_SCENARIO_B_LOCKED_FINAL_DEPARTURE",
+      "first_block_start": "MAX_OBSERVED_HOUR_START_AND_SCENARIO_B_FIRST_DEPARTURE",
+      "interior_unobserved_hour_policy": "PRESERVE_GAP_WITHOUT_INTERPOLATION_STRETCH_OR_ZERO_DEMAND",
+      "interval_convention": "HALF_OPEN",
+      "ordinary_observed_hour": "[H:00, H+1:00)"
+    },
+    "demand_proxy": {
+      "confidence": "LOW",
+      "exact_source_totals_raise_confidence": false,
+      "observation_days": 15,
+      "proxy_status": "PROXY_SENSITIVITY_ONLY",
+      "raw_trip_observations_contract_v1_eligible": false,
+      "volume_classification": "total_observation_period"
+    },
+    "fleet_values": {
+      "classification": "corpus_scenario_assumption",
+      "minimum_required_fleet": false,
+      "observed_source_fact": false,
+      "operational_fleet_requirement_approved": false,
+      "terminal_occupancy_limit": false
+    },
+    "historical_optimized_sheets": {
+      "allowed_use": "DIAGNOSTIC_ONLY_HISTORICAL_REFERENCE",
+      "excluded_from_authoritative_corpus_construction": true,
+      "sheets": [
+        "BIEU_DO_TOI_UU",
+        "DANH_GIA_TOI_UU",
+        "PHAN_BO_THEO_GIO"
+      ]
+    },
+    "terminal_occupancy": {
+      "capacity_evaluated": false,
+      "inference_sources_prohibited": [
+        "approved_fleet",
+        "available_fleet",
+        "current_vehicle_positioning",
+        "terminal_names",
+        "timetable_occupancy"
+      ],
+      "limitation": "TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED",
+      "limits_supplied": false
+    }
+  },
+  "baseline_id": "ROUTE_CORPUS_V1_REVIEWED_DIAGNOSTIC",
+  "corpus_version": "1",
+  "fixtures": [
+    {
+      "coverage_gaps": [],
+      "fixture_id": "CORPUS-ALPHA-80",
+      "fleet_assumptions": {
+        "available_fleet_limit_a": 5,
+        "available_fleet_limit_b": 8,
+        "classification": "corpus_scenario_assumption"
+      },
+      "manifest_fixture_file": "corpus_alpha_80.json",
+      "proxy_coverage_status": "COMPLETE",
+      "source_sha256_reference": "085608bc9a326b1fe68e41aa9488c8382d27e2a83307b1d97fb66953c4b30c3f",
+      "terminal_occupancy_limitation": "TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED",
+      "terminal_occupancy_limits_supplied": false
+    },
+    {
+      "coverage_gaps": [
+        {
+          "code": "PROXY_INTERIOR_HOUR_UNOBSERVED",
+          "direction": "terminal_1_to_2",
+          "interval_end": "18:00",
+          "interval_start": "17:00"
+        }
+      ],
+      "fixture_id": "CORPUS-BETA-46",
+      "fleet_assumptions": {
+        "available_fleet_limit_a": 4,
+        "available_fleet_limit_b": 7,
+        "classification": "corpus_scenario_assumption"
+      },
+      "manifest_fixture_file": "corpus_beta_46.json",
+      "proxy_coverage_status": "PROXY_COVERAGE_INCOMPLETE",
+      "source_sha256_reference": "0b886ad7670eeb47bda53690ae905d473a1b0397fc4817ca0c674675650fd159",
+      "terminal_occupancy_limitation": "TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED",
+      "terminal_occupancy_limits_supplied": false
+    }
+  ],
+  "frozen_invariants": [
+    "ALPHA_CANONICAL_REQUEST_ELIGIBILITY",
+    "ANONYMIZATION_PROFILE",
+    "BETA_CANONICAL_REQUEST_INELIGIBILITY",
+    "BOUNDARY_POLICY",
+    "COVERAGE_AND_GAP_HANDLING",
+    "DEMAND_CONFIDENCE_AND_PROXY_STATUS",
+    "DIRECTIONAL_TRIP_COUNTS",
+    "EXACT_RATIONAL_DEMAND_CONVERSION",
+    "EXACT_TIMETABLE_ROW_COUNTS",
+    "FIXTURE_IDENTITY",
+    "HISTORICAL_SHEET_EXCLUSION",
+    "HONEST_SOLVER_STATUS_INTERPRETATION",
+    "NO_FABRICATED_OPERATIONAL_FACTS",
+    "OBSERVATION_DAYS_AND_VOLUME_CLASSIFICATION",
+    "OVERLAP_PRESERVATION",
+    "PROXY_DIRECTIONAL_VOLUME_CONSERVATION",
+    "RAW_OBSERVATION_COUNTS",
+    "RUNTIME_SOURCE_FACTS",
+    "SOURCE_SHA256",
+    "TERMINAL_OCCUPANCY_LIMIT_ABSENCE_AND_LIMITATION"
+  ],
+  "non_frozen_observations": [
+    "ACCEPTED_SOLUTION",
+    "ACTIVE_OR_BINDING_FLEET_CONSTRAINTS",
+    "ACTIVE_OR_BINDING_TURNAROUND_CONSTRAINTS",
+    "CANDIDATE_EXISTENCE",
+    "CANDIDATE_FINGERPRINT",
+    "EXACT_H_R_VALUES",
+    "NATIVE_SOLVER_STATUS",
+    "OBJECTIVE_VECTOR",
+    "OPERATIONAL_TIMETABLE_QUALITY",
+    "OUTCOME_FINGERPRINT",
+    "RECOMMENDATION",
+    "SOLVER_DURATION",
+    "TERMINAL_OCCUPANCY_FEASIBILITY"
+  ],
+  "operational_timetable_approved": false,
+  "review_status": "REVIEWED_DIAGNOSTIC_BASELINE",
+  "solver_quality_baseline_approved": false,
+  "terminal_capacity_feasibility_approved": false
+}

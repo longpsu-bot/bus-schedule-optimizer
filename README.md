@@ -105,7 +105,8 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 - Solver selection through Streamlit.
 - OR-Tools fleet-minimization objectives.
 - A globally optimal timetable or a proof of infeasibility from the legacy heuristic.
-- Approval of the draft anonymized real-route corpus as a permanent regression baseline.
+- Operational-timetable, ridership-forecast, or solver-quality approval of the anonymized
+  real-route corpus.
 - Variable-trip-count optimization.
 - Accepted zero-trip or one-trip headway regimes under the current public Contract V1 shape;
   supporting those cases requires a separately authorized future Contract revision.
@@ -132,13 +133,16 @@ Only an independently validated candidate may be presented as authoritative Scen
 
 ## Near-term roadmap
 
-1. Obtain expert approval for the draft anonymized real-route corpus characterization.
-2. Run side-by-side UI, chart, and XLSX validation against unified results.
-3. Cut the UI and XLSX over only after that validation is approved.
+Milestone 4C2C is complete. The active next task is **Milestone 5A: side-by-side unified-service
+UI/chart/XLSX validation**.
 
-## Draft anonymized route corpus
+1. Build a side-by-side legacy versus unified result adapter.
+2. Validate charts and XLSX against authoritative unified facts.
+3. Cut over Streamlit only after discrepancies are reviewed.
 
-Milestone 4C1 now includes two versioned, anonymized, real-route-derived fixtures under
+## Reviewed anonymized route corpus
+
+Milestone 4C2C approves the versioned, anonymized, real-route-derived fixtures under
 `tests/fixtures/route_corpus/v1/`. The private source workbooks remain external and uncommitted.
 Overlapping raw trip-observation evidence is preserved separately from a LOW-confidence,
 departure-hour sensitivity proxy. Proxy values retain their exact 15-day
@@ -147,9 +151,19 @@ departure-hour sensitivity proxy. Proxy values retain their exact 15-day
 LOW-confidence sensitivity characterization when the exact canonical request is constructible;
 Beta remains solver-free because its evidence has an unobserved interior hour.
 
-The corpus and solver characterization are drafts, not approved operational timetables or frozen
-solver regression expectations. UI, chart, and XLSX cutover remains blocked on corpus review and
-approval.
+The corpus status is **REVIEWED DIAGNOSTIC BASELINE**. It protects source facts, anonymization,
+normalization, proxy construction, coverage handling, exact demand authority, request
+eligibility, honest solver-status interpretation, and the rule against fabricated operational
+facts. It is not an approved operational timetable, ridership forecast, optimal schedule,
+solver-performance benchmark, solver-quality baseline, or terminal-capacity-feasibility
+baseline. Current solver outcomes and timings remain non-frozen diagnostic observations.
+
+See
+[Route Corpus Reviewed Baseline V1](docs/engine/ROUTE_CORPUS_REVIEWED_BASELINE_V1.md) for the
+approved policy boundary and
+[Route Corpus Characterization Draft V1](docs/engine/ROUTE_CORPUS_CHARACTERIZATION_DRAFT_V1.md)
+for detailed historical evidence. The Streamlit UI, charts, and XLSX exports have not yet migrated
+to unified Contract V1 results.
 
 Variable-trip-count optimization and structural demand-response scenarios are optional later
 stages. See [Migration Roadmap to OR-Tools](docs/engine/MIGRATION_ROADMAP_TO_OR_TOOLS.md).

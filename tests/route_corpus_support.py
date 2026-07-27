@@ -29,6 +29,7 @@ from bus_schedule_engine.models import (
 
 CORPUS_DIR = Path(__file__).parent / "fixtures" / "route_corpus" / "v1"
 FIXTURE_FILES = ("corpus_alpha_80.json", "corpus_beta_46.json")
+REVIEWED_BASELINE_FILE = "reviewed_baseline.json"
 
 
 def load_corpus_fixture(filename: str) -> dict[str, Any]:
@@ -39,6 +40,10 @@ def load_corpus_fixture(filename: str) -> dict[str, Any]:
 
 def load_manifest() -> dict[str, Any]:
     return json.loads((CORPUS_DIR / "manifest.json").read_text(encoding="utf-8"))
+
+
+def load_reviewed_baseline() -> dict[str, Any]:
+    return json.loads((CORPUS_DIR / REVIEWED_BASELINE_FILE).read_text(encoding="utf-8"))
 
 
 def raw_trip_observations(fixture: dict[str, Any]) -> list[dict[str, Any]]:
