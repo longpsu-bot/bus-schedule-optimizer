@@ -13,10 +13,12 @@ import pytest
 from route_corpus_support import (
     CORPUS_DIR,
     FIXTURE_FILES,
+    REVIEWED_BASELINE_FILE,
     fact_fingerprint,
     imported_workbook_from_fixture,
     load_corpus_fixture,
     load_manifest,
+    load_reviewed_baseline,
     normalization_options_from_fixture,
     normalized_bundle_from_fixture,
     proxy_demand_blocks,
@@ -85,6 +87,9 @@ HISTORICAL_SHEETS = {
 }
 REPORT_PATH = (
     Path(__file__).parents[1] / "docs" / "engine" / "ROUTE_CORPUS_CHARACTERIZATION_DRAFT_V1.md"
+)
+REVIEWED_REPORT_PATH = (
+    Path(__file__).parents[1] / "docs" / "engine" / "ROUTE_CORPUS_REVIEWED_BASELINE_V1.md"
 )
 README_PATH = Path(__file__).parents[1] / "README.md"
 TERMINAL_OCCUPANCY_LIMITATION = "TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED"
@@ -175,10 +180,233 @@ def test_manifest_hashes_classifications_and_proxy_policy() -> None:
         )
 
 
+def test_reviewed_baseline_json_is_byte_deterministic_and_has_review_status() -> None:
+    baseline = load_reviewed_baseline()
+
+    assert (CORPUS_DIR / REVIEWED_BASELINE_FILE).read_bytes() == _canonical_bytes(baseline)
+    assert "generated_timestamp" not in baseline
+    assert baseline["corpus_version"] == "1"
+    assert baseline["review_status"] == "REVIEWED_DIAGNOSTIC_BASELINE"
+    assert baseline["operational_timetable_approved"] is False
+    assert baseline["solver_quality_baseline_approved"] is False
+    assert baseline["terminal_capacity_feasibility_approved"] is False
+
+
+def test_reviewed_fixture_ids_and_source_hashes_reconcile_with_manifest() -> None:
+    baseline = load_reviewed_baseline()
+    manifest_by_id = {entry["fixture_id"]: entry for entry in load_manifest()["fixtures"]}
+
+    assert {entry["fixture_id"] for entry in baseline["fixtures"]} == set(manifest_by_id)
+    for reviewed in baseline["fixtures"]:
+        manifest_entry = manifest_by_id[reviewed["fixture_id"]]
+        fixture = load_corpus_fixture(reviewed["manifest_fixture_file"])
+        assert fixture["fixture_id"] == reviewed["fixture_id"]
+        assert reviewed["source_sha256_reference"] == manifest_entry["source_sha256"]
+        assert reviewed["source_sha256_reference"] == fixture["source_sha256"]
+
+
+def test_reviewed_fleet_values_remain_scenario_assumptions_not_observed_facts() -> None:
+    baseline = load_reviewed_baseline()
+    policy = baseline["approved_policy"]["fleet_values"]
+    manifest_by_id = {entry["fixture_id"]: entry for entry in load_manifest()["fixtures"]}
+
+    assert policy == {
+        "classification": "corpus_scenario_assumption",
+        "minimum_required_fleet": False,
+        "observed_source_fact": False,
+        "operational_fleet_requirement_approved": False,
+        "terminal_occupancy_limit": False,
+    }
+    for reviewed in baseline["fixtures"]:
+        fixture = load_corpus_fixture(reviewed["manifest_fixture_file"])
+        manifest_entry = manifest_by_id[reviewed["fixture_id"]]
+        manifest_assumptions = {
+            item["field"]: item for item in manifest_entry["scenario_assumptions"]
+        }
+        fleet = reviewed["fleet_assumptions"]
+
+        assert fleet["classification"] == "corpus_scenario_assumption"
+        for field in ("available_fleet_limit_a", "available_fleet_limit_b"):
+            assert fleet[field] == fixture["normalization_options"][field]
+            assert manifest_assumptions[field] == {
+                "classification": "corpus_scenario_assumption",
+                "field": field,
+                "value": fleet[field],
+            }
+        assert not any(
+            field in json.dumps(manifest_entry["observed_source_facts"])
+            for field in ("available_fleet_limit_a", "available_fleet_limit_b")
+        )
+
+
+def test_reviewed_demand_confidence_proxy_status_and_raw_eligibility() -> None:
+    baseline = load_reviewed_baseline()
+    policy = baseline["approved_policy"]["demand_proxy"]
+
+    assert policy["confidence"] == "LOW"
+    assert policy["proxy_status"] == "PROXY_SENSITIVITY_ONLY"
+    assert policy["exact_source_totals_raise_confidence"] is False
+    assert policy["raw_trip_observations_contract_v1_eligible"] is False
+    assert policy["observation_days"] == 15
+    assert policy["volume_classification"] == "total_observation_period"
+    for filename in FIXTURE_FILES:
+        fixture = load_corpus_fixture(filename)
+        raw = fixture["demand_observations"]["raw_trip_observations"]
+        proxy = fixture["demand_observations"]["departure_hour_proxy_v1"]
+        assert raw["contract_v1_demand_interval_eligible"] is False
+        assert fixture["normalization_options"]["demand_confidence"] == policy["confidence"]
+        assert proxy["demand_confidence"] == policy["confidence"]
+        assert proxy["proxy_status"] == policy["proxy_status"]
+        assert {row["observation_days"] for row in raw["rows"]} == {policy["observation_days"]}
+
+
+def test_reviewed_coverage_and_beta_gap_match_fixture_evidence() -> None:
+    baseline = load_reviewed_baseline()
+    policy = baseline["approved_policy"]
+    reviewed_by_id = {entry["fixture_id"]: entry for entry in baseline["fixtures"]}
+
+    alpha = reviewed_by_id["CORPUS-ALPHA-80"]
+    assert alpha["proxy_coverage_status"] == "COMPLETE"
+    assert alpha["coverage_gaps"] == []
+    assert policy["alpha_disposition"]["coverage_status"] == "COMPLETE"
+    assert policy["alpha_disposition"]["canonical_request_eligibility"] == [
+        "HEURISTIC",
+        "OR_TOOLS_QUALITY",
+    ]
+
+    beta = reviewed_by_id["CORPUS-BETA-46"]
+    expected_gap = {
+        "code": "PROXY_INTERIOR_HOUR_UNOBSERVED",
+        "direction": "terminal_1_to_2",
+        "interval_end": "18:00",
+        "interval_start": "17:00",
+    }
+    assert beta["proxy_coverage_status"] == "PROXY_COVERAGE_INCOMPLETE"
+    assert beta["coverage_gaps"] == [expected_gap]
+    assert policy["beta_disposition"]["coverage_status"] == "PROXY_COVERAGE_INCOMPLETE"
+    assert policy["beta_disposition"]["coverage_gap"] == expected_gap
+    assert policy["beta_disposition"]["canonical_request_eligible"] is False
+    assert policy["beta_disposition"]["solver_execution_eligible"] is False
+    assert policy["beta_disposition"]["vector_eligible"] is False
+    assert policy["beta_disposition"]["recommendation_eligible"] is False
+
+    beta_fixture = load_corpus_fixture("corpus_beta_46.json")
+    assert beta_fixture["demand_observations"]["departure_hour_proxy_v1"]["coverage_issues"] == [
+        {
+            **expected_gap,
+            "reason": (
+                "No Scenario A trip departs in this interior clock hour; demand is not "
+                "fabricated, interpolated, or absorbed into a neighboring block."
+            ),
+            "surrounding_observed_hours": ["16:00", "18:00"],
+        }
+    ]
+
+
+def test_reviewed_proxy_volume_conservation_and_boundary_policy_are_frozen() -> None:
+    baseline = load_reviewed_baseline()
+    boundary = baseline["approved_policy"]["boundary_policy"]
+
+    assert "PROXY_DIRECTIONAL_VOLUME_CONSERVATION" in baseline["frozen_invariants"]
+    assert "BOUNDARY_POLICY" in baseline["frozen_invariants"]
+    assert boundary == {
+        "final_block_end": "ONE_MINUTE_AFTER_SCENARIO_B_LOCKED_FINAL_DEPARTURE",
+        "first_block_start": "MAX_OBSERVED_HOUR_START_AND_SCENARIO_B_FIRST_DEPARTURE",
+        "interior_unobserved_hour_policy": (
+            "PRESERVE_GAP_WITHOUT_INTERPOLATION_STRETCH_OR_ZERO_DEMAND"
+        ),
+        "interval_convention": "HALF_OPEN",
+        "ordinary_observed_hour": "[H:00, H+1:00)",
+    }
+    for filename in FIXTURE_FILES:
+        fixture = load_corpus_fixture(filename)
+        raw = raw_trip_observations(fixture)
+        proxy = proxy_demand_blocks(fixture)
+        for direction in ("terminal_1_to_2", "terminal_2_to_1"):
+            assert sum(
+                row["passenger_volume"] for row in raw if row["direction"] == direction
+            ) == sum(
+                block["passenger_volume"] for block in proxy if block["direction"] == direction
+            )
+
+
+def test_reviewed_historical_sheets_remain_excluded() -> None:
+    baseline = load_reviewed_baseline()
+    policy = baseline["approved_policy"]["historical_optimized_sheets"]
+
+    assert policy["allowed_use"] == "DIAGNOSTIC_ONLY_HISTORICAL_REFERENCE"
+    assert policy["excluded_from_authoritative_corpus_construction"] is True
+    assert set(policy["sheets"]) == HISTORICAL_SHEETS
+    assert load_manifest()["historical_source_sheet_policy"] == (
+        "HISTORICAL_NON_AUTHORITATIVE_REFERENCE"
+    )
+    for filename in FIXTURE_FILES:
+        assert set(load_corpus_fixture(filename)["excluded_source_sheets"]) == HISTORICAL_SHEETS
+
+
+def test_reviewed_terminal_occupancy_absence_and_limitation_are_frozen() -> None:
+    baseline = load_reviewed_baseline()
+    policy = baseline["approved_policy"]["terminal_occupancy"]
+
+    assert policy["limits_supplied"] is False
+    assert policy["capacity_evaluated"] is False
+    assert policy["limitation"] == TERMINAL_OCCUPANCY_LIMITATION
+    assert baseline["terminal_capacity_feasibility_approved"] is False
+    for reviewed in baseline["fixtures"]:
+        fixture = load_corpus_fixture(reviewed["manifest_fixture_file"])
+        assert reviewed["terminal_occupancy_limits_supplied"] is False
+        assert reviewed["terminal_occupancy_limitation"] == TERMINAL_OCCUPANCY_LIMITATION
+        assert not any("occupancy" in key for key in _nested_keys(fixture))
+        assert normalized_bundle_from_fixture(fixture).scenario_b.terminal_occupancy_limits is None
+
+
+def test_reviewed_solver_observations_are_explicitly_non_frozen() -> None:
+    non_frozen = set(load_reviewed_baseline()["non_frozen_observations"])
+
+    assert {
+        "ACCEPTED_SOLUTION",
+        "ACTIVE_OR_BINDING_FLEET_CONSTRAINTS",
+        "ACTIVE_OR_BINDING_TURNAROUND_CONSTRAINTS",
+        "CANDIDATE_EXISTENCE",
+        "CANDIDATE_FINGERPRINT",
+        "EXACT_H_R_VALUES",
+        "NATIVE_SOLVER_STATUS",
+        "OBJECTIVE_VECTOR",
+        "OPERATIONAL_TIMETABLE_QUALITY",
+        "OUTCOME_FINGERPRINT",
+        "RECOMMENDATION",
+        "SOLVER_DURATION",
+        "TERMINAL_OCCUPANCY_FEASIBILITY",
+    } <= non_frozen
+
+
+def test_reviewed_docs_and_readme_preserve_the_approved_boundary() -> None:
+    reviewed_report = REVIEWED_REPORT_PATH.read_text(encoding="utf-8")
+    report_lower = reviewed_report.lower()
+    readme = README_PATH.read_text(encoding="utf-8")
+    draft = REPORT_PATH.read_text(encoding="utf-8")
+
+    assert "**REVIEWED DIAGNOSTIC BASELINE**" in reviewed_report
+    assert "**NOT AN APPROVED OPERATIONAL TIMETABLE**" in reviewed_report
+    assert "is an approved operational timetable" not in report_lower
+    assert "alpha is feasible" not in report_lower
+    assert "alpha is infeasible" not in report_lower
+    assert "alpha is optimal" not in report_lower
+    assert "beta demand is complete" not in report_lower
+    assert "beta's demand is complete" not in report_lower
+    assert "PROXY_COVERAGE_INCOMPLETE" in reviewed_report
+    assert "Milestone 4C2C is complete" in readme
+    assert "Milestone 5A" in readme
+    assert "The Streamlit UI, charts, and XLSX exports have not yet migrated" in readme
+    assert "## Questions requiring expert approval" not in draft
+    assert "## Approved review decisions" in draft
+    assert "Timings and current" in draft and "non-frozen observations" in draft
+
+
 def test_committed_payload_has_no_absolute_path_or_private_route_identifier() -> None:
     text = "\n".join(
         (CORPUS_DIR / filename).read_text(encoding="utf-8")
-        for filename in (*FIXTURE_FILES, "manifest.json")
+        for filename in (*FIXTURE_FILES, "manifest.json", REVIEWED_BASELINE_FILE)
     )
 
     assert not re.search(r"[A-Za-z]:[\\/]", text)

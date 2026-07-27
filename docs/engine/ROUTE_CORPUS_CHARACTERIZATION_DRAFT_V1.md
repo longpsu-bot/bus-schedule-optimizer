@@ -2,6 +2,10 @@
 
 **DRAFT — NOT AN APPROVED OPERATIONAL TIMETABLE**
 
+> **Historical diagnostic characterization.** The approved policy boundary is now
+> [Route Corpus Reviewed Baseline V1](ROUTE_CORPUS_REVIEWED_BASELINE_V1.md). Timings and current
+> solver outcomes in this draft remain non-frozen observations.
+
 **Milestone:** 4C2A exact rational demand authority, hard uniform headways inside adaptive
 demand-derived regimes, and real-route-derived differential characterization.
 
@@ -236,12 +240,20 @@ not by themselves establish operational timetable quality.
 - The earlier average-day/unscaled characterization remains discarded.
 - UI, charts, and XLSX export do not consume these unified results.
 
-## Questions requiring expert approval
+## Approved review decisions
 
-1. Are fleet assumptions 5/8 and 4/7 acceptable corpus assumptions?
-2. Is LOW confidence appropriate for `departure_hour_proxy_v1`?
-3. Are the first/final half-open boundary method and Beta gap correctly represented?
-4. Is a longer or differently bounded Alpha solve warranted after this deterministic 30-second
-   `UNKNOWN` characterization?
-5. Which future accepted outcomes, if any, should become reviewed corpus baselines?
-6. Should the historical optimized workbook sheet remain diagnostic-only?
+Milestone 4C2C approved the following policy boundary:
+
+1. Fleet values 5/8 for Alpha and 4/7 for Beta are scenario assumptions, not observed facts or
+   operational fleet requirements.
+2. `departure_hour_proxy_v1` remains `LOW` confidence and `PROXY_SENSITIVITY_ONLY`.
+3. The half-open, endpoint-aware block policy is approved, and Beta's outbound `17:00`-`18:00`
+   interval remains a real coverage gap without interpolation or fabricated demand.
+4. No longer Alpha solve is required for this review; current statuses, candidates, fingerprints,
+   vectors, recommendations, and timings remain non-frozen.
+5. Any future solver candidate must cross independent validation; no specific solver outcome is a
+   reviewed regression expectation.
+6. `DANH_GIA_TOI_UU`, `PHAN_BO_THEO_GIO`, and `BIEU_DO_TOI_UU` remain diagnostic-only historical
+   references and are excluded from authoritative corpus construction.
+7. Neither fixture supplies terminal occupancy limits, so
+   `TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED` remains in force.

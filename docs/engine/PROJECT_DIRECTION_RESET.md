@@ -181,6 +181,12 @@ boundary. OR-Tools is not a dependency and no CP-SAT adapter or model exists.
    UI and exports, compare legacy/heuristic/CP-SAT results during cutover, and remove duplicated
    calculations from presentation code.
 
+Milestone 4 fixed-resource solver implementation and route-corpus evidence are complete for the
+reviewed diagnostic scope. The corpus review does not approve an operational timetable or freeze
+solver-quality outcomes. The active next milestone is Milestone 5 UI/XLSX cutover, beginning with
+side-by-side legacy-versus-unified validation before any Streamlit, chart, or XLSX authority
+changes.
+
 Variable-trip-count optimization and structural demand-response scenarios are later optional
 work. They do not block fixed-resource hard feasibility.
 
