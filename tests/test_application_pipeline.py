@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import inspect
+from copy import deepcopy
 from dataclasses import FrozenInstanceError, fields, replace
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
+from typing import get_type_hints
 
 import pytest
 from openpyxl import load_workbook
@@ -41,6 +43,7 @@ from bus_schedule_engine.input_authority import (
     DEMAND_RESPONSE_MODE_REQUIRED_FOR_OPTIMIZATION,
     DEMAND_SOURCE_TYPE_REQUIRED_FOR_OPTIMIZATION,
     OPERATING_DAY_TYPE_REQUIRED_FOR_OPTIMIZATION,
+    WorkbookInputReadinessV1,
 )
 from bus_schedule_engine.optimization_service import (
     analyze_and_optimize_schedule_v1,
@@ -174,6 +177,9 @@ def test_public_application_api_and_model_shape() -> None:
         "failure_code",
         "failure_message",
     }
+    assert get_type_hints(ParallelApplicationRunV1)["input_readiness"] == (
+        WorkbookInputReadinessV1 | None
+    )
     assert list(inspect.signature(run_parallel_application_pipeline_v1).parameters) == [
         "imported",
         "source_id",
@@ -192,17 +198,27 @@ def test_complete_template_runs_legacy_once_and_unified_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     imported = _template_import(tmp_path)
+    original = deepcopy(imported)
     calls = {"legacy": 0, "unified": 0}
+    received: dict[str, ImportedWorkbook] = {}
     real_legacy = ui_utils.run_analysis
     real_unified = application.analyze_and_optimize_schedule_v1
 
     def legacy_spy(value):
         calls["legacy"] += 1
+        received["legacy"] = value
+        value.configuration["legacy_spy_mutation"] = True
         return real_legacy(value)
 
     def unified_spy(value, options, **kwargs):
         calls["unified"] += 1
-        return real_unified(value, options, **kwargs)
+        received["unified"] = value
+        assert "legacy_spy_mutation" not in value.configuration
+        result = real_unified(value, options, **kwargs)
+        value.trips_b.clear()
+        value.demand.clear()
+        value.configuration["unified_spy_mutation"] = True
+        return result
 
     monkeypatch.setattr(ui_utils, "run_analysis", legacy_spy)
     monkeypatch.setattr(application, "analyze_and_optimize_schedule_v1", unified_spy)
@@ -214,8 +230,19 @@ def test_complete_template_runs_legacy_once_and_unified_once(
     )
 
     assert calls == {"legacy": 1, "unified": 1}
+    assert imported == original
+    assert received["legacy"] is not imported
+    assert received["unified"] is not imported
+    assert received["legacy"] is not received["unified"]
+    assert received["legacy"].trips_b is not received["unified"].trips_b
+    assert "unified_spy_mutation" not in received["legacy"].configuration
     assert run.status == ParallelRuntimeStatusV1.PARALLEL_VALIDATION_COMPLETE
     assert run.input_readiness.optimization_ready is True
+    result_b = run.legacy_bundle.get("B")
+    assert result_b is not None
+    assert result_b.trips
+    assert result_b.trips is not imported.trips_b
+    assert result_b.trips[0] is not imported.trips_b[0]
     assert run.unified_result is not None
     assert run.side_by_side_report is not None
     assert run.unified_presentation is not None
@@ -574,6 +601,47 @@ def test_unexpected_unified_failure_retains_exact_legacy_result(
     assert run.legacy_artifacts is expected[2]
     assert run.failure_code == UNIFIED_SHADOW_RUNTIME_FAILURE
     assert run.failure_message == "synthetic unified failure"
+
+
+def test_unexpected_readiness_failure_retains_exact_legacy_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported = _template_import(tmp_path)
+    expected = (run_analysis(imported), object(), {"xlsx": b"legacy"})
+    monkeypatch.setattr(application, "run_and_build_artifacts", lambda value: expected)
+
+    def fail_readiness(_imported):
+        raise RuntimeError("synthetic readiness failure")
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("unified service must not run after readiness failure")
+
+    monkeypatch.setattr(
+        application,
+        "assess_workbook_input_readiness_v1",
+        fail_readiness,
+    )
+    monkeypatch.setattr(application, "analyze_and_optimize_schedule_v1", forbidden)
+    run = run_parallel_application_pipeline_v1(
+        imported,
+        source_id=SOURCE_ID,
+        imported_at=IMPORTED_AT,
+    )
+
+    assert run.status == ParallelRuntimeStatusV1.UNIFIED_RUNTIME_FAILED
+    assert run.legacy_bundle is expected[0]
+    assert run.legacy_figure is expected[1]
+    assert run.legacy_artifacts is expected[2]
+    assert run.input_readiness is None
+    assert run.unified_result is None
+    assert run.side_by_side_report is None
+    assert run.unified_presentation is None
+    assert run.unified_demand_supply_figure is None
+    assert run.unified_departure_figure is None
+    assert run.unified_xlsx_bytes is None
+    assert run.failure_code == UNIFIED_SHADOW_RUNTIME_FAILURE
+    assert run.failure_message == "synthetic readiness failure"
 
 
 def test_unexpected_legacy_failure_still_blocks_the_ordinary_run(

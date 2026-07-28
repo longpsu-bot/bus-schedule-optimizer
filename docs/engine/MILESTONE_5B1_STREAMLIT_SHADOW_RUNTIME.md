@@ -25,6 +25,11 @@ uploaded workbook bytes
 `run_and_build_artifacts(...)` path exactly once. The returned legacy bundle, overview figure,
 XLSX files, HTML, PNG, and Scenario C fingerprint are passed through without replacement.
 
+Before either execution path runs, the application deep-copies the imported workbook into
+independent legacy and unified inputs. Mutable trip lists, demand lists, configuration, and nested
+trip objects are therefore not shared between the caller, the legacy bundle, and unified
+normalization or analysis.
+
 When the workbook is optimization-ready, the runtime calls
 `analyze_and_optimize_schedule_v1(...)` exactly once. The public
 `build_side_by_side_validation_report_v1(...)` then compares the already computed legacy and
@@ -44,6 +49,10 @@ Readiness is assessed after import and user overrides. If optimization authority
 
 This preserves legacy diagnostic analysis for workbooks such as a blank
 `available_fleet_limit`, while the unified path fails closed.
+
+Readiness assessment is part of the guarded post-legacy shadow stage. If readiness assessment
+itself raises unexpectedly, the runtime returns `UNIFIED_RUNTIME_FAILED`, retains the completed
+legacy artifacts, and leaves `input_readiness=None`; it does not invent readiness evidence.
 
 ## 4. Parallel session-state evidence
 
@@ -103,11 +112,11 @@ the exported metadata before retaining the XLSX bytes.
 Legacy execution remains the ordinary blocking boundary. If it fails, the submission fails as it
 did before.
 
-After legacy artifacts succeed, an unexpected unified exception or artifact-integrity mismatch
+After legacy artifacts succeed, an unexpected readiness, unified, or artifact-integrity exception
 returns `UNIFIED_RUNTIME_FAILED` with stable code `UNIFIED_SHADOW_RUNTIME_FAILED` and a concise
-message. The exact legacy bundle, figure, and downloads remain available. All partial unified
-objects are discarded, and Streamlit displays one warning that visible results still use the
-legacy pipeline.
+message. The exact legacy bundle, figure, and downloads remain available. Readiness is retained
+only if its assessment completed successfully; all partial unified objects are discarded, and
+Streamlit displays one warning that visible results still use the legacy pipeline.
 
 ## 7. No visible results-page cutover
 

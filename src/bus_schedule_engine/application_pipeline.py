@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -55,7 +56,7 @@ class ParallelApplicationRunV1:
     legacy_bundle: AnalysisBundle
     legacy_figure: object
     legacy_artifacts: Mapping[str, bytes]
-    input_readiness: WorkbookInputReadinessV1
+    input_readiness: WorkbookInputReadinessV1 | None
     unified_result: BusScheduleOptimizationResult | None
     side_by_side_report: SideBySideValidationReportV1 | None
     unified_presentation: UnifiedPresentationBundleV1 | None
@@ -149,7 +150,7 @@ def _failed_shadow_run(
     legacy_bundle: AnalysisBundle,
     legacy_figure: object,
     legacy_artifacts: Mapping[str, bytes],
-    input_readiness: WorkbookInputReadinessV1,
+    input_readiness: WorkbookInputReadinessV1 | None,
     source_id: str,
     imported_at: datetime,
     exc: Exception,
@@ -182,36 +183,38 @@ def run_parallel_application_pipeline_v1(
     solver_choice: SolverChoice = SolverChoice.HEURISTIC,
 ) -> ParallelApplicationRunV1:
     """Run legacy once, then build non-authoritative unified evidence when ready."""
-    legacy_bundle, legacy_figure, legacy_artifacts = run_and_build_artifacts(imported)
-    input_readiness = assess_workbook_input_readiness_v1(imported)
-
-    if not input_readiness.optimization_ready:
-        return ParallelApplicationRunV1(
-            status=ParallelRuntimeStatusV1.INPUT_NOT_READY,
-            legacy_bundle=legacy_bundle,
-            legacy_figure=legacy_figure,
-            legacy_artifacts=legacy_artifacts,
-            input_readiness=input_readiness,
-            unified_result=None,
-            side_by_side_report=None,
-            unified_presentation=None,
-            unified_demand_supply_figure=None,
-            unified_departure_figure=None,
-            unified_xlsx_bytes=None,
-            source_id=source_id,
-            imported_at=imported_at,
-            failure_code=None,
-            failure_message=None,
-        )
+    legacy_input = deepcopy(imported)
+    unified_input = deepcopy(imported)
+    legacy_bundle, legacy_figure, legacy_artifacts = run_and_build_artifacts(legacy_input)
+    input_readiness: WorkbookInputReadinessV1 | None = None
 
     try:
+        input_readiness = assess_workbook_input_readiness_v1(unified_input)
+        if not input_readiness.optimization_ready:
+            return ParallelApplicationRunV1(
+                status=ParallelRuntimeStatusV1.INPUT_NOT_READY,
+                legacy_bundle=legacy_bundle,
+                legacy_figure=legacy_figure,
+                legacy_artifacts=legacy_artifacts,
+                input_readiness=input_readiness,
+                unified_result=None,
+                side_by_side_report=None,
+                unified_presentation=None,
+                unified_demand_supply_figure=None,
+                unified_departure_figure=None,
+                unified_xlsx_bytes=None,
+                source_id=source_id,
+                imported_at=imported_at,
+                failure_code=None,
+                failure_message=None,
+            )
         normalization_options = normalization_options_from_workbook_v1(
-            imported,
+            unified_input,
             source_id=source_id,
             imported_at=imported_at,
         )
         unified_result = analyze_and_optimize_schedule_v1(
-            imported,
+            unified_input,
             normalization_options,
             solver_choice=solver_choice,
         )
