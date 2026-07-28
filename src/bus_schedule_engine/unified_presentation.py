@@ -930,6 +930,25 @@ def _presentation_fingerprint(presentation: UnifiedPresentationBundleV1) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
+def verify_unified_presentation_integrity_v1(
+    presentation: UnifiedPresentationBundleV1,
+) -> None:
+    """Reject presentation copies whose mode or semantic fingerprint is stale."""
+    if not isinstance(presentation, UnifiedPresentationBundleV1):
+        raise TypeError("presentation must be a UnifiedPresentationBundleV1")
+    if presentation.presentation_mode != PRESENTATION_MODE_VALIDATION_ONLY:
+        raise _consistency_error(
+            "PRESENTATION_MODE_MISMATCH",
+            "unified presentation artifacts must remain VALIDATION_ONLY",
+        )
+    expected_fingerprint = _presentation_fingerprint(presentation)
+    if presentation.presentation_fingerprint != expected_fingerprint:
+        raise _consistency_error(
+            "PRESENTATION_FINGERPRINT_MISMATCH",
+            "stored presentation fingerprint does not match its semantic contents",
+        )
+
+
 def build_unified_presentation_v1(
     result: BusScheduleOptimizationResult,
     validation_report: SideBySideValidationReportV1,
@@ -1034,4 +1053,5 @@ __all__ = [
     "UnifiedPresentationConsistencyError",
     "build_unified_presentation_v1",
     "unified_presentation_to_dict",
+    "verify_unified_presentation_integrity_v1",
 ]

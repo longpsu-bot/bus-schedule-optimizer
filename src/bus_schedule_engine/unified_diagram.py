@@ -10,6 +10,7 @@ from .unified_presentation import (
     PRESENTATION_MODE_VALIDATION_ONLY,
     PresentationTripV1,
     UnifiedPresentationBundleV1,
+    verify_unified_presentation_integrity_v1,
 )
 
 _STATUS_COLORS = {
@@ -68,6 +69,7 @@ def build_unified_demand_supply_figure_v1(
     """Build an exact-grain demand/supply figure without rerunning business logic."""
     if not isinstance(presentation, UnifiedPresentationBundleV1):
         raise TypeError("presentation must be a UnifiedPresentationBundleV1")
+    verify_unified_presentation_integrity_v1(presentation)
 
     blocks = presentation.blocks
     categories = [_block_category(block) for block in blocks]
@@ -231,6 +233,7 @@ def build_unified_departure_figure_v1(
     """Build exact A/B/accepted-C departure lanes on a continuous service axis."""
     if not isinstance(presentation, UnifiedPresentationBundleV1):
         raise TypeError("presentation must be a UnifiedPresentationBundleV1")
+    verify_unified_presentation_integrity_v1(presentation)
 
     figure = go.Figure()
     lane_order: list[str] = []

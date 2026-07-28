@@ -13,7 +13,12 @@ The adapters are independently callable:
 build_unified_presentation_v1(result, validation_report)
 build_unified_demand_supply_figure_v1(presentation)
 build_unified_departure_figure_v1(presentation)
-export_unified_result_workbook_v1(presentation, path, overwrite=False)
+export_unified_result_workbook_v1(
+    presentation,
+    path,
+    overwrite=False,
+    source_workbook_path=None,
+)
 read_unified_export_metadata_v1(path)
 ```
 
@@ -90,13 +95,20 @@ contains source B trip, B and C departures, shift, regime, reason, vehicle, and 
 
 Both figures store presentation mode, presentation fingerprint, B fingerprint, accepted-solution
 fingerprint, accepted-C state and authority, cutover state, review codes, and exact demand-grain
-label in `layout.meta`. Neither figure calls a legacy chart builder.
+label in `layout.meta`. Before rendering, both call
+`verify_unified_presentation_integrity_v1(...)` to require `VALIDATION_ONLY` mode and verify that
+the stored semantic fingerprint still matches the complete presentation. Neither figure calls a
+legacy chart builder.
 
 ## 8. XLSX outputs
 
-`export_unified_result_workbook_v1(...)` defaults to `overwrite=False`, refuses an existing target,
-and refuses a target that is the declared source workbook. It creates plain `.xlsx` cells without
-macros, protection, or business formulas.
+`export_unified_result_workbook_v1(...)` defaults to `overwrite=False` and refuses an existing
+target. `source_id` remains a logical runtime identity and is never interpreted as a filesystem
+path. A caller may provide `source_workbook_path` as separate filesystem safety metadata; the
+exporter rejects an output resolving to that path. `overwrite=True` requires
+`source_workbook_path`, because source-path safety cannot otherwise be proven. The safety path is
+not stored in the presentation or included in its semantic fingerprint. The exporter creates
+plain `.xlsx` cells without macros, protection, or business formulas.
 
 The workbook contains `TONG_QUAN`, optional `A_BIEU_DO`, mandatory `B_BIEU_DO`, exact
 `CUNG_CAU_BLOCK`, `DANH_GIA_B`, `SOLVER`, `DOI_CHIEU_5A1`, `GIOI_HAN`, and `FINGERPRINTS`.
@@ -116,6 +128,10 @@ fleet and headway facts, all side-by-side records, explanations, and limitations
 
 It excludes output paths, workbook timestamps, Plotly styling and dimensions, solver-duration
 telemetry, and temporary paths. Contract fingerprints are not recalculated or modified.
+`verify_unified_presentation_integrity_v1(...)` recomputes this canonical fingerprint while
+excluding the stored fingerprint field and raises `PRESENTATION_FINGERPRINT_MISMATCH` when a
+copied or modified presentation retains stale metadata. A non-validation presentation mode is
+also rejected before any chart or workbook is emitted.
 `read_unified_export_metadata_v1(...)` reads the presentation fingerprint, B fingerprint,
 accepted-solution fingerprint, source ID, mode, and cutover state from `FINGERPRINTS` to validate
 artifact alignment. That reader is not business authority.

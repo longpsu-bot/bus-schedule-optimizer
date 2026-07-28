@@ -14,9 +14,17 @@ from presentation_support import (
     rejected_result_and_report,
 )
 
+import bus_schedule_engine.unified_presentation as unified_presentation
 from bus_schedule_engine import comparison_exporter, excel_exporter
 from bus_schedule_engine.optimization_service import SolverChoice
-from bus_schedule_engine.unified_presentation import build_unified_presentation_v1
+from bus_schedule_engine.unified_diagram import (
+    build_unified_demand_supply_figure_v1,
+    build_unified_departure_figure_v1,
+)
+from bus_schedule_engine.unified_presentation import (
+    UnifiedPresentationConsistencyError,
+    build_unified_presentation_v1,
+)
 from bus_schedule_engine.unified_result_exporter import (
     UnifiedExportMetadataV1,
     export_unified_result_workbook_v1,
@@ -61,6 +69,104 @@ def _seconds(excel_time: float | timedelta | None) -> int | None:
     if isinstance(excel_time, timedelta):
         return round(excel_time.total_seconds())
     return round(excel_time * 86_400)
+
+
+def _with_recomputed_fingerprint(presentation):
+    without_fingerprint = replace(presentation, presentation_fingerprint="")
+    return replace(
+        without_fingerprint,
+        presentation_fingerprint=unified_presentation._presentation_fingerprint(
+            without_fingerprint
+        ),
+    )
+
+
+def _with_changed_b_departure(presentation):
+    scenario_b = presentation.scenario("B")
+    assert scenario_b is not None
+    changed_trip = replace(
+        scenario_b.trips[0],
+        departure_time_seconds=scenario_b.trips[0].departure_time_seconds + 60,
+    )
+    changed_b = replace(
+        scenario_b,
+        trips=(changed_trip, *scenario_b.trips[1:]),
+    )
+    return replace(
+        presentation,
+        scenarios=tuple(
+            changed_b if item.scenario_id == "B" else item for item in presentation.scenarios
+        ),
+    )
+
+
+def _with_changed_block(presentation):
+    changed = replace(
+        presentation.blocks[0],
+        passenger_demand=presentation.blocks[0].passenger_demand + 1,
+    )
+    return replace(presentation, blocks=(changed, *presentation.blocks[1:]))
+
+
+def _with_changed_outcome(presentation):
+    return replace(
+        presentation,
+        outcome=replace(presentation.outcome, selected_action="NO_CHANGE"),
+    )
+
+
+def _with_changed_discrepancy(presentation):
+    changed = replace(
+        presentation.discrepancies[0],
+        explanation=presentation.discrepancies[0].explanation + " changed",
+    )
+    return replace(
+        presentation,
+        discrepancies=(changed, *presentation.discrepancies[1:]),
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        _with_changed_b_departure,
+        _with_changed_block,
+        _with_changed_outcome,
+        _with_changed_discrepancy,
+        lambda presentation: replace(
+            presentation,
+            presentation_mode="AUTHORITATIVE",
+        ),
+        lambda presentation: replace(
+            presentation,
+            presentation_fingerprint="f" * 64,
+        ),
+    ),
+    ids=(
+        "b-departure",
+        "block-value",
+        "outcome-field",
+        "discrepancy-record",
+        "presentation-mode",
+        "stored-fingerprint",
+    ),
+)
+def test_all_artifact_builders_reject_modified_presentations(
+    mutation,
+    tmp_path: Path,
+    accepted_presentation,
+) -> None:
+    changed = mutation(accepted_presentation)
+    for builder in (
+        build_unified_demand_supply_figure_v1,
+        build_unified_departure_figure_v1,
+    ):
+        with pytest.raises(UnifiedPresentationConsistencyError):
+            builder(changed)
+    target = tmp_path / "must-not-exist.xlsx"
+    with pytest.raises(UnifiedPresentationConsistencyError):
+        export_unified_result_workbook_v1(changed, target)
+    assert not target.exists()
 
 
 def test_export_creates_only_new_path_by_default_and_refuses_existing(
@@ -388,34 +494,96 @@ def test_rejected_candidate_timetable_is_absent_but_codes_are_visible(
         workbook.close()
 
 
-def test_source_input_bytes_are_unchanged(
+def test_logical_source_id_is_not_interpreted_as_a_path(
+    monkeypatch,
+    tmp_path: Path,
+    accepted_presentation,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    presentation = _with_recomputed_fingerprint(
+        replace(accepted_presentation, source_id="input.xlsx")
+    )
+    target = tmp_path / "input.xlsx"
+
+    export_unified_result_workbook_v1(presentation, target)
+    metadata = read_unified_export_metadata_v1(target)
+
+    assert metadata.source_id == "input.xlsx"
+
+
+def test_different_source_and_output_paths_export_successfully(
     tmp_path: Path,
     accepted_presentation,
 ) -> None:
     source = tmp_path / "source.xlsx"
     source.write_bytes(b"source workbook bytes stay untouched")
-    before = hashlib.sha256(source.read_bytes()).hexdigest()
-    presentation = replace(accepted_presentation, source_id=str(source))
+    target = tmp_path / "separate-output.xlsx"
 
-    export_unified_result_workbook_v1(presentation, tmp_path / "separate-output.xlsx")
+    assert (
+        export_unified_result_workbook_v1(
+            accepted_presentation,
+            target,
+            source_workbook_path=source,
+        )
+        == target
+    )
+    assert target.exists()
 
-    assert hashlib.sha256(source.read_bytes()).hexdigest() == before
 
-
-def test_export_refuses_source_path_even_with_overwrite(
+def test_equal_source_and_output_paths_are_rejected_even_with_overwrite(
     tmp_path: Path,
     accepted_presentation,
 ) -> None:
     source = tmp_path / "source.xlsx"
     source.write_bytes(b"source")
-    presentation = replace(accepted_presentation, source_id=str(source))
     with pytest.raises(ValueError, match="source workbook"):
         export_unified_result_workbook_v1(
-            presentation,
+            accepted_presentation,
             source,
             overwrite=True,
+            source_workbook_path=source,
         )
     assert source.read_bytes() == b"source"
+
+
+def test_overwrite_requires_source_path_safety_metadata(
+    tmp_path: Path,
+    accepted_presentation,
+) -> None:
+    target = tmp_path / "existing.xlsx"
+    target.write_bytes(b"existing output")
+
+    with pytest.raises(
+        ValueError,
+        match="SOURCE_WORKBOOK_PATH_REQUIRED_FOR_OVERWRITE",
+    ):
+        export_unified_result_workbook_v1(
+            accepted_presentation,
+            target,
+            overwrite=True,
+        )
+    assert target.read_bytes() == b"existing output"
+
+
+def test_source_input_bytes_are_unchanged_when_different_output_is_overwritten(
+    tmp_path: Path,
+    accepted_presentation,
+) -> None:
+    source = tmp_path / "source.xlsx"
+    source.write_bytes(b"source workbook bytes stay untouched")
+    target = tmp_path / "existing-output.xlsx"
+    target.write_bytes(b"replaceable output")
+    before = hashlib.sha256(source.read_bytes()).hexdigest()
+
+    export_unified_result_workbook_v1(
+        accepted_presentation,
+        target,
+        overwrite=True,
+        source_workbook_path=source,
+    )
+
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == before
+    assert target.read_bytes() != b"replaceable output"
 
 
 def test_exporter_does_not_call_legacy_exporters(

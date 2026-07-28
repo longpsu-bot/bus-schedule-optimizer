@@ -9,6 +9,7 @@ from presentation_support import (
     build_result_and_report,
 )
 
+import bus_schedule_engine.unified_presentation as unified_presentation
 from bus_schedule_engine import diagram
 from bus_schedule_engine.unified_diagram import (
     build_unified_demand_supply_figure_v1,
@@ -189,7 +190,17 @@ def test_midnight_crossing_axis_is_continuous_and_chronological(
     scenarios = tuple(
         changed_b if item.scenario_id == "B" else item for item in accepted_presentation.scenarios
     )
-    presentation = replace(accepted_presentation, scenarios=scenarios)
+    changed_presentation = replace(
+        accepted_presentation,
+        scenarios=scenarios,
+        presentation_fingerprint="",
+    )
+    presentation = replace(
+        changed_presentation,
+        presentation_fingerprint=unified_presentation._presentation_fingerprint(
+            changed_presentation
+        ),
+    )
     figure = build_unified_departure_figure_v1(presentation)
     trace = _trace(figure, "B · outbound")
 

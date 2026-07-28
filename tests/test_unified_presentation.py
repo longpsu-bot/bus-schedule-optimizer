@@ -29,6 +29,7 @@ from bus_schedule_engine.unified_presentation import (
     UnifiedPresentationConsistencyError,
     build_unified_presentation_v1,
     unified_presentation_to_dict,
+    verify_unified_presentation_integrity_v1,
 )
 
 
@@ -82,6 +83,33 @@ def test_serialization_and_fingerprint_are_deterministic_and_json_compatible(
     assert accepted_presentation.presentation_fingerprint == repeated.presentation_fingerprint
     assert len(accepted_presentation.presentation_fingerprint) == 64
     assert json.loads(json.dumps(first, sort_keys=True)) == first
+
+
+def test_integrity_verifier_rejects_stale_fingerprint_and_non_validation_mode(
+    accepted_presentation,
+) -> None:
+    verify_unified_presentation_integrity_v1(accepted_presentation)
+
+    with pytest.raises(
+        UnifiedPresentationConsistencyError,
+        match="PRESENTATION_FINGERPRINT_MISMATCH",
+    ):
+        verify_unified_presentation_integrity_v1(
+            replace(
+                accepted_presentation,
+                presentation_fingerprint="0" * 64,
+            )
+        )
+    with pytest.raises(
+        UnifiedPresentationConsistencyError,
+        match="PRESENTATION_MODE_MISMATCH",
+    ):
+        verify_unified_presentation_integrity_v1(
+            replace(
+                accepted_presentation,
+                presentation_mode="AUTHORITATIVE",
+            )
+        )
 
 
 def test_public_identity_and_contract_fingerprints_are_preserved(

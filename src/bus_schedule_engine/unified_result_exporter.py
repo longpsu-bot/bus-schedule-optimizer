@@ -11,7 +11,10 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.worksheet import Worksheet
 
-from .unified_presentation import UnifiedPresentationBundleV1
+from .unified_presentation import (
+    UnifiedPresentationBundleV1,
+    verify_unified_presentation_integrity_v1,
+)
 
 _HEADER_FILL = PatternFill("solid", fgColor="1F4E78")
 _SUBHEADER_FILL = PatternFill("solid", fgColor="D9EAF7")
@@ -695,30 +698,29 @@ def _write_fingerprints(
     )
 
 
-def _source_path_matches(
-    presentation: UnifiedPresentationBundleV1,
-    target: Path,
-) -> bool:
-    source = Path(presentation.source_id)
-    return source.suffix.lower() in {".xlsx", ".xlsm", ".xls"} and (
-        source.resolve(strict=False) == target.resolve(strict=False)
-    )
-
-
 def export_unified_result_workbook_v1(
     presentation: UnifiedPresentationBundleV1,
     path: str | Path,
     *,
     overwrite: bool = False,
+    source_workbook_path: str | Path | None = None,
 ) -> Path:
     """Write a formula-free validation workbook aligned to one presentation."""
     if not isinstance(presentation, UnifiedPresentationBundleV1):
         raise TypeError("presentation must be a UnifiedPresentationBundleV1")
+    verify_unified_presentation_integrity_v1(presentation)
     target = Path(path)
-    if _source_path_matches(presentation, target):
-        raise ValueError("output path must not overwrite the presentation source workbook")
     if target.exists() and not overwrite:
         raise FileExistsError(target)
+    if source_workbook_path is not None and (
+        Path(source_workbook_path).resolve(strict=False) == target.resolve(strict=False)
+    ):
+        raise ValueError("output path must not overwrite the presentation source workbook")
+    if overwrite and source_workbook_path is None:
+        raise ValueError(
+            "SOURCE_WORKBOOK_PATH_REQUIRED_FOR_OVERWRITE: "
+            "source_workbook_path is required when overwrite=True"
+        )
     target.parent.mkdir(parents=True, exist_ok=True)
 
     workbook = Workbook()

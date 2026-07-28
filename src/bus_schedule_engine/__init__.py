@@ -57,6 +57,7 @@ from .unified_presentation import (
     UnifiedPresentationConsistencyError,
     build_unified_presentation_v1,
     unified_presentation_to_dict,
+    verify_unified_presentation_integrity_v1,
 )
 from .unified_result_exporter import (
     UnifiedExportMetadataV1,
@@ -115,4 +116,5 @@ __all__ = [
     "select_optimization_action",
     "side_by_side_report_to_dict",
     "unified_presentation_to_dict",
+    "verify_unified_presentation_integrity_v1",
 ]
