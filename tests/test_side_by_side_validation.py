@@ -22,6 +22,7 @@ from bus_schedule_engine import (
     ComparisonStatusV1,
     SideBySideValidationReportV1,
     SolverChoice,
+    build_side_by_side_validation_report_v1,
     run_side_by_side_validation_v1,
     side_by_side_report_to_dict,
 )
@@ -213,6 +214,10 @@ def _rebuild_report(
 
 
 def test_required_baseline_api_imports_and_signature() -> None:
+    assert (
+        bus_schedule_engine.build_side_by_side_validation_report_v1
+        is build_side_by_side_validation_report_v1
+    )
     assert bus_schedule_engine.run_side_by_side_validation_v1 is run_side_by_side_validation_v1
     assert bus_schedule_engine.side_by_side_report_to_dict is side_by_side_report_to_dict
     signature = inspect.signature(run_side_by_side_validation_v1)
@@ -227,6 +232,37 @@ def test_required_baseline_api_imports_and_signature() -> None:
         "solver_policy",
     ]
     assert signature.parameters["solver_choice"].default == SolverChoice.HEURISTIC
+
+
+def test_pure_builder_matches_runner_without_invoking_either_execution_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _small_fixed_resource_fixture()
+    legacy_bundle = side_by_side.run_analysis(deepcopy(imported))
+    unified_result = analyze_and_optimize_schedule_v1(deepcopy(imported), options)
+    expected = run_side_by_side_validation_v1(imported, options)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("pure report building must not run an analysis path")
+
+    monkeypatch.setattr(side_by_side, "run_analysis", forbidden)
+    monkeypatch.setattr(side_by_side, "analyze_and_optimize_schedule_v1", forbidden)
+
+    report = build_side_by_side_validation_report_v1(
+        legacy_bundle,
+        unified_result,
+    )
+
+    assert report == expected
+    assert report.legacy_snapshot.terminal_occupancy_status == (
+        expected.legacy_snapshot.terminal_occupancy_status
+    )
+    assert report.unified_snapshot.terminal_occupancy_issue_codes == (
+        expected.unified_snapshot.terminal_occupancy_issue_codes
+    )
+    assert report.blocking_discrepancy_codes == expected.blocking_discrepancy_codes
+    assert report.expert_review_required_codes == expected.expert_review_required_codes
+    assert report.informational_codes == expected.informational_codes
 
 
 def test_models_are_frozen_slotted_and_enums_are_strings() -> None:

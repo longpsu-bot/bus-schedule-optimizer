@@ -1713,9 +1713,22 @@ def run_side_by_side_validation_v1(
         heuristic_config=heuristic_config,
         solver_policy=solver_policy,
     )
-    legacy_snapshot = _build_legacy_snapshot(legacy_result)
-    unified_snapshot = _build_unified_snapshot(unified_result)
-    return _report(legacy_snapshot, unified_snapshot)
+    return build_side_by_side_validation_report_v1(legacy_result, unified_result)
+
+
+def build_side_by_side_validation_report_v1(
+    legacy_bundle: AnalysisBundle,
+    unified_result: BusScheduleOptimizationResult,
+) -> SideBySideValidationReportV1:
+    """Compare already computed legacy and unified results without rerunning either path."""
+    if not isinstance(legacy_bundle, AnalysisBundle):
+        raise TypeError("legacy_bundle must be an AnalysisBundle")
+    if not isinstance(unified_result, BusScheduleOptimizationResult):
+        raise TypeError("unified_result must be a BusScheduleOptimizationResult")
+    return _report(
+        _build_legacy_snapshot(legacy_bundle),
+        _build_unified_snapshot(unified_result),
+    )
 
 
 def _serialize(value: object) -> object:
@@ -1762,6 +1775,7 @@ __all__ = [
     "TimetableSnapshotV1",
     "TimetableTripSnapshotV1",
     "UnifiedPathSnapshotV1",
+    "build_side_by_side_validation_report_v1",
     "run_side_by_side_validation_v1",
     "side_by_side_report_to_dict",
 ]
