@@ -49,6 +49,12 @@ field still imports, but `normalization_options_from_workbook_v1(...)` fails clo
 codes before Contract V1 normalization. See
 [Milestone 5A2A authoritative input template](docs/engine/MILESTONE_5A2A_AUTHORITATIVE_INPUT_TEMPLATE.md).
 
+Milestone 5A2B adds parallel validation-only unified chart and editable-XLSX adapters. Both chart
+types and the workbook consume one deterministic unified presentation fingerprint built from the
+Contract V1 result and the Milestone 5A1 report. This does not cut over Streamlit: the current UI,
+session state, charts, and downloads remain legacy-authoritative. See
+[Milestone 5A2B unified presentation adapters](docs/engine/MILESTONE_5A2B_UNIFIED_PRESENTATION_ADAPTERS.md).
+
 Contract V1 includes separate OR-Tools v9.15 CP-SAT adapters for one-route, fixed-resource hard
 feasibility, directional demand-priority optimization, and service-quality optimization. The
 feasibility adapter remains an objective-free satisfaction model. Demand protection remains the
@@ -106,6 +112,8 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 - Unified fixed-resource solver selection with heuristic-only continuity by default, explicit
   15-stage OR-Tools service-quality solving, and transparent `BOTH` comparison of independently
   validated accepted solutions.
+- Parallel validation-only unified demand/supply and exact-departure figures plus an editable
+  formula-free XLSX workbook, all aligned by one semantic presentation fingerprint.
 
 ## Not supported yet
 
@@ -121,7 +129,8 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 - Production implementation of the deferred V1-A1 structural demand-response workflow.
 - Mixed fleets, multi-route interlining, deadhead, driver duties, depot pull-in/out, maintenance,
   or mature cross-midnight optimization.
-- Charts and XLSX do not yet consume unified Contract V1 optimization results.
+- The current Streamlit charts and downloads do not yet consume unified Contract V1 optimization
+  results; the Milestone 5A2B adapters are parallel validation artifacts only.
 
 ## Target pipeline
 
@@ -141,12 +150,14 @@ Only an independently validated candidate may be presented as authoritative Scen
 
 ## Near-term roadmap
 
-Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation and Milestone 5A2A
-authoritative input readiness are implemented**, but Milestone 5 is not complete.
+Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation, Milestone 5A2A
+authoritative input readiness, and Milestone 5A2B validation-only presentation adapters are
+implemented**, but Milestone 5 is not complete.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
 2. Milestone 5A2A: stabilize authoritative workbook input and readiness.
-3. Milestone 5A2B: validate unified presentation adapters for charts and XLSX.
+3. Milestone 5A2B: validate parallel unified presentation adapters for charts and XLSX
+   (implemented; no Streamlit cutover).
 4. Cut over Streamlit only after discrepancies are reviewed in a later authorized milestone.
 
 See
@@ -176,7 +187,7 @@ See
 approved policy boundary and
 [Route Corpus Characterization Draft V1](docs/engine/ROUTE_CORPUS_CHARACTERIZATION_DRAFT_V1.md)
 for detailed historical evidence. The Streamlit UI, charts, and XLSX exports have not yet migrated
-to unified Contract V1 results.
+to unified Contract V1 results. The 5A2B unified artifacts remain a separate validation path.
 
 Variable-trip-count optimization and structural demand-response scenarios are optional later
 stages. See [Migration Roadmap to OR-Tools](docs/engine/MIGRATION_ROADMAP_TO_OR_TOOLS.md).
