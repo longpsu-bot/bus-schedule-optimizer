@@ -242,13 +242,13 @@ def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) ->
             "allowed_trip_runtime_minutes",
             parameters.runtime_options_text,
             REQUIRED_LABEL,
-            "Thẩm quyền runtime chính xác; 55,65 cho phép mọi số phút nguyên từ 55 đến 65",
+            "Định dạng runtime ưu tiên; có thể dùng trip_runtime_minutes cho file tương thích cũ.",
         ),
         (
             "trip_runtime_minutes",
             parameters.default_trip_runtime_minutes,
             OPTIONAL_LABEL,
-            "Tương thích file cũ; dùng khi không có allowed_trip_runtime_minutes",
+            "Giá trị tương thích cũ; chỉ dùng khi allowed_trip_runtime_minutes để trống.",
         ),
         (
             "total_daily_trips",
@@ -366,7 +366,10 @@ def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) ->
     operating_day_validation = DataValidation(
         type="list", formula1='"weekday,saturday,sunday,holiday,special"'
     )
-    positive_integer = DataValidation(
+    required_positive_integer = DataValidation(
+        type="whole", operator="greaterThan", formula1="0", allow_blank=False
+    )
+    optional_positive_integer = DataValidation(
         type="whole", operator="greaterThan", formula1="0", allow_blank=True
     )
     load_factor_validation = DataValidation(
@@ -375,7 +378,8 @@ def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) ->
     ws.add_data_validation(route_type_validation)
     ws.add_data_validation(block_validation)
     ws.add_data_validation(operating_day_validation)
-    ws.add_data_validation(positive_integer)
+    ws.add_data_validation(required_positive_integer)
+    ws.add_data_validation(optional_positive_integer)
     ws.add_data_validation(load_factor_validation)
     key_rows = {ws.cell(row, 1).value: row for row in range(4, 4 + len(rows))}
     runtime_options_cell = ws.cell(key_rows["allowed_trip_runtime_minutes"], 2)
@@ -383,7 +387,7 @@ def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) ->
     runtime_list_validation = DataValidation(
         type="custom",
         formula1=f"=ISTEXT(B{runtime_options_cell.row})",
-        allow_blank=False,
+        allow_blank=True,
     )
     runtime_list_validation.errorTitle = "Phải nhập khoảng dạng văn bản"
     runtime_list_validation.error = (
@@ -400,18 +404,18 @@ def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) ->
     route_type_validation.add(ws.cell(key_rows["route_type"], 2))
     block_validation.add(ws.cell(key_rows["time_block_minutes"], 2))
     operating_day_validation.add(ws.cell(key_rows["operating_day_type"], 2))
+    for key in ("total_daily_trips", "vehicle_capacity_passengers"):
+        required_positive_integer.add(ws.cell(key_rows[key], 2))
     for key in (
         "trip_runtime_minutes",
-        "total_daily_trips",
-        "vehicle_capacity_passengers",
         "minimum_layover_minutes",
         "available_fleet_limit",
         "approved_active_fleet",
     ):
-        positive_integer.add(ws.cell(key_rows[key], 2))
+        optional_positive_integer.add(ws.cell(key_rows[key], 2))
     if scenario == "B":
-        positive_integer.add(ws.cell(key_rows["terminal_1_max_occupancy_vehicles"], 2))
-        positive_integer.add(ws.cell(key_rows["terminal_2_max_occupancy_vehicles"], 2))
+        optional_positive_integer.add(ws.cell(key_rows["terminal_1_max_occupancy_vehicles"], 2))
+        optional_positive_integer.add(ws.cell(key_rows["terminal_2_max_occupancy_vehicles"], 2))
     for key in ("target_load_factor", "maximum_load_factor"):
         load_factor_validation.add(ws.cell(key_rows[key], 2))
     ws.freeze_panes = "A4"
@@ -585,8 +589,8 @@ def create_input_template(path: str | Path) -> Path:
         ),
         (
             "Runtime chuyến",
-            "Khai báo allowed_trip_runtime_minutes, ví dụ 55,65; arrival_time có thể trống khi runtime giải được chính xác.",
-            "Nếu Excel dùng dấu phẩy thập phân, nhập 55;65.",
+            "Phải khai báo allowed_trip_runtime_minutes hoặc trip_runtime_minutes; allowed_trip_runtime_minutes là định dạng được ưu tiên.",
+            "trip_runtime_minutes chỉ dùng để tương thích file cũ; nếu Excel dùng dấu phẩy thập phân, nhập 55;65.",
         ),
         (
             "Dữ liệu mẫu",

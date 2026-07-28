@@ -116,6 +116,12 @@ def normalization_options_from_workbook_v1(
 ) -> NormalizationOptions:
     """Build strict Contract V1 options only from declared workbook and runtime authority."""
 
+    if not isinstance(source_id, str):
+        raise TypeError("source_id must be a string")
+    clean_source_id = source_id.strip()
+    if not clean_source_id:
+        raise ValueError("source_id must be a non-empty string")
+
     readiness = assess_workbook_input_readiness_v1(imported)
     if not readiness.optimization_ready:
         raise WorkbookOptimizationAuthorityError(readiness.missing_optimization_authority_codes)
@@ -131,7 +137,7 @@ def normalization_options_from_workbook_v1(
 
     parameters_a = imported.parameters_a
     return NormalizationOptions(
-        source_id=source_id,
+        source_id=clean_source_id,
         imported_at=imported_at,
         source_type=source_type,
         operating_day_type_b=_operating_day_type(imported.parameters_b.operating_day_type),
@@ -155,6 +161,6 @@ def normalization_options_from_workbook_v1(
             imported.parameters_b.terminal_2_max_occupancy_vehicles
         ),
         source_notes=metadata.source_notes,
-        demand_dataset_id=metadata.demand_dataset_id or source_id,
+        demand_dataset_id=metadata.demand_dataset_id or clean_source_id,
         **demand_options,
     )

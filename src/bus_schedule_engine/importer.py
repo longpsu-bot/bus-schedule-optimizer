@@ -147,6 +147,24 @@ def _optional_positive_integer(
     return parsed
 
 
+def _required_positive_integer(
+    value: object | None,
+    *,
+    key: str,
+    sheet_name: str,
+    allow_numeric_text: bool = False,
+) -> int:
+    parsed = _optional_positive_integer(
+        value,
+        key=key,
+        sheet_name=sheet_name,
+        allow_numeric_text=allow_numeric_text,
+    )
+    if parsed is None:
+        raise InputDataError(f"Thiếu {key} trong sheet {sheet_name}")
+    return parsed
+
+
 def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
     sheet_name = f"THONG_SO_{scenario}"
     values = _key_value_sheet(frame, sheet_name)
@@ -154,8 +172,18 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
         route_type = RouteType(str(_required(values, "route_type", sheet_name)).strip())
     except ValueError as exc:
         raise InputDataError("route_type phải là intra_provincial hoặc inter_provincial") from exc
-    capacity_raw = values.get("vehicle_capacity_passengers")
-    capacity = None if capacity_raw is None else int(capacity_raw)
+    capacity = _required_positive_integer(
+        values.get("vehicle_capacity_passengers"),
+        key="vehicle_capacity_passengers",
+        sheet_name=sheet_name,
+        allow_numeric_text=True,
+    )
+    total_daily_trips = _required_positive_integer(
+        values.get("total_daily_trips"),
+        key="total_daily_trips",
+        sheet_name=sheet_name,
+        allow_numeric_text=True,
+    )
     layover_raw = values.get("minimum_layover_minutes")
     allowed_runtime_raw = values.get("allowed_trip_runtime_minutes")
     legacy_runtime_raw = values.get("trip_runtime_minutes")
@@ -188,7 +216,7 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
         route_name=str(_required(values, "route_name", sheet_name)),
         route_type=route_type,
         trip_runtime_minutes=runtime_default,
-        total_daily_trips=int(_required(values, "total_daily_trips", sheet_name)),
+        total_daily_trips=total_daily_trips,
         terminal_1_name=str(_required(values, "terminal_1_name", sheet_name)),
         terminal_1_first_departure=parse_time_to_seconds(
             _required(values, "terminal_1_first_departure", sheet_name)

@@ -8,6 +8,7 @@ from openpyxl import load_workbook
 from bus_schedule_engine import run_side_by_side_validation_v1
 from bus_schedule_engine.contracts_v1 import (
     DemandConfidence,
+    InputSourceType,
     normalize_imported_workbook_v1,
 )
 from bus_schedule_engine.contracts_v1.terminal_occupancy import (
@@ -262,17 +263,76 @@ def test_blank_optional_dataset_id_uses_runtime_source_identity_without_fake_suf
     workbook.close()
 
     imported = import_workbook(path)
+    original_metadata = imported.authority_metadata
     options = normalization_options_from_workbook_v1(
         imported,
-        source_id="runtime-source-identity",
+        source_id="  runtime-source-identity  ",
         imported_at=IMPORTED_AT,
     )
     normalized = normalize_imported_workbook_v1(imported, options)
 
     assert imported.authority_metadata.demand_dataset_id is None
     assert imported.authority_metadata.source_notes is None
+    assert imported.authority_metadata == original_metadata
+    assert options.source_id == "runtime-source-identity"
     assert options.demand_dataset_id == "runtime-source-identity"
+    assert options.imported_at is IMPORTED_AT
+    assert options.source_type == InputSourceType.XLSX
     assert normalized.observed_demand.demand_dataset_id == "runtime-source-identity"
+    assert not normalized.observed_demand.demand_dataset_id.endswith(":demand")
+
+
+@pytest.mark.parametrize("source_id", ["", "   "])
+def test_blank_runtime_source_id_is_rejected(
+    tmp_path,
+    source_id: str,
+) -> None:
+    imported = import_workbook(create_input_template(tmp_path / "complete.xlsx"))
+
+    with pytest.raises(ValueError, match="source_id must be a non-empty string"):
+        normalization_options_from_workbook_v1(
+            imported,
+            source_id=source_id,
+            imported_at=IMPORTED_AT,
+        )
+
+
+@pytest.mark.parametrize("source_id", [None, 123])
+def test_non_string_runtime_source_id_is_rejected(
+    tmp_path,
+    source_id: object,
+) -> None:
+    imported = import_workbook(create_input_template(tmp_path / "complete.xlsx"))
+
+    with pytest.raises(TypeError, match="source_id must be a string"):
+        normalization_options_from_workbook_v1(
+            imported,
+            source_id=source_id,  # type: ignore[arg-type]
+            imported_at=IMPORTED_AT,
+        )
+
+
+def test_declared_dataset_id_takes_precedence_over_cleaned_runtime_source_id(
+    tmp_path,
+) -> None:
+    path = create_input_template(tmp_path / "declared-dataset-id.xlsx")
+    workbook = load_workbook(path)
+    _set_parameter(workbook["THONG_TIN_DU_LIEU"], "demand_dataset_id", "  DEMAND-42  ")
+    workbook.save(path)
+    workbook.close()
+
+    imported = import_workbook(path)
+    original_metadata = imported.authority_metadata
+    options = normalization_options_from_workbook_v1(
+        imported,
+        source_id="  upload-2026-07-28  ",
+        imported_at=IMPORTED_AT,
+    )
+
+    assert imported.authority_metadata.demand_dataset_id == "DEMAND-42"
+    assert imported.authority_metadata == original_metadata
+    assert options.source_id == "upload-2026-07-28"
+    assert options.demand_dataset_id == "DEMAND-42"
 
 
 def test_old_blank_authority_workbook_imports_but_is_not_optimization_ready(

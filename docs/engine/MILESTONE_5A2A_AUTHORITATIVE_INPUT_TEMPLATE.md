@@ -21,6 +21,12 @@ Demand source type, confidence, and response mode use the conditional label
 `BẮT BUỘC ĐỂ TỐI ƯU KHI CÓ SẢN LƯỢNG`. They are optimization authority only when `SAN_LUONG`
 contains observations.
 
+`vehicle_capacity_passengers` and `total_daily_trips` are import-required positive integers.
+Blank, boolean, zero, negative, non-integral, and non-numeric values fail at import; integer
+numeric text such as `"60"` is accepted. Runtime authority remains a one-of rule:
+`allowed_trip_runtime_minutes` is preferred, while `trip_runtime_minutes` remains the legacy
+fallback.
+
 ## Import readiness versus optimization readiness
 
 `assess_workbook_input_readiness_v1(imported)` consumes only imported facts. It does not mutate
@@ -64,6 +70,10 @@ normalization_options_from_workbook_v1(
 `normalization_options_from_workbook_v1` applies the same readiness rules. If authority is
 missing, it raises `WorkbookOptimizationAuthorityError` containing every sorted missing code.
 Contract normalization is not called with placeholders.
+
+The builder requires a non-empty string `source_id`, trims surrounding whitespace, and uses the
+cleaned value consistently. It preserves declared workbook `demand_dataset_id`; only a blank
+workbook dataset ID falls back to the cleaned runtime source identity.
 
 ## Optional facts and explicit limitations
 
