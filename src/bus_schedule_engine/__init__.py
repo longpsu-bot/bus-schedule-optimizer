@@ -1,5 +1,12 @@
 """Bus Schedule Engine MVP."""
 
+from .importer import ImportedWorkbook, WorkbookAuthorityMetadata
+from .input_authority import (
+    WorkbookInputReadinessV1,
+    WorkbookOptimizationAuthorityError,
+    assess_workbook_input_readiness_v1,
+    normalization_options_from_workbook_v1,
+)
 from .models import (
     AnalysisBundle,
     DemandRecord,
@@ -41,6 +48,7 @@ __all__ = [
     "DemandRecord",
     "Direction",
     "FactComparisonRecordV1",
+    "ImportedWorkbook",
     "LegacyPathSnapshotV1",
     "OptimizationAction",
     "RouteType",
@@ -52,7 +60,12 @@ __all__ = [
     "TimetableTripSnapshotV1",
     "Trip",
     "UnifiedPathSnapshotV1",
+    "WorkbookAuthorityMetadata",
+    "WorkbookInputReadinessV1",
+    "WorkbookOptimizationAuthorityError",
     "analyze_and_optimize_schedule_v1",
+    "assess_workbook_input_readiness_v1",
+    "normalization_options_from_workbook_v1",
     "run_side_by_side_validation_v1",
     "select_optimization_action",
     "side_by_side_report_to_dict",

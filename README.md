@@ -43,6 +43,12 @@ validation adapter. This creates review evidence without changing application be
 Streamlit application, charts, and XLSX exports still use the legacy path and do not yet consume
 unified Contract V1 results.
 
+Milestone 5A2A adds a separate authoritative-input readiness gate. Generated workbooks label
+fields as required, required for optimization, or optional. A blank optimization-only authority
+field still imports, but `normalization_options_from_workbook_v1(...)` fails closed with stable
+codes before Contract V1 normalization. See
+[Milestone 5A2A authoritative input template](docs/engine/MILESTONE_5A2A_AUTHORITATIVE_INPUT_TEMPLATE.md).
+
 Contract V1 includes separate OR-Tools v9.15 CP-SAT adapters for one-route, fixed-resource hard
 feasibility, directional demand-priority optimization, and service-quality optimization. The
 feasibility adapter remains an objective-free satisfaction model. Demand protection remains the
@@ -135,12 +141,13 @@ Only an independently validated candidate may be presented as authoritative Scen
 
 ## Near-term roadmap
 
-Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation is implemented**, but
-Milestone 5 is not complete.
+Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation and Milestone 5A2A
+authoritative input readiness are implemented**, but Milestone 5 is not complete.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
-2. Milestone 5A2: validate unified presentation adapters for charts and XLSX.
-3. Cut over Streamlit only after discrepancies are reviewed in a later authorized milestone.
+2. Milestone 5A2A: stabilize authoritative workbook input and readiness.
+3. Milestone 5A2B: validate unified presentation adapters for charts and XLSX.
+4. Cut over Streamlit only after discrepancies are reviewed in a later authorized milestone.
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)
@@ -212,12 +219,16 @@ Optional sheets are:
 
 - `HUONG_DAN`;
 - `THONG_SO_A` and `BIEU_DO_A`;
+- `THONG_TIN_DU_LIEU`;
 - `SAN_LUONG`;
 - `CAU_HINH`.
 
 `total_daily_trips` is the total across both directions.
 `vehicle_capacity_passengers` is required. Times use `HH:mm`; dates use `dd/mm/yyyy`.
 `allowed_trip_runtime_minutes` accepts an inclusive integer range such as `55,65` or `55;65`.
+Blank `available_fleet_limit` or `operating_day_type` permits import but blocks authoritative
+fixed-resource optimization. Demand source type, confidence, and response mode become required
+for optimization only when `SAN_LUONG` has observations.
 `THONG_SO_B` may optionally include `terminal_1_max_occupancy_vehicles` and
 `terminal_2_max_occupancy_vehicles`; each supplied value must be an integer of at least one.
 Either key may be omitted, and no current workbook is required to contain either key.

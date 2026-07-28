@@ -35,6 +35,11 @@ TEXT = "1E293B"
 MUTED = "64748B"
 THIN_GRAY = Side(style="thin", color="CBD5E1")
 
+REQUIRED_LABEL = "BẮT BUỘC"
+REQUIRED_FOR_OPTIMIZATION_LABEL = "BẮT BUỘC ĐỂ TỐI ƯU"
+CONDITIONAL_DEMAND_LABEL = "BẮT BUỘC ĐỂ TỐI ƯU KHI CÓ SẢN LƯỢNG"
+OPTIONAL_LABEL = "TÙY CHỌN"
+
 
 def _title(ws, title: str, end_column: int) -> None:
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=end_column)
@@ -67,6 +72,20 @@ def _body_style(ws, start_row: int, end_row: int, end_column: int) -> None:
         if row[0].row % 2 == 0:
             for cell in row:
                 cell.fill = PatternFill("solid", fgColor="F8FAFC")
+
+
+def _style_requirement_rows(ws, start_row: int, end_row: int, level_column: int) -> None:
+    fills = {
+        REQUIRED_LABEL: PatternFill("solid", fgColor=RED),
+        REQUIRED_FOR_OPTIMIZATION_LABEL: PatternFill("solid", fgColor=AMBER),
+        CONDITIONAL_DEMAND_LABEL: PatternFill("solid", fgColor=AMBER),
+        OPTIONAL_LABEL: PatternFill("solid", fgColor=LIGHT_BLUE),
+    }
+    for row in range(start_row, end_row + 1):
+        level_cell = ws.cell(row, level_column)
+        level_cell.fill = fills[str(level_cell.value)]
+        level_cell.font = Font(name="Aptos", size=10, bold=True, color=TEXT)
+        ws.cell(row, 1).font = Font(name="Aptos", size=10, bold=True, color=TEXT)
 
 
 def _autowidth(ws, maximum: int = 42) -> None:
@@ -108,7 +127,21 @@ def _sample_parameters() -> tuple[ScenarioParameters, ScenarioParameters]:
         "time_block_minutes": 60,
         "minimum_layover_minutes": 10,
     }
-    return ScenarioParameters(**common), ScenarioParameters(**common)
+    parameters_a = ScenarioParameters(
+        **common,
+        available_fleet_limit=8,
+        approved_active_fleet=4,
+        operating_day_type="weekday",
+    )
+    parameters_b = ScenarioParameters(
+        **common,
+        available_fleet_limit=8,
+        approved_active_fleet=4,
+        operating_day_type="weekday",
+        terminal_1_max_occupancy_vehicles=4,
+        terminal_2_max_occupancy_vehicles=4,
+    )
+    return parameters_a, parameters_b
 
 
 def _inclusive_times(first: int, last: int, count: int) -> list[int]:
@@ -199,59 +232,127 @@ def _sample_trips(
 
 
 def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) -> None:
-    _title(ws, f"THÔNG SỐ SCENARIO {scenario}", 3)
-    _table_header(ws, 3, ["Tham số", "Giá trị", "Diễn giải"])
+    _title(ws, f"THÔNG SỐ SCENARIO {scenario}", 4)
+    _table_header(ws, 3, ["Tham số", "Giá trị", "Mức độ", "Diễn giải"])
     rows = [
-        ("route_id", parameters.route_id, "Mã tuyến"),
-        ("route_name", parameters.route_name, "Tên tuyến"),
-        ("route_type", parameters.route_type.value, "Loại tuyến"),
+        ("route_id", parameters.route_id, REQUIRED_LABEL, "Mã tuyến"),
+        ("route_name", parameters.route_name, REQUIRED_LABEL, "Tên tuyến"),
+        ("route_type", parameters.route_type.value, REQUIRED_LABEL, "Loại tuyến"),
         (
             "allowed_trip_runtime_minutes",
             parameters.runtime_options_text,
-            "Khoảng nguyên bao gồm hai đầu; 55,65 cho phép mọi giá trị từ 55 đến 65",
+            REQUIRED_LABEL,
+            "Thẩm quyền runtime chính xác; 55,65 cho phép mọi số phút nguyên từ 55 đến 65",
         ),
         (
             "trip_runtime_minutes",
             parameters.default_trip_runtime_minutes,
-            "Tương thích file cũ; dùng làm mặc định khi arrival_time để trống",
+            OPTIONAL_LABEL,
+            "Tương thích file cũ; dùng khi không có allowed_trip_runtime_minutes",
         ),
-        ("total_daily_trips", parameters.total_daily_trips, "Tổng lượt hai chiều/ngày"),
-        ("terminal_1_name", parameters.terminal_1_name, "Tên bến 1"),
+        (
+            "total_daily_trips",
+            parameters.total_daily_trips,
+            REQUIRED_LABEL,
+            "Tổng lượt hai chiều/ngày",
+        ),
+        ("terminal_1_name", parameters.terminal_1_name, REQUIRED_LABEL, "Tên bến 1"),
         (
             "terminal_1_first_departure",
             _as_time(parameters.terminal_1_first_departure),
+            REQUIRED_LABEL,
             "Giờ đầu bến 1",
         ),
         (
             "terminal_1_last_departure",
             _as_time(parameters.terminal_1_last_departure),
+            REQUIRED_LABEL,
             "Giờ cuối bến 1",
         ),
-        ("terminal_2_name", parameters.terminal_2_name, "Tên bến 2"),
+        ("terminal_2_name", parameters.terminal_2_name, REQUIRED_LABEL, "Tên bến 2"),
         (
             "terminal_2_first_departure",
             _as_time(parameters.terminal_2_first_departure),
+            REQUIRED_LABEL,
             "Giờ đầu bến 2",
         ),
         (
             "terminal_2_last_departure",
             _as_time(parameters.terminal_2_last_departure),
+            REQUIRED_LABEL,
             "Giờ cuối bến 2",
         ),
-        ("vehicle_capacity_passengers", parameters.capacity, "Bắt buộc; không tự suy đoán"),
-        ("target_load_factor", parameters.target_load_factor, "Mặc định 85%"),
-        ("maximum_load_factor", parameters.maximum_load_factor, "Trần khuyến nghị 90%"),
-        ("time_block_minutes", parameters.time_block_minutes, "Chỉ 30 hoặc 60"),
+        (
+            "vehicle_capacity_passengers",
+            parameters.capacity,
+            REQUIRED_LABEL,
+            "Sức chứa hợp pháp; không tự suy đoán",
+        ),
+        (
+            "available_fleet_limit",
+            parameters.available_fleet_limit,
+            REQUIRED_FOR_OPTIMIZATION_LABEL,
+            "Giới hạn đội xe cứng; không phải đội xe tối thiểu",
+        ),
+        (
+            "operating_day_type",
+            parameters.operating_day_type,
+            REQUIRED_FOR_OPTIMIZATION_LABEL,
+            "weekday, saturday, sunday, holiday hoặc special",
+        ),
+        (
+            "approved_active_fleet",
+            parameters.approved_active_fleet,
+            OPTIONAL_LABEL,
+            "Siêu dữ liệu quản trị; không thay thế available_fleet_limit",
+        ),
+        (
+            "target_load_factor",
+            parameters.target_load_factor,
+            OPTIONAL_LABEL,
+            "Mặc định 85%",
+        ),
+        (
+            "maximum_load_factor",
+            parameters.maximum_load_factor,
+            OPTIONAL_LABEL,
+            "Trần khuyến nghị 90%",
+        ),
+        (
+            "time_block_minutes",
+            parameters.time_block_minutes,
+            OPTIONAL_LABEL,
+            "Chỉ 30 hoặc 60",
+        ),
         (
             "minimum_layover_minutes",
             parameters.effective_layover_minutes,
-            "Không thấp hơn hard constraint",
+            OPTIONAL_LABEL,
+            "Để trống để dùng mức tối thiểu theo loại tuyến",
         ),
     ]
+    if scenario == "B":
+        rows.extend(
+            [
+                (
+                    "terminal_1_max_occupancy_vehicles",
+                    parameters.terminal_1_max_occupancy_vehicles,
+                    OPTIONAL_LABEL,
+                    "Để trống nếu chưa có thẩm quyền sức chứa vật lý bến 1",
+                ),
+                (
+                    "terminal_2_max_occupancy_vehicles",
+                    parameters.terminal_2_max_occupancy_vehicles,
+                    OPTIONAL_LABEL,
+                    "Để trống nếu chưa có thẩm quyền sức chứa vật lý bến 2",
+                ),
+            ]
+        )
     for row_index, row in enumerate(rows, 4):
         for column, value in enumerate(row, 1):
             ws.cell(row_index, column, value)
-    _body_style(ws, 4, 3 + len(rows), 3)
+    _body_style(ws, 4, 3 + len(rows), 4)
+    _style_requirement_rows(ws, 4, 3 + len(rows), 3)
     for row in range(4, 4 + len(rows)):
         key = ws.cell(row, 1).value
         if key and "departure" in key:
@@ -262,12 +363,18 @@ def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) ->
         type="list", formula1='"intra_provincial,inter_provincial"'
     )
     block_validation = DataValidation(type="list", formula1='"30,60"')
-    positive_integer = DataValidation(type="whole", operator="greaterThan", formula1="0")
+    operating_day_validation = DataValidation(
+        type="list", formula1='"weekday,saturday,sunday,holiday,special"'
+    )
+    positive_integer = DataValidation(
+        type="whole", operator="greaterThan", formula1="0", allow_blank=True
+    )
     load_factor_validation = DataValidation(
         type="decimal", operator="between", formula1="0.01", formula2="1"
     )
     ws.add_data_validation(route_type_validation)
     ws.add_data_validation(block_validation)
+    ws.add_data_validation(operating_day_validation)
     ws.add_data_validation(positive_integer)
     ws.add_data_validation(load_factor_validation)
     key_rows = {ws.cell(row, 1).value: row for row in range(4, 4 + len(rows))}
@@ -292,17 +399,88 @@ def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) ->
     runtime_list_validation.add(runtime_options_cell)
     route_type_validation.add(ws.cell(key_rows["route_type"], 2))
     block_validation.add(ws.cell(key_rows["time_block_minutes"], 2))
+    operating_day_validation.add(ws.cell(key_rows["operating_day_type"], 2))
     for key in (
         "trip_runtime_minutes",
         "total_daily_trips",
         "vehicle_capacity_passengers",
         "minimum_layover_minutes",
+        "available_fleet_limit",
+        "approved_active_fleet",
     ):
         positive_integer.add(ws.cell(key_rows[key], 2))
+    if scenario == "B":
+        positive_integer.add(ws.cell(key_rows["terminal_1_max_occupancy_vehicles"], 2))
+        positive_integer.add(ws.cell(key_rows["terminal_2_max_occupancy_vehicles"], 2))
     for key in ("target_load_factor", "maximum_load_factor"):
         load_factor_validation.add(ws.cell(key_rows[key], 2))
     ws.freeze_panes = "A4"
     _autowidth(ws)
+
+
+def _write_authority_metadata_sheet(ws) -> None:
+    _title(ws, "THÔNG TIN THẨM QUYỀN DỮ LIỆU", 4)
+    _table_header(ws, 3, ["Tham số", "Giá trị", "Mức độ", "Diễn giải"])
+    rows = [
+        (
+            "demand_dataset_id",
+            "MVP-01-DEMAND-SAMPLE",
+            OPTIONAL_LABEL,
+            "Mã bộ dữ liệu do người dùng khai báo; không tự tạo mã giả",
+        ),
+        (
+            "demand_source_type",
+            "manual_count",
+            CONDITIONAL_DEMAND_LABEL,
+            "ticketing, manual_count, apc, survey, aggregate_report hoặc other",
+        ),
+        (
+            "demand_confidence",
+            "medium",
+            CONDITIONAL_DEMAND_LABEL,
+            "Chất lượng bằng chứng do người dùng khai báo: high, medium, low hoặc unknown",
+        ),
+        (
+            "demand_response_mode",
+            "static",
+            CONDITIONAL_DEMAND_LABEL,
+            "static, elasticity_scenario hoặc calibrated",
+        ),
+        (
+            "source_notes",
+            "Dữ liệu minh họa, không phải giá trị vận hành đã phê duyệt.",
+            OPTIONAL_LABEL,
+            "Ghi chú nguồn; hệ thống không diễn giải thành quy tắc vận hành",
+        ),
+    ]
+    for row_index, row in enumerate(rows, 4):
+        for column, value in enumerate(row, 1):
+            ws.cell(row_index, column, value)
+    _body_style(ws, 4, 3 + len(rows), 4)
+    _style_requirement_rows(ws, 4, 3 + len(rows), 3)
+
+    source_type_validation = DataValidation(
+        type="list",
+        formula1='"ticketing,manual_count,apc,survey,aggregate_report,other"',
+        allow_blank=True,
+    )
+    confidence_validation = DataValidation(
+        type="list", formula1='"high,medium,low,unknown"', allow_blank=True
+    )
+    response_validation = DataValidation(
+        type="list",
+        formula1='"static,elasticity_scenario,calibrated"',
+        allow_blank=True,
+    )
+    ws.add_data_validation(source_type_validation)
+    ws.add_data_validation(confidence_validation)
+    ws.add_data_validation(response_validation)
+    key_rows = {ws.cell(row, 1).value: row for row in range(4, 4 + len(rows))}
+    source_type_validation.add(ws.cell(key_rows["demand_source_type"], 2))
+    confidence_validation.add(ws.cell(key_rows["demand_confidence"], 2))
+    response_validation.add(ws.cell(key_rows["demand_response_mode"], 2))
+    ws.freeze_panes = "A4"
+    _autowidth(ws, 58)
 
 
 def _write_trip_input_sheet(ws, trips: list[Trip], parameters: ScenarioParameters) -> None:
@@ -366,61 +544,53 @@ def create_input_template(path: str | Path) -> Path:
     _table_header(guide, 3, ["Chủ đề", "Quy tắc", "Thao tác"])
     guide_rows = [
         (
-            "Chế độ chỉ có B",
-            "Tối thiểu cần THONG_SO_B và BIEU_DO_B; A, sản lượng và cấu hình là tùy chọn.",
-            "Thiếu sản lượng thì C chỉ báo không đủ dữ liệu để tối ưu.",
+            "Ba mức yêu cầu",
+            "BẮT BUỘC để import; BẮT BUỘC ĐỂ TỐI ƯU có thể để trống khi import; TÙY CHỌN không chặn tối ưu.",
+            "Đọc nhãn Mức độ, không chỉ dựa vào màu ô.",
         ),
         (
-            "Tổng chuyến",
-            "Là tổng lượt xuất bến của cả hai chiều trong một ngày.",
-            "Luôn khai báo ở THONG_SO_B; THONG_SO_A chỉ dùng khi có Scenario A.",
+            "Giới hạn đội xe",
+            "Để trống available_fleet_limit vẫn import được nhưng chặn tối ưu authoritative.",
+            "Khai báo đúng giới hạn cứng; đây không phải đội xe tối thiểu được tính toán.",
         ),
         (
-            "Sức chứa",
-            "Tổng hành khách hợp pháp gồm ngồi và đứng; bắt buộc nhập.",
-            "Không để trống vehicle_capacity_passengers.",
+            "Đội xe phê duyệt",
+            "approved_active_fleet là siêu dữ liệu quản trị tùy chọn.",
+            "Không dùng trường này thay available_fleet_limit.",
         ),
         (
-            "Thời gian hành trình",
-            "Khai báo cận dưới và cận trên trong allowed_trip_runtime_minutes, ví dụ 55,65.",
-            (
-                "Mọi số phút nguyên từ 55 đến 65, gồm cả 60 và 61, đều hợp lệ. Nếu Excel "
-                "dùng dấu phẩy thập phân, nhập 55;65 để tránh bị đổi thành 55.65."
-            ),
+            "Sức chứa bến",
+            "Hai giới hạn bến đều tùy chọn và có thể để trống độc lập.",
+            "Có một giới hạn thì chỉ đánh giá một phần; để trống cả hai thì không đánh giá sức chứa bến.",
         ),
         (
-            "Sản lượng",
-            "Chọn total_observation_period nếu là tổng kỳ; average_day nếu đã là bình quân ngày.",
-            "Nếu tổng kỳ, nhập đúng observation_days.",
+            "Thẩm quyền nhu cầu",
+            "Khi SAN_LUONG có quan sát, nguồn, độ tin cậy và chế độ phản hồi là bắt buộc để tối ưu.",
+            "demand_confidence là chất lượng bằng chứng do người dùng khai báo; hệ thống không tự nâng cấp.",
         ),
         (
-            "Không tách chiều",
-            "Dùng direction = combined; hệ thống chỉ kết luận tổng hợp.",
-            "Không diễn giải thành quá tải một chiều.",
+            "Nhu cầu gộp",
+            "direction = combined chỉ cho phép kết luận tổng hợp.",
+            "Hệ thống không tự chia sản lượng gộp thành hai chiều.",
         ),
         (
-            "Target 85%",
-            "Mức sức chứa hiệu dụng dùng để tính số chuyến cần thiết.",
-            "Có thể chỉnh nhưng phải ≤ trần.",
+            "Nguồn runtime",
+            "source_id, imported_at và source_type do ứng dụng cung cấp, không nằm trong workbook.",
+            "Không suy source_id từ mã tuyến hoặc tên tệp.",
         ),
         (
-            "Trần 90%",
-            "Block vượt trần là chưa phù hợp và được cảnh báo đỏ.",
-            "Không dùng score để che vi phạm.",
+            "Scenario A",
+            "Toàn bộ Scenario A là tùy chọn; chế độ chỉ có Scenario B vẫn được hỗ trợ.",
+            "Nếu có A, fleet limit và operating day của A phải đủ trước tối ưu authoritative.",
         ),
         (
-            "Quay đầu",
-            "Tối thiểu 5 phút nội tỉnh, 15 phút liên tỉnh.",
-            "Có thể nhập cao hơn nhưng không thấp hơn.",
-        ),
-        (
-            "Giờ",
-            "Dùng định dạng HH:mm; arrival có thể để trống khi import qua UI.",
-            "Không sửa departure nguồn tự động.",
+            "Runtime chuyến",
+            "Khai báo allowed_trip_runtime_minutes, ví dụ 55,65; arrival_time có thể trống khi runtime giải được chính xác.",
+            "Nếu Excel dùng dấu phẩy thập phân, nhập 55;65.",
         ),
         (
             "Dữ liệu mẫu",
-            "Workbook này có dữ liệu minh họa để chạy ngay.",
+            "Workbook có dữ liệu minh họa đầy đủ để chạy pipeline thống nhất.",
             "Thay thế các dòng mẫu bằng dữ liệu thật.",
         ),
     ]
@@ -435,6 +605,7 @@ def create_input_template(path: str | Path) -> Path:
     _write_trip_input_sheet(workbook.create_sheet("BIEU_DO_A"), trips_a, parameters_a)
     _write_parameter_sheet(workbook.create_sheet("THONG_SO_B"), parameters_b, "B")
     _write_trip_input_sheet(workbook.create_sheet("BIEU_DO_B"), trips_b, parameters_b)
+    _write_authority_metadata_sheet(workbook.create_sheet("THONG_TIN_DU_LIEU"))
 
     demand_sheet = workbook.create_sheet("SAN_LUONG")
     demand_headers = [
