@@ -1,21 +1,35 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from io import BytesIO
 from numbers import Integral, Real
 from pathlib import Path
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
 import pandas as pd
 
 from .models import DemandRecord, Direction, RouteType, ScenarioParameters, Trip, VolumeType
 from .time_utils import parse_runtime_options, parse_time_to_seconds
 
+if TYPE_CHECKING:
+    from .contracts_v1.models import DemandConfidence, DemandResponseMode, DemandSourceType
+
 
 class InputDataError(ValueError):
     """Blocking error in the input workbook."""
+
+
+@dataclass(frozen=True, slots=True)
+class WorkbookAuthorityMetadata:
+    """Workbook-owned demand authority; runtime provenance is intentionally excluded."""
+
+    demand_dataset_id: str | None = None
+    demand_source_type: DemandSourceType | None = None
+    demand_confidence: DemandConfidence | None = None
+    demand_response_mode: DemandResponseMode | None = None
+    source_notes: str | None = None
 
 
 @dataclass(frozen=True)
@@ -26,6 +40,7 @@ class ImportedWorkbook:
     trips_b: list[Trip]
     demand: list[DemandRecord]
     configuration: dict[str, object]
+    authority_metadata: WorkbookAuthorityMetadata = field(default_factory=WorkbookAuthorityMetadata)
 
 
 REQUIRED_SHEETS = {
@@ -38,8 +53,11 @@ SUPPORTED_SHEETS = REQUIRED_SHEETS | {
     "THONG_SO_A",
     "BIEU_DO_A",
     "SAN_LUONG",
+    "THONG_TIN_DU_LIEU",
     "CAU_HINH",
 }
+
+OPERATING_DAY_TYPES = {"weekday", "saturday", "sunday", "holiday", "special"}
 
 
 def _clean(value: object) -> object | None:
@@ -107,6 +125,7 @@ def _optional_positive_integer(
     *,
     key: str,
     sheet_name: str,
+    allow_numeric_text: bool = False,
 ) -> int | None:
     if value is None:
         return None
@@ -116,10 +135,33 @@ def _optional_positive_integer(
         isinstance(value, Real) and math.isfinite(float(value)) and float(value).is_integer()
     ):
         parsed = int(value)
+    elif allow_numeric_text and isinstance(value, str):
+        try:
+            parsed = int(value.strip())
+        except ValueError as exc:
+            raise InputDataError(f"{key} trong {sheet_name} phải là số nguyên >= 1") from exc
     else:
         raise InputDataError(f"{key} trong {sheet_name} phải là số nguyên >= 1")
     if parsed < 1:
         raise InputDataError(f"{key} trong {sheet_name} phải là số nguyên >= 1")
+    return parsed
+
+
+def _required_positive_integer(
+    value: object | None,
+    *,
+    key: str,
+    sheet_name: str,
+    allow_numeric_text: bool = False,
+) -> int:
+    parsed = _optional_positive_integer(
+        value,
+        key=key,
+        sheet_name=sheet_name,
+        allow_numeric_text=allow_numeric_text,
+    )
+    if parsed is None:
+        raise InputDataError(f"Thiếu {key} trong sheet {sheet_name}")
     return parsed
 
 
@@ -130,8 +172,18 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
         route_type = RouteType(str(_required(values, "route_type", sheet_name)).strip())
     except ValueError as exc:
         raise InputDataError("route_type phải là intra_provincial hoặc inter_provincial") from exc
-    capacity_raw = values.get("vehicle_capacity_passengers")
-    capacity = None if capacity_raw is None else int(capacity_raw)
+    capacity = _required_positive_integer(
+        values.get("vehicle_capacity_passengers"),
+        key="vehicle_capacity_passengers",
+        sheet_name=sheet_name,
+        allow_numeric_text=True,
+    )
+    total_daily_trips = _required_positive_integer(
+        values.get("total_daily_trips"),
+        key="total_daily_trips",
+        sheet_name=sheet_name,
+        allow_numeric_text=True,
+    )
     layover_raw = values.get("minimum_layover_minutes")
     allowed_runtime_raw = values.get("allowed_trip_runtime_minutes")
     legacy_runtime_raw = values.get("trip_runtime_minutes")
@@ -140,6 +192,12 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
     operating_day_type_raw = values.get("operating_day_type")
     terminal_1_max_occupancy_raw = values.get("terminal_1_max_occupancy_vehicles")
     terminal_2_max_occupancy_raw = values.get("terminal_2_max_occupancy_vehicles")
+    operating_day_type = (
+        None if operating_day_type_raw is None else str(operating_day_type_raw).strip().lower()
+    )
+    if operating_day_type is not None and operating_day_type not in OPERATING_DAY_TYPES:
+        allowed = ", ".join(sorted(OPERATING_DAY_TYPES))
+        raise InputDataError(f"operating_day_type trong {sheet_name} phải là một trong: {allowed}")
     try:
         runtime_options = parse_runtime_options(
             allowed_runtime_raw
@@ -158,7 +216,7 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
         route_name=str(_required(values, "route_name", sheet_name)),
         route_type=route_type,
         trip_runtime_minutes=runtime_default,
-        total_daily_trips=int(_required(values, "total_daily_trips", sheet_name)),
+        total_daily_trips=total_daily_trips,
         terminal_1_name=str(_required(values, "terminal_1_name", sheet_name)),
         terminal_1_first_departure=parse_time_to_seconds(
             _required(values, "terminal_1_first_departure", sheet_name)
@@ -179,13 +237,19 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
         time_block_minutes=int(values.get("time_block_minutes") or 60),
         minimum_layover_minutes=None if layover_raw is None else int(layover_raw),
         allowed_trip_runtime_minutes=runtime_options,
-        available_fleet_limit=(None if available_fleet_raw is None else int(available_fleet_raw)),
-        approved_active_fleet=(
-            None if approved_active_fleet_raw is None else int(approved_active_fleet_raw)
+        available_fleet_limit=_optional_positive_integer(
+            available_fleet_raw,
+            key="available_fleet_limit",
+            sheet_name=sheet_name,
+            allow_numeric_text=True,
         ),
-        operating_day_type=(
-            None if operating_day_type_raw is None else str(operating_day_type_raw).strip()
+        approved_active_fleet=_optional_positive_integer(
+            approved_active_fleet_raw,
+            key="approved_active_fleet",
+            sheet_name=sheet_name,
+            allow_numeric_text=True,
         ),
+        operating_day_type=operating_day_type,
         terminal_1_max_occupancy_vehicles=(
             _optional_positive_integer(
                 terminal_1_max_occupancy_raw,
@@ -203,6 +267,37 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
             )
             if scenario == "B"
             else None
+        ),
+    )
+
+
+def _authority_metadata(frame: pd.DataFrame) -> WorkbookAuthorityMetadata:
+    from .contracts_v1.models import DemandConfidence, DemandResponseMode, DemandSourceType
+
+    sheet_name = "THONG_TIN_DU_LIEU"
+    values = _key_value_sheet(frame, sheet_name)
+
+    def optional_enum(key: str, enum_type):
+        raw = values.get(key)
+        if raw is None:
+            return None
+        try:
+            return enum_type(str(raw).strip())
+        except ValueError as exc:
+            allowed = ", ".join(item.value for item in enum_type)
+            raise InputDataError(f"{key} trong {sheet_name} phải là một trong: {allowed}") from exc
+
+    return WorkbookAuthorityMetadata(
+        demand_dataset_id=(
+            None
+            if values.get("demand_dataset_id") is None
+            else str(values["demand_dataset_id"]).strip()
+        ),
+        demand_source_type=optional_enum("demand_source_type", DemandSourceType),
+        demand_confidence=optional_enum("demand_confidence", DemandConfidence),
+        demand_response_mode=optional_enum("demand_response_mode", DemandResponseMode),
+        source_notes=(
+            None if values.get("source_notes") is None else str(values["source_notes"]).strip()
         ),
     )
 
@@ -295,6 +390,11 @@ def import_workbook(source: str | Path | bytes | BinaryIO) -> ImportedWorkbook:
         if "CAU_HINH" in sheets and sheets["CAU_HINH"].shape[1] >= 2
         else {}
     )
+    authority_metadata = (
+        _authority_metadata(sheets["THONG_TIN_DU_LIEU"])
+        if "THONG_TIN_DU_LIEU" in sheets
+        else WorkbookAuthorityMetadata()
+    )
     parameters_a: ScenarioParameters | None = None
     trips_a: list[Trip] = []
     schedule_a = sheets.get("BIEU_DO_A")
@@ -323,4 +423,5 @@ def import_workbook(source: str | Path | bytes | BinaryIO) -> ImportedWorkbook:
         trips_b=_trips(sheets["BIEU_DO_B"], "B"),
         demand=demand,
         configuration=configuration,
+        authority_metadata=authority_metadata,
     )
