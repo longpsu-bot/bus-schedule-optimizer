@@ -87,11 +87,17 @@ solver comparison, or C acceptance.
 
 `build_unified_demand_supply_figure_v1(...)` shows exact Contract blocks, passenger-demand bars,
 returned A/B/C trip counts, and returned 85% and 90% required-trip facts. C appears only when
-accepted. Categories retain block ID, interval, and direction.
+accepted. Categories retain block ID and interval, and display each direction with the exact
+declared terminal names. Combined demand is displayed as `Tổng hợp hai chiều`.
 
 `build_unified_departure_figure_v1(...)` shows exact A, B, and accepted-C departures on separate
-scenario/direction lanes. The service-day axis remains continuous past midnight. C hover evidence
+scenario/direction lanes. Visible lanes, trace names, and hover direction labels use the exact
+declared terminal names. The service-day axis remains continuous past midnight. C hover evidence
 contains source B trip, B and C departures, shift, regime, reason, vehicle, and exact terminals.
+
+The translation from `outbound`, `inbound`, and `combined` to visible Vietnamese direction labels
+is display-only. Raw direction enums remain unchanged in presentation objects and Plotly
+`customdata`; block keys, chart metadata, and presentation fingerprints are unaffected.
 
 Both figures store presentation mode, presentation fingerprint, B fingerprint, accepted-solution
 fingerprint, accepted-C state and authority, cutover state, review codes, and exact demand-grain

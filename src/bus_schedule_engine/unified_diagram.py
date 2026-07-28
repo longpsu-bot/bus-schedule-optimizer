@@ -55,11 +55,25 @@ def _review_annotation(presentation: UnifiedPresentationBundleV1) -> str:
     return f"{PRESENTATION_MODE_VALIDATION_ONLY} · {status}"
 
 
-def _block_category(block: object) -> str:
+def _direction_display(
+    presentation: UnifiedPresentationBundleV1,
+    direction: str,
+) -> str:
+    if direction == "outbound":
+        return f"{presentation.terminal_1_name} → {presentation.terminal_2_name}"
+    if direction == "inbound":
+        return f"{presentation.terminal_2_name} → {presentation.terminal_1_name}"
+    return "Tổng hợp hai chiều"
+
+
+def _block_category(
+    presentation: UnifiedPresentationBundleV1,
+    block: object,
+) -> str:
     return (
         f"{_service_time(block.block_start_seconds)}–"
         f"{_service_time(block.block_end_seconds)} · "
-        f"{block.direction} · {block.block_id}"
+        f"{_direction_display(presentation, block.direction)} · {block.block_id}"
     )
 
 
@@ -72,7 +86,7 @@ def build_unified_demand_supply_figure_v1(
     verify_unified_presentation_integrity_v1(presentation)
 
     blocks = presentation.blocks
-    categories = [_block_category(block) for block in blocks]
+    categories = [_block_category(presentation, block) for block in blocks]
     figure = go.Figure()
     if blocks:
         figure.add_trace(
@@ -88,12 +102,13 @@ def build_unified_demand_supply_figure_v1(
                         block.confidence,
                         block.b_status,
                         block.allocation_reason,
+                        _direction_display(presentation, block.direction),
                     ]
                     for block in blocks
                 ],
                 hovertemplate=(
                     "Block=%{customdata[0]}<br>"
-                    "Chiều=%{customdata[1]}<br>"
+                    "Chiều=%{customdata[5]}<br>"
                     "Nhu cầu=%{y}<br>"
                     "Độ tin cậy=%{customdata[2]}<br>"
                     "Trạng thái B=%{customdata[3]}<br>"
@@ -203,7 +218,10 @@ def build_unified_demand_supply_figure_v1(
     return figure
 
 
-def _departure_customdata(trip: PresentationTripV1) -> list[object]:
+def _departure_customdata(
+    presentation: UnifiedPresentationBundleV1,
+    trip: PresentationTripV1,
+) -> list[object]:
     return [
         trip.trip_id,
         trip.direction,
@@ -211,6 +229,7 @@ def _departure_customdata(trip: PresentationTripV1) -> list[object]:
         trip.arrival_terminal,
         _service_time(trip.departure_time_seconds),
         _service_time(trip.arrival_time_seconds),
+        _direction_display(presentation, trip.direction),
     ]
 
 
@@ -249,13 +268,13 @@ def build_unified_departure_figure_v1(
             trips = tuple(trip for trip in scenario.trips if trip.direction == direction)
             if not trips:
                 continue
-            lane = f"{scenario.scenario_id} · {direction}"
+            lane = f"{scenario.scenario_id} · {_direction_display(presentation, direction)}"
             lane_order.append(lane)
             all_trips.extend(trips)
             if scenario.scenario_id == "C":
                 customdata = [
                     [
-                        *_departure_customdata(trip),
+                        *_departure_customdata(presentation, trip),
                         trip.source_b_trip_id,
                         _service_time(trip.b_departure_time_seconds),
                         trip.shift_minutes,
@@ -267,23 +286,23 @@ def build_unified_departure_figure_v1(
                 ]
                 hovertemplate = (
                     "C trip=%{customdata[0]}<br>"
-                    "Chiều=%{customdata[1]}<br>"
+                    "Chiều=%{customdata[6]}<br>"
                     "Bến đi=%{customdata[2]}<br>"
                     "Bến đến=%{customdata[3]}<br>"
                     "Giờ C=%{customdata[4]}<br>"
                     "Giờ đến=%{customdata[5]}<br>"
-                    "Nguồn B=%{customdata[6]}<br>"
-                    "Giờ B=%{customdata[7]}<br>"
-                    "Dịch chuyển (phút)=%{customdata[8]}<br>"
-                    "Chế độ=%{customdata[9]}<br>"
-                    "Lý do=%{customdata[10]}<br>"
-                    "Xe=%{customdata[11]}<extra></extra>"
+                    "Nguồn B=%{customdata[7]}<br>"
+                    "Giờ B=%{customdata[8]}<br>"
+                    "Dịch chuyển (phút)=%{customdata[9]}<br>"
+                    "Chế độ=%{customdata[10]}<br>"
+                    "Lý do=%{customdata[11]}<br>"
+                    "Xe=%{customdata[12]}<extra></extra>"
                 )
             else:
-                customdata = [_departure_customdata(trip) for trip in trips]
+                customdata = [_departure_customdata(presentation, trip) for trip in trips]
                 hovertemplate = (
                     "Trip=%{customdata[0]}<br>"
-                    "Chiều=%{customdata[1]}<br>"
+                    "Chiều=%{customdata[6]}<br>"
                     "Bến đi=%{customdata[2]}<br>"
                     "Bến đến=%{customdata[3]}<br>"
                     "Giờ đi=%{customdata[4]}<br>"
