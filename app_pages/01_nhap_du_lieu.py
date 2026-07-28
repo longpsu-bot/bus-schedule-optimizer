@@ -1,5 +1,12 @@
+from datetime import UTC, datetime
+from hashlib import sha256
+
 import streamlit as st
 
+from bus_schedule_engine.application_pipeline import (
+    ParallelRuntimeStatusV1,
+    run_parallel_application_pipeline_v1,
+)
 from bus_schedule_engine.fleet import assign_fleet
 from bus_schedule_engine.importer import InputDataError, import_workbook
 from bus_schedule_engine.models import Direction
@@ -7,10 +14,34 @@ from bus_schedule_engine.time_utils import parse_runtime_options
 from bus_schedule_engine.ui_utils import (
     apply_overrides,
     preview_sheet,
-    run_and_build_artifacts,
     template_bytes,
     workbook_sheet_names,
 )
+
+_LEGACY_RESULT_STATE_KEYS = (
+    "imported_workbook",
+    "analysis_bundle",
+    "diagram_figure",
+    "download_artifacts",
+    "scenario_c_fingerprint",
+)
+_UNIFIED_SHADOW_STATE_KEYS = (
+    "parallel_runtime_status",
+    "workbook_input_readiness",
+    "unified_optimization_result",
+    "side_by_side_validation_report",
+    "unified_presentation",
+    "unified_demand_supply_figure",
+    "unified_departure_figure",
+    "unified_download_artifacts",
+    "unified_runtime_failure",
+)
+
+
+def _clear_result_state() -> None:
+    for state_key in (*_LEGACY_RESULT_STATE_KEYS, *_UNIFIED_SHADOW_STATE_KEYS):
+        st.session_state[state_key] = None
+
 
 st.subheader("Workbook và thông số chạy")
 st.write(
@@ -38,6 +69,8 @@ uploaded = st.file_uploader(
 
 if uploaded is not None:
     content = uploaded.getvalue()
+    if content != st.session_state.get("input_bytes"):
+        _clear_result_state()
     st.session_state.input_bytes = content
 else:
     content = st.session_state.input_bytes
@@ -185,19 +218,67 @@ if content:
                 block_minutes=int(block_minutes),
                 allowed_runtime_minutes=allowed_runtime_minutes,
             )
+            _clear_result_state()
+            source_id = f"streamlit-upload-sha256:{sha256(content).hexdigest()}"
+            imported_at = datetime.now(UTC)
             try:
                 with st.status("Đang kiểm tra, đánh giá và tạo báo cáo…", expanded=True) as status:
-                    bundle, figure, artifacts = run_and_build_artifacts(updated)
+                    parallel_run = run_parallel_application_pipeline_v1(
+                        updated,
+                        source_id=source_id,
+                        imported_at=imported_at,
+                    )
                     status.update(label="Hoàn tất pipeline", state="complete", expanded=False)
             except (InputDataError, ValueError) as exc:
                 st.error(f"Không thể chạy pipeline: {exc}", icon=":material/error:")
             else:
                 st.session_state.imported_workbook = updated
-                st.session_state.analysis_bundle = bundle
-                st.session_state.diagram_figure = figure
-                st.session_state.download_artifacts = artifacts
-                st.session_state.scenario_c_fingerprint = artifacts["c_fingerprint"].decode("utf-8")
-                result_b = bundle.get("B")
+                st.session_state.analysis_bundle = parallel_run.legacy_bundle
+                st.session_state.diagram_figure = parallel_run.legacy_figure
+                st.session_state.download_artifacts = parallel_run.legacy_artifacts
+                st.session_state.scenario_c_fingerprint = parallel_run.legacy_artifacts[
+                    "c_fingerprint"
+                ].decode("utf-8")
+                st.session_state.parallel_runtime_status = parallel_run.status
+                st.session_state.workbook_input_readiness = parallel_run.input_readiness
+                st.session_state.unified_optimization_result = parallel_run.unified_result
+                st.session_state.side_by_side_validation_report = parallel_run.side_by_side_report
+                st.session_state.unified_presentation = parallel_run.unified_presentation
+                st.session_state.unified_demand_supply_figure = (
+                    parallel_run.unified_demand_supply_figure
+                )
+                st.session_state.unified_departure_figure = parallel_run.unified_departure_figure
+                st.session_state.unified_download_artifacts = (
+                    {
+                        "xlsx": parallel_run.unified_xlsx_bytes,
+                        "presentation_fingerprint": (
+                            parallel_run.unified_presentation.presentation_fingerprint
+                        ),
+                        "b_fingerprint": (parallel_run.unified_presentation.source_b_fingerprint),
+                        "accepted_solution_fingerprint": (
+                            parallel_run.unified_presentation.accepted_solution_fingerprint
+                        ),
+                    }
+                    if parallel_run.unified_xlsx_bytes is not None
+                    and parallel_run.unified_presentation is not None
+                    else None
+                )
+                st.session_state.unified_runtime_failure = (
+                    {
+                        "code": parallel_run.failure_code,
+                        "message": parallel_run.failure_message,
+                    }
+                    if parallel_run.failure_code is not None
+                    else None
+                )
+                if parallel_run.status == ParallelRuntimeStatusV1.UNIFIED_RUNTIME_FAILED:
+                    st.warning(
+                        "Kết quả hiện tại vẫn dùng pipeline legacy. "
+                        "Pipeline Contract V1 chạy song song chưa hoàn tất: "
+                        f"{parallel_run.failure_message}",
+                        icon=":material/warning:",
+                    )
+                result_b = parallel_run.legacy_bundle.get("B")
                 st.success(
                     f"Phương án B: {result_b.validation.status if result_b else 'N/A'}. "
                     "Dùng thanh điều hướng phía trên để xem từng phần kết quả.",

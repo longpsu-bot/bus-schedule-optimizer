@@ -1,5 +1,12 @@
 """Bus Schedule Engine MVP."""
 
+from .application_pipeline import (
+    UNIFIED_SHADOW_RUNTIME_FAILURE,
+    ParallelApplicationRunV1,
+    ParallelRuntimeStatusV1,
+    UnifiedArtifactAlignmentError,
+    run_parallel_application_pipeline_v1,
+)
 from .importer import ImportedWorkbook, WorkbookAuthorityMetadata
 from .input_authority import (
     WorkbookInputReadinessV1,
@@ -34,6 +41,7 @@ from .side_by_side_validation import (
     TimetableSnapshotV1,
     TimetableTripSnapshotV1,
     UnifiedPathSnapshotV1,
+    build_side_by_side_validation_report_v1,
     run_side_by_side_validation_v1,
     side_by_side_report_to_dict,
 )
@@ -79,6 +87,8 @@ __all__ = [
     "LegacyPathSnapshotV1",
     "OptimizationAction",
     "PRESENTATION_MODE_VALIDATION_ONLY",
+    "ParallelApplicationRunV1",
+    "ParallelRuntimeStatusV1",
     "PresentationBlockV1",
     "PresentationDemandGapV1",
     "PresentationDimensionV1",
@@ -98,19 +108,23 @@ __all__ = [
     "TimetableTripSnapshotV1",
     "Trip",
     "UnifiedExportMetadataV1",
+    "UnifiedArtifactAlignmentError",
     "UnifiedPresentationBundleV1",
     "UnifiedPresentationConsistencyError",
     "UnifiedPathSnapshotV1",
     "WorkbookAuthorityMetadata",
     "WorkbookInputReadinessV1",
     "WorkbookOptimizationAuthorityError",
+    "UNIFIED_SHADOW_RUNTIME_FAILURE",
     "analyze_and_optimize_schedule_v1",
     "assess_workbook_input_readiness_v1",
+    "build_side_by_side_validation_report_v1",
     "build_unified_demand_supply_figure_v1",
     "build_unified_departure_figure_v1",
     "build_unified_presentation_v1",
     "export_unified_result_workbook_v1",
     "normalization_options_from_workbook_v1",
+    "run_parallel_application_pipeline_v1",
     "run_side_by_side_validation_v1",
     "read_unified_export_metadata_v1",
     "select_optimization_action",

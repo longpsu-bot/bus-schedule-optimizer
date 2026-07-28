@@ -55,6 +55,12 @@ Contract V1 result and the Milestone 5A1 report. This does not cut over Streamli
 session state, charts, and downloads remain legacy-authoritative. See
 [Milestone 5A2B unified presentation adapters](docs/engine/MILESTONE_5A2B_UNIFIED_PRESENTATION_ADAPTERS.md).
 
+Milestone 5B1 now runs unified Contract V1 once in the real Streamlit submission flow when
+authoritative input is ready and stores aligned validation evidence in parallel session state.
+Visible result pages, charts, Scenario C, and downloads remain legacy-authoritative. Milestone 5B2
+will separately consider the results-page cutover after review. See
+[Milestone 5B1 Streamlit shadow runtime](docs/engine/MILESTONE_5B1_STREAMLIT_SHADOW_RUNTIME.md).
+
 Contract V1 includes separate OR-Tools v9.15 CP-SAT adapters for one-route, fixed-resource hard
 feasibility, directional demand-priority optimization, and service-quality optimization. The
 feasibility adapter remains an objective-free satisfaction model. Demand protection remains the
@@ -117,7 +123,7 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 
 ## Not supported yet
 
-- Contract V1 execution through the Streamlit application.
+- Contract V1 result-page authority or downloads through the Streamlit application.
 - Solver selection through Streamlit.
 - OR-Tools fleet-minimization objectives.
 - A globally optimal timetable or a proof of infeasibility from the legacy heuristic.
@@ -130,7 +136,7 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 - Mixed fleets, multi-route interlining, deadhead, driver duties, depot pull-in/out, maintenance,
   or mature cross-midnight optimization.
 - The current Streamlit charts and downloads do not yet consume unified Contract V1 optimization
-  results; the Milestone 5A2B adapters are parallel validation artifacts only.
+  results; the Milestone 5B1 runtime stores them as parallel validation artifacts only.
 
 ## Target pipeline
 
@@ -151,14 +157,16 @@ Only an independently validated candidate may be presented as authoritative Scen
 ## Near-term roadmap
 
 Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation, Milestone 5A2A
-authoritative input readiness, and Milestone 5A2B validation-only presentation adapters are
-implemented**, but Milestone 5 is not complete.
+authoritative input readiness, Milestone 5A2B validation-only presentation adapters, and Milestone
+5B1 Streamlit shadow execution are implemented**, but Milestone 5 is not complete.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
 2. Milestone 5A2A: stabilize authoritative workbook input and readiness.
 3. Milestone 5A2B: validate parallel unified presentation adapters for charts and XLSX
    (implemented; no Streamlit cutover).
-4. Cut over Streamlit only after discrepancies are reviewed in a later authorized milestone.
+4. Milestone 5B1: run Contract V1 once in Streamlit and store non-authoritative shadow evidence
+   (implemented; visible pages and downloads remain legacy).
+5. Milestone 5B2: separately cut over result pages only after discrepancies are reviewed.
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)
