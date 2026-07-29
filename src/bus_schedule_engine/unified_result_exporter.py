@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.workbook.workbook import Workbook as OpenpyxlWorkbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from .unified_presentation import (
@@ -748,24 +750,19 @@ def export_unified_result_workbook_v1(
     return target
 
 
-def read_unified_export_metadata_v1(
-    path: str | Path,
+def _read_unified_export_metadata_workbook_v1(
+    workbook: OpenpyxlWorkbook,
 ) -> UnifiedExportMetadataV1:
-    """Read alignment metadata from a unified export; never use it as authority."""
-    source = Path(path)
-    workbook = load_workbook(source, read_only=True, data_only=False)
-    try:
-        if "FINGERPRINTS" not in workbook.sheetnames:
-            raise ValueError("FINGERPRINTS sheet is missing")
-        sheet = workbook["FINGERPRINTS"]
-        values = {
-            str(key): value
-            for key, value in sheet.iter_rows(min_row=2, max_col=2, values_only=True)
-            if key is not None
-        }
-    finally:
-        workbook.close()
+    if "FINGERPRINTS" not in workbook.sheetnames:
+        raise ValueError("FINGERPRINTS sheet is missing")
+    sheet = workbook["FINGERPRINTS"]
+    values = {
+        str(key): value
+        for key, value in sheet.iter_rows(min_row=2, max_col=2, values_only=True)
+        if key is not None
+    }
     required = {
+        "accepted_solution_fingerprint",
         "presentation_fingerprint",
         "normalized_b_fingerprint",
         "source_id",
@@ -779,18 +776,81 @@ def read_unified_export_metadata_v1(
     if not isinstance(blocked, bool):
         raise ValueError("cutover_blocked metadata must be a boolean")
     accepted = values.get("accepted_solution_fingerprint")
+    string_values = {
+        key: values[key]
+        for key in (
+            "presentation_fingerprint",
+            "normalized_b_fingerprint",
+            "source_id",
+            "presentation_mode",
+        )
+    }
+    invalid_strings = sorted(
+        key for key, value in string_values.items() if not isinstance(value, str) or not value
+    )
+    if invalid_strings:
+        raise ValueError(f"FINGERPRINTS metadata has invalid text values: {invalid_strings}")
+    if accepted not in {None, ""} and (not isinstance(accepted, str) or not accepted):
+        raise ValueError("accepted_solution_fingerprint metadata must be text or blank")
+
+    sheet_names = set(workbook.sheetnames)
+    if accepted in {None, ""}:
+        if "C_TRANG_THAI" not in sheet_names:
+            raise ValueError("C_TRANG_THAI sheet is required when accepted C is absent")
+        unexpected = sorted({"C_BIEU_DO", "SO_SANH_B_C", "FLEET_C", "HEADWAY_C"} & sheet_names)
+        if unexpected:
+            raise ValueError(f"accepted-C sheets must be absent without accepted C: {unexpected}")
+    else:
+        required_c_sheets = {"C_BIEU_DO", "SO_SANH_B_C", "FLEET_C", "HEADWAY_C"}
+        missing_c_sheets = sorted(required_c_sheets - sheet_names)
+        if missing_c_sheets:
+            raise ValueError(f"accepted-C sheets are incomplete: {missing_c_sheets}")
+        if "C_TRANG_THAI" in sheet_names:
+            raise ValueError("C_TRANG_THAI must be absent when accepted C exists")
+
     return UnifiedExportMetadataV1(
-        presentation_fingerprint=str(values["presentation_fingerprint"]),
-        b_fingerprint=str(values["normalized_b_fingerprint"]),
+        presentation_fingerprint=values["presentation_fingerprint"],
+        b_fingerprint=values["normalized_b_fingerprint"],
         accepted_solution_fingerprint=(str(accepted) if accepted not in {None, ""} else None),
-        source_id=str(values["source_id"]),
-        presentation_mode=str(values["presentation_mode"]),
+        source_id=values["source_id"],
+        presentation_mode=values["presentation_mode"],
         cutover_blocked=blocked,
     )
+
+
+def read_unified_export_metadata_bytes_v1(
+    content: bytes,
+) -> UnifiedExportMetadataV1:
+    """Read and validate alignment metadata directly from unified XLSX bytes."""
+    if not isinstance(content, bytes):
+        raise TypeError("content must be bytes")
+    if not content:
+        raise ValueError("unified XLSX content is empty")
+    try:
+        workbook = load_workbook(BytesIO(content), read_only=True, data_only=False)
+    except Exception as exc:
+        raise ValueError("unified XLSX content is invalid") from exc
+    try:
+        return _read_unified_export_metadata_workbook_v1(workbook)
+    finally:
+        workbook.close()
+
+
+def read_unified_export_metadata_v1(
+    path: str | Path,
+) -> UnifiedExportMetadataV1:
+    """Read alignment metadata from a unified export; never use it as authority."""
+    source = Path(path)
+    workbook = load_workbook(source, read_only=True, data_only=False)
+    try:
+        return _read_unified_export_metadata_workbook_v1(workbook)
+    finally:
+        workbook.close()
 
 
 __all__ = [
     "UnifiedExportMetadataV1",
     "export_unified_result_workbook_v1",
+    "read_unified_export_metadata_bytes_v1",
     "read_unified_export_metadata_v1",
 ]

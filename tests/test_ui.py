@@ -1,4 +1,5 @@
 from dataclasses import replace
+from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 
@@ -12,7 +13,13 @@ from presentation_support import (
 from streamlit.testing.v1 import AppTest
 
 import bus_schedule_engine.side_by_side_validation as side_by_side
-from bus_schedule_engine.application_pipeline import ParallelRuntimeStatusV1
+import bus_schedule_engine.unified_page5_artifacts as page5_artifacts
+from bus_schedule_engine import comparison_exporter, excel_exporter
+from bus_schedule_engine import diagram as legacy_diagram
+from bus_schedule_engine.application_pipeline import (
+    ParallelRuntimeStatusV1,
+    run_parallel_application_pipeline_v1,
+)
 from bus_schedule_engine.contracts_v1 import (
     GenerationResultStatus,
     RejectedCandidateDiagnosticV1,
@@ -30,7 +37,10 @@ from bus_schedule_engine.unified_diagram import (
     build_unified_departure_figure_v1,
 )
 from bus_schedule_engine.unified_presentation import build_unified_presentation_v1
+from bus_schedule_engine.unified_result_exporter import export_unified_result_workbook_v1
 from bus_schedule_engine.unified_ui_frames import demand_block_rows_v1
+
+UNIFIED_PAGE5_ARTIFACT_FAILED = "UNIFIED_PAGE5_ARTIFACT_FAILED"
 
 
 def _ready() -> WorkbookInputReadinessV1:
@@ -63,6 +73,33 @@ def _unified_page_state(pair=None) -> dict[str, object]:
         },
         "unified_runtime_failure": None,
     }
+
+
+def _unified_page5_state(tmp_path: Path, pair=None) -> dict[str, object]:
+    state = _unified_page_state(pair)
+    presentation = state["unified_presentation"]
+    target = export_unified_result_workbook_v1(
+        presentation,
+        tmp_path / "page5-unified.xlsx",
+    )
+    state["unified_download_artifacts"] = {
+        **state["unified_download_artifacts"],
+        "xlsx": target.read_bytes(),
+    }
+    return state
+
+
+def _stub_page5_rendering(monkeypatch) -> None:
+    monkeypatch.setattr(
+        page5_artifacts,
+        "_build_html_bytes",
+        lambda *args, **kwargs: b"<html>contract-v1</html>",
+    )
+    monkeypatch.setattr(
+        page5_artifacts,
+        "_build_png_bytes",
+        lambda figure: b"contract-v1-png",
+    )
 
 
 def _mixed_outcome_pair():
@@ -599,3 +636,350 @@ def test_export_page_shows_supply_summary_and_direction_selector(tmp_path) -> No
     assert not app.exception
     assert app.segmented_control[0].value == "terminal_1_to_2"
     assert len(app.get("plotly_chart")) == 2
+
+
+def test_unified_export_page_uses_two_figures_and_exactly_three_contract_downloads(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _stub_page5_rendering(monkeypatch)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("legacy Page 05 builder/exporter must not run")
+
+    monkeypatch.setattr(legacy_diagram, "build_comparison_diagram", forbidden)
+    monkeypatch.setattr(legacy_diagram, "build_departure_detail_diagram", forbidden)
+    monkeypatch.setattr(comparison_exporter, "export_bc_comparison", forbidden)
+    monkeypatch.setattr(excel_exporter, "export_results", forbidden)
+    app = _seed_page(
+        AppTest.from_file("app_pages/05_xuat_file.py"),
+        _unified_page5_state(tmp_path),
+    )
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert len(app.get("plotly_chart")) == 2
+    assert len(app.segmented_control) == 1
+    assert [download.label for download in app.get("download_button")] == [
+        "Workbook Contract V1",
+        "Báo cáo biểu đồ Contract V1 (.html)",
+        "Tổng quan đã chọn (.png)",
+    ]
+    assert not app.dataframe
+    page_source = Path("src/bus_schedule_engine/unified_page5_artifacts.py").read_text(
+        encoding="utf-8"
+    )
+    for filename in (
+        "Bus_Schedule_Contract_V1_Result.xlsx",
+        "Bus_Schedule_Contract_V1_Charts.html",
+        "Bus_Schedule_Contract_V1_Overview.png",
+    ):
+        assert filename in page_source
+    for legacy_filename in (
+        "so_sanh_B_C_tai_phan_bo_on_dinh.xlsx",
+        "Bus_Schedule_MVP_Output.xlsx",
+    ):
+        assert legacy_filename not in page_source
+
+    app.segmented_control[0].set_value("terminal_2_to_1").run(timeout=30)
+    assert not app.exception
+    assert app.segmented_control[0].value == "terminal_2_to_1"
+    assert len(app.get("download_button")) == 3
+
+
+def test_complete_generated_template_reaches_unified_page5_from_stored_pipeline_evidence(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    imported = import_workbook(create_input_template(tmp_path / "complete-template.xlsx"))
+    run = run_parallel_application_pipeline_v1(
+        imported,
+        source_id="streamlit-upload-sha256:" + "5" * 64,
+        imported_at=datetime(2026, 7, 29, 8, 0, tzinfo=UTC),
+    )
+    presentation = run.unified_presentation
+    assert run.status == ParallelRuntimeStatusV1.PARALLEL_VALIDATION_COMPLETE
+    assert presentation is not None
+    assert run.unified_xlsx_bytes is not None
+    _stub_page5_rendering(monkeypatch)
+    state = {
+        "analysis_bundle": run.legacy_bundle,
+        "diagram_figure": run.legacy_figure,
+        "download_artifacts": run.legacy_artifacts,
+        "parallel_runtime_status": run.status,
+        "workbook_input_readiness": run.input_readiness,
+        "unified_optimization_result": run.unified_result,
+        "side_by_side_validation_report": run.side_by_side_report,
+        "unified_presentation": presentation,
+        "unified_demand_supply_figure": run.unified_demand_supply_figure,
+        "unified_departure_figure": run.unified_departure_figure,
+        "unified_download_artifacts": {
+            "xlsx": run.unified_xlsx_bytes,
+            "presentation_fingerprint": presentation.presentation_fingerprint,
+            "b_fingerprint": presentation.source_b_fingerprint,
+            "accepted_solution_fingerprint": presentation.accepted_solution_fingerprint,
+        },
+        "unified_runtime_failure": None,
+    }
+    app = _seed_page(AppTest.from_file("app_pages/05_xuat_file.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert app.info
+    assert len(app.get("plotly_chart")) == 2
+    assert len(app.get("download_button")) == 3
+    assert not app.dataframe
+
+
+def test_unified_export_page_expert_review_warning_does_not_block_artifacts(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _stub_page5_rendering(monkeypatch)
+    state = _unified_page5_state(tmp_path)
+    presentation = state["unified_presentation"]
+    assert presentation.requires_expert_review
+    app = _seed_page(AppTest.from_file("app_pages/05_xuat_file.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert len(app.get("download_button")) == 3
+    assert all(code in app.warning[0].value for code in presentation.expert_review_required_codes)
+    assert "không phải phê duyệt vận hành" in app.warning[0].value
+
+
+def test_unified_export_page_no_c_never_substitutes_legacy_c(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _stub_page5_rendering(monkeypatch)
+    pair = build_corpus_result_and_report("corpus_alpha_80.json")
+    state = _unified_page5_state(tmp_path, pair)
+    presentation = state["unified_presentation"]
+    assert presentation.scenario("C") is None
+    app = _seed_page(AppTest.from_file("app_pages/05_xuat_file.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert len(app.get("plotly_chart")) == 2
+    assert len(app.get("download_button")) == 3
+    rendered_captions = " ".join(item.value for item in app.caption)
+    assert "chỉ Scenario C được validator chấp nhận" in rendered_captions
+
+
+def test_unified_export_page_mixed_solver_outcome_keeps_accepted_c_without_contradiction(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _stub_page5_rendering(monkeypatch)
+    state = _unified_page5_state(tmp_path, _mixed_outcome_pair())
+    presentation = state["unified_presentation"]
+    assert presentation.scenario("C") is not None
+    assert "MIXED_SOLVER_REJECTION" in presentation.outcome.validator_rejection_codes
+    app = _seed_page(AppTest.from_file("app_pages/05_xuat_file.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert len(app.get("download_button")) == 3
+    rendered = " ".join(
+        str(item.value)
+        for collection in (app.info, app.warning, app.error, app.caption, app.markdown)
+        for item in collection
+    )
+    assert "Ứng viên đã bị validator từ chối" not in rendered
+    assert "mixed-rejected-diagnostic-candidate" not in rendered
+
+
+def test_unified_export_page_combined_blocks_offer_no_fabricated_direction(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _stub_page5_rendering(monkeypatch)
+    state = _unified_page5_state(
+        tmp_path,
+        build_result_and_report(combined_demand=True),
+    )
+    app = _seed_page(AppTest.from_file("app_pages/05_xuat_file.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert len(app.segmented_control) == 0
+    assert any("Tổng hợp hai chiều" in item.value for item in app.caption)
+    assert len(app.get("download_button")) == 3
+
+
+def test_unified_page5_xlsx_failure_falls_back_without_partial_unified_download(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    _stub_page5_rendering(monkeypatch)
+    bundle = run_analysis(import_workbook(create_input_template(tmp_path / "legacy-input.xlsx")))
+    state = _unified_page5_state(tmp_path)
+    state.update(
+        {
+            "analysis_bundle": bundle,
+            "diagram_figure": build_comparison_diagram(bundle),
+            "download_artifacts": {
+                "comparison_xlsx": b"legacy-comparison",
+                "xlsx": b"legacy-xlsx",
+                "png": b"legacy-png",
+                "html": b"legacy-html",
+            },
+        }
+    )
+    state["unified_download_artifacts"] = {
+        **state["unified_download_artifacts"],
+        "xlsx": b"tampered-xlsx",
+    }
+    app = _seed_page(AppTest.from_file("app_pages/05_xuat_file.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert UNIFIED_PAGE5_ARTIFACT_FAILED in app.warning[0].value
+    assert [download.label for download in app.get("download_button")] == [
+        "Tải bảng so sánh B và C (.xlsx)",
+        "Workbook kết quả",
+        "Diagram PNG",
+        "Diagram HTML tương tác",
+    ]
+    assert len(app.get("download_button")) == 4
+
+
+def test_unified_page5_tampered_presentation_falls_back_before_artifact_build(
+    tmp_path: Path,
+) -> None:
+    bundle = run_analysis(import_workbook(create_input_template(tmp_path / "tamper-input.xlsx")))
+    state = _unified_page5_state(tmp_path)
+    presentation = state["unified_presentation"]
+    changed_block = replace(
+        presentation.blocks[0],
+        passenger_demand=presentation.blocks[0].passenger_demand + 1,
+    )
+    state.update(
+        {
+            "analysis_bundle": bundle,
+            "diagram_figure": build_comparison_diagram(bundle),
+            "download_artifacts": {
+                "comparison_xlsx": b"comparison",
+                "xlsx": b"xlsx",
+                "png": b"png",
+                "html": b"html",
+            },
+            "unified_presentation": replace(
+                presentation,
+                blocks=(changed_block, *presentation.blocks[1:]),
+            ),
+        }
+    )
+    app = _seed_page(AppTest.from_file("app_pages/05_xuat_file.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert UNIFIED_VISIBLE_STATE_INCOMPLETE in app.warning[0].value
+    assert len(app.get("download_button")) == 4
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected_code"),
+    (
+        (ParallelRuntimeStatusV1.INPUT_NOT_READY, "AVAILABLE_FLEET_LIMIT_REQUIRED"),
+        (ParallelRuntimeStatusV1.UNIFIED_RUNTIME_FAILED, "UNIFIED_PAGE5_RUNTIME_FAILURE"),
+    ),
+)
+def test_page5_authority_modes_preserve_four_download_legacy_fallback(
+    mode,
+    expected_code: str,
+    tmp_path: Path,
+) -> None:
+    bundle = run_analysis(import_workbook(create_input_template(tmp_path / "fallback-input.xlsx")))
+    state = {
+        "analysis_bundle": bundle,
+        "diagram_figure": build_comparison_diagram(bundle),
+        "download_artifacts": {
+            "comparison_xlsx": b"comparison",
+            "xlsx": b"xlsx",
+            "png": b"png",
+            "html": b"html",
+        },
+        "parallel_runtime_status": mode,
+    }
+    if mode == ParallelRuntimeStatusV1.INPUT_NOT_READY:
+        state["workbook_input_readiness"] = WorkbookInputReadinessV1(
+            import_ready=True,
+            optimization_ready=False,
+            blocking_import_codes=(),
+            missing_optimization_authority_codes=(expected_code,),
+            optional_limitations=(),
+        )
+    else:
+        state["unified_runtime_failure"] = {
+            "code": expected_code,
+            "message": "Synthetic Page 05 runtime failure.",
+        }
+    app = _seed_page(AppTest.from_file("app_pages/05_xuat_file.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert expected_code in app.warning[0].value
+    assert len(app.get("download_button")) == 4
+
+
+def test_page5_blocking_and_stale_states_never_expose_unified_artifacts(
+    tmp_path: Path,
+) -> None:
+    bundle = run_analysis(import_workbook(create_input_template(tmp_path / "blocking-input.xlsx")))
+    state = _unified_page5_state(tmp_path)
+    state.update(
+        {
+            "analysis_bundle": bundle,
+            "diagram_figure": build_comparison_diagram(bundle),
+            "download_artifacts": {
+                "comparison_xlsx": b"comparison",
+                "xlsx": b"xlsx",
+                "png": b"png",
+                "html": b"html",
+            },
+        }
+    )
+    state["side_by_side_validation_report"] = replace(
+        state["side_by_side_validation_report"],
+        blocking_discrepancy_codes=("BLOCKING_PAGE5_TEST",),
+    )
+    app = _seed_page(AppTest.from_file("app_pages/05_xuat_file.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert "BLOCKING_PAGE5_TEST" in app.warning[0].value
+    assert len(app.get("download_button")) == 4
+
+    state = _unified_page5_state(tmp_path / "stale")
+    state.update(
+        {
+            "analysis_bundle": bundle,
+            "diagram_figure": build_comparison_diagram(bundle),
+            "download_artifacts": {
+                "comparison_xlsx": b"comparison",
+                "xlsx": b"xlsx",
+                "png": b"png",
+                "html": b"html",
+            },
+        }
+    )
+    state["unified_departure_figure"] = None
+    app = _seed_page(AppTest.from_file("app_pages/05_xuat_file.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert UNIFIED_VISIBLE_STATE_INCOMPLETE in app.warning[0].value
+    assert len(app.get("download_button")) == 4

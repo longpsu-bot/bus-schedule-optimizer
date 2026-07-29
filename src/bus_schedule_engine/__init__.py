@@ -52,8 +52,18 @@ from .ui_result_authority import (
     resolve_visible_result_context_v1,
 )
 from .unified_diagram import (
+    available_unified_directions_v1,
+    build_unified_demand_supply_figure_for_direction_v1,
     build_unified_demand_supply_figure_v1,
     build_unified_departure_figure_v1,
+)
+from .unified_page5_artifacts import (
+    UNIFIED_PAGE5_HTML_FILENAME,
+    UNIFIED_PAGE5_PNG_FILENAME,
+    UNIFIED_PAGE5_XLSX_FILENAME,
+    UnifiedPage5ArtifactError,
+    UnifiedPage5ArtifactsV1,
+    build_unified_page5_artifacts_v1,
 )
 from .unified_presentation import (
     PRESENTATION_MODE_VALIDATION_ONLY,
@@ -76,6 +86,7 @@ from .unified_presentation import (
 from .unified_result_exporter import (
     UnifiedExportMetadataV1,
     export_unified_result_workbook_v1,
+    read_unified_export_metadata_bytes_v1,
     read_unified_export_metadata_v1,
 )
 from .unified_ui_frames import (
@@ -136,15 +147,23 @@ __all__ = [
     "WorkbookInputReadinessV1",
     "WorkbookOptimizationAuthorityError",
     "UNIFIED_SHADOW_RUNTIME_FAILURE",
+    "UNIFIED_PAGE5_HTML_FILENAME",
+    "UNIFIED_PAGE5_PNG_FILENAME",
+    "UNIFIED_PAGE5_XLSX_FILENAME",
     "UNIFIED_VISIBLE_STATE_INCOMPLETE",
+    "UnifiedPage5ArtifactError",
+    "UnifiedPage5ArtifactsV1",
     "VisibleResultContextV1",
     "VisibleResultModeV1",
     "accepted_c_summary_v1",
     "analyze_and_optimize_schedule_v1",
     "assess_workbook_input_readiness_v1",
+    "available_unified_directions_v1",
     "build_side_by_side_validation_report_v1",
+    "build_unified_demand_supply_figure_for_direction_v1",
     "build_unified_demand_supply_figure_v1",
     "build_unified_departure_figure_v1",
+    "build_unified_page5_artifacts_v1",
     "build_unified_presentation_v1",
     "demand_block_rows_v1",
     "demand_gap_rows_v1",
@@ -158,6 +177,7 @@ __all__ = [
     "resolve_visible_result_context_v1",
     "run_parallel_application_pipeline_v1",
     "run_side_by_side_validation_v1",
+    "read_unified_export_metadata_bytes_v1",
     "read_unified_export_metadata_v1",
     "select_optimization_action",
     "side_by_side_report_to_dict",

@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 
 from .unified_presentation import (
     PRESENTATION_MODE_VALIDATION_ONLY,
+    PresentationBlockV1,
     PresentationTripV1,
     UnifiedPresentationBundleV1,
     verify_unified_presentation_integrity_v1,
@@ -24,6 +25,7 @@ _STATUS_COLORS = {
 }
 _SCENARIO_COLORS = {"A": "#8A8F98", "B": "#2673DD", "C": "#1A9850"}
 _DIRECTION_ORDER = {"outbound": 0, "inbound": 1, "combined": 2}
+_DEMAND_DIRECTION_ORDER = ("combined", "outbound", "inbound")
 _SCENARIO_ORDER = {"A": 0, "B": 1, "C": 2}
 
 
@@ -77,15 +79,12 @@ def _block_category(
     )
 
 
-def build_unified_demand_supply_figure_v1(
+def _build_unified_demand_supply_figure_v1(
     presentation: UnifiedPresentationBundleV1,
+    blocks: tuple[PresentationBlockV1, ...],
+    *,
+    metadata: dict[str, object] | None = None,
 ) -> go.Figure:
-    """Build an exact-grain demand/supply figure without rerunning business logic."""
-    if not isinstance(presentation, UnifiedPresentationBundleV1):
-        raise TypeError("presentation must be a UnifiedPresentationBundleV1")
-    verify_unified_presentation_integrity_v1(presentation)
-
-    blocks = presentation.blocks
     categories = [_block_category(presentation, block) for block in blocks]
     figure = go.Figure()
     if blocks:
@@ -201,7 +200,7 @@ def build_unified_demand_supply_figure_v1(
         },
         legend={"orientation": "h", "y": -0.3},
         margin={"b": 180, "t": 100},
-        meta=_figure_meta(presentation),
+        meta={**_figure_meta(presentation), **(metadata or {})},
         annotations=[
             *figure.layout.annotations,
             {
@@ -216,6 +215,51 @@ def build_unified_demand_supply_figure_v1(
         ],
     )
     return figure
+
+
+def available_unified_directions_v1(
+    presentation: UnifiedPresentationBundleV1,
+) -> tuple[str, ...]:
+    """Return only exact block directions, in deterministic display order."""
+    if not isinstance(presentation, UnifiedPresentationBundleV1):
+        raise TypeError("presentation must be a UnifiedPresentationBundleV1")
+    verify_unified_presentation_integrity_v1(presentation)
+    available = {block.direction for block in presentation.blocks}
+    unsupported = sorted(available - set(_DEMAND_DIRECTION_ORDER))
+    if unsupported:
+        raise ValueError(f"unsupported Contract V1 block directions: {unsupported}")
+    return tuple(direction for direction in _DEMAND_DIRECTION_ORDER if direction in available)
+
+
+def build_unified_demand_supply_figure_v1(
+    presentation: UnifiedPresentationBundleV1,
+) -> go.Figure:
+    """Build an exact-grain demand/supply figure without rerunning business logic."""
+    if not isinstance(presentation, UnifiedPresentationBundleV1):
+        raise TypeError("presentation must be a UnifiedPresentationBundleV1")
+    verify_unified_presentation_integrity_v1(presentation)
+    return _build_unified_demand_supply_figure_v1(presentation, presentation.blocks)
+
+
+def build_unified_demand_supply_figure_for_direction_v1(
+    presentation: UnifiedPresentationBundleV1,
+    direction: str,
+) -> go.Figure:
+    """Build one exact returned direction subset without allocation or aggregation."""
+    available = available_unified_directions_v1(presentation)
+    if not isinstance(direction, str):
+        raise TypeError("direction must be a string")
+    if direction not in available:
+        raise ValueError(f"direction must be one of the exact returned directions: {available}")
+    blocks = tuple(block for block in presentation.blocks if block.direction == direction)
+    return _build_unified_demand_supply_figure_v1(
+        presentation,
+        blocks,
+        metadata={
+            "displayed_direction": direction,
+            "displayed_grain": "EXACT_DIRECTION_SUBSET",
+        },
+    )
 
 
 def _departure_customdata(
@@ -357,6 +401,8 @@ def build_unified_departure_figure_v1(
 
 
 __all__ = [
+    "available_unified_directions_v1",
+    "build_unified_demand_supply_figure_for_direction_v1",
     "build_unified_demand_supply_figure_v1",
     "build_unified_departure_figure_v1",
 ]
