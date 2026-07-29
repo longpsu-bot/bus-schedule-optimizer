@@ -11,11 +11,17 @@ from presentation_support import (
 )
 from streamlit.testing.v1 import AppTest
 
+import bus_schedule_engine.side_by_side_validation as side_by_side
 from bus_schedule_engine.application_pipeline import ParallelRuntimeStatusV1
+from bus_schedule_engine.contracts_v1 import (
+    GenerationResultStatus,
+    RejectedCandidateDiagnosticV1,
+)
 from bus_schedule_engine.diagram import build_comparison_diagram
 from bus_schedule_engine.excel_exporter import create_input_template
 from bus_schedule_engine.importer import import_workbook
 from bus_schedule_engine.input_authority import WorkbookInputReadinessV1
+from bus_schedule_engine.optimization_service import SolverChoice
 from bus_schedule_engine.service import run_analysis
 from bus_schedule_engine.ui_result_authority import UNIFIED_VISIBLE_STATE_INCOMPLETE
 from bus_schedule_engine.ui_utils import block_frame, scenario_frame, validation_frame
@@ -57,6 +63,49 @@ def _unified_page_state(pair=None) -> dict[str, object]:
         },
         "unified_runtime_failure": None,
     }
+
+
+def _mixed_outcome_pair():
+    result, report = build_result_and_report(solver_choice=SolverChoice.BOTH)
+    comparison = result.comparison
+    assert comparison is not None
+    assert result.recommended_outcome is not None
+
+    if result.recommended_outcome is result.ortools_outcome:
+        rejected_field = "heuristic_outcome"
+        rejected_outcome = result.heuristic_outcome
+        comparison = replace(comparison, heuristic_vector=None)
+    else:
+        rejected_field = "ortools_outcome"
+        rejected_outcome = result.ortools_outcome
+        comparison = replace(comparison, ortools_vector=None)
+    assert rejected_outcome is not None
+
+    rejected = replace(
+        rejected_outcome,
+        result_status=GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR,
+        outcome_fingerprint="mixed-rejected-outcome",
+        solution=None,
+        diagnostic_candidate=RejectedCandidateDiagnosticV1(
+            candidate_fingerprint="mixed-rejected-diagnostic-candidate",
+            rejection_codes=("MIXED_SOLVER_REJECTION",),
+            summary="The non-recommended solver candidate was rejected.",
+        ),
+    )
+    mixed_result = replace(
+        result,
+        comparison=replace(
+            comparison,
+            reason_code="ONLY_RECOMMENDED_SOLUTION_ACCEPTED",
+            explanation="Only the separately accepted recommended solution is eligible.",
+        ),
+        **{rejected_field: rejected},
+    )
+    mixed_report = side_by_side._report(
+        report.legacy_snapshot,
+        side_by_side._build_unified_snapshot(mixed_result),
+    )
+    return mixed_result, mixed_report
 
 
 def _seed_page(app: AppTest, state: dict[str, object]) -> AppTest:
@@ -317,6 +366,55 @@ def test_page04_rejected_candidate_shows_code_without_raw_candidate() -> None:
     )
     assert "rejected-diagnostic-candidate" not in rendered
     assert len(app.code) == 0
+
+
+def test_page04_mixed_solver_outcome_distinguishes_rejection_from_accepted_c() -> None:
+    state = _unified_page_state(_mixed_outcome_pair())
+    presentation = state["unified_presentation"]
+    app = _seed_page(AppTest.from_file("app_pages/04_khuyen_nghi.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert presentation.outcome.solver_choice == "BOTH"
+    assert presentation.outcome.accepted_c_exists is True
+    assert presentation.outcome.validator_rejection_codes == ("MIXED_SOLVER_REJECTION",)
+    mixed_warning = next(
+        warning for warning in app.warning if "Một hoặc nhiều ứng viên solver khác" in warning.value
+    )
+    assert "MIXED_SOLVER_REJECTION" in mixed_warning.value
+    assert "nghiệm riêng biệt đã được validator chấp nhận" in mixed_warning.value
+    assert not any("MIXED_SOLVER_REJECTION" in error.value for error in app.error)
+    assert any(
+        "nghiệm Contract V1 đã được validator độc lập chấp nhận" in success.value
+        for success in app.success
+    )
+    assert any(metric.label == "Chuyến B / C (DISPLAY_DERIVED)" for metric in app.metric)
+    assert app.code[0].value == presentation.accepted_solution_fingerprint
+
+    rendered = " ".join(
+        [
+            *(
+                str(item.value)
+                for collection in (
+                    app.info,
+                    app.warning,
+                    app.error,
+                    app.success,
+                    app.markdown,
+                )
+                for item in collection
+            ),
+            *(str(item.value.to_dict("records")) for item in app.dataframe),
+        ]
+    )
+    assert "Ứng viên đã bị validator từ chối; không hiển thị dữ liệu ứng viên thô." not in (
+        rendered
+    )
+    assert "mixed-rejected-diagnostic-candidate" not in rendered
+    scenario_c = presentation.scenario("C")
+    assert scenario_c is not None
+    assert scenario_c.source_fingerprint == presentation.accepted_solution_fingerprint
 
 
 def test_input_not_ready_banner_preserves_codes_and_legacy_page03_behavior(

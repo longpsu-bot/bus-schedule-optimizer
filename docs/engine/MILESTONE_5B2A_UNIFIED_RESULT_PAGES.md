@@ -26,8 +26,10 @@ caller:
 
 The resolver is frozen/slotted at its return boundary, does not import Streamlit, does not read
 session state, and does not call validation, analysis, diagram construction, export, or solver
-paths. It does not rebuild business objects or recompute presentation integrity. It compares the
-stored evidence that Milestone 5B1 already produced.
+paths. It does not rebuild business objects. It calls
+`verify_unified_presentation_integrity_v1(...)` to recompute the canonical fingerprint of the
+already-stored presentation DTO, then compares that verified identity with the evidence Milestone
+5B1 already produced.
 
 ## 3. Unified-mode conditions
 
@@ -38,17 +40,18 @@ stored evidence that Milestone 5B1 already produced.
 3. readiness exists and `optimization_ready=True`;
 4. the unified result, report, presentation, and both unified figures exist;
 5. unified XLSX bytes and all three stored metadata fingerprints exist;
-6. presentation mode is `VALIDATION_ONLY`;
-7. neither report nor presentation contains a blocking discrepancy;
-8. report and presentation blocker tuples agree;
-9. the presentation fingerprint matches both figure metadata records and XLSX metadata;
-10. the normalized-B fingerprint matches the result, report, presentation, figures, and XLSX
+6. the presentation's current semantic contents match its stored canonical fingerprint;
+7. presentation mode is `VALIDATION_ONLY`;
+8. neither report nor presentation contains a blocking discrepancy;
+9. report and presentation blocker tuples agree;
+10. the presentation fingerprint matches both figure metadata records and XLSX metadata;
+11. the normalized-B fingerprint matches the result, report, presentation, figures, and XLSX
     metadata;
-11. the accepted-C fingerprint matches the result, report, presentation, figures, and XLSX
+12. the accepted-C fingerprint matches the result, report, presentation, figures, and XLSX
     metadata, including `None` everywhere when no accepted C exists;
-12. accepted-C presence, timetable, fleet, block fields, and presentation outcome agree;
-13. dimension issue vectors have consistent lengths; and
-14. the presentation source identity agrees with the unified result.
+13. accepted-C presence, timetable, fleet, block fields, and presentation outcome agree;
+14. dimension issue vectors have consistent lengths; and
+15. the presentation source identity agrees with the unified result.
 
 Passing this gate selects which returned facts Pages 02–04 display. It is not operational approval.
 
@@ -113,6 +116,12 @@ accepted solution fingerprint. Counts and maxima over exact returned presentatio
 When accepted C does not exist, the page states that no authoritative C exists, displays the
 returned decision and diagnostic statuses, and renders no C timetable. Rejected raw candidates are
 not present in the presentation and are not exposed.
+
+For `BOTH`, aggregate rejection codes can belong to a non-recommended solver candidate while a
+separate recommended solution is accepted as authoritative C. In that mixed state Page 04 shows
+the codes as warning-level diagnostic evidence and explicitly states that the displayed C is the
+separate accepted solution. The blanket candidate-rejected error is used only when no accepted C
+exists.
 
 ## 9. Page 05 explicit non-cutover
 

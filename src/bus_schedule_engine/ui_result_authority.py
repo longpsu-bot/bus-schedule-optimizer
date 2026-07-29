@@ -18,6 +18,8 @@ from .side_by_side_validation import SideBySideValidationReportV1
 from .unified_presentation import (
     PRESENTATION_MODE_VALIDATION_ONLY,
     UnifiedPresentationBundleV1,
+    UnifiedPresentationConsistencyError,
+    verify_unified_presentation_integrity_v1,
 )
 
 UNIFIED_VISIBLE_STATE_INCOMPLETE = "UNIFIED_VISIBLE_STATE_INCOMPLETE"
@@ -263,6 +265,10 @@ def _completed_state_is_aligned(
         and unified_departure_figure is not None
         and isinstance(unified_download_artifacts, Mapping)
     ):
+        return False
+    try:
+        verify_unified_presentation_integrity_v1(presentation)
+    except (UnifiedPresentationConsistencyError, TypeError):
         return False
     if presentation.presentation_mode != PRESENTATION_MODE_VALIDATION_ONLY:
         return False

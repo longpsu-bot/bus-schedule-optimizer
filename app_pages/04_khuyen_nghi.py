@@ -51,15 +51,25 @@ if visible.uses_unified:
     st.subheader("Kết quả khuyến nghị Contract V1")
     st.dataframe(outcome_rows_v1(presentation), hide_index=True)
 
+    accepted_summary = accepted_c_summary_v1(presentation)
     rejection_codes = presentation.outcome.validator_rejection_codes
     if rejection_codes:
-        st.error(
-            "Ứng viên đã bị validator từ chối; không hiển thị dữ liệu ứng viên thô:\n\n"
-            + "\n".join(f"- {code}" for code in rejection_codes),
-            icon=":material/block:",
-        )
+        code_text = "\n".join(f"- {code}" for code in rejection_codes)
+        if accepted_summary is None:
+            st.error(
+                "Ứng viên đã bị validator từ chối; không hiển thị dữ liệu ứng viên thô.\n\n"
+                f"{code_text}",
+                icon=":material/block:",
+            )
+        else:
+            st.warning(
+                "Một hoặc nhiều ứng viên solver khác đã bị validator từ chối.\n\n"
+                "Các mã dưới đây được giữ lại làm bằng chứng chẩn đoán; phương án C "
+                "hiển thị bên dưới là nghiệm riêng biệt đã được validator chấp nhận.\n\n"
+                f"{code_text}",
+                icon=":material/rate_review:",
+            )
 
-    accepted_summary = accepted_c_summary_v1(presentation)
     if accepted_summary is None:
         st.warning(
             "Không tồn tại phương án C có thẩm quyền trong kết quả Contract V1. "

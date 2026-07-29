@@ -210,6 +210,90 @@ def test_presentation_fingerprint_mismatch_falls_back(aligned_state) -> None:
     assert context.mode == VisibleResultModeV1.LEGACY_INCOMPLETE_SHADOW_STATE
 
 
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "block_fact",
+        "technical_issue",
+        "outcome_field",
+        "discrepancy",
+        "stored_fingerprint",
+        "presentation_mode",
+    ),
+)
+def test_stale_or_invalid_presentation_contents_fail_closed(
+    aligned_state,
+    mutation: str,
+) -> None:
+    original = aligned_state["presentation"]
+    state = dict(aligned_state)
+
+    if mutation == "block_fact":
+        blocks = list(original.blocks)
+        blocks[0] = replace(
+            blocks[0],
+            passenger_demand=blocks[0].passenger_demand + 1,
+        )
+        presentation = replace(original, blocks=tuple(blocks))
+    elif mutation == "technical_issue":
+        dimensions = list(original.dimensions)
+        index = next(
+            index for index, dimension in enumerate(dimensions) if dimension.issue_messages
+        )
+        dimension = dimensions[index]
+        dimensions[index] = replace(
+            dimension,
+            issue_messages=(
+                f"{dimension.issue_messages[0]} Altered.",
+                *dimension.issue_messages[1:],
+            ),
+        )
+        presentation = replace(original, dimensions=tuple(dimensions))
+    elif mutation == "outcome_field":
+        presentation = replace(
+            original,
+            outcome=replace(original.outcome, selected_action="ALTERED_ACTION"),
+        )
+    elif mutation == "discrepancy":
+        discrepancies = list(original.discrepancies)
+        discrepancies[0] = replace(
+            discrepancies[0],
+            explanation=f"{discrepancies[0].explanation} Altered.",
+        )
+        presentation = replace(original, discrepancies=tuple(discrepancies))
+    elif mutation == "stored_fingerprint":
+        changed_fingerprint = "f" * 64
+        presentation = replace(
+            original,
+            presentation_fingerprint=changed_fingerprint,
+        )
+        for figure_key in (
+            "unified_demand_supply_figure",
+            "unified_departure_figure",
+        ):
+            figure = deepcopy(aligned_state[figure_key])
+            metadata = dict(figure.layout.meta)
+            metadata["presentation_fingerprint"] = changed_fingerprint
+            figure.update_layout(meta=metadata)
+            state[figure_key] = figure
+        state["unified_download_artifacts"] = {
+            **aligned_state["unified_download_artifacts"],
+            "presentation_fingerprint": changed_fingerprint,
+        }
+    else:
+        presentation = replace(original, presentation_mode="AUTHORITATIVE")
+
+    if mutation != "stored_fingerprint":
+        assert presentation.presentation_fingerprint == original.presentation_fingerprint
+    state["presentation"] = presentation
+
+    context = _resolve(state)
+
+    assert context.mode == VisibleResultModeV1.LEGACY_INCOMPLETE_SHADOW_STATE
+    assert context.reason_codes == (UNIFIED_VISIBLE_STATE_INCOMPLETE,)
+    assert context.presentation is None
+
+
 def test_normalized_b_fingerprint_mismatch_falls_back(aligned_state) -> None:
     artifacts = {
         **aligned_state["unified_download_artifacts"],
