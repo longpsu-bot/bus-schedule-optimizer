@@ -55,11 +55,15 @@ Contract V1 result and the Milestone 5A1 report. This does not cut over Streamli
 session state, charts, and downloads remain legacy-authoritative. See
 [Milestone 5A2B unified presentation adapters](docs/engine/MILESTONE_5A2B_UNIFIED_PRESENTATION_ADAPTERS.md).
 
-Milestone 5B1 now runs unified Contract V1 once in the real Streamlit submission flow when
-authoritative input is ready and stores aligned validation evidence in parallel session state.
-Visible result pages, charts, Scenario C, and downloads remain legacy-authoritative. Milestone 5B2
-will separately consider the results-page cutover after review. See
-[Milestone 5B1 Streamlit shadow runtime](docs/engine/MILESTONE_5B1_STREAMLIT_SHADOW_RUNTIME.md).
+Milestone 5B1 completes the shadow runtime: unified Contract V1 runs once in the real Streamlit
+submission flow when authoritative input is ready and stores aligned validation evidence in
+parallel session state. Milestone 5B2A now cuts over visible diagnostic and recommendation Pages
+02–04 through one explicit authority resolver; missing, failed, blocked, or inconsistent shadow
+evidence retains a prominently labeled legacy fallback. Page 05 charts and downloads remain
+entirely legacy-authoritative, and Milestone 5B2B remains pending. See
+[Milestone 5B1 Streamlit shadow runtime](docs/engine/MILESTONE_5B1_STREAMLIT_SHADOW_RUNTIME.md)
+and
+[Milestone 5B2A unified result pages](docs/engine/MILESTONE_5B2A_UNIFIED_RESULT_PAGES.md).
 
 Contract V1 includes separate OR-Tools v9.15 CP-SAT adapters for one-route, fixed-resource hard
 feasibility, directional demand-priority optimization, and service-quality optimization. The
@@ -123,7 +127,8 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 
 ## Not supported yet
 
-- Contract V1 result-page authority or downloads through the Streamlit application.
+- Contract V1 authority for Page 05 charts, PNG/HTML generation, or downloads through the
+  Streamlit application.
 - Solver selection through Streamlit.
 - OR-Tools fleet-minimization objectives.
 - A globally optimal timetable or a proof of infeasibility from the legacy heuristic.
@@ -157,8 +162,9 @@ Only an independently validated candidate may be presented as authoritative Scen
 ## Near-term roadmap
 
 Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation, Milestone 5A2A
-authoritative input readiness, Milestone 5A2B validation-only presentation adapters, and Milestone
-5B1 Streamlit shadow execution are implemented**, but Milestone 5 is not complete.
+authoritative input readiness, Milestone 5A2B validation-only presentation adapters, Milestone
+5B1 Streamlit shadow execution, and Milestone 5B2A unified result Pages 02–04 are implemented**,
+but Milestone 5 is not complete.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
 2. Milestone 5A2A: stabilize authoritative workbook input and readiness.
@@ -166,7 +172,9 @@ authoritative input readiness, Milestone 5A2B validation-only presentation adapt
    (implemented; no Streamlit cutover).
 4. Milestone 5B1: run Contract V1 once in Streamlit and store non-authoritative shadow evidence
    (implemented; visible pages and downloads remain legacy).
-5. Milestone 5B2: separately cut over result pages only after discrepancies are reviewed.
+5. Milestone 5B2A: cut over Pages 02–04 through the explicit visible-result authority gate
+   (implemented; Page 05 remains legacy).
+6. Milestone 5B2B: separately cut over charts and downloads (pending).
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)
@@ -195,7 +203,9 @@ See
 approved policy boundary and
 [Route Corpus Characterization Draft V1](docs/engine/ROUTE_CORPUS_CHARACTERIZATION_DRAFT_V1.md)
 for detailed historical evidence. The Streamlit UI, charts, and XLSX exports have not yet migrated
-to unified Contract V1 results. The 5A2B unified artifacts remain a separate validation path.
+in full to unified Contract V1 results. Pages 02–04 may now display aligned unified facts through
+the 5B2A authority gate, while Page 05 charts and XLSX/PNG/HTML exports remain
+legacy-authoritative.
 
 Variable-trip-count optimization and structural demand-response scenarios are optional later
 stages. See [Migration Roadmap to OR-Tools](docs/engine/MIGRATION_ROADMAP_TO_OR_TOOLS.md).
