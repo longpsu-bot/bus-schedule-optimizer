@@ -12,7 +12,10 @@ from pathlib import Path
 import plotly
 import plotly.io as pio
 
-from .unified_diagram import build_unified_demand_supply_figure_for_direction_v1
+from .unified_diagram import (
+    build_unified_demand_supply_figure_for_direction_v1,
+    build_unified_departure_figure_v1,
+)
 from .unified_presentation import (
     PRESENTATION_MODE_VALIDATION_ONLY,
     UnifiedPresentationBundleV1,
@@ -91,6 +94,23 @@ def _verify_stored_figure(
     if mismatches:
         raise UnifiedPage5ArtifactError(
             f"{artifact_name} metadata does not align with presentation: {mismatches}"
+        )
+
+
+def _verify_stored_departure_figure_contents(
+    stored_departure_figure: object,
+    canonical_departure_figure: object,
+) -> None:
+    try:
+        stored_json = stored_departure_figure.to_plotly_json()
+        canonical_json = canonical_departure_figure.to_plotly_json()
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise UnifiedPage5ArtifactError(
+            "stored departure figure contents cannot be verified"
+        ) from exc
+    if stored_json != canonical_json:
+        raise UnifiedPage5ArtifactError(
+            "stored departure figure contents do not match the verified presentation"
         )
 
 
@@ -270,6 +290,7 @@ def build_unified_page5_artifacts_v1(
         if presentation.cutover_blocked or presentation.blocking_discrepancy_codes:
             raise UnifiedPage5ArtifactError("blocking discrepancies prohibit unified Page 05")
         _verify_accepted_c_shape(presentation)
+        canonical_departure_figure = build_unified_departure_figure_v1(presentation)
         _verify_stored_figure(
             presentation,
             stored_demand_supply_figure,
@@ -279,6 +300,10 @@ def build_unified_page5_artifacts_v1(
             presentation,
             stored_departure_figure,
             artifact_name="stored departure figure",
+        )
+        _verify_stored_departure_figure_contents(
+            stored_departure_figure,
+            canonical_departure_figure,
         )
 
         workbook_metadata = read_unified_export_metadata_bytes_v1(xlsx_bytes)
@@ -307,7 +332,7 @@ def build_unified_page5_artifacts_v1(
         html_bytes = _build_html_bytes(
             presentation,
             selected_figure,
-            stored_departure_figure,
+            canonical_departure_figure,
             selected_direction=selected_direction,
         )
         png_bytes = _build_png_bytes(selected_figure)
@@ -321,7 +346,7 @@ def build_unified_page5_artifacts_v1(
     return UnifiedPage5ArtifactsV1(
         selected_direction=selected_direction,
         demand_supply_figure=selected_figure,
-        departure_figure=stored_departure_figure,
+        departure_figure=canonical_departure_figure,
         xlsx_bytes=xlsx_bytes,
         html_bytes=html_bytes,
         png_bytes=png_bytes,

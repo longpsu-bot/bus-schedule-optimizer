@@ -4,6 +4,7 @@ from dataclasses import FrozenInstanceError, replace
 from io import BytesIO
 from pathlib import Path
 
+import plotly.graph_objects as go
 import pytest
 from openpyxl import load_workbook
 from presentation_support import (
@@ -198,6 +199,166 @@ def test_stored_figure_metadata_mismatch_fails_closed(
             demand_figure=demand,
             departure_figure=departure,
         )
+
+
+def test_changed_departure_time_with_unchanged_metadata_fails_closed(
+    fast_render,
+    tmp_path: Path,
+    accepted_presentation,
+) -> None:
+    demand, departure = _stored_figures(accepted_presentation)
+    original_metadata = dict(departure.layout.meta)
+    changed_times = list(departure.data[0].x)
+    changed_times[0] += 60
+    departure.data[0].x = changed_times
+
+    assert dict(departure.layout.meta) == original_metadata
+    with pytest.raises(
+        UnifiedPage5ArtifactError,
+        match="contents do not match",
+    ):
+        _build_artifacts(
+            accepted_presentation,
+            _xlsx_bytes(accepted_presentation, tmp_path),
+            demand_figure=demand,
+            departure_figure=departure,
+        )
+
+
+def test_changed_c_customdata_with_unchanged_metadata_fails_closed(
+    fast_render,
+    tmp_path: Path,
+    accepted_presentation,
+) -> None:
+    demand, departure = _stored_figures(accepted_presentation)
+    original_metadata = dict(departure.layout.meta)
+    c_trace = next(trace for trace in departure.data if str(trace.name).startswith("C ·"))
+    changed_customdata = [list(row) for row in c_trace.customdata]
+    changed_customdata[0][7] = "fabricated-source-b-trip"
+    changed_customdata[0][12] = "fabricated-vehicle"
+    c_trace.customdata = changed_customdata
+
+    assert dict(departure.layout.meta) == original_metadata
+    with pytest.raises(
+        UnifiedPage5ArtifactError,
+        match="contents do not match",
+    ):
+        _build_artifacts(
+            accepted_presentation,
+            _xlsx_bytes(accepted_presentation, tmp_path),
+            demand_figure=demand,
+            departure_figure=departure,
+        )
+
+
+def test_removed_b_lane_with_unchanged_metadata_fails_closed(
+    fast_render,
+    tmp_path: Path,
+    accepted_presentation,
+) -> None:
+    demand, departure = _stored_figures(accepted_presentation)
+    original_metadata = dict(departure.layout.meta)
+    departure.data = tuple(
+        trace for trace in departure.data if not str(trace.name).startswith("B ·")
+    )
+
+    assert dict(departure.layout.meta) == original_metadata
+    with pytest.raises(
+        UnifiedPage5ArtifactError,
+        match="contents do not match",
+    ):
+        _build_artifacts(
+            accepted_presentation,
+            _xlsx_bytes(accepted_presentation, tmp_path),
+            demand_figure=demand,
+            departure_figure=departure,
+        )
+
+
+def test_added_c_lane_in_no_c_presentation_fails_closed(
+    fast_render,
+    tmp_path: Path,
+    alpha_presentation,
+) -> None:
+    demand, departure = _stored_figures(alpha_presentation)
+    original_metadata = dict(departure.layout.meta)
+    departure.add_trace(
+        go.Scatter(
+            name="C · fabricated rejected candidate",
+            x=[8 * 3600],
+            y=["C · fabricated rejected candidate"],
+            mode="markers",
+            customdata=[["rejected-candidate-raw-fact"]],
+        )
+    )
+
+    assert dict(departure.layout.meta) == original_metadata
+    with pytest.raises(
+        UnifiedPage5ArtifactError,
+        match="contents do not match",
+    ):
+        _build_artifacts(
+            alpha_presentation,
+            _xlsx_bytes(alpha_presentation, tmp_path),
+            demand_figure=demand,
+            departure_figure=departure,
+        )
+
+
+def test_unchanged_canonical_stored_departure_figure_passes(
+    fast_render,
+    tmp_path: Path,
+    accepted_presentation,
+) -> None:
+    demand, stored_departure = _stored_figures(accepted_presentation)
+    artifacts = _build_artifacts(
+        accepted_presentation,
+        _xlsx_bytes(accepted_presentation, tmp_path),
+        demand_figure=demand,
+        departure_figure=stored_departure,
+    )
+
+    assert artifacts.departure_figure is not stored_departure
+    assert artifacts.departure_figure.to_plotly_json() == stored_departure.to_plotly_json()
+
+
+def test_returned_and_html_departure_figure_is_canonical_verified_rebuild(
+    monkeypatch,
+    tmp_path: Path,
+    accepted_presentation,
+) -> None:
+    demand = build_unified_demand_supply_figure_v1(accepted_presentation)
+    canonical_departure = build_unified_departure_figure_v1(accepted_presentation)
+    stored_departure = go.Figure(canonical_departure)
+    captured = {}
+
+    monkeypatch.setattr(
+        page5_artifacts,
+        "build_unified_departure_figure_v1",
+        lambda presentation: canonical_departure,
+    )
+
+    def capture_html(
+        presentation,
+        demand_supply_figure,
+        departure_figure,
+        *,
+        selected_direction,
+    ):
+        captured["departure_figure"] = departure_figure
+        return b"<html>canonical departure</html>"
+
+    monkeypatch.setattr(page5_artifacts, "_build_html_bytes", capture_html)
+    monkeypatch.setattr(page5_artifacts, "_build_png_bytes", lambda figure: b"png")
+    artifacts = _build_artifacts(
+        accepted_presentation,
+        _xlsx_bytes(accepted_presentation, tmp_path),
+        demand_figure=demand,
+        departure_figure=stored_departure,
+    )
+
+    assert artifacts.departure_figure is canonical_departure
+    assert captured["departure_figure"] is canonical_departure
 
 
 def test_none_accepted_c_fingerprints_and_facts_align(

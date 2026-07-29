@@ -19,6 +19,14 @@ figure-metadata, XLSX-metadata, HTML, and PNG checks must all succeed before any
 download is exposed. A construction failure displays `UNIFIED_PAGE5_ARTIFACT_FAILED` and renders
 the complete legacy Page 05 instead.
 
+The stored departure figure is shadow evidence, not trusted visible content. After verifying the
+presentation DTO, the artifact builder rebuilds the canonical departure figure through
+`build_unified_departure_figure_v1(...)` and requires exact deterministic Plotly JSON equality
+with the stored figure. This comparison includes trace times, lanes, names, `x`, `y`,
+`customdata`, hover templates, lane order, and metadata. Any changed, added, or removed trace
+fails closed. The rebuilt canonical figure—not the mutable stored object—is returned for
+Streamlit and embedded in HTML.
+
 ## 3. Exact-direction chart selection
 
 `available_unified_directions_v1(...)` returns only directions present in
@@ -50,7 +58,7 @@ Page 05 returns the exact validated XLSX bytes; it does not regenerate the workb
 ## 5. Unified HTML contract
 
 The HTML download is a deterministic, offline UTF-8 document containing the selected exact
-demand/supply figure and the complete stored departure figure. Plotly JavaScript is embedded
+demand/supply figure and the canonical verified departure figure. Plotly JavaScript is embedded
 inline once. The fixed div IDs are:
 
 - `contract-v1-demand-supply`;
