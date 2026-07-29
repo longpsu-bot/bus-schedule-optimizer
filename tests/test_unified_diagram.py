@@ -12,6 +12,8 @@ from presentation_support import (
 import bus_schedule_engine.unified_presentation as unified_presentation
 from bus_schedule_engine import diagram
 from bus_schedule_engine.unified_diagram import (
+    available_unified_directions_v1,
+    build_unified_demand_supply_figure_for_direction_v1,
     build_unified_demand_supply_figure_v1,
     build_unified_departure_figure_v1,
 )
@@ -137,6 +139,80 @@ def test_combined_demand_chart_stays_combined() -> None:
         all(direction not in value for direction in ("outbound", "inbound", "combined"))
         for value in figure.layout.xaxis.categoryarray
     )
+
+
+def test_available_directions_are_exact_and_do_not_fabricate_combined(
+    accepted_presentation,
+) -> None:
+    assert available_unified_directions_v1(accepted_presentation) == (
+        "outbound",
+        "inbound",
+    )
+
+    combined = build_unified_presentation_v1(*build_result_and_report(combined_demand=True))
+    assert available_unified_directions_v1(combined) == ("combined",)
+
+
+def test_available_direction_order_is_deterministic(
+    accepted_presentation,
+) -> None:
+    combined_block = replace(accepted_presentation.blocks[0], direction="combined")
+    changed = replace(
+        accepted_presentation,
+        blocks=(
+            accepted_presentation.blocks[-1],
+            combined_block,
+            *accepted_presentation.blocks[1:-1],
+        ),
+        presentation_fingerprint="",
+    )
+    presentation = replace(
+        changed,
+        presentation_fingerprint=unified_presentation._presentation_fingerprint(changed),
+    )
+
+    assert available_unified_directions_v1(presentation) == (
+        "combined",
+        "outbound",
+        "inbound",
+    )
+
+
+@pytest.mark.parametrize("direction", ("outbound", "inbound"))
+def test_direction_figure_filters_exact_blocks_and_preserves_fingerprint(
+    accepted_presentation,
+    direction: str,
+) -> None:
+    figure = build_unified_demand_supply_figure_for_direction_v1(
+        accepted_presentation,
+        direction,
+    )
+    expected_blocks = [
+        block for block in accepted_presentation.blocks if block.direction == direction
+    ]
+    demand_trace = _trace(figure, "Nhu cầu hành khách")
+    metadata = dict(figure.layout.meta)
+
+    assert [row[0] for row in demand_trace.customdata] == [
+        block.block_id for block in expected_blocks
+    ]
+    assert {row[1] for row in demand_trace.customdata} == {direction}
+    assert list(_trace(figure, "Số chuyến B").y) == [
+        block.b_trip_count for block in expected_blocks
+    ]
+    assert metadata["presentation_fingerprint"] == (accepted_presentation.presentation_fingerprint)
+    assert metadata["displayed_direction"] == direction
+    assert metadata["displayed_grain"] == "EXACT_DIRECTION_SUBSET"
+
+
+def test_direction_figure_rejects_absent_direction(
+    accepted_presentation,
+) -> None:
+    with pytest.raises(ValueError, match="exact returned directions"):
+        build_unified_demand_supply_figure_for_direction_v1(
+            accepted_presentation,
+            "combined",
+        )
 
 
 def test_departure_chart_uses_exact_b_and_accepted_c_departures(

@@ -4,10 +4,11 @@ import hashlib
 import json
 from dataclasses import replace
 from datetime import timedelta
+from io import BytesIO
 from pathlib import Path
 
 import pytest
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 from presentation_support import (
     build_corpus_result_and_report,
     build_result_and_report,
@@ -28,6 +29,7 @@ from bus_schedule_engine.unified_presentation import (
 from bus_schedule_engine.unified_result_exporter import (
     UnifiedExportMetadataV1,
     export_unified_result_workbook_v1,
+    read_unified_export_metadata_bytes_v1,
     read_unified_export_metadata_v1,
 )
 
@@ -446,6 +448,49 @@ def test_fingerprint_metadata_reader_matches_presentation(
     assert metadata.source_id == accepted_presentation.source_id
     assert metadata.presentation_mode == "VALIDATION_ONLY"
     assert metadata.cutover_blocked == accepted_presentation.cutover_blocked
+
+
+def test_byte_metadata_reader_matches_path_reader(
+    tmp_path: Path,
+    accepted_presentation,
+) -> None:
+    target = export_unified_result_workbook_v1(
+        accepted_presentation,
+        tmp_path / "metadata-bytes.xlsx",
+    )
+
+    assert read_unified_export_metadata_bytes_v1(
+        target.read_bytes()
+    ) == read_unified_export_metadata_v1(target)
+
+
+def test_byte_metadata_reader_rejects_invalid_xlsx_bytes() -> None:
+    with pytest.raises(ValueError, match="invalid"):
+        read_unified_export_metadata_bytes_v1(b"not-an-xlsx")
+
+
+def test_byte_metadata_reader_rejects_missing_fingerprints_sheet() -> None:
+    workbook = Workbook()
+    workbook.active.title = "TONG_QUAN"
+    content = BytesIO()
+    workbook.save(content)
+    workbook.close()
+
+    with pytest.raises(ValueError, match="FINGERPRINTS sheet is missing"):
+        read_unified_export_metadata_bytes_v1(content.getvalue())
+
+
+def test_byte_metadata_reader_aligns_none_accepted_c(
+    tmp_path: Path,
+    alpha_presentation,
+) -> None:
+    target = export_unified_result_workbook_v1(
+        alpha_presentation,
+        tmp_path / "alpha-metadata-bytes.xlsx",
+    )
+    metadata = read_unified_export_metadata_bytes_v1(target.read_bytes())
+
+    assert metadata.accepted_solution_fingerprint is None
 
 
 def test_workbook_is_unprotected_editable_and_has_no_formulas(
