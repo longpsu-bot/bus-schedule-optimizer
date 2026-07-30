@@ -1,7 +1,12 @@
-"""Application-layer orchestration for the legacy-authoritative shadow runtime."""
+"""Application orchestration for the unified runtime and offline legacy oracle."""
 
 from __future__ import annotations
 
+import hashlib
+import json
+import logging
+import os
+import re
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
@@ -9,6 +14,7 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import TYPE_CHECKING
 
 from .contracts_v1 import GenerationResultStatus
 from .importer import ImportedWorkbook
@@ -20,28 +26,209 @@ from .input_authority import (
 from .models import AnalysisBundle
 from .optimization_service import (
     BusScheduleOptimizationResult,
+    OptimizationExecutionErrorV1,
+    OptimizationExecutionStageV1,
     SolverChoice,
     analyze_and_optimize_schedule_v1,
 )
-from .side_by_side_validation import (
-    SideBySideValidationReportV1,
-    build_side_by_side_validation_report_v1,
-)
-from .ui_utils import run_and_build_artifacts
 from .unified_diagram import (
     build_unified_demand_supply_figure_v1,
     build_unified_departure_figure_v1,
 )
 from .unified_presentation import (
     UnifiedPresentationBundleV1,
+    UnifiedPresentationConsistencyError,
+    build_unified_application_presentation_v1,
     build_unified_presentation_v1,
+    verify_unified_presentation_integrity_v1,
 )
 from .unified_result_exporter import (
     export_unified_result_workbook_v1,
     read_unified_export_metadata_v1,
 )
 
+if TYPE_CHECKING:
+    from .side_by_side_validation import SideBySideValidationReportV1
+else:
+    SideBySideValidationReportV1 = object
+
+LOGGER = logging.getLogger(__name__)
+
 UNIFIED_SHADOW_RUNTIME_FAILURE = "UNIFIED_SHADOW_RUNTIME_FAILED"
+WORKBOOK_IMPORT_INVALID = "WORKBOOK_IMPORT_INVALID"
+WORKBOOK_OPTIMIZATION_NOT_READY = "WORKBOOK_OPTIMIZATION_NOT_READY"
+CONTRACT_V1_NORMALIZATION_FAILED = "CONTRACT_V1_NORMALIZATION_FAILED"
+CONTRACT_V1_SOLVER_FAILED = "CONTRACT_V1_SOLVER_FAILED"
+CONTRACT_V1_APPLICATION_ERROR = "CONTRACT_V1_APPLICATION_ERROR"
+CONTRACT_V1_ARTIFACT_FAILED = "CONTRACT_V1_ARTIFACT_FAILED"
+CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH = "CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH"
+
+_LOCAL_PATH_PATTERN = re.compile(r"(?i)(?:[a-z]:[\\/]|\\\\)[^\s,;]+|(?:/[^/\s]+){2,}")
+_SENSITIVE_SOURCE_PATTERN = re.compile(
+    r"(?i)\b(?:passenger observations?|raw workbook rows?|workbook bytes|raw rows?)\b"
+)
+_MAX_SANITIZED_MESSAGE_LENGTH = 240
+
+
+class UnifiedApplicationStatusV1(StrEnum):
+    INPUT_NOT_READY = "INPUT_NOT_READY"
+    COMPLETE = "COMPLETE"
+    ARTIFACT_FAILED = "ARTIFACT_FAILED"
+    FAILED = "FAILED"
+
+
+@dataclass(frozen=True, slots=True)
+class UnifiedRuntimeFailureV1:
+    code: str
+    stage: str
+    correlation_id: str
+    sanitized_message: str
+    retryable: bool
+    solver_choice: str
+    source_id: str
+    presentation_fingerprint: str | None
+    b_fingerprint: str | None
+    accepted_solution_fingerprint: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class UnifiedApplicationRunV1:
+    status: UnifiedApplicationStatusV1
+    input_readiness: WorkbookInputReadinessV1
+    unified_result: BusScheduleOptimizationResult | None
+    unified_presentation: UnifiedPresentationBundleV1 | None
+    unified_demand_supply_figure: object | None
+    unified_departure_figure: object | None
+    unified_xlsx_bytes: bytes | None
+    source_id: str
+    imported_at: datetime
+    failure: UnifiedRuntimeFailureV1 | None
+
+
+def run_and_build_artifacts(
+    imported: ImportedWorkbook,
+) -> tuple[AnalysisBundle, object, Mapping[str, bytes]]:
+    """Load the legacy runtime only when the offline parallel adapter is invoked."""
+    from .ui_utils import run_and_build_artifacts as legacy_runner
+
+    return legacy_runner(imported)
+
+
+def build_side_by_side_validation_report_v1(
+    legacy_bundle: AnalysisBundle,
+    unified_result: BusScheduleOptimizationResult,
+) -> SideBySideValidationReportV1:
+    """Load comparison code only for explicit offline parallel validation."""
+    from .side_by_side_validation import (
+        build_side_by_side_validation_report_v1 as legacy_comparator,
+    )
+
+    return legacy_comparator(legacy_bundle, unified_result)
+
+
+def _sanitize_failure_message(exc: Exception) -> str:
+    message = " ".join(str(exc).split()) or exc.__class__.__name__
+    if _SENSITIVE_SOURCE_PATTERN.search(message):
+        return f"{exc.__class__.__name__}: source-data details redacted"
+    message = _LOCAL_PATH_PATTERN.sub("[path]", message)
+    message = re.sub(r"\{[^{}]{1,200}\}", "{redacted}", message)
+    return message[:_MAX_SANITIZED_MESSAGE_LENGTH]
+
+
+def _result_status_codes(
+    result: BusScheduleOptimizationResult | None,
+) -> tuple[str, ...]:
+    if result is None:
+        return ()
+    codes = {
+        outcome.result_status.value
+        for outcome in (result.heuristic_outcome, result.ortools_outcome)
+        if outcome is not None
+    }
+    return tuple(sorted(codes))
+
+
+def build_unified_runtime_failure_v1(
+    *,
+    code: str,
+    stage: str,
+    exc: Exception,
+    retryable: bool,
+    solver_choice: SolverChoice,
+    source_id: str,
+    imported_at: datetime,
+    input_readiness: WorkbookInputReadinessV1,
+    result: BusScheduleOptimizationResult | None = None,
+    presentation: UnifiedPresentationBundleV1 | None = None,
+) -> UnifiedRuntimeFailureV1:
+    """Build and log bounded, deterministic failure evidence."""
+    sanitized_message = _sanitize_failure_message(exc)
+    exception_class = getattr(
+        exc,
+        "original_exception_type",
+        exc.__class__.__name__,
+    )
+    correlation_payload = json.dumps(
+        {
+            "source_id": source_id,
+            "imported_at": imported_at.isoformat(),
+            "stage": stage,
+            "exception_class": exception_class,
+            "sanitized_message": sanitized_message,
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    correlation_id = f"m5c2-{hashlib.sha256(correlation_payload).hexdigest()[:20]}"
+    b_fingerprint = result.normalized_inputs.scenario_b_fingerprint if result is not None else None
+    accepted_solution_fingerprint = (
+        presentation.accepted_solution_fingerprint if presentation is not None else None
+    )
+    presentation_fingerprint = (
+        presentation.presentation_fingerprint if presentation is not None else None
+    )
+    failure = UnifiedRuntimeFailureV1(
+        code=code,
+        stage=stage,
+        correlation_id=correlation_id,
+        sanitized_message=sanitized_message,
+        retryable=retryable,
+        solver_choice=solver_choice.value,
+        source_id=source_id,
+        presentation_fingerprint=presentation_fingerprint,
+        b_fingerprint=b_fingerprint,
+        accepted_solution_fingerprint=accepted_solution_fingerprint,
+    )
+    target_commit = os.environ.get("TARGET_COMMIT") or os.environ.get("GITHUB_SHA") or "unavailable"
+    readiness_codes = tuple(
+        sorted(
+            {
+                *input_readiness.blocking_import_codes,
+                *input_readiness.missing_optimization_authority_codes,
+            }
+        )
+    )
+    LOGGER.error(
+        "unified_runtime_failure correlation_id=%s target_commit=%s stage=%s "
+        "code=%s exception_class=%s message=%s source_id=%s readiness_codes=%s "
+        "solver_choice=%s result_status_codes=%s presentation_fingerprint=%s "
+        "b_fingerprint=%s accepted_solution_fingerprint=%s",
+        failure.correlation_id,
+        target_commit,
+        failure.stage,
+        failure.code,
+        exception_class,
+        failure.sanitized_message,
+        failure.source_id,
+        readiness_codes,
+        failure.solver_choice,
+        _result_status_codes(result),
+        failure.presentation_fingerprint,
+        failure.b_fingerprint,
+        failure.accepted_solution_fingerprint,
+    )
+    return failure
 
 
 class ParallelRuntimeStatusV1(StrEnum):
@@ -143,6 +330,232 @@ def _verify_unified_artifact_alignment_v1(
         )
     if presentation.source_id != source_id or xlsx_metadata.source_id != source_id:
         raise UnifiedArtifactAlignmentError("unified source identities do not align")
+
+
+def _failed_unified_run(
+    *,
+    input_readiness: WorkbookInputReadinessV1,
+    source_id: str,
+    imported_at: datetime,
+    solver_choice: SolverChoice,
+    code: str,
+    stage: str,
+    exc: Exception,
+    retryable: bool,
+    result: BusScheduleOptimizationResult | None = None,
+    presentation: UnifiedPresentationBundleV1 | None = None,
+    retain_verified_presentation: bool = False,
+) -> UnifiedApplicationRunV1:
+    failure = build_unified_runtime_failure_v1(
+        code=code,
+        stage=stage,
+        exc=exc,
+        retryable=retryable,
+        solver_choice=solver_choice,
+        source_id=source_id,
+        imported_at=imported_at,
+        input_readiness=input_readiness,
+        result=result,
+        presentation=presentation,
+    )
+    return UnifiedApplicationRunV1(
+        status=(
+            UnifiedApplicationStatusV1.ARTIFACT_FAILED
+            if retain_verified_presentation
+            else UnifiedApplicationStatusV1.FAILED
+        ),
+        input_readiness=input_readiness,
+        unified_result=result if retain_verified_presentation else None,
+        unified_presentation=presentation if retain_verified_presentation else None,
+        unified_demand_supply_figure=None,
+        unified_departure_figure=None,
+        unified_xlsx_bytes=None,
+        source_id=source_id,
+        imported_at=imported_at,
+        failure=failure,
+    )
+
+
+def _execution_failure_code(stage: OptimizationExecutionStageV1) -> str:
+    if stage == OptimizationExecutionStageV1.NORMALIZATION:
+        return CONTRACT_V1_NORMALIZATION_FAILED
+    if stage in {
+        OptimizationExecutionStageV1.HEURISTIC_SOLVER,
+        OptimizationExecutionStageV1.OR_TOOLS_SOLVER,
+        OptimizationExecutionStageV1.SOLVER_COMPARISON,
+    }:
+        return CONTRACT_V1_SOLVER_FAILED
+    return CONTRACT_V1_APPLICATION_ERROR
+
+
+def run_unified_application_pipeline_v1(
+    imported: ImportedWorkbook,
+    *,
+    source_id: str,
+    imported_at: datetime,
+    solver_choice: SolverChoice = SolverChoice.HEURISTIC,
+) -> UnifiedApplicationRunV1:
+    """Run the ordinary application path using Contract V1 only."""
+    unified_input = deepcopy(imported)
+    input_readiness = assess_workbook_input_readiness_v1(unified_input)
+    if not input_readiness.optimization_ready:
+        return UnifiedApplicationRunV1(
+            status=UnifiedApplicationStatusV1.INPUT_NOT_READY,
+            input_readiness=input_readiness,
+            unified_result=None,
+            unified_presentation=None,
+            unified_demand_supply_figure=None,
+            unified_departure_figure=None,
+            unified_xlsx_bytes=None,
+            source_id=source_id,
+            imported_at=imported_at,
+            failure=None,
+        )
+
+    try:
+        normalization_options = normalization_options_from_workbook_v1(
+            unified_input,
+            source_id=source_id,
+            imported_at=imported_at,
+        )
+    except Exception as exc:
+        return _failed_unified_run(
+            input_readiness=input_readiness,
+            source_id=source_id,
+            imported_at=imported_at,
+            solver_choice=solver_choice,
+            code=CONTRACT_V1_NORMALIZATION_FAILED,
+            stage=OptimizationExecutionStageV1.NORMALIZATION.value,
+            exc=exc,
+            retryable=False,
+        )
+
+    try:
+        unified_result = analyze_and_optimize_schedule_v1(
+            unified_input,
+            normalization_options,
+            solver_choice=solver_choice,
+        )
+    except OptimizationExecutionErrorV1 as exc:
+        return _failed_unified_run(
+            input_readiness=input_readiness,
+            source_id=source_id,
+            imported_at=imported_at,
+            solver_choice=solver_choice,
+            code=_execution_failure_code(exc.stage),
+            stage=exc.stage.value,
+            exc=exc,
+            retryable=exc.stage
+            in {
+                OptimizationExecutionStageV1.HEURISTIC_SOLVER,
+                OptimizationExecutionStageV1.OR_TOOLS_SOLVER,
+                OptimizationExecutionStageV1.SOLVER_COMPARISON,
+            },
+        )
+    except Exception as exc:
+        return _failed_unified_run(
+            input_readiness=input_readiness,
+            source_id=source_id,
+            imported_at=imported_at,
+            solver_choice=solver_choice,
+            code=CONTRACT_V1_APPLICATION_ERROR,
+            stage="UNKNOWN",
+            exc=exc,
+            retryable=True,
+        )
+
+    try:
+        presentation = build_unified_application_presentation_v1(unified_result)
+        verify_unified_presentation_integrity_v1(presentation)
+        normalized_source_id = unified_result.normalized_inputs.scenario_b.source_metadata.source_id
+        if normalized_source_id != source_id or presentation.source_id != source_id:
+            raise UnifiedPresentationConsistencyError(
+                "SOURCE_IDENTITY_MISMATCH: normalized Scenario B and presentation "
+                "must share the submitted source identity"
+            )
+    except UnifiedPresentationConsistencyError as exc:
+        return _failed_unified_run(
+            input_readiness=input_readiness,
+            source_id=source_id,
+            imported_at=imported_at,
+            solver_choice=solver_choice,
+            code=CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH,
+            stage="PRESENTATION_INTEGRITY",
+            exc=exc,
+            retryable=False,
+            result=unified_result,
+        )
+    except Exception as exc:
+        return _failed_unified_run(
+            input_readiness=input_readiness,
+            source_id=source_id,
+            imported_at=imported_at,
+            solver_choice=solver_choice,
+            code=CONTRACT_V1_APPLICATION_ERROR,
+            stage="PRESENTATION",
+            exc=exc,
+            retryable=True,
+            result=unified_result,
+        )
+
+    try:
+        demand_supply_figure = build_unified_demand_supply_figure_v1(presentation)
+        departure_figure = build_unified_departure_figure_v1(presentation)
+        with TemporaryDirectory(prefix="bus_schedule_contract_v1_") as directory:
+            xlsx_path = export_unified_result_workbook_v1(
+                presentation,
+                Path(directory) / "Bus_Schedule_Contract_V1_Result.xlsx",
+                overwrite=False,
+            )
+            _verify_unified_artifact_alignment_v1(
+                unified_result,
+                presentation,
+                demand_supply_figure,
+                departure_figure,
+                xlsx_path,
+                source_id=source_id,
+            )
+            xlsx_bytes = xlsx_path.read_bytes()
+    except (UnifiedPresentationConsistencyError, UnifiedArtifactAlignmentError) as exc:
+        return _failed_unified_run(
+            input_readiness=input_readiness,
+            source_id=source_id,
+            imported_at=imported_at,
+            solver_choice=solver_choice,
+            code=CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH,
+            stage="ARTIFACT_ALIGNMENT",
+            exc=exc,
+            retryable=False,
+            result=unified_result,
+            presentation=presentation,
+        )
+    except Exception as exc:
+        return _failed_unified_run(
+            input_readiness=input_readiness,
+            source_id=source_id,
+            imported_at=imported_at,
+            solver_choice=solver_choice,
+            code=CONTRACT_V1_ARTIFACT_FAILED,
+            stage="ARTIFACT_CONSTRUCTION",
+            exc=exc,
+            retryable=True,
+            result=unified_result,
+            presentation=presentation,
+            retain_verified_presentation=True,
+        )
+
+    return UnifiedApplicationRunV1(
+        status=UnifiedApplicationStatusV1.COMPLETE,
+        input_readiness=input_readiness,
+        unified_result=unified_result,
+        unified_presentation=presentation,
+        unified_demand_supply_figure=demand_supply_figure,
+        unified_departure_figure=departure_figure,
+        unified_xlsx_bytes=xlsx_bytes,
+        source_id=source_id,
+        imported_at=imported_at,
+        failure=None,
+    )
 
 
 def _failed_shadow_run(
@@ -274,9 +687,21 @@ def run_parallel_application_pipeline_v1(
 
 
 __all__ = [
+    "CONTRACT_V1_APPLICATION_ERROR",
+    "CONTRACT_V1_ARTIFACT_FAILED",
+    "CONTRACT_V1_NORMALIZATION_FAILED",
+    "CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH",
+    "CONTRACT_V1_SOLVER_FAILED",
     "ParallelApplicationRunV1",
     "ParallelRuntimeStatusV1",
     "UNIFIED_SHADOW_RUNTIME_FAILURE",
+    "UnifiedApplicationRunV1",
+    "UnifiedApplicationStatusV1",
     "UnifiedArtifactAlignmentError",
+    "UnifiedRuntimeFailureV1",
+    "WORKBOOK_IMPORT_INVALID",
+    "WORKBOOK_OPTIMIZATION_NOT_READY",
+    "build_unified_runtime_failure_v1",
     "run_parallel_application_pipeline_v1",
+    "run_unified_application_pipeline_v1",
 ]

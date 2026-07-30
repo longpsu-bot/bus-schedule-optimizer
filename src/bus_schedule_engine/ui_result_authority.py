@@ -1,20 +1,22 @@
-"""Pure visible-result authority resolution for Streamlit result pages."""
+"""Pure visible-result authority resolution for unified Streamlit pages."""
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
 from .application_pipeline import (
-    UNIFIED_SHADOW_RUNTIME_FAILURE,
-    ParallelRuntimeStatusV1,
+    CONTRACT_V1_ARTIFACT_FAILED,
+    CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH,
+    WORKBOOK_OPTIMIZATION_NOT_READY,
+    UnifiedApplicationStatusV1,
+    UnifiedRuntimeFailureV1,
 )
 from .contracts_v1 import GenerationResultStatus
 from .input_authority import WorkbookInputReadinessV1
-from .models import AnalysisBundle
 from .optimization_service import BusScheduleOptimizationResult
-from .side_by_side_validation import SideBySideValidationReportV1
 from .unified_presentation import (
     PRESENTATION_MODE_VALIDATION_ONLY,
     UnifiedPresentationBundleV1,
@@ -28,63 +30,66 @@ _UNIFIED_BANNER = (
     "Nguồn kết quả hiển thị: Contract V1.\n\n"
     "Kết quả hỗ trợ chuyên gia và không tự động thay thế quyết định khai thác."
 )
-_LEGACY_BANNER_PREFIX = "Nguồn kết quả hiển thị: pipeline legacy."
 _NO_RESULT_MESSAGE = "Chưa có kết quả. Hãy chạy phân tích ở trang Nhập dữ liệu."
 
 
 class VisibleResultModeV1(StrEnum):
-    """The single visible authority selected for result Pages 02–04."""
+    """The only visible authority states supported by ordinary Streamlit."""
 
     NO_RESULT = "NO_RESULT"
+    INPUT_NOT_READY = "INPUT_NOT_READY"
     UNIFIED_CONTRACT_V1 = "UNIFIED_CONTRACT_V1"
-    LEGACY_INPUT_NOT_READY = "LEGACY_INPUT_NOT_READY"
-    LEGACY_UNIFIED_FAILED = "LEGACY_UNIFIED_FAILED"
-    LEGACY_CUTOVER_BLOCKED = "LEGACY_CUTOVER_BLOCKED"
-    LEGACY_INCOMPLETE_SHADOW_STATE = "LEGACY_INCOMPLETE_SHADOW_STATE"
+    UNIFIED_ARTIFACT_FAILED = "UNIFIED_ARTIFACT_FAILED"
+    CONTRACT_V1_FAILED = "CONTRACT_V1_FAILED"
 
 
 @dataclass(frozen=True, slots=True)
 class VisibleResultContextV1:
-    """Resolved visible authority and the only unified objects pages may consume."""
+    """Resolved visible authority and the unified objects pages may consume."""
 
     mode: VisibleResultModeV1
     uses_unified: bool
+    artifacts_available: bool
     presentation: UnifiedPresentationBundleV1 | None
     unified_result: BusScheduleOptimizationResult | None
-    report: SideBySideValidationReportV1 | None
+    input_readiness: WorkbookInputReadinessV1 | None
+    failure: UnifiedRuntimeFailureV1 | None
     banner_level: str
     banner_message: str
     reason_codes: tuple[str, ...]
 
 
-def _no_result_context() -> VisibleResultContextV1:
-    return VisibleResultContextV1(
-        mode=VisibleResultModeV1.NO_RESULT,
-        uses_unified=False,
-        presentation=None,
-        unified_result=None,
-        report=None,
-        banner_level="warning",
-        banner_message=_NO_RESULT_MESSAGE,
-        reason_codes=(),
-    )
-
-
-def _legacy_context(
+def _context(
     mode: VisibleResultModeV1,
     *,
-    reason: str,
-    reason_codes: tuple[str, ...],
+    uses_unified: bool = False,
+    artifacts_available: bool = False,
+    presentation: UnifiedPresentationBundleV1 | None = None,
+    unified_result: BusScheduleOptimizationResult | None = None,
+    input_readiness: WorkbookInputReadinessV1 | None = None,
+    failure: UnifiedRuntimeFailureV1 | None = None,
+    banner_level: str = "warning",
+    banner_message: str,
+    reason_codes: tuple[str, ...] = (),
 ) -> VisibleResultContextV1:
     return VisibleResultContextV1(
         mode=mode,
-        uses_unified=False,
-        presentation=None,
-        unified_result=None,
-        report=None,
-        banner_level="warning",
-        banner_message=f"{_LEGACY_BANNER_PREFIX}\n\n{reason}",
+        uses_unified=uses_unified,
+        artifacts_available=artifacts_available,
+        presentation=presentation,
+        unified_result=unified_result,
+        input_readiness=input_readiness,
+        failure=failure,
+        banner_level=banner_level,
+        banner_message=banner_message,
         reason_codes=reason_codes,
+    )
+
+
+def _no_result_context() -> VisibleResultContextV1:
+    return _context(
+        VisibleResultModeV1.NO_RESULT,
+        banner_message=_NO_RESULT_MESSAGE,
     )
 
 
@@ -96,57 +101,38 @@ def _input_not_ready_context(
         if isinstance(readiness, WorkbookInputReadinessV1)
         else ()
     )
-    code_text = "\n".join(f"- {code}" for code in codes) or "- Không có mã thẩm quyền được trả về."
-    return _legacy_context(
-        VisibleResultModeV1.LEGACY_INPUT_NOT_READY,
-        reason=(
-            "Đang hiển thị kết quả chẩn đoán legacy.\n\n"
-            "Dữ liệu chưa đủ thẩm quyền để chạy Contract V1:\n"
-            f"{code_text}"
+    code_text = "\n".join(f"- {code}" for code in codes) or "- Không có mã được trả về."
+    return _context(
+        VisibleResultModeV1.INPUT_NOT_READY,
+        input_readiness=readiness,
+        banner_message=(
+            f"{WORKBOOK_OPTIMIZATION_NOT_READY}\n\n"
+            "Workbook đã nhập được nhưng còn thiếu thẩm quyền tối ưu hóa:\n"
+            f"{code_text}\n\n"
+            "Hãy tải mẫu đầu vào mới ở trang Nhập dữ liệu, bổ sung đúng các trường "
+            "được nêu, rồi chạy lại."
         ),
-        reason_codes=codes,
+        reason_codes=(WORKBOOK_OPTIMIZATION_NOT_READY, *codes),
     )
 
 
-def _runtime_failed_context(
-    failure: Mapping[str, object] | None,
+def _failure_context(
+    failure: UnifiedRuntimeFailureV1,
+    *,
+    readiness: WorkbookInputReadinessV1 | None,
 ) -> VisibleResultContextV1:
-    code = UNIFIED_SHADOW_RUNTIME_FAILURE
-    message = "Contract V1 không hoàn tất; không sử dụng bất kỳ trạng thái unified từng phần nào."
-    if isinstance(failure, Mapping):
-        supplied_code = failure.get("code")
-        supplied_message = failure.get("message")
-        if isinstance(supplied_code, str) and supplied_code:
-            code = supplied_code
-        if isinstance(supplied_message, str) and supplied_message:
-            message = supplied_message
-    return _legacy_context(
-        VisibleResultModeV1.LEGACY_UNIFIED_FAILED,
-        reason=(
-            "Đang hiển thị kết quả chẩn đoán legacy vì runtime Contract V1 thất bại.\n\n"
-            f"Mã: {code}\n\nThông tin: {message}"
+    return _context(
+        VisibleResultModeV1.CONTRACT_V1_FAILED,
+        input_readiness=readiness,
+        failure=failure,
+        banner_level="error",
+        banner_message=(
+            f"{failure.code}\n\n"
+            f"Giai đoạn: {failure.stage}\n\n"
+            f"Mã đối chiếu: {failure.correlation_id}\n\n"
+            f"Thông tin: {failure.sanitized_message}"
         ),
-        reason_codes=(code,),
-    )
-
-
-def _cutover_blocked_context(codes: tuple[str, ...]) -> VisibleResultContextV1:
-    code_text = "\n".join(f"- {code}" for code in codes)
-    return _legacy_context(
-        VisibleResultModeV1.LEGACY_CUTOVER_BLOCKED,
-        reason=(f"Cutover Contract V1 bị chặn bởi các sai lệch đối chiếu sau:\n{code_text}"),
-        reason_codes=codes,
-    )
-
-
-def _incomplete_context() -> VisibleResultContextV1:
-    return _legacy_context(
-        VisibleResultModeV1.LEGACY_INCOMPLETE_SHADOW_STATE,
-        reason=(
-            "Bằng chứng shadow Contract V1 chưa đầy đủ hoặc không nhất quán.\n\n"
-            f"Mã: {UNIFIED_VISIBLE_STATE_INCOMPLETE}"
-        ),
-        reason_codes=(UNIFIED_VISIBLE_STATE_INCOMPLETE,),
+        reason_codes=(failure.code,),
     )
 
 
@@ -158,22 +144,9 @@ def _figure_metadata(figure: object) -> Mapping[str, object] | None:
     if isinstance(metadata, Mapping):
         return metadata
     try:
-        converted = dict(metadata)
+        return dict(metadata)
     except (TypeError, ValueError):
         return None
-    return converted
-
-
-def _blocking_codes(
-    report: SideBySideValidationReportV1 | None,
-    presentation: UnifiedPresentationBundleV1 | None,
-) -> tuple[str, ...]:
-    values: list[str] = []
-    if isinstance(report, SideBySideValidationReportV1):
-        values.extend(report.blocking_discrepancy_codes)
-    if isinstance(presentation, UnifiedPresentationBundleV1):
-        values.extend(presentation.blocking_discrepancy_codes)
-    return tuple(dict.fromkeys(values))
 
 
 def _accepted_result_fingerprint(
@@ -201,7 +174,6 @@ def _presentation_shape_is_consistent(
     scenario_c = presentation.scenario("C")
     if scenario_b is None or scenario_b.source_fingerprint != b_fingerprint:
         return False
-
     for dimension in presentation.dimensions:
         issue_count = len(dimension.issue_codes)
         if not (
@@ -209,7 +181,6 @@ def _presentation_shape_is_consistent(
             and len(dimension.issue_messages) == issue_count
         ):
             return False
-
     outcome = presentation.outcome
     if outcome.accepted_solution_fingerprint != accepted_fingerprint:
         return False
@@ -235,7 +206,6 @@ def _presentation_shape_is_consistent(
             for block in presentation.blocks
             for field_name in c_fields
         )
-
     return bool(
         outcome.accepted_c_exists
         and outcome.accepted_c_authority
@@ -245,113 +215,41 @@ def _presentation_shape_is_consistent(
     )
 
 
-def _completed_state_is_aligned(
+def _verified_analysis_is_aligned(
     *,
     input_readiness: WorkbookInputReadinessV1 | None,
     unified_result: BusScheduleOptimizationResult | None,
-    report: SideBySideValidationReportV1 | None,
     presentation: UnifiedPresentationBundleV1 | None,
-    unified_demand_supply_figure: object | None,
-    unified_departure_figure: object | None,
-    unified_download_artifacts: Mapping[str, object] | None,
 ) -> bool:
     if not (
         isinstance(input_readiness, WorkbookInputReadinessV1)
         and input_readiness.optimization_ready is True
         and isinstance(unified_result, BusScheduleOptimizationResult)
-        and isinstance(report, SideBySideValidationReportV1)
         and isinstance(presentation, UnifiedPresentationBundleV1)
-        and unified_demand_supply_figure is not None
-        and unified_departure_figure is not None
-        and isinstance(unified_download_artifacts, Mapping)
     ):
         return False
     try:
         verify_unified_presentation_integrity_v1(presentation)
     except (UnifiedPresentationConsistencyError, TypeError):
         return False
-    if presentation.presentation_mode != PRESENTATION_MODE_VALIDATION_ONLY:
-        return False
-    if presentation.cutover_blocked:
-        return False
-    if report.blocking_discrepancy_codes != presentation.blocking_discrepancy_codes:
-        return False
-
-    required_download_keys = {
-        "xlsx",
-        "presentation_fingerprint",
-        "b_fingerprint",
-        "accepted_solution_fingerprint",
-    }
-    if not required_download_keys.issubset(unified_download_artifacts):
-        return False
-    xlsx = unified_download_artifacts["xlsx"]
-    if not isinstance(xlsx, bytes | bytearray | memoryview) or not xlsx:
-        return False
-
-    demand_metadata = _figure_metadata(unified_demand_supply_figure)
-    departure_metadata = _figure_metadata(unified_departure_figure)
-    if demand_metadata is None or departure_metadata is None:
-        return False
-    required_figure_keys = {
-        "presentation_fingerprint",
-        "source_b_fingerprint",
-        "accepted_solution_fingerprint",
-    }
-    if not (
-        required_figure_keys.issubset(demand_metadata)
-        and required_figure_keys.issubset(departure_metadata)
+    if (
+        presentation.presentation_mode != PRESENTATION_MODE_VALIDATION_ONLY
+        or presentation.cutover_blocked
+        or presentation.blocking_discrepancy_codes
+        or presentation.discrepancies
     ):
         return False
-
-    presentation_fingerprint = presentation.presentation_fingerprint
-    if not isinstance(presentation_fingerprint, str) or not presentation_fingerprint:
-        return False
-    if any(
-        value != presentation_fingerprint
-        for value in (
-            demand_metadata["presentation_fingerprint"],
-            departure_metadata["presentation_fingerprint"],
-            unified_download_artifacts["presentation_fingerprint"],
-        )
-    ):
-        return False
-
     normalized = unified_result.normalized_inputs
     b_fingerprint = normalized.scenario_b_fingerprint
-    if not isinstance(b_fingerprint, str) or not b_fingerprint:
-        return False
-    if any(
-        value != b_fingerprint
-        for value in (
-            presentation.source_b_fingerprint,
-            report.unified_snapshot.normalized_scenario_b_fingerprint,
-            demand_metadata["source_b_fingerprint"],
-            departure_metadata["source_b_fingerprint"],
-            unified_download_artifacts["b_fingerprint"],
-        )
-    ):
-        return False
-
     accepted_state_valid, accepted_fingerprint = _accepted_result_fingerprint(unified_result)
     if not accepted_state_valid:
         return False
-    if any(
-        value != accepted_fingerprint
-        for value in (
-            presentation.accepted_solution_fingerprint,
-            report.unified_snapshot.solution_fingerprint,
-            demand_metadata["accepted_solution_fingerprint"],
-            departure_metadata["accepted_solution_fingerprint"],
-            unified_download_artifacts["accepted_solution_fingerprint"],
-        )
-    ):
-        return False
-
     scenario_b = normalized.scenario_b
     source_metadata = scenario_b.source_metadata
     if (
-        presentation.source_id != source_metadata.source_id
+        presentation.source_b_fingerprint != b_fingerprint
+        or presentation.accepted_solution_fingerprint != accepted_fingerprint
+        or presentation.source_id != source_metadata.source_id
         or presentation.imported_at != source_metadata.imported_at.isoformat()
         or presentation.route_id != scenario_b.route_id
         or presentation.route_name != scenario_b.route_name
@@ -366,56 +264,184 @@ def _completed_state_is_aligned(
     )
 
 
+def _completed_artifacts_are_aligned(
+    *,
+    unified_result: BusScheduleOptimizationResult,
+    presentation: UnifiedPresentationBundleV1,
+    unified_demand_supply_figure: object | None,
+    unified_departure_figure: object | None,
+    unified_download_artifacts: Mapping[str, object] | None,
+) -> bool:
+    if (
+        unified_demand_supply_figure is None
+        or unified_departure_figure is None
+        or not isinstance(unified_download_artifacts, Mapping)
+    ):
+        return False
+    required_download_keys = {
+        "xlsx",
+        "source_id",
+        "presentation_fingerprint",
+        "b_fingerprint",
+        "accepted_solution_fingerprint",
+    }
+    if not required_download_keys.issubset(unified_download_artifacts):
+        return False
+    xlsx = unified_download_artifacts["xlsx"]
+    if not isinstance(xlsx, bytes | bytearray | memoryview) or not xlsx:
+        return False
+    figure_metadata = (
+        _figure_metadata(unified_demand_supply_figure),
+        _figure_metadata(unified_departure_figure),
+    )
+    required_figure_keys = {
+        "presentation_fingerprint",
+        "source_b_fingerprint",
+        "accepted_solution_fingerprint",
+    }
+    if any(
+        metadata is None or not required_figure_keys.issubset(metadata)
+        for metadata in figure_metadata
+    ):
+        return False
+    b_fingerprint = unified_result.normalized_inputs.scenario_b_fingerprint
+    _, accepted_fingerprint = _accepted_result_fingerprint(unified_result)
+    assert all(metadata is not None for metadata in figure_metadata)
+    return bool(
+        all(
+            metadata["presentation_fingerprint"] == presentation.presentation_fingerprint
+            and metadata["source_b_fingerprint"] == b_fingerprint
+            and metadata["accepted_solution_fingerprint"] == accepted_fingerprint
+            for metadata in figure_metadata
+        )
+        and unified_download_artifacts["source_id"] == presentation.source_id
+        and unified_download_artifacts["presentation_fingerprint"]
+        == presentation.presentation_fingerprint
+        and unified_download_artifacts["b_fingerprint"] == b_fingerprint
+        and unified_download_artifacts["accepted_solution_fingerprint"] == accepted_fingerprint
+    )
+
+
+def _semantic_state_failure(
+    *,
+    result: BusScheduleOptimizationResult | None,
+    presentation: UnifiedPresentationBundleV1 | None,
+) -> UnifiedRuntimeFailureV1:
+    source_id = presentation.source_id if presentation is not None else "unavailable"
+    payload = (
+        f"{source_id}|SESSION_STATE_ALIGNMENT|"
+        f"{getattr(presentation, 'presentation_fingerprint', None)}"
+    ).encode()
+    return UnifiedRuntimeFailureV1(
+        code=CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH,
+        stage="SESSION_STATE_ALIGNMENT",
+        correlation_id=f"m5c2-{hashlib.sha256(payload).hexdigest()[:20]}",
+        sanitized_message=("Trạng thái kết quả Contract V1 không đầy đủ hoặc không nhất quán."),
+        retryable=False,
+        solver_choice=(result.solver_choice.value if result is not None else "HEURISTIC"),
+        source_id=source_id,
+        presentation_fingerprint=(
+            presentation.presentation_fingerprint if presentation is not None else None
+        ),
+        b_fingerprint=(
+            result.normalized_inputs.scenario_b_fingerprint if result is not None else None
+        ),
+        accepted_solution_fingerprint=(
+            presentation.accepted_solution_fingerprint if presentation is not None else None
+        ),
+    )
+
+
 def resolve_visible_result_context_v1(
     *,
-    legacy_bundle: AnalysisBundle | None,
-    parallel_runtime_status: ParallelRuntimeStatusV1 | None,
+    runtime_status: UnifiedApplicationStatusV1 | None,
     input_readiness: WorkbookInputReadinessV1 | None,
     unified_result: BusScheduleOptimizationResult | None,
-    report: SideBySideValidationReportV1 | None,
     presentation: UnifiedPresentationBundleV1 | None,
     unified_demand_supply_figure: object | None,
     unified_departure_figure: object | None,
     unified_download_artifacts: Mapping[str, object] | None,
-    unified_runtime_failure: Mapping[str, object] | None,
+    unified_runtime_failure: UnifiedRuntimeFailureV1 | None,
 ) -> VisibleResultContextV1:
-    """Choose one visible authority from existing Milestone 5B1 session evidence only."""
-    if legacy_bundle is None:
+    """Resolve one fail-closed visible state from unified session evidence."""
+    if runtime_status is None:
         return _no_result_context()
-    if parallel_runtime_status == ParallelRuntimeStatusV1.INPUT_NOT_READY:
+    if runtime_status == UnifiedApplicationStatusV1.INPUT_NOT_READY:
         return _input_not_ready_context(input_readiness)
-    if parallel_runtime_status == ParallelRuntimeStatusV1.UNIFIED_RUNTIME_FAILED:
-        return _runtime_failed_context(unified_runtime_failure)
-    if parallel_runtime_status != ParallelRuntimeStatusV1.PARALLEL_VALIDATION_COMPLETE:
-        return _incomplete_context()
+    if runtime_status == UnifiedApplicationStatusV1.FAILED:
+        failure = (
+            unified_runtime_failure
+            if isinstance(unified_runtime_failure, UnifiedRuntimeFailureV1)
+            else _semantic_state_failure(
+                result=None,
+                presentation=None,
+            )
+        )
+        return _failure_context(failure, readiness=input_readiness)
 
-    blockers = _blocking_codes(report, presentation)
-    if blockers:
-        return _cutover_blocked_context(blockers)
-    if not _completed_state_is_aligned(
+    analysis_aligned = _verified_analysis_is_aligned(
         input_readiness=input_readiness,
         unified_result=unified_result,
-        report=report,
         presentation=presentation,
-        unified_demand_supply_figure=unified_demand_supply_figure,
-        unified_departure_figure=unified_departure_figure,
-        unified_download_artifacts=unified_download_artifacts,
-    ):
-        return _incomplete_context()
-
-    assert isinstance(unified_result, BusScheduleOptimizationResult)
-    assert isinstance(report, SideBySideValidationReportV1)
-    assert isinstance(presentation, UnifiedPresentationBundleV1)
-    return VisibleResultContextV1(
-        mode=VisibleResultModeV1.UNIFIED_CONTRACT_V1,
-        uses_unified=True,
-        presentation=presentation,
-        unified_result=unified_result,
-        report=report,
-        banner_level="info",
-        banner_message=_UNIFIED_BANNER,
-        reason_codes=tuple(presentation.expert_review_required_codes),
     )
+    if runtime_status == UnifiedApplicationStatusV1.ARTIFACT_FAILED:
+        if (
+            analysis_aligned
+            and isinstance(unified_result, BusScheduleOptimizationResult)
+            and isinstance(presentation, UnifiedPresentationBundleV1)
+            and isinstance(unified_runtime_failure, UnifiedRuntimeFailureV1)
+            and unified_runtime_failure.code == CONTRACT_V1_ARTIFACT_FAILED
+            and unified_demand_supply_figure is None
+            and unified_departure_figure is None
+            and unified_download_artifacts is None
+        ):
+            return _context(
+                VisibleResultModeV1.UNIFIED_ARTIFACT_FAILED,
+                uses_unified=True,
+                artifacts_available=False,
+                presentation=presentation,
+                unified_result=unified_result,
+                input_readiness=input_readiness,
+                failure=unified_runtime_failure,
+                banner_message=(
+                    f"{CONTRACT_V1_ARTIFACT_FAILED}\n\n"
+                    f"Mã đối chiếu: {unified_runtime_failure.correlation_id}\n\n"
+                    "Kết quả xác minh vẫn dùng được ở Trang 02–04; biểu đồ và "
+                    "tệp tải xuống ở Trang 05 đã bị vô hiệu hóa."
+                ),
+                reason_codes=(CONTRACT_V1_ARTIFACT_FAILED,),
+            )
+    elif (
+        runtime_status == UnifiedApplicationStatusV1.COMPLETE
+        and analysis_aligned
+        and isinstance(unified_result, BusScheduleOptimizationResult)
+        and isinstance(presentation, UnifiedPresentationBundleV1)
+        and unified_runtime_failure is None
+        and _completed_artifacts_are_aligned(
+            unified_result=unified_result,
+            presentation=presentation,
+            unified_demand_supply_figure=unified_demand_supply_figure,
+            unified_departure_figure=unified_departure_figure,
+            unified_download_artifacts=unified_download_artifacts,
+        )
+    ):
+        return _context(
+            VisibleResultModeV1.UNIFIED_CONTRACT_V1,
+            uses_unified=True,
+            artifacts_available=True,
+            presentation=presentation,
+            unified_result=unified_result,
+            input_readiness=input_readiness,
+            banner_level="info",
+            banner_message=_UNIFIED_BANNER,
+            reason_codes=tuple(presentation.expert_review_required_codes),
+        )
+
+    failure = _semantic_state_failure(
+        result=unified_result,
+        presentation=presentation,
+    )
+    return _failure_context(failure, readiness=input_readiness)
 
 
 __all__ = [

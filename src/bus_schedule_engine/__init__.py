@@ -1,11 +1,25 @@
 """Bus Schedule Engine MVP."""
 
+from importlib import import_module
+
 from .application_pipeline import (
+    CONTRACT_V1_APPLICATION_ERROR,
+    CONTRACT_V1_ARTIFACT_FAILED,
+    CONTRACT_V1_NORMALIZATION_FAILED,
+    CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH,
+    CONTRACT_V1_SOLVER_FAILED,
     UNIFIED_SHADOW_RUNTIME_FAILURE,
+    WORKBOOK_IMPORT_INVALID,
+    WORKBOOK_OPTIMIZATION_NOT_READY,
     ParallelApplicationRunV1,
     ParallelRuntimeStatusV1,
+    UnifiedApplicationRunV1,
+    UnifiedApplicationStatusV1,
     UnifiedArtifactAlignmentError,
+    UnifiedRuntimeFailureV1,
+    build_unified_runtime_failure_v1,
     run_parallel_application_pipeline_v1,
+    run_unified_application_pipeline_v1,
 )
 from .importer import ImportedWorkbook, WorkbookAuthorityMetadata
 from .input_authority import (
@@ -25,25 +39,12 @@ from .models import (
 from .optimization_service import (
     BusScheduleOptimizationResult,
     OptimizationAction,
+    OptimizationExecutionErrorV1,
+    OptimizationExecutionStageV1,
     SolverChoice,
     SolverComparisonV1,
     analyze_and_optimize_schedule_v1,
     select_optimization_action,
-)
-from .side_by_side_validation import (
-    ComparisonCategoryV1,
-    ComparisonDispositionV1,
-    ComparisonRuleV1,
-    ComparisonStatusV1,
-    FactComparisonRecordV1,
-    LegacyPathSnapshotV1,
-    SideBySideValidationReportV1,
-    TimetableSnapshotV1,
-    TimetableTripSnapshotV1,
-    UnifiedPathSnapshotV1,
-    build_side_by_side_validation_report_v1,
-    run_side_by_side_validation_v1,
-    side_by_side_report_to_dict,
 )
 from .ui_result_authority import (
     UNIFIED_VISIBLE_STATE_INCOMPLETE,
@@ -63,6 +64,7 @@ from .unified_page5_artifacts import (
     UNIFIED_PAGE5_XLSX_FILENAME,
     UnifiedPage5ArtifactError,
     UnifiedPage5ArtifactsV1,
+    UnifiedPage5SemanticIntegrityError,
     build_unified_page5_artifacts_v1,
 )
 from .unified_presentation import (
@@ -79,6 +81,7 @@ from .unified_presentation import (
     PresentationTripV1,
     UnifiedPresentationBundleV1,
     UnifiedPresentationConsistencyError,
+    build_unified_application_presentation_v1,
     build_unified_presentation_v1,
     unified_presentation_to_dict,
     verify_unified_presentation_integrity_v1,
@@ -103,9 +106,40 @@ from .unified_ui_frames import (
     technical_summary_v1,
 )
 
+_SIDE_BY_SIDE_EXPORTS = {
+    "ComparisonCategoryV1",
+    "ComparisonDispositionV1",
+    "ComparisonRuleV1",
+    "ComparisonStatusV1",
+    "FactComparisonRecordV1",
+    "LegacyPathSnapshotV1",
+    "SideBySideValidationReportV1",
+    "TimetableSnapshotV1",
+    "TimetableTripSnapshotV1",
+    "UnifiedPathSnapshotV1",
+    "build_side_by_side_validation_report_v1",
+    "run_side_by_side_validation_v1",
+    "side_by_side_report_to_dict",
+}
+
+
+def __getattr__(name: str) -> object:
+    if name in _SIDE_BY_SIDE_EXPORTS:
+        module = import_module(".side_by_side_validation", __name__)
+        value = getattr(module, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 __all__ = [
     "AnalysisBundle",
     "BusScheduleOptimizationResult",
+    "CONTRACT_V1_APPLICATION_ERROR",
+    "CONTRACT_V1_ARTIFACT_FAILED",
+    "CONTRACT_V1_NORMALIZATION_FAILED",
+    "CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH",
+    "CONTRACT_V1_SOLVER_FAILED",
     "ComparisonCategoryV1",
     "ComparisonDispositionV1",
     "ComparisonRuleV1",
@@ -117,6 +151,8 @@ __all__ = [
     "ImportedWorkbook",
     "LegacyPathSnapshotV1",
     "OptimizationAction",
+    "OptimizationExecutionErrorV1",
+    "OptimizationExecutionStageV1",
     "PRESENTATION_MODE_VALIDATION_ONLY",
     "ParallelApplicationRunV1",
     "ParallelRuntimeStatusV1",
@@ -140,6 +176,8 @@ __all__ = [
     "Trip",
     "UnifiedExportMetadataV1",
     "UnifiedArtifactAlignmentError",
+    "UnifiedApplicationRunV1",
+    "UnifiedApplicationStatusV1",
     "UnifiedPresentationBundleV1",
     "UnifiedPresentationConsistencyError",
     "UnifiedPathSnapshotV1",
@@ -153,8 +191,12 @@ __all__ = [
     "UNIFIED_VISIBLE_STATE_INCOMPLETE",
     "UnifiedPage5ArtifactError",
     "UnifiedPage5ArtifactsV1",
+    "UnifiedPage5SemanticIntegrityError",
+    "UnifiedRuntimeFailureV1",
     "VisibleResultContextV1",
     "VisibleResultModeV1",
+    "WORKBOOK_IMPORT_INVALID",
+    "WORKBOOK_OPTIMIZATION_NOT_READY",
     "accepted_c_summary_v1",
     "analyze_and_optimize_schedule_v1",
     "assess_workbook_input_readiness_v1",
@@ -164,7 +206,9 @@ __all__ = [
     "build_unified_demand_supply_figure_v1",
     "build_unified_departure_figure_v1",
     "build_unified_page5_artifacts_v1",
+    "build_unified_application_presentation_v1",
     "build_unified_presentation_v1",
+    "build_unified_runtime_failure_v1",
     "demand_block_rows_v1",
     "demand_gap_rows_v1",
     "demand_summary_v1",
@@ -176,6 +220,7 @@ __all__ = [
     "headway_regime_rows_v1",
     "resolve_visible_result_context_v1",
     "run_parallel_application_pipeline_v1",
+    "run_unified_application_pipeline_v1",
     "run_side_by_side_validation_v1",
     "read_unified_export_metadata_bytes_v1",
     "read_unified_export_metadata_v1",

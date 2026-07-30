@@ -19,6 +19,7 @@ from .unified_diagram import (
 from .unified_presentation import (
     PRESENTATION_MODE_VALIDATION_ONLY,
     UnifiedPresentationBundleV1,
+    UnifiedPresentationConsistencyError,
     verify_unified_presentation_integrity_v1,
 )
 from .unified_result_exporter import read_unified_export_metadata_bytes_v1
@@ -38,6 +39,10 @@ _PLOTLY_CONFIG = {
 
 class UnifiedPage5ArtifactError(ValueError):
     """The aligned unified Page 05 bundle could not be built safely."""
+
+
+class UnifiedPage5SemanticIntegrityError(UnifiedPage5ArtifactError):
+    """Stored Page 05 evidence does not align with the verified presentation."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,13 +65,15 @@ def _figure_metadata(figure: object) -> Mapping[str, object]:
     try:
         metadata = figure.layout.meta
     except (AttributeError, TypeError) as exc:
-        raise UnifiedPage5ArtifactError("stored unified figure has no metadata") from exc
+        raise UnifiedPage5SemanticIntegrityError("stored unified figure has no metadata") from exc
     if isinstance(metadata, Mapping):
         return metadata
     try:
         return dict(metadata)
     except (TypeError, ValueError) as exc:
-        raise UnifiedPage5ArtifactError("stored unified figure metadata is malformed") from exc
+        raise UnifiedPage5SemanticIntegrityError(
+            "stored unified figure metadata is malformed"
+        ) from exc
 
 
 def _verify_stored_figure(
@@ -92,7 +99,7 @@ def _verify_stored_figure(
         key for key, expected_value in expected.items() if metadata.get(key) != expected_value
     )
     if mismatches:
-        raise UnifiedPage5ArtifactError(
+        raise UnifiedPage5SemanticIntegrityError(
             f"{artifact_name} metadata does not align with presentation: {mismatches}"
         )
 
@@ -105,11 +112,11 @@ def _verify_stored_departure_figure_contents(
         stored_json = stored_departure_figure.to_plotly_json()
         canonical_json = canonical_departure_figure.to_plotly_json()
     except (AttributeError, TypeError, ValueError) as exc:
-        raise UnifiedPage5ArtifactError(
+        raise UnifiedPage5SemanticIntegrityError(
             "stored departure figure contents cannot be verified"
         ) from exc
     if stored_json != canonical_json:
-        raise UnifiedPage5ArtifactError(
+        raise UnifiedPage5SemanticIntegrityError(
             "stored departure figure contents do not match the verified presentation"
         )
 
@@ -141,7 +148,7 @@ def _verify_accepted_c_shape(presentation: UnifiedPresentationBundleV1) -> None:
             or presentation.headway_regimes
             or has_c_block_fact
         ):
-            raise UnifiedPage5ArtifactError(
+            raise UnifiedPage5SemanticIntegrityError(
                 "accepted-C facts must remain absent without an accepted-C fingerprint"
             )
         return
@@ -153,7 +160,7 @@ def _verify_accepted_c_shape(presentation: UnifiedPresentationBundleV1) -> None:
         and scenario_c is not None
         and scenario_c.source_fingerprint == accepted_fingerprint
     ):
-        raise UnifiedPage5ArtifactError(
+        raise UnifiedPage5SemanticIntegrityError(
             "accepted-C facts do not align with the accepted fingerprint"
         )
 
@@ -286,9 +293,13 @@ def build_unified_page5_artifacts_v1(
             raise TypeError("xlsx_bytes must be bytes")
         verify_unified_presentation_integrity_v1(presentation)
         if presentation.presentation_mode != PRESENTATION_MODE_VALIDATION_ONLY:
-            raise UnifiedPage5ArtifactError("presentation mode must remain VALIDATION_ONLY")
+            raise UnifiedPage5SemanticIntegrityError(
+                "presentation mode must remain VALIDATION_ONLY"
+            )
         if presentation.cutover_blocked or presentation.blocking_discrepancy_codes:
-            raise UnifiedPage5ArtifactError("blocking discrepancies prohibit unified Page 05")
+            raise UnifiedPage5SemanticIntegrityError(
+                "blocking discrepancies prohibit unified Page 05"
+            )
         _verify_accepted_c_shape(presentation)
         canonical_departure_figure = build_unified_departure_figure_v1(presentation)
         _verify_stored_figure(
@@ -306,7 +317,12 @@ def build_unified_page5_artifacts_v1(
             canonical_departure_figure,
         )
 
-        workbook_metadata = read_unified_export_metadata_bytes_v1(xlsx_bytes)
+        try:
+            workbook_metadata = read_unified_export_metadata_bytes_v1(xlsx_bytes)
+        except Exception as exc:
+            raise UnifiedPage5SemanticIntegrityError(
+                "stored unified XLSX metadata cannot be verified"
+            ) from exc
         expected_workbook_metadata = {
             "presentation_fingerprint": presentation.presentation_fingerprint,
             "b_fingerprint": presentation.source_b_fingerprint,
@@ -321,7 +337,7 @@ def build_unified_page5_artifacts_v1(
             if getattr(workbook_metadata, key) != expected
         )
         if workbook_mismatches:
-            raise UnifiedPage5ArtifactError(
+            raise UnifiedPage5SemanticIntegrityError(
                 f"unified XLSX metadata does not align with presentation: {workbook_mismatches}"
             )
 
@@ -338,6 +354,8 @@ def build_unified_page5_artifacts_v1(
         png_bytes = _build_png_bytes(selected_figure)
     except UnifiedPage5ArtifactError:
         raise
+    except UnifiedPresentationConsistencyError as exc:
+        raise UnifiedPage5SemanticIntegrityError(str(exc)) from exc
     except Exception as exc:
         raise UnifiedPage5ArtifactError(
             f"unified Page 05 artifact construction failed: {exc}"
@@ -365,5 +383,6 @@ __all__ = [
     "UNIFIED_PAGE5_XLSX_FILENAME",
     "UnifiedPage5ArtifactError",
     "UnifiedPage5ArtifactsV1",
+    "UnifiedPage5SemanticIntegrityError",
     "build_unified_page5_artifacts_v1",
 ]

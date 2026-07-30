@@ -12,6 +12,8 @@ import bus_schedule_engine.optimization_service as optimization_service
 from bus_schedule_engine import (
     BusScheduleOptimizationResult,
     OptimizationAction,
+    OptimizationExecutionErrorV1,
+    OptimizationExecutionStageV1,
     SolverChoice,
     analyze_and_optimize_schedule_v1,
     select_optimization_action,
@@ -1157,3 +1159,115 @@ def test_solver_attempted_is_true_only_after_canonical_runner_is_called(
     assert result.solver_attempted is True
     assert result.heuristic_outcome is outcome
     assert canonical_solver_runner is not recording_runner
+
+
+def test_unexpected_normalization_exception_is_staged_with_cause(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _fixture()
+    original = RuntimeError("normalizer unavailable")
+
+    def fail(*args, **kwargs):
+        raise original
+
+    monkeypatch.setattr(
+        optimization_service,
+        "normalize_imported_workbook_v1",
+        fail,
+    )
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
+        analyze_and_optimize_schedule_v1(imported, options)
+
+    assert captured.value.stage == OptimizationExecutionStageV1.NORMALIZATION
+    assert captured.value.__cause__ is original
+
+
+def test_expected_contract_validation_error_is_not_wrapped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _fixture()
+    issue_error = ContractValidationError(())
+
+    def fail(*args, **kwargs):
+        raise issue_error
+
+    monkeypatch.setattr(
+        optimization_service,
+        "normalize_imported_workbook_v1",
+        fail,
+    )
+    with pytest.raises(ContractValidationError) as captured:
+        analyze_and_optimize_schedule_v1(imported, options)
+
+    assert captured.value is issue_error
+
+
+def test_unexpected_evaluation_exception_is_staged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _fixture()
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("evaluation unavailable")
+
+    monkeypatch.setattr(optimization_service, "evaluate_scenario_b_v1", fail)
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
+        analyze_and_optimize_schedule_v1(imported, options)
+
+    assert captured.value.stage == OptimizationExecutionStageV1.EVALUATION
+    assert isinstance(captured.value.__cause__, RuntimeError)
+
+
+@pytest.mark.parametrize(
+    ("solver_choice", "expected_stage"),
+    (
+        (SolverChoice.HEURISTIC, OptimizationExecutionStageV1.HEURISTIC_SOLVER),
+        (SolverChoice.OR_TOOLS, OptimizationExecutionStageV1.OR_TOOLS_SOLVER),
+    ),
+)
+def test_unexpected_solver_exception_is_staged(
+    monkeypatch: pytest.MonkeyPatch,
+    solver_choice: SolverChoice,
+    expected_stage: OptimizationExecutionStageV1,
+) -> None:
+    imported, options = _small_fixed_resource_fixture(
+        irregular_timetable=False,
+        demand_profile=(255, 85),
+    )
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("solver unavailable")
+
+    monkeypatch.setattr(optimization_service, "run_schedule_solver_v1", fail)
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
+        analyze_and_optimize_schedule_v1(
+            imported,
+            options,
+            solver_choice=solver_choice,
+        )
+
+    assert captured.value.stage == expected_stage
+    assert isinstance(captured.value.__cause__, RuntimeError)
+
+
+def test_unexpected_both_comparison_exception_is_staged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _small_fixed_resource_fixture(
+        irregular_timetable=False,
+        demand_profile=(255, 85),
+    )
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("comparison unavailable")
+
+    monkeypatch.setattr(optimization_service, "compare_solver_outcomes_v1", fail)
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
+        analyze_and_optimize_schedule_v1(
+            imported,
+            options,
+            solver_choice=SolverChoice.BOTH,
+        )
+
+    assert captured.value.stage == OptimizationExecutionStageV1.SOLVER_COMPARISON
+    assert isinstance(captured.value.__cause__, RuntimeError)

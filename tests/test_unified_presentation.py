@@ -27,6 +27,7 @@ from bus_schedule_engine.unified_presentation import (
     PresentationTripV1,
     UnifiedPresentationBundleV1,
     UnifiedPresentationConsistencyError,
+    build_unified_application_presentation_v1,
     build_unified_presentation_v1,
     unified_presentation_to_dict,
     verify_unified_presentation_integrity_v1,
@@ -83,6 +84,45 @@ def test_serialization_and_fingerprint_are_deterministic_and_json_compatible(
     assert accepted_presentation.presentation_fingerprint == repeated.presentation_fingerprint
     assert len(accepted_presentation.presentation_fingerprint) == 64
     assert json.loads(json.dumps(first, sort_keys=True)) == first
+
+
+def test_report_free_application_projection_preserves_contract_facts(
+    accepted_pair,
+) -> None:
+    result, report = accepted_pair
+    application_presentation = build_unified_application_presentation_v1(result)
+    comparison_presentation = build_unified_presentation_v1(result, report)
+
+    verify_unified_presentation_integrity_v1(application_presentation)
+    assert application_presentation.presentation_mode == PRESENTATION_MODE_VALIDATION_ONLY
+    assert application_presentation.cutover_blocked is False
+    assert application_presentation.blocking_discrepancy_codes == ()
+    assert application_presentation.discrepancies == ()
+    assert application_presentation.validation_explanations == ()
+    assert application_presentation.validation_limitations == ()
+    assert application_presentation.scenarios == comparison_presentation.scenarios
+    assert application_presentation.blocks == comparison_presentation.blocks
+    assert application_presentation.dimensions == comparison_presentation.dimensions
+    assert application_presentation.outcome == comparison_presentation.outcome
+    assert application_presentation.fleet_assignments == (comparison_presentation.fleet_assignments)
+    assert application_presentation.initial_fleet == comparison_presentation.initial_fleet
+    assert application_presentation.headway_regimes == (comparison_presentation.headway_regimes)
+    assert application_presentation.terminal_occupancy_status == (
+        comparison_presentation.terminal_occupancy_status
+    )
+
+
+def test_report_free_review_codes_are_sorted_and_deduplicated(accepted_pair) -> None:
+    result, _report = accepted_pair
+    presentation = build_unified_application_presentation_v1(result)
+
+    assert presentation.expert_review_required_codes == tuple(
+        sorted(set(presentation.expert_review_required_codes))
+    )
+    assert presentation.informational_codes == tuple(sorted(set(presentation.informational_codes)))
+    assert presentation.requires_expert_review is bool(
+        presentation.expert_review_required_codes or result.limitations
+    )
 
 
 def test_integrity_verifier_rejects_stale_fingerprint_and_non_validation_mode(
@@ -372,11 +412,52 @@ def test_both_solver_vectors_and_recommendation_are_preserved() -> None:
     assert presentation.outcome.comparison_reason == comparison.reason_code
 
 
+def test_report_free_mixed_both_keeps_accepted_c_and_other_rejection() -> None:
+    both_result, _report = build_result_and_report(solver_choice=SolverChoice.BOTH)
+    rejected_result, _rejected_report = rejected_result_and_report()
+    comparison = both_result.comparison
+    assert comparison is not None
+    assert both_result.ortools_outcome is not None
+    mixed_result = replace(
+        both_result,
+        heuristic_outcome=rejected_result.heuristic_outcome,
+        comparison=replace(
+            comparison,
+            heuristic_vector=None,
+            recommended_solver=SolverChoice.OR_TOOLS,
+            reason_code="ONLY_OR_TOOLS_ACCEPTED",
+            explanation="OR-Tools is the only independently accepted solution.",
+        ),
+        recommended_outcome=both_result.ortools_outcome,
+    )
+
+    presentation = build_unified_application_presentation_v1(mixed_result)
+
+    assert presentation.outcome.accepted_c_exists is True
+    assert presentation.scenario("C") is not None
+    assert presentation.outcome.recommended_solver == "OR_TOOLS"
+    assert "SYNTHETIC_DOMAIN_REJECTION" in (presentation.outcome.validator_rejection_codes)
+    assert presentation.outcome.accepted_solution_fingerprint == (
+        both_result.ortools_outcome.solution.solution_fingerprint
+    )
+
+
 def test_partial_terminal_capacity_status_and_limitation_are_preserved() -> None:
     result, report = build_result_and_report(terminal_1_occupancy=10)
     presentation = build_unified_presentation_v1(result, report)
+    application_presentation = build_unified_application_presentation_v1(result)
 
     assert presentation.terminal_occupancy_status == "PARTIALLY_EVALUATED"
+    assert application_presentation.terminal_occupancy_status == "PARTIALLY_EVALUATED"
+    assert application_presentation.terminal_occupancy_terminal_statuses == (
+        presentation.terminal_occupancy_terminal_statuses
+    )
+    assert application_presentation.terminal_occupancy_limits == (
+        presentation.terminal_occupancy_limits
+    )
+    assert application_presentation.terminal_occupancy_issue_codes == (
+        presentation.terminal_occupancy_issue_codes
+    )
     assert dict(presentation.terminal_occupancy_terminal_statuses) == {
         "terminal_1": "PASS",
         "terminal_2": "NOT_EVALUATED",

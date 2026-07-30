@@ -7,6 +7,7 @@ from enum import StrEnum
 
 from .c_config import ScenarioCConfig
 from .contracts_v1 import (
+    ContractValidationError,
     GenerationResultStatus,
     NormalizationOptions,
     NormalizedInputBundleV1,
@@ -49,6 +50,26 @@ class SolverChoice(StrEnum):
     HEURISTIC = "HEURISTIC"
     OR_TOOLS = "OR_TOOLS"
     BOTH = "BOTH"
+
+
+class OptimizationExecutionStageV1(StrEnum):
+    """Stable application-visible stages for unexpected execution failures."""
+
+    NORMALIZATION = "NORMALIZATION"
+    EVALUATION = "EVALUATION"
+    HEURISTIC_SOLVER = "HEURISTIC_SOLVER"
+    OR_TOOLS_SOLVER = "OR_TOOLS_SOLVER"
+    SOLVER_COMPARISON = "SOLVER_COMPARISON"
+
+
+class OptimizationExecutionErrorV1(RuntimeError):
+    """Wrap an unexpected exception without changing completed outcome semantics."""
+
+    def __init__(self, stage: OptimizationExecutionStageV1, exc: Exception) -> None:
+        self.stage = stage
+        self.original_exception_type = exc.__class__.__name__
+        message = " ".join(str(exc).split()) or self.original_exception_type
+        super().__init__(f"{stage.value}: {message}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +174,15 @@ def _accepted_outcome(
     return None
 
 
+def _run_stage(stage: OptimizationExecutionStageV1, operation):
+    try:
+        return operation()
+    except (ContractValidationError, OptimizationExecutionErrorV1):
+        raise
+    except Exception as exc:
+        raise OptimizationExecutionErrorV1(stage, exc) from exc
+
+
 def _result(
     *,
     normalized_inputs: NormalizedInputBundleV1,
@@ -217,24 +247,40 @@ def analyze_and_optimize_schedule_v1(
 ) -> BusScheduleOptimizationResult:
     """Normalize, assess, and conditionally run the selected canonical solver boundary."""
     _validate_solver_choice(solver_choice)
-    normalized_inputs = normalize_imported_workbook_v1(imported, normalization_options)
+    normalized_inputs = _run_stage(
+        OptimizationExecutionStageV1.NORMALIZATION,
+        lambda: normalize_imported_workbook_v1(imported, normalization_options),
+    )
     effective_evaluation_policy = evaluation_policy or ScenarioBEvaluationPolicyV1()
-    b_evaluation = evaluate_scenario_b_v1(
-        normalized_inputs,
-        effective_evaluation_policy,
-    )
-    effective_decision_policy = decision_policy or _default_decision_policy(
-        effective_evaluation_policy
-    )
-    adjustment_context = build_service_adjustment_evaluation_context_v1(
-        normalized_inputs,
-        effective_evaluation_policy,
-        effective_decision_policy,
-        repeatability_evidence,
+
+    def evaluate():
+        b_evaluation = evaluate_scenario_b_v1(
+            normalized_inputs,
+            effective_evaluation_policy,
+        )
+        effective_decision_policy = decision_policy or _default_decision_policy(
+            effective_evaluation_policy
+        )
+        adjustment_context = build_service_adjustment_evaluation_context_v1(
+            normalized_inputs,
+            effective_evaluation_policy,
+            effective_decision_policy,
+            repeatability_evidence,
+            b_evaluation,
+        )
+        adjustment_assessment = evaluate_service_adjustment_need_v1(adjustment_context)
+        selected_action = select_optimization_action(adjustment_assessment)
+        return b_evaluation, adjustment_context, adjustment_assessment, selected_action
+
+    (
         b_evaluation,
+        adjustment_context,
+        adjustment_assessment,
+        selected_action,
+    ) = _run_stage(
+        OptimizationExecutionStageV1.EVALUATION,
+        evaluate,
     )
-    adjustment_assessment = evaluate_service_adjustment_need_v1(adjustment_context)
-    selected_action = select_optimization_action(adjustment_assessment)
 
     result_arguments = {
         "normalized_inputs": normalized_inputs,
@@ -266,22 +312,29 @@ def analyze_and_optimize_schedule_v1(
         )
 
     if solver_choice == SolverChoice.HEURISTIC:
-        effective_heuristic_config = heuristic_config or ScenarioCConfig.from_mapping(
-            imported.configuration
-        )
-        heuristic_context, heuristic_solver = build_heuristic_schedule_request_v1(
-            normalized_inputs,
-            b_evaluation,
-            imported.parameters_b,
-            imported.trips_b,
-            imported.demand,
-            effective_heuristic_config,
-            evaluation_policy=effective_evaluation_policy,
-            solver_policy=solver_policy,
-        )
-        heuristic_outcome = run_schedule_solver_v1(
-            heuristic_context,
-            heuristic_solver,
+
+        def run_heuristic():
+            effective_heuristic_config = heuristic_config or ScenarioCConfig.from_mapping(
+                imported.configuration
+            )
+            heuristic_context, heuristic_solver = build_heuristic_schedule_request_v1(
+                normalized_inputs,
+                b_evaluation,
+                imported.parameters_b,
+                imported.trips_b,
+                imported.demand,
+                effective_heuristic_config,
+                evaluation_policy=effective_evaluation_policy,
+                solver_policy=solver_policy,
+            )
+            return run_schedule_solver_v1(
+                heuristic_context,
+                heuristic_solver,
+            )
+
+        heuristic_outcome = _run_stage(
+            OptimizationExecutionStageV1.HEURISTIC_SOLVER,
+            run_heuristic,
         )
         return _result(
             **result_arguments,
@@ -293,15 +346,22 @@ def analyze_and_optimize_schedule_v1(
         )
 
     if solver_choice == SolverChoice.OR_TOOLS:
-        ortools_context, ortools_solver = build_ortools_service_quality_request_v1(
-            normalized_inputs,
-            b_evaluation,
-            evaluation_policy=effective_evaluation_policy,
-            solver_policy=solver_policy,
-        )
-        ortools_outcome = run_schedule_solver_v1(
-            ortools_context,
-            ortools_solver,
+
+        def run_ortools():
+            ortools_context, ortools_solver = build_ortools_service_quality_request_v1(
+                normalized_inputs,
+                b_evaluation,
+                evaluation_policy=effective_evaluation_policy,
+                solver_policy=solver_policy,
+            )
+            return run_schedule_solver_v1(
+                ortools_context,
+                ortools_solver,
+            )
+
+        ortools_outcome = _run_stage(
+            OptimizationExecutionStageV1.OR_TOOLS_SOLVER,
+            run_ortools,
         )
         return _result(
             **result_arguments,
@@ -312,51 +372,67 @@ def analyze_and_optimize_schedule_v1(
             recommended_outcome=_accepted_outcome(ortools_outcome),
         )
 
-    effective_heuristic_config = heuristic_config or ScenarioCConfig.from_mapping(
-        imported.configuration
+    heuristic_context, heuristic_solver = _run_stage(
+        OptimizationExecutionStageV1.HEURISTIC_SOLVER,
+        lambda: build_heuristic_schedule_request_v1(
+            normalized_inputs,
+            b_evaluation,
+            imported.parameters_b,
+            imported.trips_b,
+            imported.demand,
+            heuristic_config or ScenarioCConfig.from_mapping(imported.configuration),
+            evaluation_policy=effective_evaluation_policy,
+            solver_policy=solver_policy,
+        ),
     )
-    heuristic_context, heuristic_solver = build_heuristic_schedule_request_v1(
-        normalized_inputs,
-        b_evaluation,
-        imported.parameters_b,
-        imported.trips_b,
-        imported.demand,
-        effective_heuristic_config,
-        evaluation_policy=effective_evaluation_policy,
-        solver_policy=solver_policy,
+    ortools_context, ortools_solver = _run_stage(
+        OptimizationExecutionStageV1.OR_TOOLS_SOLVER,
+        lambda: build_ortools_service_quality_request_v1(
+            normalized_inputs,
+            b_evaluation,
+            evaluation_policy=effective_evaluation_policy,
+            solver_policy=solver_policy,
+        ),
     )
-    ortools_context, ortools_solver = build_ortools_service_quality_request_v1(
-        normalized_inputs,
-        b_evaluation,
-        evaluation_policy=effective_evaluation_policy,
-        solver_policy=solver_policy,
+    heuristic_outcome = _run_stage(
+        OptimizationExecutionStageV1.HEURISTIC_SOLVER,
+        lambda: run_schedule_solver_v1(
+            heuristic_context,
+            heuristic_solver,
+        ),
     )
-    heuristic_outcome = run_schedule_solver_v1(
-        heuristic_context,
-        heuristic_solver,
-    )
-    ortools_outcome = run_schedule_solver_v1(
-        ortools_context,
-        ortools_solver,
+    ortools_outcome = _run_stage(
+        OptimizationExecutionStageV1.OR_TOOLS_SOLVER,
+        lambda: run_schedule_solver_v1(
+            ortools_context,
+            ortools_solver,
+        ),
     )
     exact_demand_authority = getattr(
         ortools_solver,
         "exact_demand_authority",
         None,
     )
-    comparison = (
-        compare_solver_outcomes_v1(
-            ortools_context.problem,
-            heuristic_outcome,
-            ortools_outcome,
-            exact_demand_authority=exact_demand_authority,
+
+    def compare():
+        return (
+            compare_solver_outcomes_v1(
+                ortools_context.problem,
+                heuristic_outcome,
+                ortools_outcome,
+                exact_demand_authority=exact_demand_authority,
+            )
+            if exact_demand_authority is not None
+            else compare_solver_outcomes_v1(
+                ortools_context.problem,
+                heuristic_outcome,
+                ortools_outcome,
+            )
         )
-        if exact_demand_authority is not None
-        else compare_solver_outcomes_v1(
-            ortools_context.problem,
-            heuristic_outcome,
-            ortools_outcome,
-        )
+
+    comparison = _run_stage(
+        OptimizationExecutionStageV1.SOLVER_COMPARISON,
+        compare,
     )
     recommended_outcome = {
         SolverChoice.HEURISTIC: heuristic_outcome,
@@ -380,6 +456,8 @@ def analyze_and_optimize_schedule_v1(
 __all__ = [
     "BusScheduleOptimizationResult",
     "OptimizationAction",
+    "OptimizationExecutionErrorV1",
+    "OptimizationExecutionStageV1",
     "SolverComparisonV1",
     "SolverChoice",
     "analyze_and_optimize_schedule_v1",

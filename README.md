@@ -10,23 +10,27 @@ The active product direction is defined in
 
 ## Current implementation state
 
-The repository currently contains two separate paths.
+The repository contains one ordinary application runtime and one retained offline regression
+oracle.
 
-### Legacy MVP application runtime
+### Contract V1 ordinary application runtime
 
-The legacy modules under `app_pages/` and `src/bus_schedule_engine/` remain the explicit
-Streamlit fallback. This path:
+Milestone 5C2 implements the unified-only ordinary Streamlit path. It:
 
-- imports the legacy workbook format;
-- validates Scenario B with the legacy validator;
-- evaluates demand at the legacy block grain;
-- generates deterministic fixed-resource Scenario C candidates;
-- assigns fleet with the legacy greedy two-terminal algorithm;
-- compares scenarios with the legacy scoring configuration;
-- renders Plotly charts; and
-- exports the existing XLSX reports.
+- assesses authoritative-input readiness before analysis;
+- runs Contract V1 once for optimization-ready input;
+- builds a report-free, fingerprinted unified presentation;
+- fails closed on runtime or semantic-integrity failure;
+- renders unified Plotly charts and the three Contract V1 downloads; and
+- never runs legacy analysis or per-submission side-by-side comparison.
 
-### Contract V1 target domain and solver boundary
+### Offline legacy regression oracle
+
+Legacy analysis, chart/export code, and the side-by-side adapter remain available for tests and
+the explicit `python -m bus_schedule_engine.release_audit` command. They are not imported or
+executed by ordinary Streamlit. Broad legacy deletion has not started.
+
+### Contract V1 domain and solver boundary
 
 `src/bus_schedule_engine/contracts_v1/` is a separately tested target boundary. It provides:
 
@@ -53,21 +57,20 @@ Contract V1 result and the Milestone 5A1 report. This does not cut over Streamli
 session state, charts, and downloads remain legacy-authoritative. See
 [Milestone 5A2B unified presentation adapters](docs/engine/MILESTONE_5A2B_UNIFIED_PRESENTATION_ADAPTERS.md).
 
-Milestone 5B1 completes the shadow runtime: unified Contract V1 runs once in the real Streamlit
-submission flow when authoritative input is ready and stores aligned validation evidence in
-parallel session state. Milestone 5B2A now cuts over visible diagnostic and recommendation Pages
-02–04 through one explicit authority resolver; missing, failed, blocked, or inconsistent shadow
-evidence retains a prominently labeled legacy fallback. Milestone 5B2B cuts over Page 05 through
-the same resolver to exact-direction unified charts and three validated Contract V1 downloads;
-artifact failure retains the complete four-download legacy fallback. See
+Milestone 5B1 introduced the shadow runtime. Milestone 5B2A cut over visible diagnostic and
+recommendation Pages 02–04, and Milestone 5B2B cut over Page 05 to exact-direction unified charts
+and three validated Contract V1 downloads. See
 [Milestone 5B1 Streamlit shadow runtime](docs/engine/MILESTONE_5B1_STREAMLIT_SHADOW_RUNTIME.md)
 and
 [Milestone 5B2A unified result pages](docs/engine/MILESTONE_5B2A_UNIFIED_RESULT_PAGES.md), and
 [Milestone 5B2B unified Page 05 artifacts](docs/engine/MILESTONE_5B2B_UNIFIED_PAGE5_ARTIFACTS.md).
-Milestone 5B2B is merged and the visible cutover is conditionally complete, but the ordinary
-runtime still executes legacy first. Legacy runtime retirement has not started. Milestone 5C1 is
-the active decision task, and Milestone 5 remains incomplete. See
-[Milestone 5C1 legacy runtime retirement decision](docs/engine/MILESTONE_5C1_LEGACY_RUNTIME_RETIREMENT_DECISION.md).
+Milestone 5C1 is merged and selects Option C. Milestone 5C2 now implements the unified-only
+ordinary runtime: Streamlit performs no legacy analysis or per-submission comparison, while
+legacy remains an offline oracle. `LEGACY_RUNTIME_RETIRED` and Milestone 5 still await formal
+production approval, and `LEGACY_CODE_DELETED` is not claimed. See
+[Milestone 5C1 legacy runtime retirement decision](docs/engine/MILESTONE_5C1_LEGACY_RUNTIME_RETIREMENT_DECISION.md)
+and
+[Milestone 5C2 unified-first runtime](docs/engine/MILESTONE_5C2_UNIFIED_FIRST_RUNTIME.md).
 
 Contract V1 includes separate OR-Tools v9.15 CP-SAT adapters for one-route, fixed-resource hard
 feasibility, directional demand-priority optimization, and service-quality optimization. The
@@ -126,10 +129,12 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 - Unified fixed-resource solver selection with heuristic-only continuity by default, explicit
   15-stage OR-Tools service-quality solving, and transparent `BOTH` comparison of independently
   validated accepted solutions.
-- Parallel validation-only unified demand/supply and exact-departure figures plus an editable
-  formula-free XLSX workbook, all aligned by one semantic presentation fingerprint.
+- Unified-only ordinary runtime with readiness-first execution and fail-closed errors.
+- Unified demand/supply and exact-departure figures plus an editable formula-free XLSX workbook,
+  all aligned by one semantic presentation fingerprint.
 - Unified Page 05 exact-direction charts plus validated XLSX, deterministic offline HTML, and
-  selected-overview PNG downloads behind the existing visible-result authority gate.
+  selected-overview PNG downloads.
+- Explicit deterministic offline release-audit JSON backed by the retained legacy oracle.
 
 ## Not supported yet
 
@@ -144,13 +149,16 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 - Production implementation of the deferred V1-A1 structural demand-response workflow.
 - Mixed fleets, multi-route interlining, deadhead, driver duties, depot pull-in/out, maintenance,
   or mature cross-midnight optimization.
-- Automatic retirement of the labeled legacy UI and download fallback.
+- Formal production approval of the implemented `LEGACY_RUNTIME_RETIRED` gate.
+- Broad deletion or rehoming of the retained legacy regression-oracle code.
 
 ## Target pipeline
 
 ```text
 Workbook/UI
--> import and normalize
+-> import
+-> assess authoritative-input readiness
+-> strict Contract V1 normalization
 -> validate and evaluate B
 -> quantify whether adjustment is needed
 -> build ScheduleProblemV1
@@ -167,7 +175,8 @@ Only an independently validated candidate may be presented as authoritative Scen
 Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation, Milestone 5A2A
 authoritative input readiness, Milestone 5A2B validation-only presentation adapters, Milestone
 5B1 Streamlit shadow execution, Milestone 5B2A unified result Pages 02–04, and Milestone 5B2B
-unified Page 05 artifacts are implemented and merged**, but Milestone 5 is not complete.
+unified Page 05 artifacts are implemented and merged. Milestone 5C1 is merged and Milestone 5C2
+is implemented**, but Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
 2. Milestone 5A2A: stabilize authoritative workbook input and readiness.
@@ -179,8 +188,10 @@ unified Page 05 artifacts are implemented and merged**, but Milestone 5 is not c
    (implemented).
 6. Milestone 5B2B: cut over Page 05 charts and downloads through the same gate while retaining
    the complete legacy fallback (implemented; legacy retirement remains separate).
-7. Milestone 5C1: define and approve the legacy-runtime retirement decision and exact Milestone 5
-   completion gate (active; documentation only; retirement has not started).
+7. Milestone 5C1: define and approve the Option C legacy-runtime retirement gate (merged).
+8. Milestone 5C2: make Contract V1 the only ordinary Streamlit runtime and move side-by-side
+   validation to an explicit offline release audit (implemented; formal approval pending).
+9. Milestone 5C3: separately remove authorized legacy code after approval (not started).
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)
@@ -208,10 +219,11 @@ See
 [Route Corpus Reviewed Baseline V1](docs/engine/ROUTE_CORPUS_REVIEWED_BASELINE_V1.md) for the
 approved policy boundary and
 [Route Corpus Characterization Draft V1](docs/engine/ROUTE_CORPUS_CHARACTERIZATION_DRAFT_V1.md)
-for detailed historical evidence. The Streamlit UI, charts, and XLSX exports have not yet migrated
-in full to unified Contract V1 results. Pages 02–04 display aligned unified facts through the
-5B2A authority gate, and Page 05 uses the same gate for aligned XLSX/PNG/HTML artifacts while
-retaining the complete labeled legacy fallback.
+for detailed historical evidence. Pages 02–05 now display only aligned unified Contract V1 facts
+and artifacts. The corpus remains diagnostic evidence and does not approve an operating
+timetable. The prior reviewed baseline recorded that “The Streamlit UI, charts, and XLSX exports have not yet migrated”;
+Milestone 5C2 supersedes that historical runtime statement without changing the corpus facts or
+approval boundary.
 
 Variable-trip-count optimization and structural demand-response scenarios are optional later
 stages. See [Migration Roadmap to OR-Tools](docs/engine/MIGRATION_ROADMAP_TO_OR_TOOLS.md).
@@ -225,7 +237,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 
-## Run the current legacy application
+## Run the unified application
 
 ```powershell
 .\.venv\Scripts\streamlit.exe run streamlit_app.py
@@ -233,6 +245,15 @@ python -m venv .venv
 
 The five Vietnamese UI pages cover input, technical checks, demand evaluation,
 recommendations, and chart/XLSX export.
+
+Run the retained legacy comparison only as an explicit offline release audit:
+
+```powershell
+.\.venv\Scripts\python.exe -m bus_schedule_engine.release_audit `
+  --workbook "Schedule template.xlsx" `
+  --solver HEURISTIC `
+  --output "outputs/release-audit.json"
+```
 
 ## Validate the repository
 
