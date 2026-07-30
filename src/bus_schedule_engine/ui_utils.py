@@ -4,17 +4,16 @@ from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from .block_supply import scenario_supply_summary
-from .comparison_exporter import export_bc_comparison, exported_c_fingerprint
-from .diagram import build_comparison_diagram, diagram_png_bytes
-from .excel_exporter import create_input_template, export_results
 from .importer import ImportedWorkbook
-from .models import AnalysisBundle, RouteType
-from .service import run_analysis
+from .models import RouteType
 from .time_utils import format_hhmm
+
+if TYPE_CHECKING:
+    from .models import AnalysisBundle
 
 
 def workbook_sheet_names(content: bytes) -> list[str]:
@@ -70,6 +69,12 @@ def apply_overrides(
 def run_and_build_artifacts(
     imported: ImportedWorkbook,
 ) -> tuple[AnalysisBundle, object, dict[str, bytes]]:
+    """Run the legacy oracle only for an explicit offline caller."""
+    from .comparison_exporter import export_bc_comparison, exported_c_fingerprint
+    from .diagram import build_comparison_diagram, diagram_png_bytes
+    from .excel_exporter import export_results
+    from .service import run_analysis
+
     bundle = run_analysis(imported)
     figure = build_comparison_diagram(bundle)
     result_c = bundle.get("C")
@@ -102,6 +107,8 @@ def run_and_build_artifacts(
 
 
 def template_bytes() -> bytes:
+    from .excel_exporter import create_input_template
+
     with TemporaryDirectory(prefix="bus_schedule_template_") as directory:
         path = create_input_template(Path(directory) / "Bus_Schedule_Input_Template.xlsx")
         return path.read_bytes()
@@ -193,6 +200,8 @@ def scenario_frame(bundle: AnalysisBundle) -> pd.DataFrame:
 
 
 def supply_summary_frame(bundle: AnalysisBundle) -> pd.DataFrame:
+    from .block_supply import scenario_supply_summary
+
     return pd.DataFrame(scenario_supply_summary(bundle))
 
 

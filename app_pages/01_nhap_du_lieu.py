@@ -4,11 +4,14 @@ from hashlib import sha256
 import streamlit as st
 
 from bus_schedule_engine.application_pipeline import (
-    ParallelRuntimeStatusV1,
-    run_parallel_application_pipeline_v1,
+    CONTRACT_V1_ARTIFACT_FAILED,
+    WORKBOOK_IMPORT_INVALID,
+    WORKBOOK_OPTIMIZATION_NOT_READY,
+    UnifiedApplicationStatusV1,
+    run_unified_application_pipeline_v1,
+    sanitize_import_error_message_v1,
 )
-from bus_schedule_engine.fleet import assign_fleet
-from bus_schedule_engine.importer import InputDataError, import_workbook
+from bus_schedule_engine.importer import import_workbook
 from bus_schedule_engine.models import Direction
 from bus_schedule_engine.time_utils import parse_runtime_options
 from bus_schedule_engine.ui_utils import (
@@ -19,27 +22,30 @@ from bus_schedule_engine.ui_utils import (
 )
 
 _LEGACY_RESULT_STATE_KEYS = (
-    "imported_workbook",
     "analysis_bundle",
     "diagram_figure",
     "download_artifacts",
     "scenario_c_fingerprint",
-)
-_UNIFIED_SHADOW_STATE_KEYS = (
     "parallel_runtime_status",
+    "side_by_side_validation_report",
+)
+_UNIFIED_RESULT_STATE_KEYS = (
+    "imported_workbook",
     "workbook_input_readiness",
     "unified_optimization_result",
-    "side_by_side_validation_report",
     "unified_presentation",
     "unified_demand_supply_figure",
     "unified_departure_figure",
     "unified_download_artifacts",
     "unified_runtime_failure",
+    "unified_runtime_status",
 )
 
 
 def _clear_result_state() -> None:
-    for state_key in (*_LEGACY_RESULT_STATE_KEYS, *_UNIFIED_SHADOW_STATE_KEYS):
+    for state_key in _LEGACY_RESULT_STATE_KEYS:
+        st.session_state.pop(state_key, None)
+    for state_key in _UNIFIED_RESULT_STATE_KEYS:
         st.session_state[state_key] = None
 
 
@@ -73,14 +79,21 @@ if uploaded is not None:
         _clear_result_state()
     st.session_state.input_bytes = content
 else:
-    content = st.session_state.input_bytes
+    content = st.session_state.get("input_bytes")
 
 if content:
     try:
         imported = import_workbook(content)
         sheet_names = workbook_sheet_names(content)
-    except (InputDataError, ValueError) as exc:
-        st.error(f"Workbook chưa hợp lệ: {exc}", icon=":material/error:")
+    except Exception as exc:
+        st.error(
+            f"{WORKBOOK_IMPORT_INVALID}\n\n{sanitize_import_error_message_v1(exc)}",
+            icon=":material/error:",
+        )
+        st.info(
+            "Hãy dùng template đầu vào mới, chuyển dữ liệu sang đúng sheet và trường "
+            "được báo lỗi, rồi tải workbook lên lại."
+        )
         st.stop()
 
     preview_name = st.selectbox("Sheet xem trước", sheet_names, key="input_preview_sheet")
@@ -93,10 +106,8 @@ if content:
         default="Tái phân bổ ổn định, giữ nguyên số chuyến và số xe",
         key="recommendation_mode",
     )
-    active_fleet = max(
-        assign_fleet(imported.trips_b, imported.parameters_b).minimum_vehicles,
-        len({trip.vehicle_id for trip in imported.trips_b if trip.vehicle_id}),
-    )
+    declared_vehicle_count = len({trip.vehicle_id for trip in imported.trips_b if trip.vehicle_id})
+    declared_available_fleet = imported.parameters_b.available_fleet_limit
     with st.container(border=True):
         st.markdown("**Các giá trị khóa từ Scenario B**")
         with st.container(horizontal=True):
@@ -111,7 +122,16 @@ if content:
                 sum(trip.direction == Direction.TERMINAL_2_TO_1 for trip in imported.trips_b),
                 border=True,
             )
-            st.metric("Xe hoạt động", active_fleet, border=True)
+            st.metric("Số mã xe đã khai báo", declared_vehicle_count, border=True)
+            st.metric(
+                "Giới hạn đội xe đã khai báo",
+                (
+                    declared_available_fleet
+                    if declared_available_fleet is not None
+                    else "Chưa khai báo"
+                ),
+                border=True,
+            )
         st.caption(
             f"Sức chứa {imported.parameters_b.capacity} khách · hành trình "
             f"{imported.parameters_b.runtime_range_text} phút · "
@@ -221,67 +241,96 @@ if content:
             _clear_result_state()
             source_id = f"streamlit-upload-sha256:{sha256(content).hexdigest()}"
             imported_at = datetime.now(UTC)
-            try:
-                with st.status("Đang kiểm tra, đánh giá và tạo báo cáo…", expanded=True) as status:
-                    parallel_run = run_parallel_application_pipeline_v1(
-                        updated,
-                        source_id=source_id,
-                        imported_at=imported_at,
-                    )
-                    status.update(label="Hoàn tất pipeline", state="complete", expanded=False)
-            except (InputDataError, ValueError) as exc:
-                st.error(f"Không thể chạy pipeline: {exc}", icon=":material/error:")
+            with st.status(
+                "Đang kiểm tra, đánh giá và tạo báo cáo…",
+                expanded=True,
+            ) as status:
+                unified_run = run_unified_application_pipeline_v1(
+                    updated,
+                    source_id=source_id,
+                    imported_at=imported_at,
+                )
+                status.update(label="Hoàn tất pipeline", state="complete", expanded=False)
+
+            st.session_state.imported_workbook = updated
+            st.session_state.workbook_input_readiness = unified_run.input_readiness
+            st.session_state.unified_runtime_status = unified_run.status
+            st.session_state.unified_runtime_failure = unified_run.failure
+            st.session_state.unified_optimization_result = unified_run.unified_result
+            st.session_state.unified_presentation = unified_run.unified_presentation
+            st.session_state.unified_demand_supply_figure = unified_run.unified_demand_supply_figure
+            st.session_state.unified_departure_figure = unified_run.unified_departure_figure
+            st.session_state.unified_download_artifacts = (
+                {
+                    "xlsx": unified_run.unified_xlsx_bytes,
+                    "source_id": unified_run.source_id,
+                    "presentation_fingerprint": (
+                        unified_run.unified_presentation.presentation_fingerprint
+                    ),
+                    "b_fingerprint": (unified_run.unified_presentation.source_b_fingerprint),
+                    "accepted_solution_fingerprint": (
+                        unified_run.unified_presentation.accepted_solution_fingerprint
+                    ),
+                }
+                if unified_run.status == UnifiedApplicationStatusV1.COMPLETE
+                and unified_run.unified_xlsx_bytes is not None
+                and unified_run.unified_presentation is not None
+                else None
+            )
+
+            if unified_run.status == UnifiedApplicationStatusV1.INPUT_NOT_READY:
+                codes = "\n".join(
+                    f"- {code}"
+                    for code in unified_run.input_readiness.missing_optimization_authority_codes
+                )
+                st.write(f"Nguồn: `{source_id}`")
+                st.write(
+                    f"Tuyến: `{updated.parameters_b.route_id}` · {updated.parameters_b.route_name}"
+                )
+                st.write(
+                    f"Bến: {updated.parameters_b.terminal_1_name} ↔ "
+                    f"{updated.parameters_b.terminal_2_name}"
+                )
+                st.write(
+                    "Số dòng nhập: "
+                    f"Scenario A = {len(updated.trips_a)}, "
+                    f"Scenario B = {len(updated.trips_b)}, "
+                    f"nhu cầu = {len(updated.demand)}."
+                )
+                st.warning(
+                    f"{WORKBOOK_OPTIMIZATION_NOT_READY}\n\n{codes}\n\n"
+                    "Hãy dùng template mới, bổ sung các trường thẩm quyền còn thiếu "
+                    "và chạy lại.",
+                    icon=":material/warning:",
+                )
+            elif unified_run.status == UnifiedApplicationStatusV1.ARTIFACT_FAILED:
+                assert unified_run.failure is not None
+                st.warning(
+                    f"{CONTRACT_V1_ARTIFACT_FAILED}\n\n"
+                    f"Mã đối chiếu: {unified_run.failure.correlation_id}\n\n"
+                    "Trang 02–04 vẫn khả dụng; mọi biểu đồ và tệp tải xuống ở "
+                    "Trang 05 đã bị vô hiệu hóa.",
+                    icon=":material/warning:",
+                )
+            elif unified_run.status == UnifiedApplicationStatusV1.FAILED:
+                assert unified_run.failure is not None
+                st.error(
+                    f"{unified_run.failure.code}\n\n"
+                    f"Giai đoạn: {unified_run.failure.stage}\n\n"
+                    f"Mã đối chiếu: {unified_run.failure.correlation_id}\n\n"
+                    f"{unified_run.failure.sanitized_message}",
+                    icon=":material/error:",
+                )
             else:
-                st.session_state.imported_workbook = updated
-                st.session_state.analysis_bundle = parallel_run.legacy_bundle
-                st.session_state.diagram_figure = parallel_run.legacy_figure
-                st.session_state.download_artifacts = parallel_run.legacy_artifacts
-                st.session_state.scenario_c_fingerprint = parallel_run.legacy_artifacts[
-                    "c_fingerprint"
-                ].decode("utf-8")
-                st.session_state.parallel_runtime_status = parallel_run.status
-                st.session_state.workbook_input_readiness = parallel_run.input_readiness
-                st.session_state.unified_optimization_result = parallel_run.unified_result
-                st.session_state.side_by_side_validation_report = parallel_run.side_by_side_report
-                st.session_state.unified_presentation = parallel_run.unified_presentation
-                st.session_state.unified_demand_supply_figure = (
-                    parallel_run.unified_demand_supply_figure
-                )
-                st.session_state.unified_departure_figure = parallel_run.unified_departure_figure
-                st.session_state.unified_download_artifacts = (
-                    {
-                        "xlsx": parallel_run.unified_xlsx_bytes,
-                        "presentation_fingerprint": (
-                            parallel_run.unified_presentation.presentation_fingerprint
-                        ),
-                        "b_fingerprint": (parallel_run.unified_presentation.source_b_fingerprint),
-                        "accepted_solution_fingerprint": (
-                            parallel_run.unified_presentation.accepted_solution_fingerprint
-                        ),
-                    }
-                    if parallel_run.unified_xlsx_bytes is not None
-                    and parallel_run.unified_presentation is not None
-                    else None
-                )
-                st.session_state.unified_runtime_failure = (
-                    {
-                        "code": parallel_run.failure_code,
-                        "message": parallel_run.failure_message,
-                    }
-                    if parallel_run.failure_code is not None
-                    else None
-                )
-                if parallel_run.status == ParallelRuntimeStatusV1.UNIFIED_RUNTIME_FAILED:
-                    st.warning(
-                        "Kết quả hiện tại vẫn dùng pipeline legacy. "
-                        "Pipeline Contract V1 chạy song song chưa hoàn tất: "
-                        f"{parallel_run.failure_message}",
-                        icon=":material/warning:",
-                    )
-                result_b = parallel_run.legacy_bundle.get("B")
+                assert unified_run.unified_presentation is not None
+                outcome = unified_run.unified_presentation.outcome
                 st.success(
-                    f"Phương án B: {result_b.validation.status if result_b else 'N/A'}. "
-                    "Dùng thanh điều hướng phía trên để xem từng phần kết quả.",
+                    f"Contract V1 B: {outcome.b_disposition}. "
+                    f"Hành động: {outcome.selected_action}. "
+                    f"Trạng thái solver: "
+                    f"{outcome.heuristic_result_status or outcome.ortools_result_status or 'NOT_ATTEMPTED'}. "
+                    f"Scenario C được chấp nhận: "
+                    f"{'Có' if outcome.accepted_c_exists else 'Không'}.",
                     icon=":material/check_circle:",
                 )
 else:

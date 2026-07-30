@@ -4,20 +4,16 @@ from bus_schedule_engine.ui_result_authority import (
     VisibleResultModeV1,
     resolve_visible_result_context_v1,
 )
-from bus_schedule_engine.ui_utils import block_frame
 from bus_schedule_engine.unified_ui_frames import (
     demand_block_rows_v1,
     demand_gap_rows_v1,
     demand_summary_v1,
 )
 
-bundle = st.session_state.get("analysis_bundle")
 visible = resolve_visible_result_context_v1(
-    legacy_bundle=bundle,
-    parallel_runtime_status=st.session_state.get("parallel_runtime_status"),
+    runtime_status=st.session_state.get("unified_runtime_status"),
     input_readiness=st.session_state.get("workbook_input_readiness"),
     unified_result=st.session_state.get("unified_optimization_result"),
-    report=st.session_state.get("side_by_side_validation_report"),
     presentation=st.session_state.get("unified_presentation"),
     unified_demand_supply_figure=st.session_state.get("unified_demand_supply_figure"),
     unified_departure_figure=st.session_state.get("unified_departure_figure"),
@@ -29,8 +25,19 @@ if visible.mode == VisibleResultModeV1.NO_RESULT:
     st.warning(visible.banner_message)
     st.stop()
 
-if visible.uses_unified:
+if not visible.uses_unified:
+    if visible.banner_level == "error":
+        st.error(visible.banner_message, icon=":material/error:")
+    else:
+        st.warning(visible.banner_message, icon=":material/warning:")
+    st.stop()
+
+if visible.mode == VisibleResultModeV1.UNIFIED_ARTIFACT_FAILED:
+    st.warning(visible.banner_message, icon=":material/warning:")
+else:
     st.info(visible.banner_message, icon=":material/info:")
+
+if visible.uses_unified:
     presentation = visible.presentation
     assert presentation is not None
     if presentation.requires_expert_review:
@@ -91,40 +98,5 @@ if visible.uses_unified:
         column_config={
             "Hệ số tải B": st.column_config.NumberColumn(format="percent"),
             "Hệ số tải C": st.column_config.NumberColumn(format="percent"),
-        },
-    )
-else:
-    st.warning(visible.banner_message, icon=":material/warning:")
-
-    scenario_names = [result.name for result in bundle.scenarios]
-    scenario = st.segmented_control(
-        "Phương án cần xem",
-        scenario_names,
-        default="B" if "B" in scenario_names else scenario_names[0],
-    )
-    result = bundle.get(scenario)
-    cols = st.columns(4)
-    cols[0].metric("Kết luận nhu cầu", result.evaluation.demand_status.value)
-    cols[1].metric(
-        "Hệ số tải cao nhất",
-        "—"
-        if result.evaluation.maximum_load_factor is None
-        else f"{result.evaluation.maximum_load_factor:.1%}",
-    )
-    cols[2].metric("Khung trên mục tiêu", result.evaluation.blocks_over_target)
-    cols[3].metric("Khung trên tối đa", result.evaluation.blocks_over_maximum)
-
-    for limitation in result.evaluation.limitations:
-        st.warning(limitation, icon=":material/warning:")
-
-    frame = block_frame(bundle, scenario)
-    st.dataframe(
-        frame,
-        hide_index=True,
-        column_config={
-            "Hệ số tải": st.column_config.NumberColumn(format="percent"),
-            "Giãn cách TB": st.column_config.NumberColumn(format="%.1f phút"),
-            "Độ lệch giãn cách": st.column_config.NumberColumn(format="%.1f phút"),
-            "Khoảng trống lớn nhất": st.column_config.NumberColumn(format="%.1f phút"),
         },
     )

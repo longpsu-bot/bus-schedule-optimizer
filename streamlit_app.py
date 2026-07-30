@@ -7,22 +7,27 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+for legacy_key in (
+    "analysis_bundle",
+    "diagram_figure",
+    "download_artifacts",
+    "scenario_c_fingerprint",
+    "parallel_runtime_status",
+    "side_by_side_validation_report",
+):
+    st.session_state.pop(legacy_key, None)
+
 for key, default in {
     "input_bytes": None,
     "imported_workbook": None,
-    "analysis_bundle": None,
-    "diagram_figure": None,
-    "download_artifacts": None,
-    "scenario_c_fingerprint": None,
-    "parallel_runtime_status": None,
     "workbook_input_readiness": None,
     "unified_optimization_result": None,
-    "side_by_side_validation_report": None,
     "unified_presentation": None,
     "unified_demand_supply_figure": None,
     "unified_departure_figure": None,
     "unified_download_artifacts": None,
     "unified_runtime_failure": None,
+    "unified_runtime_status": None,
 }.items():
     st.session_state.setdefault(key, default)
 

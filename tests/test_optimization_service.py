@@ -12,6 +12,8 @@ import bus_schedule_engine.optimization_service as optimization_service
 from bus_schedule_engine import (
     BusScheduleOptimizationResult,
     OptimizationAction,
+    OptimizationExecutionErrorV1,
+    OptimizationExecutionStageV1,
     SolverChoice,
     analyze_and_optimize_schedule_v1,
     select_optimization_action,
@@ -83,6 +85,18 @@ NO_SOLVER_DECISIONS = (
     ServiceAdjustmentDecisionV1.TECHNICAL_ADJUSTMENT_REQUIRED,
     ServiceAdjustmentDecisionV1.INSUFFICIENT_DATA,
 )
+
+
+def test_execution_stage_model_includes_application_boundaries() -> None:
+    assert tuple(stage.value for stage in OptimizationExecutionStageV1) == (
+        "NORMALIZATION",
+        "EVALUATION",
+        "HEURISTIC_SOLVER",
+        "OR_TOOLS_SOLVER",
+        "SOLVER_COMPARISON",
+        "PRESENTATION",
+        "ARTIFACTS",
+    )
 
 
 def _fixture(
@@ -872,10 +886,7 @@ def test_supplied_mismatched_decision_policy_fails_before_assessment(
         forbidden_assessment,
     )
 
-    with pytest.raises(
-        ContractValidationError,
-        match="ADJUSTMENT_DECISION_POLICY_EVALUATION_AUTHORITY_MISMATCH",
-    ):
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
         analyze_and_optimize_schedule_v1(
             imported,
             options,
@@ -883,6 +894,11 @@ def test_supplied_mismatched_decision_policy_fails_before_assessment(
             decision_policy=ServiceAdjustmentDecisionPolicyV1(planning_load_factor_ceiling=0.85),
         )
 
+    assert captured.value.stage == OptimizationExecutionStageV1.EVALUATION
+    assert isinstance(captured.value.__cause__, ContractValidationError)
+    assert "ADJUSTMENT_DECISION_POLICY_EVALUATION_AUTHORITY_MISMATCH" in str(
+        captured.value.__cause__
+    )
     assert assessment_called is False
 
 
@@ -1157,3 +1173,137 @@ def test_solver_attempted_is_true_only_after_canonical_runner_is_called(
     assert result.solver_attempted is True
     assert result.heuristic_outcome is outcome
     assert canonical_solver_runner is not recording_runner
+
+
+def test_unexpected_normalization_exception_is_staged_with_cause(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _fixture()
+    original = RuntimeError("normalizer unavailable")
+
+    def fail(*args, **kwargs):
+        raise original
+
+    monkeypatch.setattr(
+        optimization_service,
+        "normalize_imported_workbook_v1",
+        fail,
+    )
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
+        analyze_and_optimize_schedule_v1(imported, options)
+
+    assert captured.value.stage == OptimizationExecutionStageV1.NORMALIZATION
+    assert captured.value.__cause__ is original
+
+
+def test_contract_validation_error_during_normalization_is_staged_with_cause(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _fixture()
+    issue_error = ContractValidationError(())
+
+    def fail(*args, **kwargs):
+        raise issue_error
+
+    monkeypatch.setattr(
+        optimization_service,
+        "normalize_imported_workbook_v1",
+        fail,
+    )
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
+        analyze_and_optimize_schedule_v1(imported, options)
+
+    assert captured.value.stage == OptimizationExecutionStageV1.NORMALIZATION
+    assert captured.value.__cause__ is issue_error
+
+
+def test_contract_validation_error_during_evaluation_is_staged_with_cause(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _fixture()
+    issue_error = ContractValidationError(())
+
+    def fail(*args, **kwargs):
+        raise issue_error
+
+    monkeypatch.setattr(
+        optimization_service,
+        "build_service_adjustment_evaluation_context_v1",
+        fail,
+    )
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
+        analyze_and_optimize_schedule_v1(imported, options)
+
+    assert captured.value.stage == OptimizationExecutionStageV1.EVALUATION
+    assert captured.value.__cause__ is issue_error
+
+
+def test_unexpected_evaluation_exception_is_staged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _fixture()
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("evaluation unavailable")
+
+    monkeypatch.setattr(optimization_service, "evaluate_scenario_b_v1", fail)
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
+        analyze_and_optimize_schedule_v1(imported, options)
+
+    assert captured.value.stage == OptimizationExecutionStageV1.EVALUATION
+    assert isinstance(captured.value.__cause__, RuntimeError)
+
+
+@pytest.mark.parametrize(
+    ("solver_choice", "expected_stage"),
+    (
+        (SolverChoice.HEURISTIC, OptimizationExecutionStageV1.HEURISTIC_SOLVER),
+        (SolverChoice.OR_TOOLS, OptimizationExecutionStageV1.OR_TOOLS_SOLVER),
+    ),
+)
+def test_unexpected_solver_exception_is_staged(
+    monkeypatch: pytest.MonkeyPatch,
+    solver_choice: SolverChoice,
+    expected_stage: OptimizationExecutionStageV1,
+) -> None:
+    imported, options = _small_fixed_resource_fixture(
+        irregular_timetable=False,
+        demand_profile=(255, 85),
+    )
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("solver unavailable")
+
+    monkeypatch.setattr(optimization_service, "run_schedule_solver_v1", fail)
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
+        analyze_and_optimize_schedule_v1(
+            imported,
+            options,
+            solver_choice=solver_choice,
+        )
+
+    assert captured.value.stage == expected_stage
+    assert isinstance(captured.value.__cause__, RuntimeError)
+
+
+def test_unexpected_both_comparison_exception_is_staged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _small_fixed_resource_fixture(
+        irregular_timetable=False,
+        demand_profile=(255, 85),
+    )
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("comparison unavailable")
+
+    monkeypatch.setattr(optimization_service, "compare_solver_outcomes_v1", fail)
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
+        analyze_and_optimize_schedule_v1(
+            imported,
+            options,
+            solver_choice=SolverChoice.BOTH,
+        )
+
+    assert captured.value.stage == OptimizationExecutionStageV1.SOLVER_COMPARISON
+    assert isinstance(captured.value.__cause__, RuntimeError)

@@ -546,6 +546,32 @@ def test_png_renderer_receives_exact_selected_figure(
     }
 
 
+def test_html_failure_rejects_the_entire_bundle_before_png(
+    monkeypatch,
+    tmp_path: Path,
+    accepted_presentation,
+) -> None:
+    png_calls = 0
+
+    def fail_html(*args, **kwargs):
+        raise RuntimeError("html renderer unavailable")
+
+    def record_png(*args, **kwargs):
+        nonlocal png_calls
+        png_calls += 1
+        return b"png"
+
+    monkeypatch.setattr(page5_artifacts, "_build_html_bytes", fail_html)
+    monkeypatch.setattr(page5_artifacts, "_build_png_bytes", record_png)
+    with pytest.raises(UnifiedPage5ArtifactError, match="html renderer unavailable"):
+        _build_artifacts(
+            accepted_presentation,
+            _xlsx_bytes(accepted_presentation, tmp_path),
+        )
+
+    assert png_calls == 0
+
+
 def test_png_failure_rejects_the_entire_bundle(
     monkeypatch,
     tmp_path: Path,

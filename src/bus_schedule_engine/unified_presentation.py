@@ -6,7 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum
-from typing import TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 from .contracts_v1 import (
     DepartureTerminal,
@@ -16,12 +16,22 @@ from .contracts_v1 import (
 from .contracts_v1.evaluation import BlockSupplyPlanV1, EvaluationDimensionV1
 from .contracts_v1.models import ScenarioInputV1
 from .contracts_v1.solver_models import ScheduleSolutionV1
+from .contracts_v1.terminal_occupancy import (
+    TERMINAL_1_OCCUPANCY_CAPACITY_EXCEEDED,
+    TERMINAL_1_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+    TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED,
+    TERMINAL_2_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+    TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+)
 from .optimization_service import BusScheduleOptimizationResult
-from .side_by_side_validation import SideBySideValidationReportV1
+
+if TYPE_CHECKING:
+    from .side_by_side_validation import SideBySideValidationReportV1
 
 PRESENTATION_MODE_VALIDATION_ONLY = "VALIDATION_ONLY"
 SCENARIO_C_AUTHORITY_ACCEPTED = "CONTRACT_V1_INDEPENDENTLY_VALIDATED"
 DISPLAY_DERIVED = "DISPLAY_DERIVED"
+UNIFIED_LIMITATIONS_REQUIRE_EXPERT_REVIEW = "UNIFIED_LIMITATIONS_REQUIRE_EXPERT_REVIEW"
 
 _DIRECTION_ORDER = {"outbound": 0, "inbound": 1, "combined": 2}
 _SCENARIO_ORDER = {"A": 0, "B": 1, "C": 2}
@@ -732,7 +742,6 @@ def _validator_rejection_codes(result: BusScheduleOptimizationResult) -> tuple[s
 
 def _build_outcome(
     result: BusScheduleOptimizationResult,
-    report: SideBySideValidationReportV1,
     solution: ScheduleSolutionV1 | None,
 ) -> PresentationOutcomeV1:
     comparison = result.comparison
@@ -761,7 +770,7 @@ def _build_outcome(
         ),
         comparison_reason=(comparison.reason_code if comparison is not None else None),
         accepted_c_exists=accepted,
-        accepted_c_authority=(report.unified_snapshot.scenario_c_authority if accepted else None),
+        accepted_c_authority=(SCENARIO_C_AUTHORITY_ACCEPTED if accepted else None),
         accepted_solution_fingerprint=(
             solution.solution_fingerprint if solution is not None else None
         ),
@@ -893,6 +902,101 @@ def _build_discrepancies(
     )
 
 
+def _terminal_occupancy_evidence(
+    result: BusScheduleOptimizationResult,
+) -> tuple[
+    str,
+    tuple[tuple[str, str], ...],
+    tuple[tuple[str, int | None], ...],
+    tuple[str, ...],
+]:
+    scenario = result.normalized_inputs.scenario_b
+    limits = scenario.terminal_occupancy_limits
+    returned_codes = {
+        *(issue.code for issue in result.b_evaluation.evaluation.technical_feasibility.issues),
+        *result.b_evaluation.evaluation.limitations,
+        *result.limitations,
+    }
+    occupancy_codes = tuple(
+        sorted(
+            returned_codes
+            & {
+                TERMINAL_1_OCCUPANCY_CAPACITY_EXCEEDED,
+                TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED,
+                TERMINAL_1_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+                TERMINAL_2_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+                TERMINAL_OCCUPANCY_CAPACITY_NOT_EVALUATED,
+            }
+        )
+    )
+    terminal_1_limit = limits.terminal_1 if limits is not None else None
+    terminal_2_limit = limits.terminal_2 if limits is not None else None
+    terminal_1_status = (
+        "NOT_EVALUATED"
+        if terminal_1_limit is None
+        else ("FAIL" if TERMINAL_1_OCCUPANCY_CAPACITY_EXCEEDED in occupancy_codes else "PASS")
+    )
+    terminal_2_status = (
+        "NOT_EVALUATED"
+        if terminal_2_limit is None
+        else ("FAIL" if TERMINAL_2_OCCUPANCY_CAPACITY_EXCEEDED in occupancy_codes else "PASS")
+    )
+    terminal_statuses = (
+        ("terminal_1", terminal_1_status),
+        ("terminal_2", terminal_2_status),
+    )
+    status_values = {terminal_1_status, terminal_2_status}
+    if "FAIL" in status_values:
+        aggregate_status = "FAIL"
+    elif status_values == {"NOT_EVALUATED"}:
+        aggregate_status = "NOT_EVALUATED"
+    elif status_values == {"PASS"}:
+        aggregate_status = "PASS"
+    else:
+        aggregate_status = "PARTIALLY_EVALUATED"
+    return (
+        aggregate_status,
+        terminal_statuses,
+        (
+            ("terminal_1", terminal_1_limit),
+            ("terminal_2", terminal_2_limit),
+        ),
+        occupancy_codes,
+    )
+
+
+def _runtime_review_codes(
+    dimensions: tuple[PresentationDimensionV1, ...],
+    result: BusScheduleOptimizationResult,
+    terminal_occupancy_issue_codes: tuple[str, ...],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    expert_codes = {
+        code
+        for dimension in dimensions
+        for code, severity in zip(
+            dimension.issue_codes,
+            dimension.issue_severities,
+            strict=True,
+        )
+        if severity != "INFO"
+    }
+    informational_codes = {
+        code
+        for dimension in dimensions
+        for code, severity in zip(
+            dimension.issue_codes,
+            dimension.issue_severities,
+            strict=True,
+        )
+        if severity == "INFO"
+    }
+    expert_codes.update(_validator_rejection_codes(result))
+    expert_codes.update(terminal_occupancy_issue_codes)
+    if result.limitations and not expert_codes:
+        expert_codes.add(UNIFIED_LIMITATIONS_REQUIRE_EXPERT_REVIEW)
+    return tuple(sorted(expert_codes)), tuple(sorted(informational_codes))
+
+
 def _serialize(value: object) -> object:
     if isinstance(value, Enum):
         return value.value
@@ -949,18 +1053,23 @@ def verify_unified_presentation_integrity_v1(
         )
 
 
-def build_unified_presentation_v1(
+def _build_unified_presentation(
     result: BusScheduleOptimizationResult,
-    validation_report: SideBySideValidationReportV1,
+    validation_report: SideBySideValidationReportV1 | None,
 ) -> UnifiedPresentationBundleV1:
-    """Project returned unified and 5A1 facts into a validation-only presentation."""
     if not isinstance(result, BusScheduleOptimizationResult):
         raise TypeError("result must be a BusScheduleOptimizationResult")
-    if not isinstance(validation_report, SideBySideValidationReportV1):
-        raise TypeError("validation_report must be a SideBySideValidationReportV1")
 
     solution = _accepted_solution(result)
-    _verify_result_report_consistency(result, validation_report, solution)
+    if solution is not None and (
+        solution.source_b_fingerprint != result.normalized_inputs.scenario_b_fingerprint
+    ):
+        raise _consistency_error(
+            "ACCEPTED_SOLUTION_SOURCE_B_MISMATCH",
+            "accepted solution does not bind normalized Scenario B",
+        )
+    if validation_report is not None:
+        _verify_result_report_consistency(result, validation_report, solution)
     normalized = result.normalized_inputs
     scenario_b = normalized.scenario_b
 
@@ -988,8 +1097,43 @@ def build_unified_presentation_v1(
     dimensions = tuple(
         _presentation_dimension(name, getattr(evaluation, name)) for name in _DIMENSION_ORDER
     )
-    outcome = _build_outcome(result, validation_report, solution)
-    snapshot = validation_report.unified_snapshot
+    outcome = _build_outcome(result, solution)
+    (
+        terminal_occupancy_status,
+        terminal_occupancy_terminal_statuses,
+        terminal_occupancy_limits,
+        terminal_occupancy_issue_codes,
+    ) = _terminal_occupancy_evidence(result)
+    if validation_report is None:
+        expert_review_required_codes, informational_codes = _runtime_review_codes(
+            dimensions,
+            result,
+            terminal_occupancy_issue_codes,
+        )
+        blocking_discrepancy_codes: tuple[str, ...] = ()
+        discrepancies: tuple[PresentationDiscrepancyV1, ...] = ()
+        validation_explanations: tuple[str, ...] = ()
+        validation_limitations: tuple[str, ...] = ()
+    else:
+        snapshot = validation_report.unified_snapshot
+        if (
+            terminal_occupancy_status != snapshot.terminal_occupancy_status
+            or terminal_occupancy_terminal_statuses
+            != tuple(snapshot.terminal_occupancy_terminal_statuses)
+            or terminal_occupancy_limits != tuple(snapshot.terminal_occupancy_limits)
+            or terminal_occupancy_issue_codes != tuple(snapshot.terminal_occupancy_issue_codes)
+        ):
+            raise _consistency_error(
+                "TERMINAL_OCCUPANCY_REPORT_MISMATCH",
+                "unified terminal occupancy facts differ from the validation report",
+            )
+        blocking_discrepancy_codes = tuple(validation_report.blocking_discrepancy_codes)
+        expert_review_required_codes = tuple(validation_report.expert_review_required_codes)
+        informational_codes = tuple(validation_report.informational_codes)
+        discrepancies = _build_discrepancies(validation_report)
+        validation_explanations = tuple(validation_report.explanations)
+        validation_limitations = tuple(validation_report.limitations)
+
     provisional = UnifiedPresentationBundleV1(
         presentation_mode=PRESENTATION_MODE_VALIDATION_ONLY,
         presentation_fingerprint="",
@@ -1004,14 +1148,11 @@ def build_unified_presentation_v1(
         source_b_fingerprint=normalized.scenario_b_fingerprint,
         accepted_solution_fingerprint=outcome.accepted_solution_fingerprint,
         accepted_outcome_fingerprint=outcome.accepted_outcome_fingerprint,
-        cutover_blocked=bool(validation_report.blocking_discrepancy_codes),
-        requires_expert_review=bool(
-            validation_report.blocking_discrepancy_codes
-            or validation_report.expert_review_required_codes
-        ),
-        blocking_discrepancy_codes=tuple(validation_report.blocking_discrepancy_codes),
-        expert_review_required_codes=tuple(validation_report.expert_review_required_codes),
-        informational_codes=tuple(validation_report.informational_codes),
+        cutover_blocked=bool(blocking_discrepancy_codes),
+        requires_expert_review=bool(blocking_discrepancy_codes or expert_review_required_codes),
+        blocking_discrepancy_codes=blocking_discrepancy_codes,
+        expert_review_required_codes=expert_review_required_codes,
+        informational_codes=informational_codes,
         scenarios=tuple(scenarios),
         blocks=_build_blocks(result, solution),
         dimensions=dimensions,
@@ -1020,15 +1161,15 @@ def build_unified_presentation_v1(
         initial_fleet=_build_initial_fleet(solution),
         headway_regimes=_build_headway_regimes(solution),
         demand_gaps=_build_demand_gaps(result),
-        terminal_occupancy_status=snapshot.terminal_occupancy_status,
-        terminal_occupancy_terminal_statuses=tuple(snapshot.terminal_occupancy_terminal_statuses),
-        terminal_occupancy_limits=tuple(snapshot.terminal_occupancy_limits),
-        terminal_occupancy_issue_codes=tuple(snapshot.terminal_occupancy_issue_codes),
-        discrepancies=_build_discrepancies(validation_report),
+        terminal_occupancy_status=terminal_occupancy_status,
+        terminal_occupancy_terminal_statuses=terminal_occupancy_terminal_statuses,
+        terminal_occupancy_limits=terminal_occupancy_limits,
+        terminal_occupancy_issue_codes=terminal_occupancy_issue_codes,
+        discrepancies=discrepancies,
         explanations=tuple(result.explanations),
         limitations=tuple(result.limitations),
-        validation_explanations=tuple(validation_report.explanations),
-        validation_limitations=tuple(validation_report.limitations),
+        validation_explanations=validation_explanations,
+        validation_limitations=validation_limitations,
     )
     return replace(
         provisional,
@@ -1036,9 +1177,29 @@ def build_unified_presentation_v1(
     )
 
 
+def build_unified_application_presentation_v1(
+    result: BusScheduleOptimizationResult,
+) -> UnifiedPresentationBundleV1:
+    """Project a Contract-only application presentation without legacy comparison facts."""
+    return _build_unified_presentation(result, None)
+
+
+def build_unified_presentation_v1(
+    result: BusScheduleOptimizationResult,
+    validation_report: SideBySideValidationReportV1,
+) -> UnifiedPresentationBundleV1:
+    """Project returned unified and offline 5A1 facts into a presentation."""
+    from .side_by_side_validation import SideBySideValidationReportV1
+
+    if not isinstance(validation_report, SideBySideValidationReportV1):
+        raise TypeError("validation_report must be a SideBySideValidationReportV1")
+    return _build_unified_presentation(result, validation_report)
+
+
 __all__ = [
     "DISPLAY_DERIVED",
     "PRESENTATION_MODE_VALIDATION_ONLY",
+    "UNIFIED_LIMITATIONS_REQUIRE_EXPERT_REVIEW",
     "PresentationBlockV1",
     "PresentationDemandGapV1",
     "PresentationDimensionV1",
@@ -1051,6 +1212,7 @@ __all__ = [
     "PresentationTripV1",
     "UnifiedPresentationBundleV1",
     "UnifiedPresentationConsistencyError",
+    "build_unified_application_presentation_v1",
     "build_unified_presentation_v1",
     "unified_presentation_to_dict",
     "verify_unified_presentation_integrity_v1",
