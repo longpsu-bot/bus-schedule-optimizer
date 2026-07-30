@@ -7,7 +7,6 @@ from enum import StrEnum
 
 from .c_config import ScenarioCConfig
 from .contracts_v1 import (
-    ContractValidationError,
     GenerationResultStatus,
     NormalizationOptions,
     NormalizedInputBundleV1,
@@ -179,7 +178,7 @@ def _accepted_outcome(
 def _run_stage(stage: OptimizationExecutionStageV1, operation):
     try:
         return operation()
-    except (ContractValidationError, OptimizationExecutionErrorV1):
+    except OptimizationExecutionErrorV1:
         raise
     except Exception as exc:
         raise OptimizationExecutionErrorV1(stage, exc) from exc

@@ -22,6 +22,7 @@ from route_corpus_support import (
 
 import bus_schedule_engine
 import bus_schedule_engine.application_pipeline as application
+import bus_schedule_engine.optimization_service as optimization_service
 import bus_schedule_engine.service as legacy_service
 import bus_schedule_engine.side_by_side_validation as side_by_side
 import bus_schedule_engine.ui_utils as ui_utils
@@ -38,7 +39,7 @@ from bus_schedule_engine.application_pipeline import (
     run_parallel_application_pipeline_v1,
     run_unified_application_pipeline_v1,
 )
-from bus_schedule_engine.contracts_v1 import GenerationResultStatus
+from bus_schedule_engine.contracts_v1 import ContractValidationError, GenerationResultStatus
 from bus_schedule_engine.excel_exporter import create_input_template
 from bus_schedule_engine.importer import (
     ImportedWorkbook,
@@ -873,6 +874,70 @@ def test_solver_exception_is_staged_and_fails_closed(
     assert run.failure.stage == "HEURISTIC_SOLVER"
     assert run.unified_result is None
     assert run.unified_presentation is None
+
+
+def test_normalization_contract_validation_error_fails_at_normalization(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported = _template_import(tmp_path)
+    issue_error = ContractValidationError(())
+
+    def fail(*args, **kwargs):
+        raise issue_error
+
+    monkeypatch.setattr(
+        optimization_service,
+        "normalize_imported_workbook_v1",
+        fail,
+    )
+    run = run_unified_application_pipeline_v1(
+        imported,
+        source_id=SOURCE_ID,
+        imported_at=IMPORTED_AT,
+    )
+
+    assert run.status == UnifiedApplicationStatusV1.FAILED
+    assert run.failure is not None
+    assert run.failure.code == application.CONTRACT_V1_NORMALIZATION_FAILED
+    assert run.failure.stage == OptimizationExecutionStageV1.NORMALIZATION.value
+    assert run.unified_result is None
+    assert run.unified_presentation is None
+    assert run.unified_demand_supply_figure is None
+    assert run.unified_departure_figure is None
+    assert run.unified_xlsx_bytes is None
+
+
+def test_evaluation_contract_validation_error_fails_at_evaluation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported = _template_import(tmp_path)
+    issue_error = ContractValidationError(())
+
+    def fail(*args, **kwargs):
+        raise issue_error
+
+    monkeypatch.setattr(
+        optimization_service,
+        "build_service_adjustment_evaluation_context_v1",
+        fail,
+    )
+    run = run_unified_application_pipeline_v1(
+        imported,
+        source_id=SOURCE_ID,
+        imported_at=IMPORTED_AT,
+    )
+
+    assert run.status == UnifiedApplicationStatusV1.FAILED
+    assert run.failure is not None
+    assert run.failure.code == application.CONTRACT_V1_APPLICATION_ERROR
+    assert run.failure.stage == OptimizationExecutionStageV1.EVALUATION.value
+    assert run.unified_result is None
+    assert run.unified_presentation is None
+    assert run.unified_demand_supply_figure is None
+    assert run.unified_departure_figure is None
+    assert run.unified_xlsx_bytes is None
 
 
 def test_artifact_failure_retains_only_verified_result_and_presentation(

@@ -886,10 +886,7 @@ def test_supplied_mismatched_decision_policy_fails_before_assessment(
         forbidden_assessment,
     )
 
-    with pytest.raises(
-        ContractValidationError,
-        match="ADJUSTMENT_DECISION_POLICY_EVALUATION_AUTHORITY_MISMATCH",
-    ):
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
         analyze_and_optimize_schedule_v1(
             imported,
             options,
@@ -897,6 +894,11 @@ def test_supplied_mismatched_decision_policy_fails_before_assessment(
             decision_policy=ServiceAdjustmentDecisionPolicyV1(planning_load_factor_ceiling=0.85),
         )
 
+    assert captured.value.stage == OptimizationExecutionStageV1.EVALUATION
+    assert isinstance(captured.value.__cause__, ContractValidationError)
+    assert "ADJUSTMENT_DECISION_POLICY_EVALUATION_AUTHORITY_MISMATCH" in str(
+        captured.value.__cause__
+    )
     assert assessment_called is False
 
 
@@ -1194,7 +1196,7 @@ def test_unexpected_normalization_exception_is_staged_with_cause(
     assert captured.value.__cause__ is original
 
 
-def test_expected_contract_validation_error_is_not_wrapped(
+def test_contract_validation_error_during_normalization_is_staged_with_cause(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     imported, options = _fixture()
@@ -1208,10 +1210,32 @@ def test_expected_contract_validation_error_is_not_wrapped(
         "normalize_imported_workbook_v1",
         fail,
     )
-    with pytest.raises(ContractValidationError) as captured:
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
         analyze_and_optimize_schedule_v1(imported, options)
 
-    assert captured.value is issue_error
+    assert captured.value.stage == OptimizationExecutionStageV1.NORMALIZATION
+    assert captured.value.__cause__ is issue_error
+
+
+def test_contract_validation_error_during_evaluation_is_staged_with_cause(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _fixture()
+    issue_error = ContractValidationError(())
+
+    def fail(*args, **kwargs):
+        raise issue_error
+
+    monkeypatch.setattr(
+        optimization_service,
+        "build_service_adjustment_evaluation_context_v1",
+        fail,
+    )
+    with pytest.raises(OptimizationExecutionErrorV1) as captured:
+        analyze_and_optimize_schedule_v1(imported, options)
+
+    assert captured.value.stage == OptimizationExecutionStageV1.EVALUATION
+    assert captured.value.__cause__ is issue_error
 
 
 def test_unexpected_evaluation_exception_is_staged(

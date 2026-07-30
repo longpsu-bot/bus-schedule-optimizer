@@ -16,7 +16,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
-from .contracts_v1 import ContractValidationError, GenerationResultStatus
+from .contracts_v1 import GenerationResultStatus
 from .importer import ImportedWorkbook
 from .input_authority import (
     WorkbookInputReadinessV1,
@@ -476,17 +476,6 @@ def run_unified_application_pipeline_v1(
             unified_input,
             normalization_options,
             solver_choice=solver_choice,
-        )
-    except ContractValidationError as exc:
-        return _failed_unified_run(
-            input_readiness=input_readiness,
-            source_id=source_id,
-            imported_at=imported_at,
-            solver_choice=solver_choice,
-            code=CONTRACT_V1_NORMALIZATION_FAILED,
-            stage=OptimizationExecutionStageV1.NORMALIZATION.value,
-            exc=exc,
-            retryable=False,
         )
     except OptimizationExecutionErrorV1 as exc:
         return _failed_unified_run(

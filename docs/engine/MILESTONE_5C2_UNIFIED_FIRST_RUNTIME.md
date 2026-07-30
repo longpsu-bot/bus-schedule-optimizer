@@ -76,10 +76,12 @@ into fabricated domain codes.
 
 Unexpected failures use the narrow stages `NORMALIZATION`, `EVALUATION`, `HEURISTIC_SOLVER`,
 `OR_TOOLS_SOLVER`, `SOLVER_COMPARISON`, `PRESENTATION`, and `ARTIFACTS`. Service-stage wrappers
-retain the original exception as the cause. The application maps them to `CONTRACT_V1_NORMALIZATION_FAILED`,
-`CONTRACT_V1_SOLVER_FAILED`, or `CONTRACT_V1_APPLICATION_ERROR`. Normal no-solver results,
-returned infeasible/unknown outcomes, completed no-C results, and validator-rejected candidates
-are not runtime failures.
+retain the original exception as the cause. `ContractValidationError` is classified by the stage
+where it occurs; it is not globally synonymous with normalization failure. The application maps
+`NORMALIZATION` to `CONTRACT_V1_NORMALIZATION_FAILED`, solver stages to
+`CONTRACT_V1_SOLVER_FAILED`, and `EVALUATION` or an unknown stage to
+`CONTRACT_V1_APPLICATION_ERROR`. Normal no-solver results, returned infeasible/unknown outcomes,
+completed no-C results, and validator-rejected candidates are not runtime failures.
 
 ## 10. Correlation-ID and logging policy
 
