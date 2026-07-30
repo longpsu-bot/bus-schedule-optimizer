@@ -64,6 +64,10 @@ artifact failure retains the complete four-download legacy fallback. See
 and
 [Milestone 5B2A unified result pages](docs/engine/MILESTONE_5B2A_UNIFIED_RESULT_PAGES.md), and
 [Milestone 5B2B unified Page 05 artifacts](docs/engine/MILESTONE_5B2B_UNIFIED_PAGE5_ARTIFACTS.md).
+Milestone 5B2B is merged and the visible cutover is conditionally complete, but the ordinary
+runtime still executes legacy first. Legacy runtime retirement has not started. Milestone 5C1 is
+the active decision task, and Milestone 5 remains incomplete. See
+[Milestone 5C1 legacy runtime retirement decision](docs/engine/MILESTONE_5C1_LEGACY_RUNTIME_RETIREMENT_DECISION.md).
 
 Contract V1 includes separate OR-Tools v9.15 CP-SAT adapters for one-route, fixed-resource hard
 feasibility, directional demand-priority optimization, and service-quality optimization. The
@@ -163,7 +167,7 @@ Only an independently validated candidate may be presented as authoritative Scen
 Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation, Milestone 5A2A
 authoritative input readiness, Milestone 5A2B validation-only presentation adapters, Milestone
 5B1 Streamlit shadow execution, Milestone 5B2A unified result Pages 02–04, and Milestone 5B2B
-unified Page 05 artifacts are implemented**, but Milestone 5 is not complete.
+unified Page 05 artifacts are implemented and merged**, but Milestone 5 is not complete.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
 2. Milestone 5A2A: stabilize authoritative workbook input and readiness.
@@ -175,6 +179,8 @@ unified Page 05 artifacts are implemented**, but Milestone 5 is not complete.
    (implemented).
 6. Milestone 5B2B: cut over Page 05 charts and downloads through the same gate while retaining
    the complete legacy fallback (implemented; legacy retirement remains separate).
+7. Milestone 5C1: define and approve the legacy-runtime retirement decision and exact Milestone 5
+   completion gate (active; documentation only; retirement has not started).
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)
