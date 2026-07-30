@@ -23,6 +23,27 @@ def test_ordinary_package_import_does_not_load_offline_side_by_side_module() -> 
     assert completed.returncode == 0, completed.stderr
 
 
+def test_streamlit_input_helpers_do_not_eagerly_import_legacy_runtime() -> None:
+    code = (
+        "import sys; import bus_schedule_engine.ui_utils; "
+        "blocked = ("
+        "'bus_schedule_engine.service', "
+        "'bus_schedule_engine.diagram', "
+        "'bus_schedule_engine.comparison_exporter'"
+        "); "
+        "assert all(name not in sys.modules for name in blocked)"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
 def test_streamlit_pages_have_no_ordinary_legacy_runtime_calls() -> None:
     sources = {
         path.name: path.read_text(encoding="utf-8")

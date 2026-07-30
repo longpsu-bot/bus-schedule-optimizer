@@ -16,7 +16,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
-from .contracts_v1 import GenerationResultStatus
+from .contracts_v1 import ContractValidationError, GenerationResultStatus
 from .importer import ImportedWorkbook
 from .input_authority import (
     WorkbookInputReadinessV1,
@@ -68,6 +68,24 @@ _SENSITIVE_SOURCE_PATTERN = re.compile(
     r"(?i)\b(?:passenger observations?|raw workbook rows?|workbook bytes|raw rows?)\b"
 )
 _MAX_SANITIZED_MESSAGE_LENGTH = 240
+_SAFE_IMPORT_SHEET_PATTERN = re.compile(
+    r"\b(?:THONG_SO_[AB]|BIEU_DO_[AB]|SAN_LUONG|THONG_TIN_DU_LIEU|CAU_HINH|HUONG_DAN)\b"
+)
+_SAFE_IMPORT_FIELD_PATTERN = re.compile(
+    r"\b(?:"
+    r"route_id|route_name|route_type|terminal_[12]_name|"
+    r"terminal_[12]_(?:first|last)_departure|"
+    r"terminal_[12]_max_occupancy_vehicles|"
+    r"vehicle_capacity_passengers|total_daily_trips|minimum_layover_minutes|"
+    r"allowed_trip_runtime_minutes|trip_runtime_minutes|available_fleet_limit|"
+    r"approved_active_fleet|operating_day_type|target_load_factor|"
+    r"maximum_load_factor|time_block_minutes|trip_id|departure_terminal|"
+    r"direction|departure_time|arrival_time|vehicle_id|vehicle_capacity_override|"
+    r"period_start|period_end|observation_days|time_block_start|time_block_end|"
+    r"passenger_volume|volume_type|demand_dataset_id|demand_source_type|"
+    r"demand_confidence|demand_response_mode|source_notes"
+    r")\b"
+)
 
 
 class UnifiedApplicationStatusV1(StrEnum):
@@ -135,6 +153,19 @@ def _sanitize_failure_message(exc: Exception) -> str:
     return message[:_MAX_SANITIZED_MESSAGE_LENGTH]
 
 
+def sanitize_import_error_message_v1(exc: Exception) -> str:
+    """Return bounded import diagnostics without echoing workbook cell values."""
+    message = " ".join(str(exc).split())
+    sheets = tuple(sorted(set(_SAFE_IMPORT_SHEET_PATTERN.findall(message))))
+    fields = tuple(sorted(set(_SAFE_IMPORT_FIELD_PATTERN.findall(message))))
+    details = ["Workbook content or structure is invalid."]
+    if sheets:
+        details.append(f"Sheet: {', '.join(sheets)}.")
+    if fields:
+        details.append(f"Field: {', '.join(fields)}.")
+    return f"{exc.__class__.__name__}: {' '.join(details)}"[:_MAX_SANITIZED_MESSAGE_LENGTH]
+
+
 def _result_status_codes(
     result: BusScheduleOptimizationResult | None,
 ) -> tuple[str, ...]:
@@ -182,8 +213,18 @@ def build_unified_runtime_failure_v1(
     ).encode("utf-8")
     correlation_id = f"m5c2-{hashlib.sha256(correlation_payload).hexdigest()[:20]}"
     b_fingerprint = result.normalized_inputs.scenario_b_fingerprint if result is not None else None
+    outcome = result.recommended_outcome if result is not None else None
+    result_accepted_solution_fingerprint = (
+        outcome.solution.solution_fingerprint
+        if outcome is not None
+        and outcome.result_status == GenerationResultStatus.SOLUTION_ACCEPTED
+        and outcome.solution is not None
+        else None
+    )
     accepted_solution_fingerprint = (
-        presentation.accepted_solution_fingerprint if presentation is not None else None
+        presentation.accepted_solution_fingerprint
+        if presentation is not None
+        else result_accepted_solution_fingerprint
     )
     presentation_fingerprint = (
         presentation.presentation_fingerprint if presentation is not None else None
@@ -436,6 +477,17 @@ def run_unified_application_pipeline_v1(
             normalization_options,
             solver_choice=solver_choice,
         )
+    except ContractValidationError as exc:
+        return _failed_unified_run(
+            input_readiness=input_readiness,
+            source_id=source_id,
+            imported_at=imported_at,
+            solver_choice=solver_choice,
+            code=CONTRACT_V1_NORMALIZATION_FAILED,
+            stage=OptimizationExecutionStageV1.NORMALIZATION.value,
+            exc=exc,
+            retryable=False,
+        )
     except OptimizationExecutionErrorV1 as exc:
         return _failed_unified_run(
             input_readiness=input_readiness,
@@ -480,7 +532,7 @@ def run_unified_application_pipeline_v1(
             imported_at=imported_at,
             solver_choice=solver_choice,
             code=CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH,
-            stage="PRESENTATION_INTEGRITY",
+            stage=OptimizationExecutionStageV1.PRESENTATION.value,
             exc=exc,
             retryable=False,
             result=unified_result,
@@ -492,7 +544,7 @@ def run_unified_application_pipeline_v1(
             imported_at=imported_at,
             solver_choice=solver_choice,
             code=CONTRACT_V1_APPLICATION_ERROR,
-            stage="PRESENTATION",
+            stage=OptimizationExecutionStageV1.PRESENTATION.value,
             exc=exc,
             retryable=True,
             result=unified_result,
@@ -523,7 +575,7 @@ def run_unified_application_pipeline_v1(
             imported_at=imported_at,
             solver_choice=solver_choice,
             code=CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH,
-            stage="ARTIFACT_ALIGNMENT",
+            stage=OptimizationExecutionStageV1.ARTIFACTS.value,
             exc=exc,
             retryable=False,
             result=unified_result,
@@ -536,7 +588,7 @@ def run_unified_application_pipeline_v1(
             imported_at=imported_at,
             solver_choice=solver_choice,
             code=CONTRACT_V1_ARTIFACT_FAILED,
-            stage="ARTIFACT_CONSTRUCTION",
+            stage=OptimizationExecutionStageV1.ARTIFACTS.value,
             exc=exc,
             retryable=True,
             result=unified_result,
@@ -704,4 +756,5 @@ __all__ = [
     "build_unified_runtime_failure_v1",
     "run_parallel_application_pipeline_v1",
     "run_unified_application_pipeline_v1",
+    "sanitize_import_error_message_v1",
 ]

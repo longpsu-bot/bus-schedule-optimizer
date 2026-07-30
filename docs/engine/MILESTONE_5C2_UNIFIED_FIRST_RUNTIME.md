@@ -74,9 +74,9 @@ into fabricated domain codes.
 
 ## 9. Failure-stage model
 
-Unexpected service exceptions carry one of `NORMALIZATION`, `EVALUATION`, `HEURISTIC_SOLVER`,
-`OR_TOOLS_SOLVER`, or `SOLVER_COMPARISON`, with the original exception retained as the cause.
-The application maps them to `CONTRACT_V1_NORMALIZATION_FAILED`,
+Unexpected failures use the narrow stages `NORMALIZATION`, `EVALUATION`, `HEURISTIC_SOLVER`,
+`OR_TOOLS_SOLVER`, `SOLVER_COMPARISON`, `PRESENTATION`, and `ARTIFACTS`. Service-stage wrappers
+retain the original exception as the cause. The application maps them to `CONTRACT_V1_NORMALIZATION_FAILED`,
 `CONTRACT_V1_SOLVER_FAILED`, or `CONTRACT_V1_APPLICATION_ERROR`. Normal no-solver results,
 returned infeasible/unknown outcomes, completed no-C results, and validator-rejected candidates
 are not runtime failures.

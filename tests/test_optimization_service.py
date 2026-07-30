@@ -87,6 +87,18 @@ NO_SOLVER_DECISIONS = (
 )
 
 
+def test_execution_stage_model_includes_application_boundaries() -> None:
+    assert tuple(stage.value for stage in OptimizationExecutionStageV1) == (
+        "NORMALIZATION",
+        "EVALUATION",
+        "HEURISTIC_SOLVER",
+        "OR_TOOLS_SOLVER",
+        "SOLVER_COMPARISON",
+        "PRESENTATION",
+        "ARTIFACTS",
+    )
+
+
 def _fixture(
     *,
     demand_mode: str = "directional",

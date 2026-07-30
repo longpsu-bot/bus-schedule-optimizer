@@ -21,6 +21,7 @@ from .unified_presentation import (
     PRESENTATION_MODE_VALIDATION_ONLY,
     UnifiedPresentationBundleV1,
     UnifiedPresentationConsistencyError,
+    build_unified_application_presentation_v1,
     verify_unified_presentation_integrity_v1,
 )
 
@@ -230,7 +231,11 @@ def _verified_analysis_is_aligned(
         return False
     try:
         verify_unified_presentation_integrity_v1(presentation)
+        expected_presentation = build_unified_application_presentation_v1(unified_result)
+        verify_unified_presentation_integrity_v1(expected_presentation)
     except (UnifiedPresentationConsistencyError, TypeError):
+        return False
+    if presentation != expected_presentation:
         return False
     if (
         presentation.presentation_mode != PRESENTATION_MODE_VALIDATION_ONLY
@@ -334,7 +339,7 @@ def _semantic_state_failure(
     ).encode()
     return UnifiedRuntimeFailureV1(
         code=CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH,
-        stage="SESSION_STATE_ALIGNMENT",
+        stage="PRESENTATION",
         correlation_id=f"m5c2-{hashlib.sha256(payload).hexdigest()[:20]}",
         sanitized_message=("Trạng thái kết quả Contract V1 không đầy đủ hoặc không nhất quán."),
         retryable=False,

@@ -60,6 +60,8 @@ class OptimizationExecutionStageV1(StrEnum):
     HEURISTIC_SOLVER = "HEURISTIC_SOLVER"
     OR_TOOLS_SOLVER = "OR_TOOLS_SOLVER"
     SOLVER_COMPARISON = "SOLVER_COMPARISON"
+    PRESENTATION = "PRESENTATION"
+    ARTIFACTS = "ARTIFACTS"
 
 
 class OptimizationExecutionErrorV1(RuntimeError):

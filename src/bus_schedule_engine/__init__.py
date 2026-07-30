@@ -20,6 +20,7 @@ from .application_pipeline import (
     build_unified_runtime_failure_v1,
     run_parallel_application_pipeline_v1,
     run_unified_application_pipeline_v1,
+    sanitize_import_error_message_v1,
 )
 from .importer import ImportedWorkbook, WorkbookAuthorityMetadata
 from .input_authority import (
@@ -222,6 +223,7 @@ __all__ = [
     "run_parallel_application_pipeline_v1",
     "run_unified_application_pipeline_v1",
     "run_side_by_side_validation_v1",
+    "sanitize_import_error_message_v1",
     "read_unified_export_metadata_bytes_v1",
     "read_unified_export_metadata_v1",
     "select_optimization_action",

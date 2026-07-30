@@ -22,6 +22,7 @@ from route_corpus_support import (
 
 import bus_schedule_engine
 import bus_schedule_engine.application_pipeline as application
+import bus_schedule_engine.service as legacy_service
 import bus_schedule_engine.side_by_side_validation as side_by_side
 import bus_schedule_engine.ui_utils as ui_utils
 from bus_schedule_engine.application_pipeline import (
@@ -210,7 +211,7 @@ def test_complete_template_runs_legacy_once_and_unified_once(
     original = deepcopy(imported)
     calls = {"legacy": 0, "unified": 0}
     received: dict[str, ImportedWorkbook] = {}
-    real_legacy = ui_utils.run_analysis
+    real_legacy = legacy_service.run_analysis
     real_unified = application.analyze_and_optimize_schedule_v1
 
     def legacy_spy(value):
@@ -229,7 +230,7 @@ def test_complete_template_runs_legacy_once_and_unified_once(
         value.configuration["unified_spy_mutation"] = True
         return result
 
-    monkeypatch.setattr(ui_utils, "run_analysis", legacy_spy)
+    monkeypatch.setattr(legacy_service, "run_analysis", legacy_spy)
     monkeypatch.setattr(application, "analyze_and_optimize_schedule_v1", unified_spy)
 
     run = run_parallel_application_pipeline_v1(
@@ -893,6 +894,7 @@ def test_artifact_failure_retains_only_verified_result_and_presentation(
     assert run.status == UnifiedApplicationStatusV1.ARTIFACT_FAILED
     assert run.failure is not None
     assert run.failure.code == CONTRACT_V1_ARTIFACT_FAILED
+    assert run.failure.stage == OptimizationExecutionStageV1.ARTIFACTS.value
     assert run.unified_result is not None
     assert run.unified_presentation is not None
     assert run.unified_demand_supply_figure is None
@@ -923,6 +925,7 @@ def test_semantic_mismatch_exposes_no_analytical_result(
     assert run.status == UnifiedApplicationStatusV1.FAILED
     assert run.failure is not None
     assert run.failure.code == CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH
+    assert run.failure.stage == OptimizationExecutionStageV1.PRESENTATION.value
     assert run.unified_result is None
     assert run.unified_presentation is None
     assert run.unified_xlsx_bytes is None
@@ -940,7 +943,7 @@ def test_failure_correlation_is_deterministic_and_local_paths_are_removed(
     )
     kwargs = {
         "code": CONTRACT_V1_ARTIFACT_FAILED,
-        "stage": "ARTIFACT_CONSTRUCTION",
+        "stage": OptimizationExecutionStageV1.ARTIFACTS.value,
         "exc": RuntimeError(r"failed at C:\Users\private\workbook.xlsx"),
         "retryable": True,
         "solver_choice": application.SolverChoice.HEURISTIC,
@@ -965,3 +968,17 @@ def test_failure_correlation_is_deterministic_and_local_paths_are_removed(
     )
     assert "SECRET_PASSENGER_OBSERVATION" not in sensitive.sanitized_message
     assert "SECRET_PASSENGER_OBSERVATION" not in caplog.text
+
+
+def test_import_error_sanitizer_retains_safe_location_but_not_cell_value() -> None:
+    message = application.sanitize_import_error_message_v1(
+        ValueError(
+            r"BIEU_DO_B, dòng Excel 4: direction không hợp lệ: "
+            r"SECRET_PASSENGER_ROW C:\Users\private\workbook.xlsx"
+        )
+    )
+
+    assert "BIEU_DO_B" in message
+    assert "direction" in message
+    assert "SECRET_PASSENGER_ROW" not in message
+    assert r"C:\Users" not in message

@@ -9,7 +9,11 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .application_pipeline import WORKBOOK_IMPORT_INVALID, WORKBOOK_OPTIMIZATION_NOT_READY
+from .application_pipeline import (
+    WORKBOOK_IMPORT_INVALID,
+    WORKBOOK_OPTIMIZATION_NOT_READY,
+    sanitize_import_error_message_v1,
+)
 from .importer import import_workbook
 from .input_authority import (
     assess_workbook_input_readiness_v1,
@@ -22,10 +26,6 @@ RELEASE_AUDIT_SCHEMA_V1 = "BUS_SCHEDULE_RELEASE_AUDIT_V1"
 RELEASE_AUDIT_PASSED = "RELEASE_AUDIT_PASSED"
 RELEASE_AUDIT_BLOCKED = "RELEASE_AUDIT_BLOCKED"
 _DETERMINISTIC_IMPORTED_AT = datetime(2000, 1, 1, tzinfo=UTC)
-
-
-def _safe_error_message(exc: Exception) -> str:
-    return (" ".join(str(exc).split()) or exc.__class__.__name__)[:240]
 
 
 def _write_report(output: Path, payload: dict[str, object]) -> None:
@@ -75,7 +75,7 @@ def run_release_audit_v1(
         payload.update(
             {
                 "status": WORKBOOK_IMPORT_INVALID,
-                "sanitized_message": _safe_error_message(exc),
+                "sanitized_message": sanitize_import_error_message_v1(exc),
             }
         )
         _write_report(output, payload)

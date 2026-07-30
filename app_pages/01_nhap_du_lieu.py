@@ -9,6 +9,7 @@ from bus_schedule_engine.application_pipeline import (
     WORKBOOK_OPTIMIZATION_NOT_READY,
     UnifiedApplicationStatusV1,
     run_unified_application_pipeline_v1,
+    sanitize_import_error_message_v1,
 )
 from bus_schedule_engine.importer import import_workbook
 from bus_schedule_engine.models import Direction
@@ -46,10 +47,6 @@ def _clear_result_state() -> None:
         st.session_state.pop(state_key, None)
     for state_key in _UNIFIED_RESULT_STATE_KEYS:
         st.session_state[state_key] = None
-
-
-def _safe_error_message(exc: Exception) -> str:
-    return (" ".join(str(exc).split()) or exc.__class__.__name__)[:300]
 
 
 st.subheader("Workbook và thông số chạy")
@@ -90,7 +87,7 @@ if content:
         sheet_names = workbook_sheet_names(content)
     except Exception as exc:
         st.error(
-            f"{WORKBOOK_IMPORT_INVALID}\n\n{_safe_error_message(exc)}",
+            f"{WORKBOOK_IMPORT_INVALID}\n\n{sanitize_import_error_message_v1(exc)}",
             icon=":material/error:",
         )
         st.info(

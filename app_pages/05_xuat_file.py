@@ -8,6 +8,7 @@ from bus_schedule_engine.application_pipeline import (
     build_unified_runtime_failure_v1,
 )
 from bus_schedule_engine.models import Direction
+from bus_schedule_engine.optimization_service import OptimizationExecutionStageV1
 from bus_schedule_engine.ui_result_authority import (
     VisibleResultModeV1,
     resolve_visible_result_context_v1,
@@ -183,7 +184,7 @@ try:
 except (AssertionError, UnifiedPage5ArtifactError, TypeError, ValueError) as exc:
     semantic = isinstance(exc, UnifiedPage5SemanticIntegrityError)
     code = CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH if semantic else CONTRACT_V1_ARTIFACT_FAILED
-    stage = "PAGE5_SEMANTIC_INTEGRITY" if semantic else "PAGE5_ARTIFACT_CONSTRUCTION"
+    stage = OptimizationExecutionStageV1.ARTIFACTS.value
     if result is not None and presentation is not None and readiness is not None:
         failure = build_unified_runtime_failure_v1(
             code=code,
