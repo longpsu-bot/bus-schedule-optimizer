@@ -358,6 +358,7 @@ class TripRidershipAnalysisV1:
     confidence: str
     operating_day_type: str
     scenario_b_timetable_fingerprint: str
+    trip_ridership_input_fingerprint: str
     match_policy: TripRidershipMatchPolicyV1
     matching_policy_fingerprint: str
     analysis_fingerprint: str

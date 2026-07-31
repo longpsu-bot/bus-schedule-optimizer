@@ -126,9 +126,13 @@ if visible.uses_unified:
             f"{trip_failure.code}\n\nMã đối chiếu: {trip_failure.correlation_id}",
             icon=":material/warning:",
         )
-    elif not trip_ridership_analysis_is_current_v1(trip_analysis, b_fingerprint):
+    elif not trip_ridership_analysis_is_current_v1(
+        trip_analysis,
+        imported_workbook,
+        b_fingerprint,
+    ):
         st.warning(
-            "Phân tích sản lượng theo chuyến không khớp Scenario B hiện tại và "
+            "Phân tích sản lượng theo chuyến không khớp workbook hoặc Scenario B hiện tại và "
             "không được hiển thị.",
             icon=":material/warning:",
         )

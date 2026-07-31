@@ -63,6 +63,7 @@ from .optimization_service import (
 from .trip_ridership import (
     analyze_trip_ridership_v1,
     trip_ridership_analysis_is_current_v1,
+    trip_ridership_input_fingerprint_v1,
 )
 from .trip_ridership_codes import (
     AMBIGUOUS_TRIP_TIME_MATCH,
@@ -298,6 +299,7 @@ __all__ = [
     "technical_dimension_rows_v1",
     "technical_summary_v1",
     "trip_ridership_analysis_is_current_v1",
+    "trip_ridership_input_fingerprint_v1",
     "unified_presentation_to_dict",
     "verify_unified_presentation_integrity_v1",
 ]

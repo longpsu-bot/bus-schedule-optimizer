@@ -374,9 +374,37 @@ def test_page03_refuses_stale_supplemental_analysis(tmp_path: Path) -> None:
     app.run(timeout=30)
 
     assert not app.exception
-    assert any("không khớp Scenario B hiện tại" in item.value for item in app.warning)
+    assert any("không khớp workbook hoặc Scenario B hiện tại" in item.value for item in app.warning)
     markdown = "\n".join(item.value for item in app.markdown)
     assert "Thống kê mô tả theo chuyến B" not in markdown
+
+
+def test_page03_refuses_same_b_analysis_from_different_trip_dataset(
+    tmp_path: Path,
+) -> None:
+    state = _trip_ridership_complete_state(tmp_path)
+    imported = state["imported_workbook"]
+    changed_observation = replace(
+        imported.trip_ridership_observations[0],
+        passenger_count=imported.trip_ridership_observations[0].passenger_count + 1,
+    )
+    state["imported_workbook"] = replace(
+        imported,
+        trip_ridership_observations=(changed_observation,),
+    )
+    app = _seed_page(AppTest.from_file("app_pages/03_nhu_cau.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert any("không khớp workbook hoặc Scenario B hiện tại" in item.value for item in app.warning)
+    labels = {item.label for item in app.metric}
+    assert "Số ngày quan sát" not in labels
+    assert "Tỷ lệ ghép dùng được" not in labels
+    markdown = "\n".join(item.value for item in app.markdown)
+    assert "Thống kê mô tả theo chuyến B" not in markdown
+    assert "Tổng hợp theo chiều" not in markdown
+    assert "Bản ghi chẩn đoán bị loại" not in markdown
 
 
 @pytest.mark.parametrize(

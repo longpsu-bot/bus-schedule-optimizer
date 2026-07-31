@@ -561,7 +561,7 @@ def _dataset_summary(
 def _observation_fingerprint_facts(
     observations: tuple[TripRidershipObservationV1, ...],
 ) -> tuple[dict[str, object], ...]:
-    return tuple(
+    facts = [
         {
             "observation_id": item.observation_id,
             "service_date": item.service_date,
@@ -573,14 +573,68 @@ def _observation_fingerprint_facts(
             "passenger_count": item.passenger_count,
             "vehicle_id": item.vehicle_id,
         }
-        for item in sorted(
-            observations,
-            key=lambda observation: (
-                observation.observation_id,
-                observation.service_date,
-                observation.direction.value,
+        for item in observations
+    ]
+    return tuple(
+        sorted(
+            facts,
+            key=lambda item: json.dumps(
+                _canonical_value(item),
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
             ),
         )
+    )
+
+
+def trip_ridership_input_fingerprint_v1(
+    imported: ImportedWorkbook,
+    scenario_b_fingerprint: str,
+) -> str | None:
+    """Fingerprint normalized supplemental inputs without running matching."""
+    metadata = imported.trip_ridership_metadata
+    observations = tuple(imported.trip_ridership_observations)
+    if metadata is None or not observations:
+        return None
+    return _canonical_sha256(
+        {
+            "dataset_id": metadata.dataset_id,
+            "source_type": metadata.source_type,
+            "confidence": metadata.confidence,
+            "observed_schedule_scenario": metadata.observed_schedule_scenario,
+            "operating_day_type": metadata.operating_day_type,
+            "match_tolerance_minutes": metadata.match_tolerance_minutes,
+            "observations": _observation_fingerprint_facts(observations),
+            "scenario_b_fingerprint": scenario_b_fingerprint,
+        }
+    )
+
+
+def _analysis_fingerprint_v1(
+    *,
+    trip_ridership_input_fingerprint: str,
+    matching_policy_fingerprint: str,
+    original_record_count: int,
+    matches: tuple[TripRidershipMatchV1, ...],
+    trip_summaries: tuple[TripRidershipTripSummaryV1, ...],
+    directional_summaries: tuple[TripRidershipDirectionSummaryV1, ...],
+    dataset_summary: TripRidershipDatasetSummaryV1,
+    issue_codes: tuple[str, ...],
+    limitations: tuple[str, ...],
+) -> str:
+    return _canonical_sha256(
+        {
+            "trip_ridership_input_fingerprint": trip_ridership_input_fingerprint,
+            "matching_policy_fingerprint": matching_policy_fingerprint,
+            "original_record_count": original_record_count,
+            "matches": matches,
+            "trip_summaries": trip_summaries,
+            "directional_summaries": directional_summaries,
+            "dataset_summary": dataset_summary,
+            "issue_codes": issue_codes,
+            "limitations": limitations,
+        }
     )
 
 
@@ -605,6 +659,9 @@ def analyze_trip_ridership_v1(
         )
 
     b_fingerprint = scenario_fingerprint(scenario_b)
+    input_fingerprint = trip_ridership_input_fingerprint_v1(imported, b_fingerprint)
+    if input_fingerprint is None:
+        raise ValueError(f"{TRIP_RIDERSHIP_METADATA_MISSING}: no analyzable dataset")
     policy = TripRidershipMatchPolicyV1(
         match_tolerance_minutes=metadata.match_tolerance_minutes,
         observed_schedule_scenario=metadata.observed_schedule_scenario,
@@ -666,34 +723,27 @@ def analyze_trip_ridership_v1(
     if dataset_summary.matched_trip_date_coverage_rate != 1.0:
         limitations.append(INCOMPLETE_COVERAGE_LIMITATION)
     limitations_tuple = tuple(limitations)
-    fingerprint_payload = {
-        "metadata": {
-            "dataset_id": metadata.dataset_id,
-            "source_type": metadata.source_type,
-            "confidence": metadata.confidence,
-            "observed_schedule_scenario": metadata.observed_schedule_scenario,
-            "operating_day_type": metadata.operating_day_type,
-            "match_tolerance_minutes": metadata.match_tolerance_minutes,
-        },
-        "scenario_b_timetable_fingerprint": b_fingerprint,
-        "matching_policy_fingerprint": policy_fingerprint,
-        "observations": _observation_fingerprint_facts(observations),
-        "matches": matches,
-        "trip_summaries": trip_summaries,
-        "directional_summaries": directional_summaries,
-        "dataset_summary": dataset_summary,
-        "issue_codes": issue_codes,
-        "limitations": limitations_tuple,
-    }
+    analysis_fingerprint = _analysis_fingerprint_v1(
+        trip_ridership_input_fingerprint=input_fingerprint,
+        matching_policy_fingerprint=policy_fingerprint,
+        original_record_count=len(observations),
+        matches=matches,
+        trip_summaries=trip_summaries,
+        directional_summaries=directional_summaries,
+        dataset_summary=dataset_summary,
+        issue_codes=issue_codes,
+        limitations=limitations_tuple,
+    )
     return TripRidershipAnalysisV1(
         dataset_id=metadata.dataset_id,
         source_type=metadata.source_type,
         confidence=metadata.confidence,
         operating_day_type=metadata.operating_day_type,
         scenario_b_timetable_fingerprint=b_fingerprint,
+        trip_ridership_input_fingerprint=input_fingerprint,
         match_policy=policy,
         matching_policy_fingerprint=policy_fingerprint,
-        analysis_fingerprint=_canonical_sha256(fingerprint_payload),
+        analysis_fingerprint=analysis_fingerprint,
         original_record_count=len(observations),
         match_rows=matches,
         trip_summaries=trip_summaries,
@@ -706,13 +756,51 @@ def analyze_trip_ridership_v1(
 
 def trip_ridership_analysis_is_current_v1(
     analysis: TripRidershipAnalysisV1 | None,
+    imported: ImportedWorkbook | None,
     scenario_b_timetable_fingerprint: str | None,
 ) -> bool:
-    return bool(
-        isinstance(analysis, TripRidershipAnalysisV1)
-        and scenario_b_timetable_fingerprint
-        and analysis.scenario_b_timetable_fingerprint == scenario_b_timetable_fingerprint
+    if (
+        not isinstance(analysis, TripRidershipAnalysisV1)
+        or imported is None
+        or imported.trip_ridership_metadata is None
+        or not imported.trip_ridership_observations
+        or not scenario_b_timetable_fingerprint
+        or analysis.scenario_b_timetable_fingerprint != scenario_b_timetable_fingerprint
+    ):
+        return False
+
+    metadata = imported.trip_ridership_metadata
+    current_input_fingerprint = trip_ridership_input_fingerprint_v1(
+        imported,
+        scenario_b_timetable_fingerprint,
     )
+    if (
+        current_input_fingerprint is None
+        or analysis.trip_ridership_input_fingerprint != current_input_fingerprint
+        or analysis.dataset_id != metadata.dataset_id
+        or analysis.source_type != metadata.source_type
+        or analysis.confidence != metadata.confidence
+        or analysis.operating_day_type != metadata.operating_day_type
+        or analysis.match_policy.observed_schedule_scenario != metadata.observed_schedule_scenario
+        or analysis.match_policy.match_tolerance_minutes != metadata.match_tolerance_minutes
+        or analysis.matching_policy_fingerprint != _canonical_sha256(analysis.match_policy)
+        or analysis.original_record_count != len(imported.trip_ridership_observations)
+        or analysis.original_record_count != len(analysis.match_rows)
+    ):
+        return False
+
+    expected_analysis_fingerprint = _analysis_fingerprint_v1(
+        trip_ridership_input_fingerprint=analysis.trip_ridership_input_fingerprint,
+        matching_policy_fingerprint=analysis.matching_policy_fingerprint,
+        original_record_count=analysis.original_record_count,
+        matches=analysis.match_rows,
+        trip_summaries=analysis.trip_summaries,
+        directional_summaries=analysis.directional_summaries,
+        dataset_summary=analysis.dataset_summary,
+        issue_codes=analysis.issue_codes,
+        limitations=analysis.limitations,
+    )
+    return analysis.analysis_fingerprint == expected_analysis_fingerprint
 
 
 __all__ = [
@@ -739,4 +827,5 @@ __all__ = [
     "TRIP_RIDERSHIP_SOURCE_TYPE_INVALID",
     "analyze_trip_ridership_v1",
     "trip_ridership_analysis_is_current_v1",
+    "trip_ridership_input_fingerprint_v1",
 ]

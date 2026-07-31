@@ -27,6 +27,7 @@ from bus_schedule_engine.models import (
 from bus_schedule_engine.trip_ridership import (
     analyze_trip_ridership_v1,
     trip_ridership_analysis_is_current_v1,
+    trip_ridership_input_fingerprint_v1,
 )
 from bus_schedule_engine.trip_ridership_codes import (
     AMBIGUOUS_TRIP_TIME_MATCH,
@@ -126,23 +127,26 @@ def _observation(
     observation_id: str = "OBS-001",
     *,
     service_date: date = date(2026, 7, 1),
+    source_trip_id: str | None = None,
     scheduled_trip_id: str | None = "B-001",
     direction: TripRidershipDirectionV1 = TripRidershipDirectionV1.OUTBOUND,
     scheduled_departure_seconds: int | None = None,
     actual_departure_seconds: int | None = None,
     passenger_count: int = 20,
+    vehicle_id: str | None = None,
+    notes: str | None = None,
 ) -> TripRidershipObservationV1:
     return TripRidershipObservationV1(
         observation_id=observation_id,
         service_date=service_date,
-        source_trip_id=None,
+        source_trip_id=source_trip_id,
         scheduled_trip_id=scheduled_trip_id,
         direction=direction,
         scheduled_departure_seconds=scheduled_departure_seconds,
         actual_departure_seconds=actual_departure_seconds,
         passenger_count=passenger_count,
-        vehicle_id=None,
-        notes=None,
+        vehicle_id=vehicle_id,
+        notes=notes,
     )
 
 
@@ -319,18 +323,58 @@ def test_trip_formulas_are_not_evaluated_as_authority(tmp_path) -> None:
         import_workbook(path)
 
 
-@pytest.mark.parametrize("invalid_time", (-0.25, 1.0, 2.0, True))
+@pytest.mark.parametrize(
+    "invalid_time",
+    (-0.25, 1.0, 2.0, True, "24:00", "24:00:00"),
+)
+@pytest.mark.parametrize(
+    "field_name",
+    ("scheduled_departure_time", "actual_departure_time"),
+)
 def test_trip_times_must_remain_within_one_excel_service_day(
     tmp_path,
     invalid_time,
+    field_name,
 ) -> None:
     path = _workbook_with_observations(
         tmp_path,
-        [{"scheduled_trip_id": None, "scheduled_departure_time": invalid_time}],
+        [{"scheduled_trip_id": None, field_name: invalid_time}],
     )
 
-    with pytest.raises(InputDataError, match="scheduled_departure_time"):
+    with pytest.raises(InputDataError, match=field_name):
         import_workbook(path)
+
+
+@pytest.mark.parametrize(
+    ("valid_time", "expected_seconds"),
+    (
+        ("00:00", 0),
+        ("23:59", 23 * 3600 + 59 * 60),
+        ("23:59:59", 24 * 3600 - 1),
+    ),
+)
+@pytest.mark.parametrize(
+    ("field_name", "attribute_name"),
+    (
+        ("scheduled_departure_time", "scheduled_departure_seconds"),
+        ("actual_departure_time", "actual_departure_seconds"),
+    ),
+)
+def test_trip_times_accept_the_supported_service_day_boundary(
+    tmp_path,
+    valid_time,
+    expected_seconds,
+    field_name,
+    attribute_name,
+) -> None:
+    path = _workbook_with_observations(
+        tmp_path,
+        [{"scheduled_trip_id": None, field_name: valid_time}],
+    )
+
+    observation = import_workbook(path).trip_ridership_observations[0]
+
+    assert getattr(observation, attribute_name) == expected_seconds
 
 
 def test_explicit_trip_id_precedence_and_contradictions(normalized_context) -> None:
@@ -576,6 +620,209 @@ def test_missing_observations_remain_none_and_coverage_is_explicit(
     assert "not available" in summary.coverage_adjusted_interpretation
 
 
+def test_current_analysis_requires_current_supplemental_input(normalized_context) -> None:
+    imported, _scenario_b, analysis = _analyze(
+        normalized_context,
+        (
+            _observation(
+                source_trip_id="SOURCE-1",
+                scheduled_departure_seconds=6 * 3600,
+                actual_departure_seconds=6 * 3600 + 60,
+                vehicle_id="VEHICLE-1",
+            ),
+        ),
+    )
+
+    assert analysis.trip_ridership_input_fingerprint != analysis.analysis_fingerprint
+    assert trip_ridership_analysis_is_current_v1(
+        analysis,
+        imported,
+        analysis.scenario_b_timetable_fingerprint,
+    )
+
+
+@pytest.mark.parametrize(
+    "changed_fact",
+    (
+        "dataset_id",
+        "source_type",
+        "confidence",
+        "observed_schedule_scenario",
+        "operating_day_type",
+        "match_tolerance_minutes",
+        "observation_id",
+        "service_date",
+        "source_trip_id",
+        "scheduled_trip_id",
+        "direction",
+        "scheduled_departure_seconds",
+        "actual_departure_seconds",
+        "passenger_count",
+        "vehicle_id",
+    ),
+)
+def test_same_scenario_b_with_changed_semantic_input_is_stale(
+    normalized_context,
+    changed_fact,
+) -> None:
+    imported, _scenario_b, analysis = _analyze(
+        normalized_context,
+        (
+            _observation(
+                source_trip_id="SOURCE-1",
+                scheduled_departure_seconds=6 * 3600,
+                actual_departure_seconds=6 * 3600 + 60,
+                vehicle_id="VEHICLE-1",
+            ),
+        ),
+    )
+    metadata_changes = {
+        "dataset_id": "TRIP-DATASET-2",
+        "source_type": "apc",
+        "confidence": "high",
+        "observed_schedule_scenario": "A",
+        "operating_day_type": "saturday",
+        "match_tolerance_minutes": 6,
+    }
+    observation_changes = {
+        "observation_id": "OBS-CHANGED",
+        "service_date": date(2026, 7, 2),
+        "source_trip_id": "SOURCE-2",
+        "scheduled_trip_id": "B-003",
+        "direction": TripRidershipDirectionV1.INBOUND,
+        "scheduled_departure_seconds": 6 * 3600 + 60,
+        "actual_departure_seconds": 6 * 3600 + 2 * 60,
+        "passenger_count": 21,
+        "vehicle_id": "VEHICLE-2",
+    }
+    if changed_fact in metadata_changes:
+        assert imported.trip_ridership_metadata is not None
+        changed_imported = replace(
+            imported,
+            trip_ridership_metadata=replace(
+                imported.trip_ridership_metadata,
+                **{changed_fact: metadata_changes[changed_fact]},
+            ),
+        )
+    else:
+        changed_imported = replace(
+            imported,
+            trip_ridership_observations=(
+                replace(
+                    imported.trip_ridership_observations[0],
+                    **{changed_fact: observation_changes[changed_fact]},
+                ),
+            ),
+        )
+
+    current_fingerprint = trip_ridership_input_fingerprint_v1(
+        changed_imported,
+        analysis.scenario_b_timetable_fingerprint,
+    )
+
+    assert current_fingerprint != analysis.trip_ridership_input_fingerprint
+    assert not trip_ridership_analysis_is_current_v1(
+        analysis,
+        changed_imported,
+        analysis.scenario_b_timetable_fingerprint,
+    )
+
+
+def test_notes_and_row_order_do_not_make_current_analysis_stale(
+    normalized_context,
+) -> None:
+    observations = (
+        _observation(
+            "OBS-A",
+            source_trip_id="SOURCE-A",
+            vehicle_id="VEHICLE-A",
+            notes="first note",
+        ),
+        _observation(
+            "OBS-B",
+            service_date=date(2026, 7, 2),
+            source_trip_id="SOURCE-B",
+            vehicle_id="VEHICLE-B",
+            notes="second note",
+        ),
+    )
+    imported, _scenario_b, analysis = _analyze(normalized_context, observations)
+    assert imported.trip_ridership_metadata is not None
+    notes_changed = replace(
+        imported,
+        trip_ridership_metadata=replace(
+            imported.trip_ridership_metadata,
+            source_notes="new free-form dataset note",
+        ),
+        trip_ridership_observations=tuple(
+            replace(item, notes=f"changed {item.observation_id}") for item in observations
+        ),
+    )
+    reordered = replace(
+        imported,
+        trip_ridership_observations=tuple(reversed(observations)),
+    )
+
+    assert trip_ridership_input_fingerprint_v1(
+        notes_changed,
+        analysis.scenario_b_timetable_fingerprint,
+    ) == trip_ridership_input_fingerprint_v1(
+        reordered,
+        analysis.scenario_b_timetable_fingerprint,
+    )
+    assert trip_ridership_analysis_is_current_v1(
+        analysis,
+        notes_changed,
+        analysis.scenario_b_timetable_fingerprint,
+    )
+    assert trip_ridership_analysis_is_current_v1(
+        analysis,
+        reordered,
+        analysis.scenario_b_timetable_fingerprint,
+    )
+
+
+def test_current_analysis_fails_closed_for_missing_input_changed_b_and_bad_integrity(
+    normalized_context,
+) -> None:
+    imported, _scenario_b, analysis = _analyze(
+        normalized_context,
+        (_observation(),),
+    )
+    missing = replace(
+        imported,
+        trip_ridership_metadata=None,
+        trip_ridership_observations=(),
+    )
+    fabricated = replace(
+        analysis,
+        analysis_fingerprint=analysis.trip_ridership_input_fingerprint,
+    )
+
+    assert (
+        trip_ridership_input_fingerprint_v1(
+            missing,
+            analysis.scenario_b_timetable_fingerprint,
+        )
+        is None
+    )
+    assert not trip_ridership_analysis_is_current_v1(
+        analysis,
+        missing,
+        analysis.scenario_b_timetable_fingerprint,
+    )
+    assert not trip_ridership_analysis_is_current_v1(
+        analysis,
+        imported,
+        "0" * 64,
+    )
+    assert not trip_ridership_analysis_is_current_v1(
+        fabricated,
+        imported,
+        analysis.scenario_b_timetable_fingerprint,
+    )
+
+
 def test_semantic_row_order_preserves_fingerprint_and_fact_changes_do_not(
     normalized_context,
 ) -> None:
@@ -682,7 +929,9 @@ def test_scenario_b_and_collision_changes_change_fingerprint(normalized_context)
     assert baseline.analysis_fingerprint != changed_b_analysis.analysis_fingerprint
     assert baseline.analysis_fingerprint != collision.analysis_fingerprint
     assert not trip_ridership_analysis_is_current_v1(
-        baseline, changed_b_analysis.scenario_b_timetable_fingerprint
+        baseline,
+        imported,
+        changed_b_analysis.scenario_b_timetable_fingerprint,
     )
 
 

@@ -559,7 +559,7 @@ def _trip_ridership_time(value: object, *, field_name: str) -> int | None:
         parsed = parse_time_to_seconds(cleaned)
     except (TypeError, ValueError) as exc:
         raise InputDataError(f"{field_name} không hợp lệ") from exc
-    if not 0 <= parsed <= 86400:
+    if not 0 <= parsed < 86400:
         raise InputDataError(f"{field_name} nằm ngoài ngày dịch vụ được hỗ trợ")
     return parsed
 

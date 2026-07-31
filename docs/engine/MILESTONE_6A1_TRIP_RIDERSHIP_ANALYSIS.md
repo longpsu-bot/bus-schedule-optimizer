@@ -57,8 +57,10 @@ The required columns are `observation_id`, `service_date`, `source_trip_id`,
 Each nonblank row requires a unique trimmed observation ID, service date, `outbound` or
 `inbound` direction, a whole passenger count greater than or equal to zero, and at least one of
 scheduled trip ID, scheduled departure time, or actual departure time. Zero passengers is a real
-observation. Formulas are rejected as data authority. Imported source rows and workbook bytes
-are never mutated.
+observation. Trip times use the half-open service-day domain `0 <= seconds < 86400`: `00:00`
+through `23:59:59` are valid, while every representation of `24:00` is rejected because
+`service_date` owns the calendar-day boundary. Formulas are rejected as data authority. Imported
+source rows and workbook bytes are never mutated.
 
 ## 7. Deterministic matching precedence
 
@@ -121,13 +123,19 @@ Passenger totals are labeled as observed matched passengers. Unless trip-date co
 exactly 100%, the analysis states that coverage-adjusted interpretation is unavailable and never
 claims a full daily route total.
 
-## 13. Analysis fingerprint
+## 13. Supplemental input and analysis fingerprints
 
-The deterministic SHA-256 analysis fingerprint includes metadata except free-form notes, the
-Contract V1 Scenario B fingerprint, matching policy and tolerance, sorted normalized observation
-facts, deterministic matches, trip/direction/route summaries, issue codes, and limitations.
-Semantic row reorder does not change the fingerprint. Passenger facts, dates, directions,
-references, tolerance, Scenario B, capacity, and collision outcomes do.
+Supplemental input identity and analysis identity are separate. The deterministic SHA-256
+`trip_ridership_input_fingerprint` is independently computable before matching from dataset ID,
+source type, confidence, observed scenario, operating-day type, tolerance, sorted normalized
+observation facts, and the Contract V1 Scenario B fingerprint. Workbook paths, bytes, metadata
+notes, observation notes, and row order are excluded.
+
+The distinct `analysis_fingerprint` binds that input identity to the matching-policy identity,
+deterministic match and collision results, original record count, trip/direction/route summaries,
+issue codes, and limitations. Semantic row reorder or notes-only edits change neither identity.
+Passenger facts, dates, directions, references, tolerance, Scenario B, capacity, and collision
+outcomes change the appropriate identity.
 
 ## 14. Runtime integration
 
@@ -142,8 +150,11 @@ the normal Contract result and presentation, then analyzes optional trip evidenc
 Page 01 previews both new sheets and displays imported trip-record count before submission; it
 does not match observations before the form is submitted. Page 03 labels the analysis as
 supplemental, displays dataset quality, direction/route coverage, per-trip statistics, and
-excluded-record diagnostics. A stale Scenario B binding is not rendered. Pages 02, 04, and 05
-retain their existing Contract V1 authority and Page 05 filenames/downloads.
+excluded-record diagnostics. Before rendering, Page 03 independently recomputes only the bounded
+supplemental input fingerprint and verifies it together with Scenario B identity and the stored
+analysis-integrity fingerprint. A stale same-B/different-dataset analysis is rejected without
+rerunning matching. Pages 02, 04, and 05 retain their existing Contract V1 authority and Page 05
+filenames/downloads.
 
 ## 16. Failure isolation
 
