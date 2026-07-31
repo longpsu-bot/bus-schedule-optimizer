@@ -2,7 +2,10 @@ import streamlit as st
 
 from bus_schedule_engine.models import TripRidershipMatchStatusV1
 from bus_schedule_engine.time_utils import format_hhmm
-from bus_schedule_engine.trip_ridership import trip_ridership_analysis_is_current_v1
+from bus_schedule_engine.trip_ridership import (
+    trip_ridership_analysis_is_current_v1,
+    trip_ridership_input_fingerprint_v1,
+)
 from bus_schedule_engine.ui_result_authority import (
     VisibleResultModeV1,
     resolve_visible_result_context_v1,
@@ -303,3 +306,173 @@ if visible.uses_unified:
                 ],
                 hide_index=True,
             )
+
+    st.subheader("Đánh giá regime cần bảo vệ")
+    st.warning(
+        "Kết quả 6A2A chỉ xác định regime đề xuất bảo vệ; chưa áp dụng ràng buộc vào phương án C.",
+        icon=":material/info:",
+    )
+    protected_assessment = st.session_state.get("protected_service_floor_assessment")
+    protected_failure = st.session_state.get("protected_service_floor_failure")
+    current_trip_input_fingerprint = (
+        trip_ridership_input_fingerprint_v1(
+            imported_workbook,
+            b_fingerprint,
+        )
+        if imported_workbook is not None
+        else None
+    )
+    assessment_is_current = bool(
+        imported_workbook is not None
+        and protected_assessment is not None
+        and protected_assessment.scenario_b_fingerprint == b_fingerprint
+        and protected_assessment.trip_ridership_input_fingerprint == current_trip_input_fingerprint
+        and protected_assessment.trip_ridership_analysis_fingerprint
+        == (trip_analysis.analysis_fingerprint if trip_analysis is not None else None)
+        and (
+            protected_assessment.trip_ridership_analysis_fingerprint is None
+            or trip_ridership_analysis_is_current_v1(
+                trip_analysis,
+                imported_workbook,
+                b_fingerprint,
+            )
+        )
+    )
+    if protected_failure is not None:
+        st.warning(
+            f"{protected_failure.code}\n\nMã đối chiếu: {protected_failure.correlation_id}",
+            icon=":material/warning:",
+        )
+    elif not assessment_is_current:
+        st.info(
+            "Chưa có đánh giá 6A2A hiện hành cho workbook, Scenario B và "
+            "bộ dữ liệu sản lượng chuyến đang hoạt động."
+        )
+    else:
+        policy = protected_assessment.policy
+        st.markdown("**Ngưỡng chính sách 6A2A**")
+        st.dataframe(
+            [
+                {
+                    "Ngưỡng": "Headway B tối đa được bảo vệ (phút)",
+                    "Giá trị": policy.maximum_protected_b_headway_minutes,
+                },
+                {
+                    "Ngưỡng": "Dung sai làm tròn headway (phút)",
+                    "Giá trị": policy.headway_rounding_tolerance_minutes,
+                },
+                {
+                    "Ngưỡng": "Số chuyến tối thiểu/regime",
+                    "Giá trị": policy.minimum_departures_per_regime,
+                },
+                {
+                    "Ngưỡng": "Thời lượng tối thiểu (phút)",
+                    "Giá trị": policy.minimum_regime_duration_minutes,
+                },
+                {
+                    "Ngưỡng": "Số ngày quan sát tối thiểu/chuyến",
+                    "Giá trị": policy.minimum_observed_days_per_trip,
+                },
+                {
+                    "Ngưỡng": "Bao phủ chuyến tối thiểu",
+                    "Giá trị": policy.minimum_regime_trip_coverage_rate,
+                },
+                {
+                    "Ngưỡng": "Tỷ lệ chuyến tải cao tối thiểu",
+                    "Giá trị": policy.minimum_high_load_trip_share,
+                },
+                {
+                    "Ngưỡng": "Thống kê tải",
+                    "Giá trị": policy.protected_load_statistic,
+                },
+                {
+                    "Ngưỡng": "Độ tin cậy tối thiểu",
+                    "Giá trị": policy.minimum_trip_ridership_confidence,
+                },
+                {
+                    "Ngưỡng": "Dung sai biên tương lai (phút)",
+                    "Giá trị": (policy.future_service_window_boundary_tolerance_minutes),
+                },
+            ],
+            hide_index=True,
+        )
+
+        regimes_by_id = {regime.regime_id: regime for regime in protected_assessment.regimes}
+        st.markdown("**Mọi regime B và quyết định bảo vệ**")
+        st.dataframe(
+            [
+                {
+                    "Mã regime": decision.regime_id,
+                    "Chiều": regimes_by_id[decision.regime_id].direction.value,
+                    "Chuyến đầu": regimes_by_id[decision.regime_id].first_b_trip_id,
+                    "Chuyến cuối": regimes_by_id[decision.regime_id].last_b_trip_id,
+                    "Cửa sổ B": (
+                        f"{format_hhmm(regimes_by_id[decision.regime_id].first_departure)}–"
+                        f"{format_hhmm(regimes_by_id[decision.regime_id].last_departure)}"
+                    ),
+                    "Số chuyến B": regimes_by_id[decision.regime_id].trip_count,
+                    "Thời lượng (phút)": (regimes_by_id[decision.regime_id].duration_minutes),
+                    "Phân loại đều đặn": (
+                        regimes_by_id[decision.regime_id].regularity_classification
+                    ),
+                    "Headway B đại diện": (
+                        regimes_by_id[decision.regime_id].representative_b_headway
+                    ),
+                    "Headway B nhỏ nhất": (regimes_by_id[decision.regime_id].minimum_b_headway),
+                    "Headway B lớn nhất": (regimes_by_id[decision.regime_id].maximum_b_headway),
+                    "Chuỗi headway nội bộ": ", ".join(
+                        f"{value:g}"
+                        for value in regimes_by_id[decision.regime_id].internal_headway_sequence
+                    ),
+                    "Headway chuyển tiếp trước": (
+                        regimes_by_id[decision.regime_id].transition_headway_before
+                    ),
+                    "Headway chuyển tiếp sau": (
+                        regimes_by_id[decision.regime_id].transition_headway_after
+                    ),
+                    "Chuyến có quan sát dùng được": (
+                        decision.evidence.trips_with_any_usable_observation
+                    ),
+                    "Chuyến đủ bao phủ": decision.evidence.coverage_eligible_trips,
+                    "Tỷ lệ bao phủ regime": (decision.evidence.regime_trip_coverage_rate),
+                    "Chuyến tải cao": decision.evidence.high_load_eligible_trips,
+                    "Tỷ lệ chuyến tải cao": decision.evidence.high_load_trip_share,
+                    "P85 tải nhỏ nhất": (decision.evidence.minimum_p85_load_factor),
+                    "P85 tải trung vị": (decision.evidence.median_p85_load_factor),
+                    "P85 tải lớn nhất": (decision.evidence.maximum_p85_load_factor),
+                    "Chuyến P85 vượt maximum": (
+                        decision.evidence.trips_above_maximum_load_factor_at_p85
+                    ),
+                    "Ngày dịch vụ": decision.evidence.total_distinct_service_dates,
+                    "Ghép chính xác": decision.evidence.exact_match_count,
+                    "Ghép trong dung sai": decision.evidence.tolerance_match_count,
+                    "Bản ghi loại quy được": (decision.evidence.excluded_record_count),
+                    "Quyết định": decision.classification,
+                    "Mọi gate không đạt": ", ".join(decision.failed_gate_codes),
+                    "Giới hạn bằng chứng": ", ".join(decision.evidence.evidence_limitations),
+                }
+                for decision in protected_assessment.decisions
+            ],
+            hide_index=True,
+        )
+
+        st.markdown("**Preview sàn dịch vụ tương lai — chưa thực thi**")
+        if protected_assessment.protected_previews:
+            st.dataframe(
+                [
+                    {
+                        "Mã regime": preview.regime_id,
+                        "Headway C tối đa (phút)": (preview.maximum_future_c_headway_minutes),
+                        "Số chuyến C tối thiểu": (preview.minimum_future_c_trip_count),
+                        "Bắt đầu cửa sổ": format_hhmm(preview.protected_window_start),
+                        "Kết thúc cửa sổ": format_hhmm(preview.protected_window_end),
+                        "Dung sai biên (phút)": (preview.future_boundary_tolerance_minutes),
+                        "Cấm lấy chuyến làm donor": (preview.donor_removal_prohibited),
+                        "Trạng thái thực thi": preview.enforcement_status,
+                    }
+                    for preview in protected_assessment.protected_previews
+                ],
+                hide_index=True,
+            )
+        else:
+            st.info("Không có regime nào đạt toàn bộ gate để tạo preview sàn dịch vụ.")

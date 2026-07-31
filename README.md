@@ -32,9 +32,16 @@ to Scenario B, excludes ambiguous, collided, unmatched, and invalid records, and
 per-trip descriptive passenger/load statistics plus explicit route and direction coverage.
 This evidence is supplemental only: `SAN_LUONG` remains the sole Contract V1 demand authority,
 trip records never enter `ObservedDemandInput`, solver requests and Scenario C are unchanged, and
-ordinary Streamlit remains Contract V1-only. Protected high-demand service-floor rules remain
-future Milestone 6A2 work. See
-[Milestone 6A1 trip-level ridership analysis](docs/engine/MILESTONE_6A1_TRIP_RIDERSHIP_ANALYSIS.md).
+ordinary Streamlit remains Contract V1-only.
+
+Milestone 6A2A now derives current direction-separated Scenario B regimes and classifies which
+ones have regular short headways plus sufficient repeated P85 trip evidence for a future
+protected service floor. It returns review-only floor previews and every failed gate. It does
+not constrain or reject Scenario C, alter solver requests/outcomes, or change Page 05 artifacts;
+enforcement is reserved for Milestone 6A2B. See
+[Milestone 6A1 trip-level ridership analysis](docs/engine/MILESTONE_6A1_TRIP_RIDERSHIP_ANALYSIS.md)
+and
+[Milestone 6A2A protected service-floor authority](docs/engine/MILESTONE_6A2A_PROTECTED_SERVICE_FLOOR_AUTHORITY.md).
 
 ### Offline legacy regression oracle
 
@@ -122,6 +129,8 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 - Workbook import with Scenario B required and Scenario A/demand/configuration optional.
 - Optional supplemental trip-level ridership import, deterministic Scenario B matching, and
   coverage-aware descriptive analysis that does not affect optimization.
+- Deterministic current-B service regimes and supplemental high-demand service-floor
+  classification with review-only, explicitly non-enforced previews.
 - Legacy technical validation for totals, endpoints, runtime, turnaround, and declared vehicle
   chains.
 - Multi-day demand normalization and legacy load-factor/headway evaluation.
@@ -158,6 +167,8 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 - Operational-timetable, ridership-forecast, or solver-quality approval of the anonymized
   real-route corpus.
 - Variable-trip-count optimization.
+- Enforcement of protected-regime headway, trip-count, service-window, or donor constraints
+  (reserved for Milestone 6A2B).
 - Accepted zero-trip or one-trip headway regimes under the current public Contract V1 shape;
   supporting those cases requires a separately authorized future Contract revision.
 - Production implementation of the deferred V1-A1 structural demand-response workflow.
@@ -190,7 +201,8 @@ Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation, Mile
 authoritative input readiness, Milestone 5A2B validation-only presentation adapters, Milestone
 5B1 Streamlit shadow execution, Milestone 5B2A unified result Pages 02–04, and Milestone 5B2B
 unified Page 05 artifacts are implemented and merged. Milestone 5C1 is merged and Milestone 5C2
-is merged. Milestone 6A1 supplemental trip-level ridership analysis is implemented**, but
+is merged. Milestone 6A1 supplemental trip-level ridership analysis and Milestone 6A2A
+protected service-floor authority are implemented**, but
 Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
@@ -209,7 +221,9 @@ Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
 9. Milestone 5C3: separately remove authorized legacy code after approval (not started).
 10. Milestone 6A1: add supplemental, coverage-aware trip-level ridership analysis without
     changing optimization authority.
-11. Milestone 6A2: consider protected high-demand service floors (future; not implemented).
+11. Milestone 6A2A: define deterministic protected high-demand service-floor authority and
+    non-enforced previews (implemented).
+12. Milestone 6A2B: separately enforce reviewed service floors in Scenario C (not started).
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)
@@ -295,6 +309,8 @@ Optional sheets are:
 - `THONG_SO_A` and `BIEU_DO_A`;
 - `THONG_TIN_DU_LIEU`;
 - `SAN_LUONG`;
+- `THONG_TIN_SAN_LUONG_CHUYEN`;
+- `SAN_LUONG_CHUYEN`;
 - `CAU_HINH`.
 
 `total_daily_trips` is the total across both directions.
@@ -307,5 +323,7 @@ for optimization only when `SAN_LUONG` has observations.
 `terminal_2_max_occupancy_vehicles`; each supplied value must be an integer of at least one.
 Either key may be omitted, and no current workbook is required to contain either key.
 Combined demand remains combined and must not be fabricated into directional demand.
+Optional `protected_service_floor_*` entries in `CAU_HINH` declare the 6A2A policy. They are
+supplemental planning settings and do not change Contract V1 or Scenario C.
 
 The current exporters create new workbooks and do not overwrite `Schedule template.xlsx`.

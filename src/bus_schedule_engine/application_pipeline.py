@@ -25,6 +25,8 @@ from .input_authority import (
 )
 from .models import (
     AnalysisBundle,
+    ProtectedServiceFloorAssessmentV1,
+    ProtectedServiceFloorFailureV1,
     TripRidershipAnalysisFailureV1,
     TripRidershipAnalysisV1,
 )
@@ -35,7 +37,14 @@ from .optimization_service import (
     SolverChoice,
     analyze_and_optimize_schedule_v1,
 )
-from .trip_ridership import analyze_trip_ridership_v1
+from .protected_service_floor import (
+    assess_protected_service_floors_v1,
+    protected_service_floor_policy_from_workbook_v1,
+)
+from .protected_service_floor_codes import (
+    PROTECTED_SERVICE_FLOOR_ASSESSMENT_FAILED,
+)
+from .trip_ridership import analyze_trip_ridership_v1, trip_ridership_input_fingerprint_v1
 from .trip_ridership_codes import TRIP_RIDERSHIP_ANALYSIS_FAILED
 from .unified_diagram import (
     build_unified_demand_supply_figure_v1,
@@ -134,6 +143,8 @@ class UnifiedApplicationRunV1:
     failure: UnifiedRuntimeFailureV1 | None
     trip_ridership_analysis: TripRidershipAnalysisV1 | None = None
     trip_ridership_failure: TripRidershipAnalysisFailureV1 | None = None
+    protected_service_floor_assessment: ProtectedServiceFloorAssessmentV1 | None = None
+    protected_service_floor_failure: ProtectedServiceFloorFailureV1 | None = None
 
 
 def run_and_build_artifacts(
@@ -219,6 +230,52 @@ def _build_trip_ridership_analysis_failure_v1(
         exception_class,
         failure.dataset_id,
         failure.scenario_b_timetable_fingerprint,
+    )
+    return failure
+
+
+def _build_protected_service_floor_failure_v1(
+    *,
+    imported: ImportedWorkbook,
+    scenario_b_fingerprint: str,
+    exc: Exception,
+) -> ProtectedServiceFloorFailureV1:
+    try:
+        input_fingerprint = trip_ridership_input_fingerprint_v1(
+            imported,
+            scenario_b_fingerprint,
+        )
+    except Exception:
+        input_fingerprint = None
+    exception_class = exc.__class__.__name__
+    payload = json.dumps(
+        {
+            "code": PROTECTED_SERVICE_FLOOR_ASSESSMENT_FAILED,
+            "scenario_b_fingerprint": scenario_b_fingerprint,
+            "trip_ridership_input_fingerprint": input_fingerprint,
+            "exception_class": exception_class,
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    failure = ProtectedServiceFloorFailureV1(
+        code=PROTECTED_SERVICE_FLOOR_ASSESSMENT_FAILED,
+        correlation_id=f"m6a2a-{hashlib.sha256(payload).hexdigest()[:20]}",
+        sanitized_message=(
+            f"{exception_class}: supplemental protected-service-floor assessment failed"
+        )[:_MAX_SANITIZED_MESSAGE_LENGTH],
+        scenario_b_fingerprint=scenario_b_fingerprint,
+        trip_ridership_input_fingerprint=input_fingerprint,
+    )
+    LOGGER.error(
+        "protected_service_floor_failure correlation_id=%s code=%s "
+        "exception_class=%s b_fingerprint=%s trip_input_fingerprint=%s",
+        failure.correlation_id,
+        failure.code,
+        exception_class,
+        failure.scenario_b_fingerprint,
+        failure.trip_ridership_input_fingerprint,
     )
     return failure
 
@@ -445,6 +502,8 @@ def _failed_unified_run(
     retain_verified_presentation: bool = False,
     trip_ridership_analysis: TripRidershipAnalysisV1 | None = None,
     trip_ridership_failure: TripRidershipAnalysisFailureV1 | None = None,
+    protected_service_floor_assessment: ProtectedServiceFloorAssessmentV1 | None = None,
+    protected_service_floor_failure: ProtectedServiceFloorFailureV1 | None = None,
 ) -> UnifiedApplicationRunV1:
     failure = build_unified_runtime_failure_v1(
         code=code,
@@ -475,6 +534,12 @@ def _failed_unified_run(
         failure=failure,
         trip_ridership_analysis=(trip_ridership_analysis if retain_verified_presentation else None),
         trip_ridership_failure=(trip_ridership_failure if retain_verified_presentation else None),
+        protected_service_floor_assessment=(
+            protected_service_floor_assessment if retain_verified_presentation else None
+        ),
+        protected_service_floor_failure=(
+            protected_service_floor_failure if retain_verified_presentation else None
+        ),
     )
 
 
@@ -622,6 +687,29 @@ def run_unified_application_pipeline_v1(
                 exc=exc,
             )
 
+    protected_service_floor_assessment: ProtectedServiceFloorAssessmentV1 | None = None
+    protected_service_floor_failure: ProtectedServiceFloorFailureV1 | None = None
+    scenario_b_fingerprint = unified_result.normalized_inputs.scenario_b_fingerprint
+    try:
+        protected_service_floor_assessment = assess_protected_service_floors_v1(
+            unified_input,
+            unified_result.normalized_inputs.scenario_b,
+            trip_ridership_analysis,
+            protected_service_floor_policy_from_workbook_v1(unified_input),
+        )
+        if protected_service_floor_assessment.scenario_b_fingerprint != scenario_b_fingerprint:
+            raise ValueError(
+                "Protected-service-floor assessment is not bound to "
+                "the normalized Scenario B fingerprint"
+            )
+    except Exception as exc:
+        protected_service_floor_assessment = None
+        protected_service_floor_failure = _build_protected_service_floor_failure_v1(
+            imported=unified_input,
+            scenario_b_fingerprint=scenario_b_fingerprint,
+            exc=exc,
+        )
+
     try:
         demand_supply_figure = build_unified_demand_supply_figure_v1(presentation)
         departure_figure = build_unified_departure_figure_v1(presentation)
@@ -654,6 +742,8 @@ def run_unified_application_pipeline_v1(
             presentation=presentation,
             trip_ridership_analysis=trip_ridership_analysis,
             trip_ridership_failure=trip_ridership_failure,
+            protected_service_floor_assessment=protected_service_floor_assessment,
+            protected_service_floor_failure=protected_service_floor_failure,
         )
     except Exception as exc:
         return _failed_unified_run(
@@ -670,6 +760,8 @@ def run_unified_application_pipeline_v1(
             retain_verified_presentation=True,
             trip_ridership_analysis=trip_ridership_analysis,
             trip_ridership_failure=trip_ridership_failure,
+            protected_service_floor_assessment=protected_service_floor_assessment,
+            protected_service_floor_failure=protected_service_floor_failure,
         )
 
     return UnifiedApplicationRunV1(
@@ -685,6 +777,8 @@ def run_unified_application_pipeline_v1(
         failure=None,
         trip_ridership_analysis=trip_ridership_analysis,
         trip_ridership_failure=trip_ridership_failure,
+        protected_service_floor_assessment=protected_service_floor_assessment,
+        protected_service_floor_failure=protected_service_floor_failure,
     )
 
 

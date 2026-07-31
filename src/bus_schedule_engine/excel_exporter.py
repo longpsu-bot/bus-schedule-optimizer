@@ -852,6 +852,56 @@ def create_input_template(path: str | Path) -> Path:
         ("minimum_material_service_rate_change_ratio", 0.15, "Biến đổi suất phục vụ đáng kể"),
         ("preferred_max_shift_per_trip_minutes", 15, "Mức dịch chuyển ưu tiên"),
         ("absolute_max_shift_per_trip_minutes", 30, "Giới hạn dịch chuyển tuyệt đối"),
+        (
+            "protected_service_floor_maximum_protected_b_headway_minutes",
+            30,
+            "6A2A: giới hạn headway B được đề xuất bảo vệ",
+        ),
+        (
+            "protected_service_floor_headway_rounding_tolerance_minutes",
+            1,
+            "6A2A: dung sai balanced rounding",
+        ),
+        (
+            "protected_service_floor_minimum_departures_per_regime",
+            3,
+            "6A2A: số chuyến tối thiểu trong regime",
+        ),
+        (
+            "protected_service_floor_minimum_regime_duration_minutes",
+            30,
+            "6A2A: thời lượng regime tối thiểu",
+        ),
+        (
+            "protected_service_floor_minimum_observed_days_per_trip",
+            3,
+            "6A2A: số ngày quan sát tối thiểu mỗi chuyến",
+        ),
+        (
+            "protected_service_floor_minimum_regime_trip_coverage_rate",
+            0.80,
+            "6A2A: tỷ lệ chuyến regime đủ bao phủ",
+        ),
+        (
+            "protected_service_floor_minimum_high_load_trip_share",
+            0.67,
+            "6A2A: tỷ lệ chuyến P85 đạt target",
+        ),
+        (
+            "protected_service_floor_protected_load_statistic",
+            "P85",
+            "6A2A: thống kê tải được hỗ trợ",
+        ),
+        (
+            "protected_service_floor_minimum_trip_ridership_confidence",
+            "medium",
+            "6A2A: độ tin cậy tối thiểu",
+        ),
+        (
+            "protected_service_floor_future_service_window_boundary_tolerance_minutes",
+            0,
+            "6A2A preview: chưa áp dụng trong Scenario C",
+        ),
         ("configuration_version", "scenario_c_regimes_v1", "Phiên bản cấu hình C"),
     ]
     for row_number, row in enumerate(config_rows, 4):

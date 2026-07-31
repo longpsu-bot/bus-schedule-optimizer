@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import date
 from enum import StrEnum
@@ -378,6 +379,174 @@ class TripRidershipAnalysisFailureV1:
     sanitized_message: str
     dataset_id: str | None
     scenario_b_timetable_fingerprint: str
+
+
+@dataclass(frozen=True, slots=True)
+class CurrentBServiceRegimeV1:
+    regime_id: str
+    direction: TripRidershipDirectionV1
+    first_b_trip_id: str
+    last_b_trip_id: str
+    b_trip_ids: tuple[str, ...]
+    first_departure: int
+    last_departure: int
+    trip_count: int
+    duration_minutes: float
+    internal_headway_sequence: tuple[float, ...]
+    minimum_b_headway: float | None
+    maximum_b_headway: float | None
+    representative_b_headway: float | None
+    regularity_classification: str
+    transition_headway_before: float | None
+    transition_headway_after: float | None
+    derivation_reason_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedServiceFloorPolicyV1:
+    maximum_protected_b_headway_minutes: int = 30
+    headway_rounding_tolerance_minutes: int = 1
+    minimum_departures_per_regime: int = 3
+    minimum_regime_duration_minutes: int = 30
+    minimum_observed_days_per_trip: int = 3
+    minimum_regime_trip_coverage_rate: float = 0.80
+    minimum_high_load_trip_share: float = 0.67
+    protected_load_statistic: str = "P85"
+    minimum_trip_ridership_confidence: str = "medium"
+    future_service_window_boundary_tolerance_minutes: int = 0
+
+    def __post_init__(self) -> None:
+        for name, value in (
+            (
+                "maximum_protected_b_headway_minutes",
+                self.maximum_protected_b_headway_minutes,
+            ),
+            ("minimum_regime_duration_minutes", self.minimum_regime_duration_minutes),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        if (
+            isinstance(self.headway_rounding_tolerance_minutes, bool)
+            or not isinstance(self.headway_rounding_tolerance_minutes, int)
+            or self.headway_rounding_tolerance_minutes < 0
+        ):
+            raise ValueError("headway_rounding_tolerance_minutes must be a non-negative integer")
+        if (
+            isinstance(self.minimum_departures_per_regime, bool)
+            or not isinstance(self.minimum_departures_per_regime, int)
+            or self.minimum_departures_per_regime < 2
+        ):
+            raise ValueError("minimum_departures_per_regime must be an integer >= 2")
+        if (
+            isinstance(self.minimum_observed_days_per_trip, bool)
+            or not isinstance(self.minimum_observed_days_per_trip, int)
+            or self.minimum_observed_days_per_trip < 1
+        ):
+            raise ValueError("minimum_observed_days_per_trip must be a positive integer")
+        for name, value in (
+            ("minimum_regime_trip_coverage_rate", self.minimum_regime_trip_coverage_rate),
+            ("minimum_high_load_trip_share", self.minimum_high_load_trip_share),
+        ):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or not 0 <= float(value) <= 1
+            ):
+                raise ValueError(f"{name} must be finite and within [0, 1]")
+        if self.protected_load_statistic != "P85":
+            raise ValueError("protected_load_statistic must be P85 in Milestone 6A2A")
+        if self.minimum_trip_ridership_confidence not in {
+            "unknown",
+            "low",
+            "medium",
+            "high",
+        }:
+            raise ValueError(
+                "minimum_trip_ridership_confidence must be unknown, low, medium, or high"
+            )
+        if (
+            isinstance(self.future_service_window_boundary_tolerance_minutes, bool)
+            or not isinstance(self.future_service_window_boundary_tolerance_minutes, int)
+            or self.future_service_window_boundary_tolerance_minutes < 0
+        ):
+            raise ValueError(
+                "future_service_window_boundary_tolerance_minutes must be a non-negative integer"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedRegimeEvidenceV1:
+    regime_id: str
+    total_b_trips: int
+    trips_with_any_usable_observation: int
+    coverage_eligible_trips: int
+    high_load_eligible_trips: int
+    trips_above_maximum_load_factor_at_p85: int
+    regime_trip_coverage_rate: float
+    high_load_trip_share: float | None
+    minimum_p85_load_factor: float | None
+    median_p85_load_factor: float | None
+    maximum_p85_load_factor: float | None
+    total_distinct_service_dates: int
+    exact_match_count: int
+    tolerance_match_count: int
+    excluded_record_count: int
+    coverage_eligible_trip_ids: tuple[str, ...]
+    high_load_eligible_trip_ids: tuple[str, ...]
+    trips_above_maximum_load_factor_at_p85_ids: tuple[str, ...]
+    evidence_limitations: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedRegimeDecisionV1:
+    regime_id: str
+    classification: str
+    failed_gate_codes: tuple[str, ...]
+    evidence: ProtectedRegimeEvidenceV1
+
+    @property
+    def status(self) -> str:
+        return self.classification
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedServiceFloorPreviewV1:
+    regime_id: str
+    maximum_future_c_headway_minutes: int
+    minimum_future_c_trip_count: int
+    protected_window_start: int
+    protected_window_end: int
+    future_boundary_tolerance_minutes: int
+    donor_removal_prohibited: bool
+    enforcement_status: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedServiceFloorAssessmentV1:
+    scenario_b_fingerprint: str
+    trip_ridership_input_fingerprint: str | None
+    trip_ridership_analysis_fingerprint: str | None
+    policy_fingerprint: str
+    regime_derivation_fingerprint: str
+    assessment_fingerprint: str
+    target_load_factor: float
+    maximum_load_factor: float
+    policy: ProtectedServiceFloorPolicyV1
+    regimes: tuple[CurrentBServiceRegimeV1, ...]
+    decisions: tuple[ProtectedRegimeDecisionV1, ...]
+    protected_previews: tuple[ProtectedServiceFloorPreviewV1, ...]
+    issue_codes: tuple[str, ...]
+    limitations: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedServiceFloorFailureV1:
+    code: str
+    correlation_id: str
+    sanitized_message: str
+    scenario_b_fingerprint: str
+    trip_ridership_input_fingerprint: str | None
 
 
 @dataclass(frozen=True)
