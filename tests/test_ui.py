@@ -9,6 +9,7 @@ from openpyxl import load_workbook
 from presentation_support import build_result_and_report, rejected_result_and_report
 from streamlit.testing.v1 import AppTest
 
+import bus_schedule_engine.protected_service_floor as protected_service_floor
 from bus_schedule_engine.application_pipeline import (
     CONTRACT_V1_ARTIFACT_FAILED,
     CONTRACT_V1_SOLVER_FAILED,
@@ -151,6 +152,8 @@ def _trip_ridership_complete_state(tmp_path: Path) -> dict[str, object]:
         "imported_workbook": imported,
         "trip_ridership_analysis": run.trip_ridership_analysis,
         "trip_ridership_failure": run.trip_ridership_failure,
+        "protected_service_floor_assessment": (run.protected_service_floor_assessment),
+        "protected_service_floor_failure": run.protected_service_floor_failure,
     }
 
 
@@ -214,8 +217,15 @@ def test_page01_shows_trip_record_count_without_matching_before_submit(
     assert not app.exception
     metric = next(item for item in app.metric if item.label == "Quan sát sản lượng theo chuyến")
     assert metric.value == "1"
+    markdown = "\n".join(item.value for item in app.markdown)
+    assert "Thiết lập kế hoạch sàn dịch vụ bảo vệ 6A2A" in markdown
+    assert any(
+        "Regime chưa được phân loại trước khi gửi biểu mẫu" in item.value for item in app.caption
+    )
     _assert_missing_state_key(app, "trip_ridership_analysis")
     _assert_missing_state_key(app, "trip_ridership_failure")
+    _assert_missing_state_key(app, "protected_service_floor_assessment")
+    _assert_missing_state_key(app, "protected_service_floor_failure")
 
 
 def test_new_upload_removes_stale_legacy_and_unified_results(tmp_path: Path) -> None:
@@ -251,6 +261,8 @@ def test_new_upload_removes_stale_legacy_and_unified_results(tmp_path: Path) -> 
         "unified_runtime_status",
         "trip_ridership_analysis",
         "trip_ridership_failure",
+        "protected_service_floor_assessment",
+        "protected_service_floor_failure",
     ):
         app.session_state[key] = object()
 
@@ -275,6 +287,8 @@ def test_new_upload_removes_stale_legacy_and_unified_results(tmp_path: Path) -> 
     assert app.session_state["unified_presentation"] is None
     assert app.session_state["trip_ridership_analysis"] is None
     assert app.session_state["trip_ridership_failure"] is None
+    assert app.session_state["protected_service_floor_assessment"] is None
+    assert app.session_state["protected_service_floor_failure"] is None
 
 
 def test_import_invalid_is_stable_and_only_template_is_downloadable() -> None:
@@ -361,6 +375,60 @@ def test_page03_renders_supplemental_match_quality_and_trip_summaries(
     markdown = "\n".join(item.value for item in app.markdown)
     assert "Thống kê mô tả theo chuyến B" in markdown
     assert "Tổng hợp theo chiều" in markdown
+    assert any(item.value == "Đánh giá regime cần bảo vệ" for item in app.subheader)
+    assert any(
+        "Kết quả 6A2A chỉ xác định regime đề xuất bảo vệ" in item.value for item in app.warning
+    )
+    assert "Ngưỡng chính sách 6A2A" in markdown
+    assert "Preview sàn dịch vụ tương lai — chưa thực thi" in markdown
+
+
+def test_page03_refuses_assessment_after_active_protected_policy_changes(
+    tmp_path: Path,
+) -> None:
+    state = _trip_ridership_complete_state(tmp_path)
+    imported = state["imported_workbook"]
+    state["imported_workbook"] = replace(
+        imported,
+        configuration={
+            **imported.configuration,
+            "protected_service_floor_maximum_protected_b_headway_minutes": 25,
+        },
+    )
+    app = _seed_page(AppTest.from_file("app_pages/03_nhu_cau.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert any("Chưa có đánh giá 6A2A hiện hành" in item.value for item in app.info)
+    markdown = "\n".join(item.value for item in app.markdown)
+    assert "Ngưỡng chính sách 6A2A" not in markdown
+
+
+def test_page03_delegates_assessment_currentness_to_domain_helper(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = _trip_ridership_complete_state(tmp_path)
+    calls: list[tuple[object, ...]] = []
+
+    def reject_assessment(*args: object) -> bool:
+        calls.append(args)
+        return False
+
+    monkeypatch.setattr(
+        protected_service_floor,
+        "protected_service_floor_assessment_is_current_v1",
+        reject_assessment,
+    )
+    app = _seed_page(AppTest.from_file("app_pages/03_nhu_cau.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert len(calls) == 1
+    assert calls[0][0] is state["protected_service_floor_assessment"]
+    assert any("Chưa có đánh giá 6A2A hiện hành" in item.value for item in app.info)
 
 
 def test_page03_refuses_stale_supplemental_analysis(tmp_path: Path) -> None:

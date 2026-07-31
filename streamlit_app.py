@@ -30,6 +30,8 @@ for key, default in {
     "unified_runtime_status": None,
     "trip_ridership_analysis": None,
     "trip_ridership_failure": None,
+    "protected_service_floor_assessment": None,
+    "protected_service_floor_failure": None,
 }.items():
     st.session_state.setdefault(key, default)
 

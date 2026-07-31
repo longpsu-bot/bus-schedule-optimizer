@@ -13,6 +13,9 @@ from bus_schedule_engine.application_pipeline import (
 )
 from bus_schedule_engine.importer import import_workbook
 from bus_schedule_engine.models import Direction
+from bus_schedule_engine.protected_service_floor import (
+    protected_service_floor_policy_from_workbook_v1,
+)
 from bus_schedule_engine.time_utils import parse_runtime_options
 from bus_schedule_engine.ui_utils import (
     apply_overrides,
@@ -41,6 +44,8 @@ _UNIFIED_RESULT_STATE_KEYS = (
     "unified_runtime_status",
     "trip_ridership_analysis",
     "trip_ridership_failure",
+    "protected_service_floor_assessment",
+    "protected_service_floor_failure",
 )
 
 
@@ -151,6 +156,70 @@ if content:
             "Khung 30 hoặc 60 phút chỉ dùng để tổng hợp nhu cầu. Giãn cách được tối ưu "
             "trên chuỗi các chuyến liền kề và có thể được giữ ổn định qua nhiều khung nhu cầu liên tiếp."
         )
+
+    try:
+        protected_policy = protected_service_floor_policy_from_workbook_v1(imported)
+    except (TypeError, ValueError) as exc:
+        protected_policy = None
+        st.warning(
+            "Cấu hình kế hoạch 6A2A không hợp lệ và sẽ chỉ tạo lỗi bổ sung, "
+            f"không thay đổi Contract V1: {exc}",
+            icon=":material/warning:",
+        )
+    if protected_policy is not None:
+        with st.container(border=True):
+            st.markdown("**Thiết lập kế hoạch sàn dịch vụ bảo vệ 6A2A**")
+            st.dataframe(
+                [
+                    {
+                        "Thiết lập": "Headway B tối đa được bảo vệ (phút)",
+                        "Giá trị": protected_policy.maximum_protected_b_headway_minutes,
+                    },
+                    {
+                        "Thiết lập": "Dung sai làm tròn headway (phút)",
+                        "Giá trị": protected_policy.headway_rounding_tolerance_minutes,
+                    },
+                    {
+                        "Thiết lập": "Số chuyến tối thiểu/regime",
+                        "Giá trị": protected_policy.minimum_departures_per_regime,
+                    },
+                    {
+                        "Thiết lập": "Thời lượng tối thiểu/regime (phút)",
+                        "Giá trị": protected_policy.minimum_regime_duration_minutes,
+                    },
+                    {
+                        "Thiết lập": "Số ngày quan sát tối thiểu/chuyến",
+                        "Giá trị": protected_policy.minimum_observed_days_per_trip,
+                    },
+                    {
+                        "Thiết lập": "Tỷ lệ bao phủ chuyến tối thiểu",
+                        "Giá trị": protected_policy.minimum_regime_trip_coverage_rate,
+                    },
+                    {
+                        "Thiết lập": "Tỷ lệ chuyến tải cao tối thiểu",
+                        "Giá trị": protected_policy.minimum_high_load_trip_share,
+                    },
+                    {
+                        "Thiết lập": "Thống kê tải bảo vệ",
+                        "Giá trị": protected_policy.protected_load_statistic,
+                    },
+                    {
+                        "Thiết lập": "Độ tin cậy tối thiểu",
+                        "Giá trị": protected_policy.minimum_trip_ridership_confidence,
+                    },
+                    {
+                        "Thiết lập": "Dung sai biên cửa sổ tương lai (phút)",
+                        "Giá trị": (
+                            protected_policy.future_service_window_boundary_tolerance_minutes
+                        ),
+                    },
+                ],
+                hide_index=True,
+            )
+            st.caption(
+                "Đây là thiết lập kế hoạch được khai báo. Regime chưa được phân loại "
+                "trước khi gửi biểu mẫu."
+            )
 
     with st.form("analysis_parameters", border=True):
         st.subheader("Thông số kiểm tra và đánh giá")
@@ -265,6 +334,12 @@ if content:
             st.session_state.unified_runtime_failure = unified_run.failure
             st.session_state.trip_ridership_analysis = unified_run.trip_ridership_analysis
             st.session_state.trip_ridership_failure = unified_run.trip_ridership_failure
+            st.session_state.protected_service_floor_assessment = (
+                unified_run.protected_service_floor_assessment
+            )
+            st.session_state.protected_service_floor_failure = (
+                unified_run.protected_service_floor_failure
+            )
             st.session_state.unified_optimization_result = unified_run.unified_result
             st.session_state.unified_presentation = unified_run.unified_presentation
             st.session_state.unified_demand_supply_figure = unified_run.unified_demand_supply_figure
