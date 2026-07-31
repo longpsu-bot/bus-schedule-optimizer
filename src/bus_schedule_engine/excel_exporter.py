@@ -38,6 +38,7 @@ THIN_GRAY = Side(style="thin", color="CBD5E1")
 REQUIRED_LABEL = "BẮT BUỘC"
 REQUIRED_FOR_OPTIMIZATION_LABEL = "BẮT BUỘC ĐỂ TỐI ƯU"
 CONDITIONAL_DEMAND_LABEL = "BẮT BUỘC ĐỂ TỐI ƯU KHI CÓ SẢN LƯỢNG"
+CONDITIONAL_TRIP_RIDERSHIP_LABEL = "BẮT BUỘC KHI CÓ SAN_LUONG_CHUYEN"
 OPTIONAL_LABEL = "TÙY CHỌN"
 
 
@@ -79,6 +80,7 @@ def _style_requirement_rows(ws, start_row: int, end_row: int, level_column: int)
         REQUIRED_LABEL: PatternFill("solid", fgColor=RED),
         REQUIRED_FOR_OPTIMIZATION_LABEL: PatternFill("solid", fgColor=AMBER),
         CONDITIONAL_DEMAND_LABEL: PatternFill("solid", fgColor=AMBER),
+        CONDITIONAL_TRIP_RIDERSHIP_LABEL: PatternFill("solid", fgColor=AMBER),
         OPTIONAL_LABEL: PatternFill("solid", fgColor=LIGHT_BLUE),
     }
     for row in range(start_row, end_row + 1):
@@ -487,6 +489,146 @@ def _write_authority_metadata_sheet(ws) -> None:
     _autowidth(ws, 58)
 
 
+def _write_trip_ridership_metadata_sheet(ws) -> None:
+    _title(ws, "THÔNG TIN BỘ DỮ LIỆU SẢN LƯỢNG THEO CHUYẾN", 4)
+    _table_header(ws, 3, ["Tham số", "Giá trị", "Mức độ", "Diễn giải"])
+    rows = [
+        (
+            "trip_ridership_dataset_id",
+            "MVP-01-TRIP-RIDERSHIP-SAMPLE",
+            CONDITIONAL_TRIP_RIDERSHIP_LABEL,
+            "Mã bộ dữ liệu không được để trống; một bộ chỉ chứa một loại ngày vận hành",
+        ),
+        (
+            "trip_ridership_source_type",
+            "manual_count",
+            CONDITIONAL_TRIP_RIDERSHIP_LABEL,
+            "ticketing, manual_count, apc, survey hoặc other; không dùng báo cáo tuyến tổng hợp",
+        ),
+        (
+            "trip_ridership_confidence",
+            "medium",
+            CONDITIONAL_TRIP_RIDERSHIP_LABEL,
+            "high, medium, low hoặc unknown",
+        ),
+        (
+            "observed_schedule_scenario",
+            "B",
+            CONDITIONAL_TRIP_RIDERSHIP_LABEL,
+            "Milestone 6A1 chỉ cho phép đối chiếu với Scenario B",
+        ),
+        (
+            "operating_day_type",
+            "weekday",
+            CONDITIONAL_TRIP_RIDERSHIP_LABEL,
+            "Phải trùng THONG_SO_B; không suy từ service_date",
+        ),
+        (
+            "match_tolerance_minutes",
+            5,
+            CONDITIONAL_TRIP_RIDERSHIP_LABEL,
+            "Số nguyên từ 0 đến 30, tính cả đúng biên dung sai",
+        ),
+        (
+            "source_notes",
+            "Dữ liệu minh họa bổ sung; không phải thẩm quyền tối ưu trong 6A1.",
+            OPTIONAL_LABEL,
+            "Ghi chú nguồn tự do; không dùng trong fingerprint phân tích",
+        ),
+    ]
+    for row_index, row in enumerate(rows, 4):
+        for column, value in enumerate(row, 1):
+            ws.cell(row_index, column, value)
+    _body_style(ws, 4, 3 + len(rows), 4)
+    _style_requirement_rows(ws, 4, 3 + len(rows), 3)
+
+    source_type_validation = DataValidation(
+        type="list",
+        formula1='"ticketing,manual_count,apc,survey,other"',
+        allow_blank=False,
+    )
+    confidence_validation = DataValidation(
+        type="list", formula1='"high,medium,low,unknown"', allow_blank=False
+    )
+    scenario_validation = DataValidation(type="list", formula1='"B"', allow_blank=False)
+    operating_day_validation = DataValidation(
+        type="list",
+        formula1='"weekday,saturday,sunday,holiday,special"',
+        allow_blank=False,
+    )
+    tolerance_validation = DataValidation(
+        type="whole",
+        operator="between",
+        formula1="0",
+        formula2="30",
+        allow_blank=False,
+    )
+    for validation in (
+        source_type_validation,
+        confidence_validation,
+        scenario_validation,
+        operating_day_validation,
+        tolerance_validation,
+    ):
+        ws.add_data_validation(validation)
+    key_rows = {ws.cell(row, 1).value: row for row in range(4, 4 + len(rows))}
+    source_type_validation.add(ws.cell(key_rows["trip_ridership_source_type"], 2))
+    confidence_validation.add(ws.cell(key_rows["trip_ridership_confidence"], 2))
+    scenario_validation.add(ws.cell(key_rows["observed_schedule_scenario"], 2))
+    operating_day_validation.add(ws.cell(key_rows["operating_day_type"], 2))
+    tolerance_validation.add(ws.cell(key_rows["match_tolerance_minutes"], 2))
+    ws.freeze_panes = "A4"
+    _autowidth(ws, 62)
+
+
+def _write_trip_ridership_sheet(ws, sample_trip: Trip) -> None:
+    headers = [
+        "observation_id",
+        "service_date",
+        "source_trip_id",
+        "scheduled_trip_id",
+        "direction",
+        "scheduled_departure_time",
+        "actual_departure_time",
+        "passenger_count",
+        "vehicle_id",
+        "notes",
+    ]
+    _title(ws, "SẢN LƯỢNG HÀNH KHÁCH THEO TỪNG CHUYẾN (BỔ SUNG 6A1)", len(headers))
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(headers))
+    sample_note = ws.cell(
+        2,
+        1,
+        "DÒNG MẪU (không được import): SAMPLE-TRIP-001 | 2026-07-01 | "
+        f"{sample_trip.trip_id} | outbound | "
+        f"{_as_time(sample_trip.departure_seconds).strftime('%H:%M')} | "
+        f"{_as_time(sample_trip.departure_seconds + 3 * 60).strftime('%H:%M')} | 42. "
+        "Nhập dữ liệu thật từ dòng 4.",
+    )
+    sample_note.fill = PatternFill("solid", fgColor=LIGHT_BLUE)
+    sample_note.font = Font(name="Aptos", size=10, italic=True, color=TEXT)
+    sample_note.alignment = Alignment(vertical="center", wrap_text=True)
+    ws.row_dimensions[2].height = 34
+    _table_header(ws, 3, headers)
+
+    direction_validation = DataValidation(
+        type="list", formula1='"outbound,inbound"', allow_blank=False
+    )
+    passenger_validation = DataValidation(
+        type="whole",
+        operator="greaterThanOrEqual",
+        formula1="0",
+        allow_blank=False,
+    )
+    ws.add_data_validation(direction_validation)
+    ws.add_data_validation(passenger_validation)
+    direction_validation.add("E4:E1003")
+    passenger_validation.add("H4:H1003")
+    ws.auto_filter.ref = "A3:J3"
+    ws.freeze_panes = "A4"
+    _autowidth(ws, 48)
+
+
 def _write_trip_input_sheet(ws, trips: list[Trip], parameters: ScenarioParameters) -> None:
     headers = [
         "scenario",
@@ -597,6 +739,21 @@ def create_input_template(path: str | Path) -> Path:
             "Workbook có dữ liệu minh họa đầy đủ để chạy pipeline thống nhất.",
             "Thay thế các dòng mẫu bằng dữ liệu thật.",
         ),
+        (
+            "Sản lượng theo chuyến 6A1",
+            "SAN_LUONG_CHUYEN là dữ liệu mô tả bổ sung đối chiếu Scenario B; chưa được dùng để sinh phương án C.",
+            "Khai báo siêu dữ liệu riêng trong THONG_TIN_SAN_LUONG_CHUYEN và thay dòng SAMPLE bằng dữ liệu thực tế.",
+        ),
+        (
+            "Quan sát thiếu",
+            "Thiếu quan sát cho một chuyến-ngày không được hiểu là 0 hành khách.",
+            "Không tự điền 0 và không ngoại suy các chuyến-ngày chưa được quan sát.",
+        ),
+        (
+            "Ghép không an toàn",
+            "Bản ghi mơ hồ, va chạm cùng chuyến-ngày, không ghép được hoặc mâu thuẫn bị loại khỏi thống kê hành khách.",
+            "Tách bộ dữ liệu theo operating_day_type; dùng outbound/inbound và dung sai 0–30 phút.",
+        ),
     ]
     for row_index, row in enumerate(guide_rows, 4):
         for column, value in enumerate(row, 1):
@@ -610,6 +767,11 @@ def create_input_template(path: str | Path) -> Path:
     _write_parameter_sheet(workbook.create_sheet("THONG_SO_B"), parameters_b, "B")
     _write_trip_input_sheet(workbook.create_sheet("BIEU_DO_B"), trips_b, parameters_b)
     _write_authority_metadata_sheet(workbook.create_sheet("THONG_TIN_DU_LIEU"))
+    _write_trip_ridership_metadata_sheet(workbook.create_sheet("THONG_TIN_SAN_LUONG_CHUYEN"))
+    _write_trip_ridership_sheet(
+        workbook.create_sheet("SAN_LUONG_CHUYEN"),
+        trips_b[0],
+    )
 
     demand_sheet = workbook.create_sheet("SAN_LUONG")
     demand_headers = [

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -15,8 +16,10 @@ from bus_schedule_engine.application_pipeline import (
     WORKBOOK_OPTIMIZATION_NOT_READY,
     UnifiedApplicationStatusV1,
     UnifiedRuntimeFailureV1,
+    run_unified_application_pipeline_v1,
 )
 from bus_schedule_engine.excel_exporter import create_input_template
+from bus_schedule_engine.importer import import_workbook
 from bus_schedule_engine.input_authority import (
     AVAILABLE_FLEET_LIMIT_REQUIRED_FOR_OPTIMIZATION,
     WorkbookInputReadinessV1,
@@ -97,6 +100,60 @@ def _seed_page(app: AppTest, state: dict[str, object]) -> AppTest:
     return app
 
 
+def _trip_ridership_workbook(tmp_path: Path) -> Path:
+    path = create_input_template(tmp_path / "trip-ridership-ui.xlsx")
+    workbook = load_workbook(path)
+    values = [
+        "UI-OBS-001",
+        date(2026, 7, 1),
+        "UI-SOURCE-001",
+        "B-001",
+        "outbound",
+        None,
+        "06:03",
+        42,
+        None,
+        "UI diagnostic sample",
+    ]
+    for column, value in enumerate(values, 1):
+        workbook["SAN_LUONG_CHUYEN"].cell(4, column).value = value
+    workbook.save(path)
+    workbook.close()
+    return path
+
+
+def _trip_ridership_complete_state(tmp_path: Path) -> dict[str, object]:
+    imported = import_workbook(_trip_ridership_workbook(tmp_path))
+    run = run_unified_application_pipeline_v1(
+        imported,
+        source_id="trip-ridership-ui",
+        imported_at=datetime(2026, 7, 31, tzinfo=UTC),
+    )
+    assert run.status == UnifiedApplicationStatusV1.COMPLETE
+    assert run.unified_presentation is not None
+    return {
+        "unified_runtime_status": run.status,
+        "workbook_input_readiness": run.input_readiness,
+        "unified_optimization_result": run.unified_result,
+        "unified_presentation": run.unified_presentation,
+        "unified_demand_supply_figure": run.unified_demand_supply_figure,
+        "unified_departure_figure": run.unified_departure_figure,
+        "unified_download_artifacts": {
+            "xlsx": run.unified_xlsx_bytes,
+            "source_id": run.source_id,
+            "presentation_fingerprint": run.unified_presentation.presentation_fingerprint,
+            "b_fingerprint": run.unified_presentation.source_b_fingerprint,
+            "accepted_solution_fingerprint": (
+                run.unified_presentation.accepted_solution_fingerprint
+            ),
+        },
+        "unified_runtime_failure": run.failure,
+        "imported_workbook": imported,
+        "trip_ridership_analysis": run.trip_ridership_analysis,
+        "trip_ridership_failure": run.trip_ridership_failure,
+    }
+
+
 def _assert_missing_state_key(app: AppTest, key: str) -> None:
     with pytest.raises(KeyError):
         _ = app.session_state[key]
@@ -145,6 +202,22 @@ def test_input_page_runs_unified_only_with_default_solver(tmp_path: Path) -> Non
         _assert_missing_state_key(app, legacy_key)
 
 
+def test_page01_shows_trip_record_count_without_matching_before_submit(
+    tmp_path: Path,
+) -> None:
+    content = _trip_ridership_workbook(tmp_path).read_bytes()
+    app = AppTest.from_file("app_pages/01_nhap_du_lieu.py")
+    app.session_state["input_bytes"] = content
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    metric = next(item for item in app.metric if item.label == "Quan sát sản lượng theo chuyến")
+    assert metric.value == "1"
+    _assert_missing_state_key(app, "trip_ridership_analysis")
+    _assert_missing_state_key(app, "trip_ridership_failure")
+
+
 def test_new_upload_removes_stale_legacy_and_unified_results(tmp_path: Path) -> None:
     first = create_input_template(tmp_path / "first.xlsx").read_bytes()
     second_path = create_input_template(tmp_path / "second.xlsx")
@@ -176,6 +249,8 @@ def test_new_upload_removes_stale_legacy_and_unified_results(tmp_path: Path) -> 
         "unified_download_artifacts",
         "unified_runtime_failure",
         "unified_runtime_status",
+        "trip_ridership_analysis",
+        "trip_ridership_failure",
     ):
         app.session_state[key] = object()
 
@@ -198,6 +273,8 @@ def test_new_upload_removes_stale_legacy_and_unified_results(tmp_path: Path) -> 
         _assert_missing_state_key(app, legacy_key)
     assert app.session_state["unified_runtime_status"] is None
     assert app.session_state["unified_presentation"] is None
+    assert app.session_state["trip_ridership_analysis"] is None
+    assert app.session_state["trip_ridership_failure"] is None
 
 
 def test_import_invalid_is_stable_and_only_template_is_downloadable() -> None:
@@ -260,6 +337,74 @@ def test_pages_02_to_04_render_only_verified_unified_facts(
     assert app.info[0].value.startswith("Nguồn kết quả hiển thị: Contract V1.")
     assert app.dataframe
     assert all("pipeline legacy" not in item.value for item in app.warning)
+
+
+def test_page03_renders_supplemental_match_quality_and_trip_summaries(
+    tmp_path: Path,
+) -> None:
+    state = _trip_ridership_complete_state(tmp_path)
+    app = _seed_page(AppTest.from_file("app_pages/03_nhu_cau.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert any(item.value == "Sản lượng theo từng chuyến" for item in app.subheader)
+    assert any("chưa được sử dụng để sinh phương án C" in item.value for item in app.warning)
+    labels = {item.label for item in app.metric}
+    assert {
+        "Số ngày quan sát",
+        "Tỷ lệ ghép dùng được",
+        "Tỷ lệ ghép chính xác",
+        "Bao phủ chuyến B",
+        "Bao phủ chuyến-ngày",
+    }.issubset(labels)
+    markdown = "\n".join(item.value for item in app.markdown)
+    assert "Thống kê mô tả theo chuyến B" in markdown
+    assert "Tổng hợp theo chiều" in markdown
+
+
+def test_page03_refuses_stale_supplemental_analysis(tmp_path: Path) -> None:
+    state = _trip_ridership_complete_state(tmp_path)
+    state["trip_ridership_analysis"] = replace(
+        state["trip_ridership_analysis"],
+        scenario_b_timetable_fingerprint="0" * 64,
+    )
+    app = _seed_page(AppTest.from_file("app_pages/03_nhu_cau.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert any("không khớp workbook hoặc Scenario B hiện tại" in item.value for item in app.warning)
+    markdown = "\n".join(item.value for item in app.markdown)
+    assert "Thống kê mô tả theo chuyến B" not in markdown
+
+
+def test_page03_refuses_same_b_analysis_from_different_trip_dataset(
+    tmp_path: Path,
+) -> None:
+    state = _trip_ridership_complete_state(tmp_path)
+    imported = state["imported_workbook"]
+    changed_observation = replace(
+        imported.trip_ridership_observations[0],
+        passenger_count=imported.trip_ridership_observations[0].passenger_count + 1,
+    )
+    state["imported_workbook"] = replace(
+        imported,
+        trip_ridership_observations=(changed_observation,),
+    )
+    app = _seed_page(AppTest.from_file("app_pages/03_nhu_cau.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert any("không khớp workbook hoặc Scenario B hiện tại" in item.value for item in app.warning)
+    labels = {item.label for item in app.metric}
+    assert "Số ngày quan sát" not in labels
+    assert "Tỷ lệ ghép dùng được" not in labels
+    markdown = "\n".join(item.value for item in app.markdown)
+    assert "Thống kê mô tả theo chuyến B" not in markdown
+    assert "Tổng hợp theo chiều" not in markdown
+    assert "Bản ghi chẩn đoán bị loại" not in markdown
 
 
 @pytest.mark.parametrize(

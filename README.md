@@ -15,7 +15,7 @@ oracle.
 
 ### Contract V1 ordinary application runtime
 
-Milestone 5C2 implements the unified-only ordinary Streamlit path. It:
+Milestone 5C2 is merged and implements the unified-only ordinary Streamlit path. It:
 
 - assesses authoritative-input readiness before analysis;
 - runs Contract V1 once for optimization-ready input;
@@ -23,6 +23,18 @@ Milestone 5C2 implements the unified-only ordinary Streamlit path. It:
 - fails closed on runtime or semantic-integrity failure;
 - renders unified Plotly charts and the three Contract V1 downloads; and
 - never runs legacy analysis or per-submission side-by-side comparison.
+
+### Supplemental trip-level ridership analysis
+
+Milestone 6A1 adds optional `THONG_TIN_SAN_LUONG_CHUYEN` and
+`SAN_LUONG_CHUYEN` workbook sheets. The application deterministically matches those observations
+to Scenario B, excludes ambiguous, collided, unmatched, and invalid records, and reports
+per-trip descriptive passenger/load statistics plus explicit route and direction coverage.
+This evidence is supplemental only: `SAN_LUONG` remains the sole Contract V1 demand authority,
+trip records never enter `ObservedDemandInput`, solver requests and Scenario C are unchanged, and
+ordinary Streamlit remains Contract V1-only. Protected high-demand service-floor rules remain
+future Milestone 6A2 work. See
+[Milestone 6A1 trip-level ridership analysis](docs/engine/MILESTONE_6A1_TRIP_RIDERSHIP_ANALYSIS.md).
 
 ### Offline legacy regression oracle
 
@@ -108,6 +120,8 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 
 - One route, two terminals, and two timetable directions.
 - Workbook import with Scenario B required and Scenario A/demand/configuration optional.
+- Optional supplemental trip-level ridership import, deterministic Scenario B matching, and
+  coverage-aware descriptive analysis that does not affect optimization.
 - Legacy technical validation for totals, endpoints, runtime, turnaround, and declared vehicle
   chains.
 - Multi-day demand normalization and legacy load-factor/headway evaluation.
@@ -176,7 +190,8 @@ Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation, Mile
 authoritative input readiness, Milestone 5A2B validation-only presentation adapters, Milestone
 5B1 Streamlit shadow execution, Milestone 5B2A unified result Pages 02–04, and Milestone 5B2B
 unified Page 05 artifacts are implemented and merged. Milestone 5C1 is merged and Milestone 5C2
-is implemented**, but Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
+is merged. Milestone 6A1 supplemental trip-level ridership analysis is implemented**, but
+Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
 2. Milestone 5A2A: stabilize authoritative workbook input and readiness.
@@ -192,6 +207,9 @@ is implemented**, but Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require for
 8. Milestone 5C2: make Contract V1 the only ordinary Streamlit runtime and move side-by-side
    validation to an explicit offline release audit (implemented; formal approval pending).
 9. Milestone 5C3: separately remove authorized legacy code after approval (not started).
+10. Milestone 6A1: add supplemental, coverage-aware trip-level ridership analysis without
+    changing optimization authority.
+11. Milestone 6A2: consider protected high-demand service floors (future; not implemented).
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)
