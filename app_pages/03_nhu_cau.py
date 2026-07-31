@@ -1,11 +1,11 @@
 import streamlit as st
 
 from bus_schedule_engine.models import TripRidershipMatchStatusV1
-from bus_schedule_engine.time_utils import format_hhmm
-from bus_schedule_engine.trip_ridership import (
-    trip_ridership_analysis_is_current_v1,
-    trip_ridership_input_fingerprint_v1,
+from bus_schedule_engine.protected_service_floor import (
+    protected_service_floor_assessment_is_current_v1,
 )
+from bus_schedule_engine.time_utils import format_hhmm
+from bus_schedule_engine.trip_ridership import trip_ridership_analysis_is_current_v1
 from bus_schedule_engine.ui_result_authority import (
     VisibleResultModeV1,
     resolve_visible_result_context_v1,
@@ -314,29 +314,11 @@ if visible.uses_unified:
     )
     protected_assessment = st.session_state.get("protected_service_floor_assessment")
     protected_failure = st.session_state.get("protected_service_floor_failure")
-    current_trip_input_fingerprint = (
-        trip_ridership_input_fingerprint_v1(
-            imported_workbook,
-            b_fingerprint,
-        )
-        if imported_workbook is not None
-        else None
-    )
-    assessment_is_current = bool(
-        imported_workbook is not None
-        and protected_assessment is not None
-        and protected_assessment.scenario_b_fingerprint == b_fingerprint
-        and protected_assessment.trip_ridership_input_fingerprint == current_trip_input_fingerprint
-        and protected_assessment.trip_ridership_analysis_fingerprint
-        == (trip_analysis.analysis_fingerprint if trip_analysis is not None else None)
-        and (
-            protected_assessment.trip_ridership_analysis_fingerprint is None
-            or trip_ridership_analysis_is_current_v1(
-                trip_analysis,
-                imported_workbook,
-                b_fingerprint,
-            )
-        )
+    assessment_is_current = protected_service_floor_assessment_is_current_v1(
+        protected_assessment,
+        imported_workbook,
+        unified_result.normalized_inputs.scenario_b,
+        trip_analysis,
     )
     if protected_failure is not None:
         st.warning(

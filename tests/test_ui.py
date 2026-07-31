@@ -9,6 +9,7 @@ from openpyxl import load_workbook
 from presentation_support import build_result_and_report, rejected_result_and_report
 from streamlit.testing.v1 import AppTest
 
+import bus_schedule_engine.protected_service_floor as protected_service_floor
 from bus_schedule_engine.application_pipeline import (
     CONTRACT_V1_ARTIFACT_FAILED,
     CONTRACT_V1_SOLVER_FAILED,
@@ -380,6 +381,54 @@ def test_page03_renders_supplemental_match_quality_and_trip_summaries(
     )
     assert "Ngưỡng chính sách 6A2A" in markdown
     assert "Preview sàn dịch vụ tương lai — chưa thực thi" in markdown
+
+
+def test_page03_refuses_assessment_after_active_protected_policy_changes(
+    tmp_path: Path,
+) -> None:
+    state = _trip_ridership_complete_state(tmp_path)
+    imported = state["imported_workbook"]
+    state["imported_workbook"] = replace(
+        imported,
+        configuration={
+            **imported.configuration,
+            "protected_service_floor_maximum_protected_b_headway_minutes": 25,
+        },
+    )
+    app = _seed_page(AppTest.from_file("app_pages/03_nhu_cau.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert any("Chưa có đánh giá 6A2A hiện hành" in item.value for item in app.info)
+    markdown = "\n".join(item.value for item in app.markdown)
+    assert "Ngưỡng chính sách 6A2A" not in markdown
+
+
+def test_page03_delegates_assessment_currentness_to_domain_helper(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = _trip_ridership_complete_state(tmp_path)
+    calls: list[tuple[object, ...]] = []
+
+    def reject_assessment(*args: object) -> bool:
+        calls.append(args)
+        return False
+
+    monkeypatch.setattr(
+        protected_service_floor,
+        "protected_service_floor_assessment_is_current_v1",
+        reject_assessment,
+    )
+    app = _seed_page(AppTest.from_file("app_pages/03_nhu_cau.py"), state)
+
+    app.run(timeout=30)
+
+    assert not app.exception
+    assert len(calls) == 1
+    assert calls[0][0] is state["protected_service_floor_assessment"]
+    assert any("Chưa có đánh giá 6A2A hiện hành" in item.value for item in app.info)
 
 
 def test_page03_refuses_stale_supplemental_analysis(tmp_path: Path) -> None:

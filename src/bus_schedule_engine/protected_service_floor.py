@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 from dataclasses import asdict, dataclass
 from enum import Enum
 from numbers import Integral, Real
@@ -119,6 +120,10 @@ def _canonical_sha256(payload: object) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _is_sha256_fingerprint(value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
 
 
 def _direction(direction: ContractDirection) -> TripRidershipDirectionV1:
@@ -328,9 +333,32 @@ def protected_service_floor_policy_from_workbook_v1(
         prefixed = f"protected_service_floor_{name}"
         if prefixed in configuration:
             values[name] = _coerce_policy_value(name, configuration[prefixed])
-        elif name != "minimum_regime_duration_minutes" and name in configuration:
-            values[name] = _coerce_policy_value(name, configuration[name])
     return ProtectedServiceFloorPolicyV1(**values)
+
+
+def _protected_service_floor_policy_fingerprint_v1(
+    policy: ProtectedServiceFloorPolicyV1,
+) -> str:
+    return _canonical_sha256(
+        {
+            "profile": PROTECTED_SERVICE_FLOOR_POLICY_PROFILE,
+            "policy": asdict(policy),
+        }
+    )
+
+
+def _current_b_regime_derivation_fingerprint_v1(
+    regimes: tuple[CurrentBServiceRegimeV1, ...],
+    policy: ProtectedServiceFloorPolicyV1,
+) -> str:
+    return _canonical_sha256(
+        {
+            "profile": CURRENT_B_REGIME_DERIVATION_PROFILE,
+            "boundary_policy": asdict(_BOUNDARY_POLICY),
+            "rounding_tolerance_minutes": policy.headway_rounding_tolerance_minutes,
+            "regimes": [asdict(regime) for regime in regimes],
+        }
+    )
 
 
 def _analysis_trip_facts_match_active_workbook(
@@ -598,6 +626,38 @@ def _decision(
     )
 
 
+def _protected_service_floor_assessment_fingerprint_v1(
+    *,
+    scenario_b_fingerprint: str,
+    trip_ridership_input_fingerprint: str | None,
+    trip_ridership_analysis_fingerprint: str | None,
+    policy_fingerprint: str,
+    regime_derivation_fingerprint: str,
+    target_load_factor: float,
+    maximum_load_factor: float,
+    decisions: tuple[ProtectedRegimeDecisionV1, ...],
+    protected_previews: tuple[ProtectedServiceFloorPreviewV1, ...],
+    issue_codes: tuple[str, ...],
+    limitations: tuple[str, ...],
+) -> str:
+    return _canonical_sha256(
+        {
+            "profile": PROTECTED_SERVICE_FLOOR_ASSESSMENT_PROFILE,
+            "scenario_b_fingerprint": scenario_b_fingerprint,
+            "trip_ridership_input_fingerprint": trip_ridership_input_fingerprint,
+            "trip_ridership_analysis_fingerprint": trip_ridership_analysis_fingerprint,
+            "policy_fingerprint": policy_fingerprint,
+            "regime_derivation_fingerprint": regime_derivation_fingerprint,
+            "target_load_factor": target_load_factor,
+            "maximum_load_factor": maximum_load_factor,
+            "decisions": [asdict(decision) for decision in decisions],
+            "protected_previews": [asdict(preview) for preview in protected_previews],
+            "issue_codes": issue_codes,
+            "limitations": limitations,
+        }
+    )
+
+
 def assess_protected_service_floors_v1(
     imported: ImportedWorkbook,
     scenario_b: ScenarioBInput,
@@ -610,20 +670,11 @@ def assess_protected_service_floors_v1(
         imported,
         b_fingerprint,
     )
-    policy_fingerprint = _canonical_sha256(
-        {
-            "profile": PROTECTED_SERVICE_FLOOR_POLICY_PROFILE,
-            "policy": asdict(policy),
-        }
-    )
+    policy_fingerprint = _protected_service_floor_policy_fingerprint_v1(policy)
     regimes = derive_current_b_service_regimes_v1(scenario_b, policy)
-    regime_derivation_fingerprint = _canonical_sha256(
-        {
-            "profile": CURRENT_B_REGIME_DERIVATION_PROFILE,
-            "boundary_policy": asdict(_BOUNDARY_POLICY),
-            "rounding_tolerance_minutes": policy.headway_rounding_tolerance_minutes,
-            "regimes": [asdict(regime) for regime in regimes],
-        }
+    regime_derivation_fingerprint = _current_b_regime_derivation_fingerprint_v1(
+        regimes,
+        policy,
     )
     eligibility_code, evidence_is_current = _analysis_eligibility(
         imported,
@@ -704,21 +755,18 @@ def assess_protected_service_floors_v1(
         if trip_ridership_analysis is not None
         else None
     )
-    assessment_fingerprint = _canonical_sha256(
-        {
-            "profile": PROTECTED_SERVICE_FLOOR_ASSESSMENT_PROFILE,
-            "scenario_b_fingerprint": b_fingerprint,
-            "trip_ridership_input_fingerprint": input_fingerprint,
-            "trip_ridership_analysis_fingerprint": analysis_fingerprint,
-            "policy_fingerprint": policy_fingerprint,
-            "regime_derivation_fingerprint": regime_derivation_fingerprint,
-            "target_load_factor": imported.parameters_b.target_load_factor,
-            "maximum_load_factor": imported.parameters_b.maximum_load_factor,
-            "decisions": [asdict(decision) for decision in decision_tuple],
-            "protected_previews": [asdict(preview) for preview in previews],
-            "issue_codes": issue_codes,
-            "limitations": limitations,
-        }
+    assessment_fingerprint = _protected_service_floor_assessment_fingerprint_v1(
+        scenario_b_fingerprint=b_fingerprint,
+        trip_ridership_input_fingerprint=input_fingerprint,
+        trip_ridership_analysis_fingerprint=analysis_fingerprint,
+        policy_fingerprint=policy_fingerprint,
+        regime_derivation_fingerprint=regime_derivation_fingerprint,
+        target_load_factor=imported.parameters_b.target_load_factor,
+        maximum_load_factor=imported.parameters_b.maximum_load_factor,
+        decisions=decision_tuple,
+        protected_previews=previews,
+        issue_codes=issue_codes,
+        limitations=limitations,
     )
     return ProtectedServiceFloorAssessmentV1(
         scenario_b_fingerprint=b_fingerprint,
@@ -738,11 +786,104 @@ def assess_protected_service_floors_v1(
     )
 
 
+def protected_service_floor_assessment_is_current_v1(
+    assessment: ProtectedServiceFloorAssessmentV1 | None,
+    imported: ImportedWorkbook | None,
+    scenario_b: ScenarioBInput | None,
+    trip_ridership_analysis: TripRidershipAnalysisV1 | None,
+) -> bool:
+    """Verify the full current 6A2A authority chain without reclassifying regimes."""
+    if (
+        not isinstance(assessment, ProtectedServiceFloorAssessmentV1)
+        or not isinstance(imported, ImportedWorkbook)
+        or not isinstance(scenario_b, ScenarioBInput)
+        or not isinstance(assessment.policy, ProtectedServiceFloorPolicyV1)
+    ):
+        return False
+
+    required_fingerprints = (
+        assessment.scenario_b_fingerprint,
+        assessment.policy_fingerprint,
+        assessment.regime_derivation_fingerprint,
+        assessment.assessment_fingerprint,
+    )
+    if not all(_is_sha256_fingerprint(value) for value in required_fingerprints):
+        return False
+    for optional_fingerprint in (
+        assessment.trip_ridership_input_fingerprint,
+        assessment.trip_ridership_analysis_fingerprint,
+    ):
+        if optional_fingerprint is not None and not _is_sha256_fingerprint(optional_fingerprint):
+            return False
+
+    try:
+        current_b_fingerprint = scenario_fingerprint(scenario_b)
+        current_input_fingerprint = trip_ridership_input_fingerprint_v1(
+            imported,
+            current_b_fingerprint,
+        )
+        current_policy = protected_service_floor_policy_from_workbook_v1(imported)
+        current_policy_fingerprint = _protected_service_floor_policy_fingerprint_v1(current_policy)
+        current_derivation_fingerprint = _current_b_regime_derivation_fingerprint_v1(
+            assessment.regimes,
+            current_policy,
+        )
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+    current_analysis_fingerprint: str | None = None
+    if trip_ridership_analysis is not None:
+        if not trip_ridership_analysis_is_current_v1(
+            trip_ridership_analysis,
+            imported,
+            current_b_fingerprint,
+        ):
+            return False
+        current_analysis_fingerprint = trip_ridership_analysis.analysis_fingerprint
+        if not _is_sha256_fingerprint(current_analysis_fingerprint):
+            return False
+
+    if current_input_fingerprint is not None and not _is_sha256_fingerprint(
+        current_input_fingerprint
+    ):
+        return False
+    if (
+        assessment.scenario_b_fingerprint != current_b_fingerprint
+        or assessment.trip_ridership_input_fingerprint != current_input_fingerprint
+        or assessment.trip_ridership_analysis_fingerprint != current_analysis_fingerprint
+        or assessment.policy != current_policy
+        or assessment.policy_fingerprint != current_policy_fingerprint
+        or assessment.regime_derivation_fingerprint != current_derivation_fingerprint
+        or assessment.target_load_factor != imported.parameters_b.target_load_factor
+        or assessment.maximum_load_factor != imported.parameters_b.maximum_load_factor
+    ):
+        return False
+
+    try:
+        expected_assessment_fingerprint = _protected_service_floor_assessment_fingerprint_v1(
+            scenario_b_fingerprint=assessment.scenario_b_fingerprint,
+            trip_ridership_input_fingerprint=(assessment.trip_ridership_input_fingerprint),
+            trip_ridership_analysis_fingerprint=(assessment.trip_ridership_analysis_fingerprint),
+            policy_fingerprint=assessment.policy_fingerprint,
+            regime_derivation_fingerprint=(assessment.regime_derivation_fingerprint),
+            target_load_factor=assessment.target_load_factor,
+            maximum_load_factor=assessment.maximum_load_factor,
+            decisions=assessment.decisions,
+            protected_previews=assessment.protected_previews,
+            issue_codes=assessment.issue_codes,
+            limitations=assessment.limitations,
+        )
+    except (AttributeError, TypeError, ValueError):
+        return False
+    return assessment.assessment_fingerprint == expected_assessment_fingerprint
+
+
 __all__ = [
     "CURRENT_B_REGIME_DERIVATION_PROFILE",
     "PROTECTED_SERVICE_FLOOR_ASSESSMENT_PROFILE",
     "PROTECTED_SERVICE_FLOOR_POLICY_PROFILE",
     "assess_protected_service_floors_v1",
     "derive_current_b_service_regimes_v1",
+    "protected_service_floor_assessment_is_current_v1",
     "protected_service_floor_policy_from_workbook_v1",
 ]

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import bus_schedule_engine.protected_service_floor as protected_service_floor
 from bus_schedule_engine.application_pipeline import (
     UnifiedApplicationStatusV1,
     run_unified_application_pipeline_v1,
@@ -44,6 +45,7 @@ from bus_schedule_engine.models import (
 from bus_schedule_engine.protected_service_floor import (
     assess_protected_service_floors_v1,
     derive_current_b_service_regimes_v1,
+    protected_service_floor_assessment_is_current_v1,
     protected_service_floor_policy_from_workbook_v1,
 )
 from bus_schedule_engine.protected_service_floor_codes import (
@@ -620,6 +622,190 @@ def test_b_timetable_change_alters_regime_and_assessment_fingerprints() -> None:
     assert imported.trip_ridership_observations
 
 
+def test_unchanged_protected_service_floor_assessment_is_current() -> None:
+    imported, scenario, analysis, assessment = _assessment()
+
+    assert protected_service_floor_assessment_is_current_v1(
+        assessment,
+        imported,
+        scenario,
+        analysis,
+    )
+
+
+@pytest.mark.parametrize(
+    ("policy_key", "changed_value"),
+    (
+        ("maximum_protected_b_headway_minutes", 25),
+        ("minimum_observed_days_per_trip", 4),
+    ),
+)
+def test_active_prefixed_policy_change_makes_assessment_stale(
+    policy_key: str,
+    changed_value: object,
+) -> None:
+    imported, scenario, analysis, assessment = _assessment()
+    changed_imported = replace(
+        imported,
+        configuration={f"protected_service_floor_{policy_key}": changed_value},
+    )
+
+    assert not protected_service_floor_assessment_is_current_v1(
+        assessment,
+        changed_imported,
+        scenario,
+        analysis,
+    )
+
+
+@pytest.mark.parametrize(
+    ("parameter_name", "changed_value"),
+    (
+        ("target_load_factor", 0.80),
+        ("maximum_load_factor", 0.95),
+    ),
+)
+def test_active_load_threshold_change_makes_assessment_stale(
+    parameter_name: str,
+    changed_value: float,
+) -> None:
+    imported, scenario, analysis, assessment = _assessment()
+    changed_imported = replace(
+        imported,
+        parameters_b=replace(
+            imported.parameters_b,
+            **{parameter_name: changed_value},
+        ),
+    )
+
+    assert not protected_service_floor_assessment_is_current_v1(
+        assessment,
+        changed_imported,
+        scenario,
+        analysis,
+    )
+
+
+def test_scenario_b_change_makes_assessment_stale() -> None:
+    imported, scenario, analysis, assessment = _assessment()
+    changed_last_trip = replace(
+        scenario.exact_timetable[-1],
+        departure_time=scenario.exact_timetable[-1].departure_time + 60,
+        arrival_time=scenario.exact_timetable[-1].arrival_time + 60,
+    )
+    changed_scenario = replace(
+        scenario,
+        exact_timetable=(*scenario.exact_timetable[:-1], changed_last_trip),
+        last_departures=replace(
+            scenario.last_departures,
+            terminal_1=scenario.last_departures.terminal_1 + 60,
+        ),
+    )
+
+    assert not protected_service_floor_assessment_is_current_v1(
+        assessment,
+        imported,
+        changed_scenario,
+        analysis,
+    )
+
+
+def test_trip_ridership_input_or_analysis_change_makes_assessment_stale() -> None:
+    imported, scenario, analysis, assessment = _assessment()
+    changed_observations = tuple(
+        replace(
+            observation,
+            passenger_count=observation.passenger_count + 1,
+        )
+        if observation.observation_id == "O01-D01"
+        else observation
+        for observation in imported.trip_ridership_observations
+    )
+    changed_imported = replace(
+        imported,
+        trip_ridership_observations=changed_observations,
+    )
+    changed_analysis = analyze_trip_ridership_v1(changed_imported, scenario)
+
+    assert not protected_service_floor_assessment_is_current_v1(
+        assessment,
+        changed_imported,
+        scenario,
+        analysis,
+    )
+    assert not protected_service_floor_assessment_is_current_v1(
+        assessment,
+        changed_imported,
+        scenario,
+        changed_analysis,
+    )
+
+
+@pytest.mark.parametrize(
+    "assessment_fingerprint",
+    (None, "malformed", "0" * 64),
+)
+def test_invalid_or_mismatched_assessment_fingerprint_is_stale(
+    assessment_fingerprint: str | None,
+) -> None:
+    imported, scenario, analysis, assessment = _assessment()
+    invalid = replace(
+        assessment,
+        assessment_fingerprint=assessment_fingerprint,
+    )
+
+    assert not protected_service_floor_assessment_is_current_v1(
+        invalid,
+        imported,
+        scenario,
+        analysis,
+    )
+
+
+def test_assessment_component_or_derivation_profile_change_is_stale(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, scenario, analysis, assessment = _assessment()
+    inconsistent = replace(
+        assessment,
+        issue_codes=(*assessment.issue_codes, "TAMPERED_ASSESSMENT_COMPONENT"),
+    )
+
+    assert not protected_service_floor_assessment_is_current_v1(
+        inconsistent,
+        imported,
+        scenario,
+        analysis,
+    )
+
+    monkeypatch.setattr(
+        protected_service_floor,
+        "CURRENT_B_REGIME_DERIVATION_PROFILE",
+        "m6a2a_current_b_service_regimes_v2",
+    )
+    assert not protected_service_floor_assessment_is_current_v1(
+        assessment,
+        imported,
+        scenario,
+        analysis,
+    )
+
+
+def test_missing_required_analysis_binding_makes_assessment_stale() -> None:
+    imported, scenario, analysis, assessment = _assessment()
+    missing_binding = replace(
+        assessment,
+        trip_ridership_analysis_fingerprint=None,
+    )
+
+    assert not protected_service_floor_assessment_is_current_v1(
+        missing_binding,
+        imported,
+        scenario,
+        analysis,
+    )
+
+
 def test_notes_and_source_row_order_do_not_change_fingerprints() -> None:
     imported, scenario, analysis, assessment = _assessment()
     reordered = replace(
@@ -710,10 +896,10 @@ def test_workbook_policy_uses_explicit_optional_values() -> None:
         configuration={
             "protected_service_floor_maximum_protected_b_headway_minutes": 25,
             "protected_service_floor_minimum_regime_duration_minutes": 45,
-            "minimum_observed_days_per_trip": 4,
-            "minimum_high_load_trip_share": 0.75,
-            "protected_load_statistic": "p85",
-            "minimum_trip_ridership_confidence": "HIGH",
+            "protected_service_floor_minimum_observed_days_per_trip": 4,
+            "protected_service_floor_minimum_high_load_trip_share": 0.75,
+            "protected_service_floor_protected_load_statistic": "p85",
+            "protected_service_floor_minimum_trip_ridership_confidence": "HIGH",
         },
     )
 
@@ -725,6 +911,63 @@ def test_workbook_policy_uses_explicit_optional_values() -> None:
     assert policy.minimum_high_load_trip_share == 0.75
     assert policy.protected_load_statistic == "P85"
     assert policy.minimum_trip_ridership_confidence == "high"
+
+
+@pytest.mark.parametrize(
+    ("unprefixed_name", "unprefixed_value", "policy_field", "expected_default"),
+    (
+        ("maximum_protected_b_headway_minutes", 45, "maximum_protected_b_headway_minutes", 30),
+        ("headway_rounding_tolerance_minutes", 4, "headway_rounding_tolerance_minutes", 1),
+        ("minimum_departures_per_regime", 5, "minimum_departures_per_regime", 3),
+        ("minimum_regime_duration_minutes", 75, "minimum_regime_duration_minutes", 30),
+        ("minimum_observed_days_per_trip", 7, "minimum_observed_days_per_trip", 3),
+        ("minimum_regime_trip_coverage_rate", 0.9, "minimum_regime_trip_coverage_rate", 0.8),
+        ("minimum_high_load_trip_share", 0.95, "minimum_high_load_trip_share", 0.67),
+        ("protected_load_statistic", "P90", "protected_load_statistic", "P85"),
+        (
+            "minimum_trip_ridership_confidence",
+            "high",
+            "minimum_trip_ridership_confidence",
+            "medium",
+        ),
+        (
+            "future_service_window_boundary_tolerance_minutes",
+            9,
+            "future_service_window_boundary_tolerance_minutes",
+            0,
+        ),
+    ),
+)
+def test_unprefixed_configuration_does_not_control_6a2a_policy(
+    unprefixed_name: str,
+    unprefixed_value: object,
+    policy_field: str,
+    expected_default: object,
+) -> None:
+    scenario = _scenario((0, 15, 30))
+    imported = _imported(
+        scenario,
+        configuration={unprefixed_name: unprefixed_value},
+    )
+
+    policy = protected_service_floor_policy_from_workbook_v1(imported)
+
+    assert getattr(policy, policy_field) == expected_default
+
+
+def test_explicit_prefixed_rounding_tolerance_controls_6a2a_policy() -> None:
+    scenario = _scenario((0, 15, 30))
+    imported = _imported(
+        scenario,
+        configuration={
+            "headway_rounding_tolerance_minutes": 4,
+            "protected_service_floor_headway_rounding_tolerance_minutes": 2,
+        },
+    )
+
+    policy = protected_service_floor_policy_from_workbook_v1(imported)
+
+    assert policy.headway_rounding_tolerance_minutes == 2
 
 
 def test_generated_template_declares_all_policy_defaults(tmp_path: Path) -> None:

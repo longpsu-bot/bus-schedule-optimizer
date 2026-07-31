@@ -70,6 +70,7 @@ from .optimization_service import (
 from .protected_service_floor import (
     assess_protected_service_floors_v1,
     derive_current_b_service_regimes_v1,
+    protected_service_floor_assessment_is_current_v1,
     protected_service_floor_policy_from_workbook_v1,
 )
 from .protected_service_floor_codes import (
@@ -337,6 +338,7 @@ __all__ = [
     "export_unified_result_workbook_v1",
     "normalization_options_from_workbook_v1",
     "outcome_rows_v1",
+    "protected_service_floor_assessment_is_current_v1",
     "protected_service_floor_policy_from_workbook_v1",
     "headway_regime_rows_v1",
     "resolve_visible_result_context_v1",

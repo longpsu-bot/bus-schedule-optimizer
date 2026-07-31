@@ -59,7 +59,8 @@ performed by the policy model. Values are never inferred from the observed resul
 The template declares isolated `protected_service_floor_*` keys in `CAU_HINH`. Isolation avoids
 changing existing Scenario-C configuration semantics, especially the older
 `minimum_regime_duration_minutes` setting. Workbooks without 6A2A keys receive the policy
-defaults.
+defaults. Unprefixed Scenario-C or generic configuration keys are never aliases for 6A2A policy
+and are ignored by the protected-service-floor policy loader.
 
 ## 5. Trip-ridership eligibility
 
@@ -168,6 +169,11 @@ policy, regime-derivation, and assessment SHA-256 fingerprints. The assessment i
 the target/maximum load factors, regime facts, evidence, decisions, previews, issue codes, and
 limitations.
 
+The canonical currentness check validates the active Scenario B, trip-input and analysis
+fingerprints, prefixed policy and policy fingerprint, target/maximum load thresholds,
+regime-derivation profile and fingerprint, and the assessment fingerprint reconstructed from its
+bound components. A missing, malformed, stale, or internally inconsistent binding fails closed.
+
 Departure or timetable-order facts, headways, boundaries, passenger counts, dates, match and
 collision results, P85, capacity, load thresholds, confidence, policy, and decisions alter the
 appropriate identity. Source row order, notes, workbook path/bytes, and UI table order do not.
@@ -190,8 +196,9 @@ regimes. New upload, result clearing, and new execution clear both 6A2A session 
 
 Below the 6A1 analysis, Page 03 displays the policy, every derived B regime, headway and
 regularity, coverage/P85 evidence, decision, all failed gates, and protected previews. It labels
-the result as proposed protection that is not applied to Scenario C. Pages 02, 04, and 05 retain
-their existing authority and behavior.
+the result as proposed protection that is not applied to Scenario C. Page 03 delegates assessment
+currentness to the canonical 6A2A domain helper and does not reclassify regimes. Pages 02, 04, and
+05 retain their existing authority and behavior.
 
 ## 15. Failure isolation
 
