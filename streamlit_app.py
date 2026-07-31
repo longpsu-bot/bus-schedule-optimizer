@@ -28,6 +28,8 @@ for key, default in {
     "unified_download_artifacts": None,
     "unified_runtime_failure": None,
     "unified_runtime_status": None,
+    "trip_ridership_analysis": None,
+    "trip_ridership_failure": None,
 }.items():
     st.session_state.setdefault(key, default)
 

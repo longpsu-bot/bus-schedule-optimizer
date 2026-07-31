@@ -23,7 +23,11 @@ from .input_authority import (
     assess_workbook_input_readiness_v1,
     normalization_options_from_workbook_v1,
 )
-from .models import AnalysisBundle
+from .models import (
+    AnalysisBundle,
+    TripRidershipAnalysisFailureV1,
+    TripRidershipAnalysisV1,
+)
 from .optimization_service import (
     BusScheduleOptimizationResult,
     OptimizationExecutionErrorV1,
@@ -31,6 +35,8 @@ from .optimization_service import (
     SolverChoice,
     analyze_and_optimize_schedule_v1,
 )
+from .trip_ridership import analyze_trip_ridership_v1
+from .trip_ridership_codes import TRIP_RIDERSHIP_ANALYSIS_FAILED
 from .unified_diagram import (
     build_unified_demand_supply_figure_v1,
     build_unified_departure_figure_v1,
@@ -69,7 +75,8 @@ _SENSITIVE_SOURCE_PATTERN = re.compile(
 )
 _MAX_SANITIZED_MESSAGE_LENGTH = 240
 _SAFE_IMPORT_SHEET_PATTERN = re.compile(
-    r"\b(?:THONG_SO_[AB]|BIEU_DO_[AB]|SAN_LUONG|THONG_TIN_DU_LIEU|CAU_HINH|HUONG_DAN)\b"
+    r"\b(?:THONG_SO_[AB]|BIEU_DO_[AB]|SAN_LUONG(?:_CHUYEN)?|"
+    r"THONG_TIN_(?:DU_LIEU|SAN_LUONG_CHUYEN)|CAU_HINH|HUONG_DAN)\b"
 )
 _SAFE_IMPORT_FIELD_PATTERN = re.compile(
     r"\b(?:"
@@ -83,7 +90,11 @@ _SAFE_IMPORT_FIELD_PATTERN = re.compile(
     r"direction|departure_time|arrival_time|vehicle_id|vehicle_capacity_override|"
     r"period_start|period_end|observation_days|time_block_start|time_block_end|"
     r"passenger_volume|volume_type|demand_dataset_id|demand_source_type|"
-    r"demand_confidence|demand_response_mode|source_notes"
+    r"demand_confidence|demand_response_mode|source_notes|observation_id|"
+    r"service_date|source_trip_id|scheduled_trip_id|scheduled_departure_time|"
+    r"actual_departure_time|passenger_count|trip_ridership_dataset_id|"
+    r"trip_ridership_source_type|trip_ridership_confidence|"
+    r"observed_schedule_scenario|match_tolerance_minutes"
     r")\b"
 )
 
@@ -121,6 +132,8 @@ class UnifiedApplicationRunV1:
     source_id: str
     imported_at: datetime
     failure: UnifiedRuntimeFailureV1 | None
+    trip_ridership_analysis: TripRidershipAnalysisV1 | None = None
+    trip_ridership_failure: TripRidershipAnalysisFailureV1 | None = None
 
 
 def run_and_build_artifacts(
@@ -164,6 +177,50 @@ def sanitize_import_error_message_v1(exc: Exception) -> str:
     if fields:
         details.append(f"Field: {', '.join(fields)}.")
     return f"{exc.__class__.__name__}: {' '.join(details)}"[:_MAX_SANITIZED_MESSAGE_LENGTH]
+
+
+def _build_trip_ridership_analysis_failure_v1(
+    *,
+    imported: ImportedWorkbook,
+    scenario_b_fingerprint: str,
+    exc: Exception,
+) -> TripRidershipAnalysisFailureV1:
+    dataset_id = (
+        imported.trip_ridership_metadata.dataset_id
+        if imported.trip_ridership_metadata is not None
+        else None
+    )
+    exception_class = exc.__class__.__name__
+    payload = json.dumps(
+        {
+            "code": TRIP_RIDERSHIP_ANALYSIS_FAILED,
+            "dataset_id": dataset_id,
+            "scenario_b_fingerprint": scenario_b_fingerprint,
+            "exception_class": exception_class,
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    failure = TripRidershipAnalysisFailureV1(
+        code=TRIP_RIDERSHIP_ANALYSIS_FAILED,
+        correlation_id=f"m6a1-{hashlib.sha256(payload).hexdigest()[:20]}",
+        sanitized_message=(f"{exception_class}: supplemental trip-ridership analysis failed")[
+            :_MAX_SANITIZED_MESSAGE_LENGTH
+        ],
+        dataset_id=dataset_id,
+        scenario_b_timetable_fingerprint=scenario_b_fingerprint,
+    )
+    LOGGER.error(
+        "trip_ridership_analysis_failure correlation_id=%s code=%s "
+        "exception_class=%s dataset_id=%s b_fingerprint=%s",
+        failure.correlation_id,
+        failure.code,
+        exception_class,
+        failure.dataset_id,
+        failure.scenario_b_timetable_fingerprint,
+    )
+    return failure
 
 
 def _result_status_codes(
@@ -386,6 +443,8 @@ def _failed_unified_run(
     result: BusScheduleOptimizationResult | None = None,
     presentation: UnifiedPresentationBundleV1 | None = None,
     retain_verified_presentation: bool = False,
+    trip_ridership_analysis: TripRidershipAnalysisV1 | None = None,
+    trip_ridership_failure: TripRidershipAnalysisFailureV1 | None = None,
 ) -> UnifiedApplicationRunV1:
     failure = build_unified_runtime_failure_v1(
         code=code,
@@ -414,6 +473,8 @@ def _failed_unified_run(
         source_id=source_id,
         imported_at=imported_at,
         failure=failure,
+        trip_ridership_analysis=(trip_ridership_analysis if retain_verified_presentation else None),
+        trip_ridership_failure=(trip_ridership_failure if retain_verified_presentation else None),
     )
 
 
@@ -539,6 +600,28 @@ def run_unified_application_pipeline_v1(
             result=unified_result,
         )
 
+    trip_ridership_analysis: TripRidershipAnalysisV1 | None = None
+    trip_ridership_failure: TripRidershipAnalysisFailureV1 | None = None
+    if unified_input.trip_ridership_observations:
+        scenario_b_fingerprint = unified_result.normalized_inputs.scenario_b_fingerprint
+        try:
+            trip_ridership_analysis = analyze_trip_ridership_v1(
+                unified_input,
+                unified_result.normalized_inputs.scenario_b,
+            )
+            if trip_ridership_analysis.scenario_b_timetable_fingerprint != scenario_b_fingerprint:
+                raise ValueError(
+                    "Supplemental trip-ridership analysis is not bound to "
+                    "the normalized Scenario B fingerprint"
+                )
+        except Exception as exc:
+            trip_ridership_analysis = None
+            trip_ridership_failure = _build_trip_ridership_analysis_failure_v1(
+                imported=unified_input,
+                scenario_b_fingerprint=scenario_b_fingerprint,
+                exc=exc,
+            )
+
     try:
         demand_supply_figure = build_unified_demand_supply_figure_v1(presentation)
         departure_figure = build_unified_departure_figure_v1(presentation)
@@ -569,6 +652,8 @@ def run_unified_application_pipeline_v1(
             retryable=False,
             result=unified_result,
             presentation=presentation,
+            trip_ridership_analysis=trip_ridership_analysis,
+            trip_ridership_failure=trip_ridership_failure,
         )
     except Exception as exc:
         return _failed_unified_run(
@@ -583,6 +668,8 @@ def run_unified_application_pipeline_v1(
             result=unified_result,
             presentation=presentation,
             retain_verified_presentation=True,
+            trip_ridership_analysis=trip_ridership_analysis,
+            trip_ridership_failure=trip_ridership_failure,
         )
 
     return UnifiedApplicationRunV1(
@@ -596,6 +683,8 @@ def run_unified_application_pipeline_v1(
         source_id=source_id,
         imported_at=imported_at,
         failure=None,
+        trip_ridership_analysis=trip_ridership_analysis,
+        trip_ridership_failure=trip_ridership_failure,
     )
 
 

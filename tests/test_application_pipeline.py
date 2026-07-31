@@ -747,6 +747,8 @@ def test_unified_application_public_model_shape_and_default_solver() -> None:
         "source_id",
         "imported_at",
         "failure",
+        "trip_ridership_analysis",
+        "trip_ridership_failure",
     }
     assert UnifiedRuntimeFailureV1.__dataclass_params__.frozen is True
     assert tuple(status.value for status in UnifiedApplicationStatusV1) == (

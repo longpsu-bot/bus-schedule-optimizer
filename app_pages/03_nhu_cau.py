@@ -1,5 +1,8 @@
 import streamlit as st
 
+from bus_schedule_engine.models import TripRidershipMatchStatusV1
+from bus_schedule_engine.time_utils import format_hhmm
+from bus_schedule_engine.trip_ridership import trip_ridership_analysis_is_current_v1
 from bus_schedule_engine.ui_result_authority import (
     VisibleResultModeV1,
     resolve_visible_result_context_v1,
@@ -100,3 +103,199 @@ if visible.uses_unified:
             "Hệ số tải C": st.column_config.NumberColumn(format="percent"),
         },
     )
+
+    st.subheader("Sản lượng theo từng chuyến")
+    st.warning(
+        "Dữ liệu mô tả bổ sung; chưa được sử dụng để sinh phương án C.",
+        icon=":material/info:",
+    )
+    imported_workbook = st.session_state.get("imported_workbook")
+    trip_observations = (
+        imported_workbook.trip_ridership_observations if imported_workbook is not None else ()
+    )
+    trip_analysis = st.session_state.get("trip_ridership_analysis")
+    trip_failure = st.session_state.get("trip_ridership_failure")
+    unified_result = visible.unified_result
+    assert unified_result is not None
+    b_fingerprint = unified_result.normalized_inputs.scenario_b_fingerprint
+
+    if not trip_observations:
+        st.info("Workbook không có bộ dữ liệu SAN_LUONG_CHUYEN.")
+    elif trip_failure is not None:
+        st.warning(
+            f"{trip_failure.code}\n\nMã đối chiếu: {trip_failure.correlation_id}",
+            icon=":material/warning:",
+        )
+    elif not trip_ridership_analysis_is_current_v1(trip_analysis, b_fingerprint):
+        st.warning(
+            "Phân tích sản lượng theo chuyến không khớp Scenario B hiện tại và "
+            "không được hiển thị.",
+            icon=":material/warning:",
+        )
+    else:
+        summary = trip_analysis.dataset_summary
+        st.write(
+            f"Bộ dữ liệu: `{trip_analysis.dataset_id}` · "
+            f"Nguồn: `{trip_analysis.source_type}` · "
+            f"Độ tin cậy: `{trip_analysis.confidence}` · "
+            f"Ngày vận hành: `{trip_analysis.operating_day_type}`"
+        )
+        with st.container(horizontal=True):
+            st.metric("Số ngày quan sát", summary.distinct_service_dates, border=True)
+            st.metric(
+                "Tỷ lệ ghép dùng được",
+                ("—" if summary.usable_match_rate is None else f"{summary.usable_match_rate:.1%}"),
+                border=True,
+            )
+            st.metric(
+                "Tỷ lệ ghép chính xác",
+                ("—" if summary.exact_match_rate is None else f"{summary.exact_match_rate:.1%}"),
+                border=True,
+            )
+            st.metric(
+                "Bao phủ chuyến B",
+                (
+                    "—"
+                    if summary.scheduled_trip_coverage_rate is None
+                    else f"{summary.scheduled_trip_coverage_rate:.1%}"
+                ),
+                border=True,
+            )
+            st.metric(
+                "Bao phủ chuyến-ngày",
+                (
+                    "—"
+                    if summary.matched_trip_date_coverage_rate is None
+                    else f"{summary.matched_trip_date_coverage_rate:.1%}"
+                ),
+                border=True,
+            )
+
+        st.caption(
+            "Chỉ MATCHED_EXACT và MATCHED_WITHIN_TOLERANCE được dùng cho thống kê. "
+            "Quan sát thiếu không được xem là 0 và không có nội suy chuyến-ngày."
+        )
+        st.markdown("**Chất lượng ghép dữ liệu**")
+        st.dataframe(
+            [
+                {"Trạng thái": "MATCHED_EXACT", "Số bản ghi": summary.exact_matches},
+                {
+                    "Trạng thái": "MATCHED_WITHIN_TOLERANCE",
+                    "Số bản ghi": summary.tolerance_matches,
+                },
+                {"Trạng thái": "UNMATCHED", "Số bản ghi": summary.unmatched_records},
+                {"Trạng thái": "AMBIGUOUS", "Số bản ghi": summary.ambiguous_records},
+                {"Trạng thái": "COLLISION", "Số bản ghi": summary.collided_records},
+                {"Trạng thái": "INVALID", "Số bản ghi": summary.invalid_records},
+            ],
+            hide_index=True,
+        )
+
+        st.markdown("**Tổng hợp theo chiều**")
+        st.dataframe(
+            [
+                {
+                    "Chiều": item.direction.value,
+                    "Chuyến B": item.total_b_trips,
+                    "Chuyến B có quan sát dùng được": (item.b_trips_with_usable_observation),
+                    "Bao phủ chuyến": item.scheduled_trip_coverage_rate,
+                    "Bản ghi dùng được": item.usable_matched_records,
+                    "Khách ghép quan sát": item.observed_matched_passengers,
+                    "Khách ghép/ngày quan sát": (item.observed_matched_passengers_per_service_date),
+                    "Bao phủ chuyến-ngày": item.matched_trip_date_coverage_rate,
+                }
+                for item in trip_analysis.directional_summaries
+            ],
+            hide_index=True,
+        )
+
+        st.markdown("**Tổng hợp toàn tuyến**")
+        st.dataframe(
+            [
+                {
+                    "Chuyến B": summary.total_b_trips,
+                    "Chuyến B có quan sát dùng được": (summary.b_trips_with_usable_observation),
+                    "Bản ghi dùng được": summary.usable_matched_records,
+                    "Khách ghép quan sát": summary.observed_matched_passengers,
+                    "Khách ghép trung bình/chuyến quan sát": (
+                        summary.average_matched_passenger_count_per_observed_trip
+                    ),
+                    "Khách ghép/ngày quan sát": (
+                        summary.observed_matched_passengers_per_service_date
+                    ),
+                    "Bao phủ chuyến-ngày": summary.matched_trip_date_coverage_rate,
+                    "Diễn giải bao phủ": summary.coverage_adjusted_interpretation,
+                }
+            ],
+            hide_index=True,
+        )
+
+        st.markdown("**Thống kê mô tả theo chuyến B**")
+        st.dataframe(
+            [
+                {
+                    "Mã chuyến": item.trip_id,
+                    "Chiều": item.direction.value,
+                    "Bến đi": item.departure_terminal,
+                    "Giờ kế hoạch": format_hhmm(item.scheduled_departure_seconds),
+                    "Sức chứa": item.nominal_trip_capacity,
+                    "Số quan sát": item.observation_count,
+                    "Số ngày": item.distinct_observation_day_count,
+                    "Nhỏ nhất": item.passenger_minimum,
+                    "Lớn nhất": item.passenger_maximum,
+                    "Trung bình": item.passenger_mean,
+                    "Trung vị": item.passenger_median,
+                    "P85": item.passenger_p85,
+                    "P90": item.passenger_p90,
+                    "Hệ số tải TB": item.mean_load_factor,
+                    "Hệ số tải P85": item.p85_load_factor,
+                    "Hệ số tải P90": item.p90_load_factor,
+                    "Ngày đạt/vượt target": (item.days_at_or_above_target_load_factor),
+                    "Ngày vượt maximum": item.days_above_maximum_load_factor,
+                    "Ghép chính xác": item.exact_match_count,
+                    "Ghép trong dung sai": item.tolerance_match_count,
+                    "Lệch ghép TB (phút)": (item.mean_absolute_matching_offset_minutes),
+                    "Lệch ghép lớn nhất (phút)": (item.maximum_absolute_matching_offset_minutes),
+                }
+                for item in trip_analysis.trip_summaries
+            ],
+            hide_index=True,
+        )
+
+        diagnostics = [
+            item
+            for item in trip_analysis.match_rows
+            if item.match_status
+            in {
+                TripRidershipMatchStatusV1.UNMATCHED,
+                TripRidershipMatchStatusV1.AMBIGUOUS,
+                TripRidershipMatchStatusV1.COLLISION,
+                TripRidershipMatchStatusV1.INVALID,
+            }
+        ]
+        if diagnostics:
+            st.markdown("**Bản ghi chẩn đoán bị loại**")
+            st.dataframe(
+                [
+                    {
+                        "observation_id": item.observation_id,
+                        "service_date": item.service_date.isoformat(),
+                        "direction": item.direction.value,
+                        "source_trip_id": item.source_trip_id,
+                        "scheduled_trip_id": item.supplied_scheduled_trip_id,
+                        "scheduled_departure_time": format_hhmm(item.scheduled_departure_seconds),
+                        "actual_departure_time": format_hhmm(item.actual_departure_seconds),
+                        "match_method": item.match_method.value,
+                        "match_status": item.match_status.value,
+                        "candidate_trip_ids": ", ".join(item.candidate_trip_ids),
+                        "time_offset_minutes": (
+                            None
+                            if item.absolute_time_offset_seconds is None
+                            else item.absolute_time_offset_seconds / 60
+                        ),
+                        "issue_codes": ", ".join(item.issue_codes),
+                    }
+                    for item in diagnostics
+                ],
+                hide_index=True,
+            )

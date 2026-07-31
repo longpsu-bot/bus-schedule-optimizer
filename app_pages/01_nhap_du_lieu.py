@@ -39,6 +39,8 @@ _UNIFIED_RESULT_STATE_KEYS = (
     "unified_download_artifacts",
     "unified_runtime_failure",
     "unified_runtime_status",
+    "trip_ridership_analysis",
+    "trip_ridership_failure",
 )
 
 
@@ -130,6 +132,11 @@ if content:
                     if declared_available_fleet is not None
                     else "Chưa khai báo"
                 ),
+                border=True,
+            )
+            st.metric(
+                "Quan sát sản lượng theo chuyến",
+                len(imported.trip_ridership_observations),
                 border=True,
             )
         st.caption(
@@ -256,6 +263,8 @@ if content:
             st.session_state.workbook_input_readiness = unified_run.input_readiness
             st.session_state.unified_runtime_status = unified_run.status
             st.session_state.unified_runtime_failure = unified_run.failure
+            st.session_state.trip_ridership_analysis = unified_run.trip_ridership_analysis
+            st.session_state.trip_ridership_failure = unified_run.trip_ridership_failure
             st.session_state.unified_optimization_result = unified_run.unified_result
             st.session_state.unified_presentation = unified_run.unified_presentation
             st.session_state.unified_demand_supply_figure = unified_run.unified_demand_supply_figure
@@ -295,7 +304,9 @@ if content:
                     "Số dòng nhập: "
                     f"Scenario A = {len(updated.trips_a)}, "
                     f"Scenario B = {len(updated.trips_b)}, "
-                    f"nhu cầu = {len(updated.demand)}."
+                    f"nhu cầu = {len(updated.demand)}, "
+                    "sản lượng theo chuyến = "
+                    f"{len(updated.trip_ridership_observations)}."
                 )
                 st.warning(
                     f"{WORKBOOK_OPTIMIZATION_NOT_READY}\n\n{codes}\n\n"

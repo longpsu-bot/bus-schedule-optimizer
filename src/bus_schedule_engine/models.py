@@ -22,6 +22,35 @@ class VolumeType(StrEnum):
     AVERAGE_DAY = "average_day"
 
 
+class TripRidershipDirectionV1(StrEnum):
+    OUTBOUND = "outbound"
+    INBOUND = "inbound"
+
+
+class TripRidershipMatchMethodV1(StrEnum):
+    EXPLICIT_SCHEDULED_TRIP_ID = "EXPLICIT_SCHEDULED_TRIP_ID"
+    SCHEDULED_DEPARTURE_TIME = "SCHEDULED_DEPARTURE_TIME"
+    ACTUAL_DEPARTURE_TIME = "ACTUAL_DEPARTURE_TIME"
+    NONE = "NONE"
+
+
+class TripRidershipMatchStatusV1(StrEnum):
+    MATCHED_EXACT = "MATCHED_EXACT"
+    MATCHED_WITHIN_TOLERANCE = "MATCHED_WITHIN_TOLERANCE"
+    UNMATCHED = "UNMATCHED"
+    AMBIGUOUS = "AMBIGUOUS"
+    COLLISION = "COLLISION"
+    INVALID = "INVALID"
+
+
+class TripRidershipDatasetStatusV1(StrEnum):
+    NOT_PROVIDED = "NOT_PROVIDED"
+    COMPLETE = "COMPLETE"
+    COMPLETE_WITH_WARNINGS = "COMPLETE_WITH_WARNINGS"
+    NO_USABLE_MATCHES = "NO_USABLE_MATCHES"
+    FAILED = "FAILED"
+
+
 class Severity(StrEnum):
     BLOCKING = "BLOCKING"
     ERROR = "ERROR"
@@ -183,6 +212,171 @@ class DemandRecord:
         if self.observation_days <= 0:
             raise ValueError("observation_days phải lớn hơn 0")
         return float(self.passenger_volume) / self.observation_days
+
+
+@dataclass(frozen=True, slots=True)
+class TripRidershipDatasetMetadataV1:
+    dataset_id: str
+    source_type: str
+    confidence: str
+    observed_schedule_scenario: str
+    operating_day_type: str
+    match_tolerance_minutes: int
+    source_notes: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TripRidershipObservationV1:
+    observation_id: str
+    service_date: date
+    source_trip_id: str | None
+    scheduled_trip_id: str | None
+    direction: TripRidershipDirectionV1
+    scheduled_departure_seconds: int | None
+    actual_departure_seconds: int | None
+    passenger_count: int
+    vehicle_id: str | None
+    notes: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class TripRidershipMatchPolicyV1:
+    match_tolerance_minutes: int
+    observed_schedule_scenario: str = "B"
+    precedence: tuple[TripRidershipMatchMethodV1, ...] = (
+        TripRidershipMatchMethodV1.EXPLICIT_SCHEDULED_TRIP_ID,
+        TripRidershipMatchMethodV1.SCHEDULED_DEPARTURE_TIME,
+        TripRidershipMatchMethodV1.ACTUAL_DEPARTURE_TIME,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class TripRidershipMatchV1:
+    observation_id: str
+    service_date: date
+    direction: TripRidershipDirectionV1
+    source_trip_id: str | None
+    supplied_scheduled_trip_id: str | None
+    scheduled_departure_seconds: int | None
+    actual_departure_seconds: int | None
+    passenger_count: int
+    match_method: TripRidershipMatchMethodV1
+    match_status: TripRidershipMatchStatusV1
+    matched_trip_id: str | None
+    candidate_trip_ids: tuple[str, ...]
+    absolute_time_offset_seconds: int | None
+    issue_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TripRidershipTripSummaryV1:
+    trip_id: str
+    direction: TripRidershipDirectionV1
+    departure_terminal: str
+    scheduled_departure_seconds: int
+    nominal_trip_capacity: int
+    observation_count: int
+    distinct_observation_day_count: int
+    passenger_minimum: int | None
+    passenger_maximum: int | None
+    passenger_mean: float | None
+    passenger_median: float | None
+    passenger_p85: int | None
+    passenger_p90: int | None
+    mean_load_factor: float | None
+    median_load_factor: float | None
+    p85_load_factor: float | None
+    p90_load_factor: float | None
+    days_at_or_above_target_load_factor: int
+    share_observed_days_at_or_above_target_load_factor: float | None
+    days_above_maximum_load_factor: int
+    share_observed_days_above_maximum_load_factor: float | None
+    exact_match_count: int
+    tolerance_match_count: int
+    mean_absolute_matching_offset_minutes: float | None
+    maximum_absolute_matching_offset_minutes: float | None
+    descriptive_limitations: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TripRidershipDirectionSummaryV1:
+    direction: TripRidershipDirectionV1
+    total_b_trips: int
+    b_trips_with_usable_observation: int
+    scheduled_trip_coverage_rate: float | None
+    usable_matched_records: int
+    exact_matches: int
+    tolerance_matches: int
+    ambiguous_records: int
+    unmatched_records: int
+    collided_records: int
+    invalid_records: int
+    distinct_service_dates: int
+    observed_matched_passengers: int
+    average_matched_passenger_count_per_observed_trip: float | None
+    observed_matched_passengers_per_service_date: float | None
+    matched_trip_date_coverage_rate: float | None
+    coverage_adjusted_interpretation: str
+
+
+@dataclass(frozen=True, slots=True)
+class TripRidershipDatasetSummaryV1:
+    status: TripRidershipDatasetStatusV1
+    original_record_count: int
+    total_b_trips: int
+    b_trips_with_usable_observation: int
+    scheduled_trip_coverage_rate: float | None
+    usable_matched_records: int
+    exact_matches: int
+    tolerance_matches: int
+    unmatched_records: int
+    ambiguous_records: int
+    collided_records: int
+    invalid_records: int
+    usable_match_rate: float | None
+    exact_match_rate: float | None
+    distinct_service_dates: int
+    directions_with_usable_observations: int
+    direction_coverage_rate: float | None
+    observed_matched_passengers: int
+    average_matched_passenger_count_per_observed_trip: float | None
+    observed_matched_passengers_per_service_date: float | None
+    matched_trip_date_coverage_rate: float | None
+    minimum_absolute_matching_offset_minutes: float | None
+    mean_absolute_matching_offset_minutes: float | None
+    median_absolute_matching_offset_minutes: float | None
+    p85_absolute_matching_offset_minutes: float | None
+    p90_absolute_matching_offset_minutes: float | None
+    maximum_absolute_matching_offset_minutes: float | None
+    coverage_adjusted_interpretation: str
+
+
+@dataclass(frozen=True, slots=True)
+class TripRidershipAnalysisV1:
+    dataset_id: str
+    source_type: str
+    confidence: str
+    operating_day_type: str
+    scenario_b_timetable_fingerprint: str
+    match_policy: TripRidershipMatchPolicyV1
+    matching_policy_fingerprint: str
+    analysis_fingerprint: str
+    original_record_count: int
+    match_rows: tuple[TripRidershipMatchV1, ...]
+    trip_summaries: tuple[TripRidershipTripSummaryV1, ...]
+    directional_summaries: tuple[TripRidershipDirectionSummaryV1, ...]
+    dataset_summary: TripRidershipDatasetSummaryV1
+    issue_codes: tuple[str, ...]
+    limitations: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TripRidershipAnalysisFailureV1:
+    code: str
+    correlation_id: str
+    sanitized_message: str
+    dataset_id: str | None
+    scenario_b_timetable_fingerprint: str
 
 
 @dataclass(frozen=True)

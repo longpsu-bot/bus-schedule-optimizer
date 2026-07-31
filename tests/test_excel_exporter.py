@@ -4,11 +4,13 @@ from openpyxl import load_workbook
 
 from bus_schedule_engine.excel_exporter import (
     CONDITIONAL_DEMAND_LABEL,
+    CONDITIONAL_TRIP_RIDERSHIP_LABEL,
     OPTIONAL_LABEL,
     REQUIRED_FOR_OPTIMIZATION_LABEL,
     REQUIRED_LABEL,
     create_input_template,
 )
+from bus_schedule_engine.importer import import_workbook
 
 
 def _rows_by_key(sheet) -> dict[str, tuple[object, object, object]]:
@@ -155,3 +157,56 @@ def test_template_explains_runtime_one_of_compatibility_rule(tmp_path) -> None:
     )
     assert allowed_runtime_validation.allow_blank is True
     workbook.close()
+
+
+def test_generated_template_adds_separate_trip_ridership_sheets_and_guidance(
+    tmp_path,
+) -> None:
+    path = create_input_template(tmp_path / "input.xlsx")
+    workbook = load_workbook(path)
+
+    assert "THONG_TIN_SAN_LUONG_CHUYEN" in workbook.sheetnames
+    assert "SAN_LUONG_CHUYEN" in workbook.sheetnames
+    metadata = _rows_by_key(workbook["THONG_TIN_SAN_LUONG_CHUYEN"])
+    assert set(metadata) == {
+        "trip_ridership_dataset_id",
+        "trip_ridership_source_type",
+        "trip_ridership_confidence",
+        "observed_schedule_scenario",
+        "operating_day_type",
+        "match_tolerance_minutes",
+        "source_notes",
+    }
+    assert all(
+        row[1] == CONDITIONAL_TRIP_RIDERSHIP_LABEL
+        for key, row in metadata.items()
+        if key != "source_notes"
+    )
+    trip_sheet = workbook["SAN_LUONG_CHUYEN"]
+    assert [trip_sheet.cell(3, column).value for column in range(1, 11)] == [
+        "observation_id",
+        "service_date",
+        "source_trip_id",
+        "scheduled_trip_id",
+        "direction",
+        "scheduled_departure_time",
+        "actual_departure_time",
+        "passenger_count",
+        "vehicle_id",
+        "notes",
+    ]
+    assert "DÒNG MẪU" in trip_sheet.cell(2, 1).value
+    guide = " ".join(
+        str(cell.value)
+        for row in workbook["HUONG_DAN"].iter_rows(min_row=4)
+        for cell in row
+        if cell.value is not None
+    )
+    assert "chưa được dùng để sinh phương án C" in guide
+    assert "không được hiểu là 0 hành khách" in guide
+    assert "va chạm cùng chuyến-ngày" in guide
+    workbook.close()
+
+    imported = import_workbook(path)
+    assert imported.trip_ridership_metadata is None
+    assert imported.trip_ridership_observations == ()
