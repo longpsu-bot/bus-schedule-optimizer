@@ -16,7 +16,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
-from .contracts_v1 import GenerationResultStatus
+from .contracts_v1 import GenerationResultStatus, normalize_imported_workbook_v1
 from .importer import ImportedWorkbook
 from .input_authority import (
     WorkbookInputReadinessV1,
@@ -26,6 +26,8 @@ from .input_authority import (
 from .models import (
     AnalysisBundle,
     ProtectedServiceFloorAssessmentV1,
+    ProtectedServiceFloorEnforcementAuthorityV1,
+    ProtectedServiceFloorEnforcementFailureV1,
     ProtectedServiceFloorFailureV1,
     TripRidershipAnalysisFailureV1,
     TripRidershipAnalysisV1,
@@ -39,10 +41,16 @@ from .optimization_service import (
 )
 from .protected_service_floor import (
     assess_protected_service_floors_v1,
+    protected_service_floor_assessment_is_current_v1,
     protected_service_floor_policy_from_workbook_v1,
 )
 from .protected_service_floor_codes import (
     PROTECTED_SERVICE_FLOOR_ASSESSMENT_FAILED,
+    PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_INVALID,
+)
+from .protected_service_floor_enforcement import (
+    ProtectedServiceFloorEnforcementAuthorityError,
+    build_protected_service_floor_enforcement_authority_v1,
 )
 from .trip_ridership import analyze_trip_ridership_v1, trip_ridership_input_fingerprint_v1
 from .trip_ridership_codes import TRIP_RIDERSHIP_ANALYSIS_FAILED
@@ -145,6 +153,12 @@ class UnifiedApplicationRunV1:
     trip_ridership_failure: TripRidershipAnalysisFailureV1 | None = None
     protected_service_floor_assessment: ProtectedServiceFloorAssessmentV1 | None = None
     protected_service_floor_failure: ProtectedServiceFloorFailureV1 | None = None
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None
+    protected_service_floor_enforcement_failure: (
+        ProtectedServiceFloorEnforcementFailureV1 | None
+    ) = None
 
 
 def run_and_build_artifacts(
@@ -276,6 +290,45 @@ def _build_protected_service_floor_failure_v1(
         exception_class,
         failure.scenario_b_fingerprint,
         failure.trip_ridership_input_fingerprint,
+    )
+    return failure
+
+
+def _build_protected_service_floor_enforcement_failure_v1(
+    *,
+    scenario_b_fingerprint: str,
+    assessment_fingerprint: str | None,
+    exc: Exception,
+) -> ProtectedServiceFloorEnforcementFailureV1:
+    exception_class = exc.__class__.__name__
+    payload = json.dumps(
+        {
+            "code": PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_INVALID,
+            "scenario_b_fingerprint": scenario_b_fingerprint,
+            "assessment_fingerprint": assessment_fingerprint,
+            "exception_class": exception_class,
+        },
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    failure = ProtectedServiceFloorEnforcementFailureV1(
+        code=PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_INVALID,
+        correlation_id=f"m6a2b-{hashlib.sha256(payload).hexdigest()[:20]}",
+        sanitized_message=(
+            f"{exception_class}: protected-service-floor enforcement authority invalid"
+        )[:_MAX_SANITIZED_MESSAGE_LENGTH],
+        scenario_b_fingerprint=scenario_b_fingerprint,
+        assessment_fingerprint=assessment_fingerprint,
+    )
+    LOGGER.error(
+        "protected_service_floor_enforcement_failure correlation_id=%s code=%s "
+        "exception_class=%s b_fingerprint=%s assessment_fingerprint=%s",
+        failure.correlation_id,
+        failure.code,
+        exception_class,
+        failure.scenario_b_fingerprint,
+        failure.assessment_fingerprint,
     )
     return failure
 
@@ -504,6 +557,12 @@ def _failed_unified_run(
     trip_ridership_failure: TripRidershipAnalysisFailureV1 | None = None,
     protected_service_floor_assessment: ProtectedServiceFloorAssessmentV1 | None = None,
     protected_service_floor_failure: ProtectedServiceFloorFailureV1 | None = None,
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None,
+    protected_service_floor_enforcement_failure: (
+        ProtectedServiceFloorEnforcementFailureV1 | None
+    ) = None,
 ) -> UnifiedApplicationRunV1:
     failure = build_unified_runtime_failure_v1(
         code=code,
@@ -539,6 +598,12 @@ def _failed_unified_run(
         ),
         protected_service_floor_failure=(
             protected_service_floor_failure if retain_verified_presentation else None
+        ),
+        protected_service_floor_enforcement_authority=(
+            protected_service_floor_enforcement_authority if retain_verified_presentation else None
+        ),
+        protected_service_floor_enforcement_failure=(
+            protected_service_floor_enforcement_failure if retain_verified_presentation else None
         ),
     )
 
@@ -585,6 +650,10 @@ def run_unified_application_pipeline_v1(
             source_id=source_id,
             imported_at=imported_at,
         )
+        normalized_inputs = normalize_imported_workbook_v1(
+            unified_input,
+            normalization_options,
+        )
     except Exception as exc:
         return _failed_unified_run(
             input_readiness=input_readiness,
@@ -597,11 +666,109 @@ def run_unified_application_pipeline_v1(
             retryable=False,
         )
 
+    scenario_b_fingerprint = normalized_inputs.scenario_b_fingerprint
+    trip_ridership_analysis: TripRidershipAnalysisV1 | None = None
+    trip_ridership_failure: TripRidershipAnalysisFailureV1 | None = None
+    if unified_input.trip_ridership_observations:
+        try:
+            trip_ridership_analysis = analyze_trip_ridership_v1(
+                unified_input,
+                normalized_inputs.scenario_b,
+            )
+            if trip_ridership_analysis.scenario_b_timetable_fingerprint != (scenario_b_fingerprint):
+                raise ValueError(
+                    "Supplemental trip-ridership analysis is not bound to "
+                    "the normalized Scenario B fingerprint"
+                )
+        except Exception as exc:
+            trip_ridership_analysis = None
+            trip_ridership_failure = _build_trip_ridership_analysis_failure_v1(
+                imported=unified_input,
+                scenario_b_fingerprint=scenario_b_fingerprint,
+                exc=exc,
+            )
+
+    protected_service_floor_assessment: ProtectedServiceFloorAssessmentV1 | None = None
+    protected_service_floor_failure: ProtectedServiceFloorFailureV1 | None = None
+    try:
+        protected_service_floor_assessment = assess_protected_service_floors_v1(
+            unified_input,
+            normalized_inputs.scenario_b,
+            trip_ridership_analysis,
+            protected_service_floor_policy_from_workbook_v1(unified_input),
+        )
+        if protected_service_floor_assessment.scenario_b_fingerprint != (scenario_b_fingerprint):
+            raise ValueError(
+                "Protected-service-floor assessment is not bound to "
+                "the normalized Scenario B fingerprint"
+            )
+    except Exception as exc:
+        protected_service_floor_assessment = None
+        protected_service_floor_failure = _build_protected_service_floor_failure_v1(
+            imported=unified_input,
+            scenario_b_fingerprint=scenario_b_fingerprint,
+            exc=exc,
+        )
+
+    protected_service_floor_enforcement_authority = None
+    protected_service_floor_enforcement_failure = None
+    try:
+        if trip_ridership_failure is not None:
+            raise ProtectedServiceFloorEnforcementAuthorityError(
+                f"{PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_INVALID}: "
+                "trip-ridership analysis failed"
+            )
+        if protected_service_floor_assessment is None:
+            raise ProtectedServiceFloorEnforcementAuthorityError(
+                f"{PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_INVALID}: "
+                "the 6A2A assessment is unavailable"
+            )
+        if not protected_service_floor_assessment_is_current_v1(
+            protected_service_floor_assessment,
+            unified_input,
+            normalized_inputs.scenario_b,
+            trip_ridership_analysis,
+        ):
+            raise ProtectedServiceFloorEnforcementAuthorityError(
+                f"{PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_INVALID}: "
+                "the 6A2A assessment is not current"
+            )
+        protected_service_floor_enforcement_authority = (
+            build_protected_service_floor_enforcement_authority_v1(
+                unified_input,
+                normalized_inputs.scenario_b,
+                trip_ridership_analysis,
+                protected_service_floor_assessment,
+            )
+        )
+    except Exception as exc:
+        protected_service_floor_enforcement_authority = None
+        protected_service_floor_enforcement_failure = (
+            _build_protected_service_floor_enforcement_failure_v1(
+                scenario_b_fingerprint=scenario_b_fingerprint,
+                assessment_fingerprint=(
+                    protected_service_floor_assessment.assessment_fingerprint
+                    if protected_service_floor_assessment is not None
+                    else None
+                ),
+                exc=exc,
+            )
+        )
+
     try:
         unified_result = analyze_and_optimize_schedule_v1(
             unified_input,
             normalization_options,
             solver_choice=solver_choice,
+            protected_service_floor_enforcement_authority=(
+                protected_service_floor_enforcement_authority
+            ),
+            protected_service_floor_enforcement_failure_code=(
+                protected_service_floor_enforcement_failure.code
+                if protected_service_floor_enforcement_failure is not None
+                else None
+            ),
+            _normalized_inputs=normalized_inputs,
         )
     except OptimizationExecutionErrorV1 as exc:
         return _failed_unified_run(
@@ -665,51 +832,6 @@ def run_unified_application_pipeline_v1(
             result=unified_result,
         )
 
-    trip_ridership_analysis: TripRidershipAnalysisV1 | None = None
-    trip_ridership_failure: TripRidershipAnalysisFailureV1 | None = None
-    if unified_input.trip_ridership_observations:
-        scenario_b_fingerprint = unified_result.normalized_inputs.scenario_b_fingerprint
-        try:
-            trip_ridership_analysis = analyze_trip_ridership_v1(
-                unified_input,
-                unified_result.normalized_inputs.scenario_b,
-            )
-            if trip_ridership_analysis.scenario_b_timetable_fingerprint != scenario_b_fingerprint:
-                raise ValueError(
-                    "Supplemental trip-ridership analysis is not bound to "
-                    "the normalized Scenario B fingerprint"
-                )
-        except Exception as exc:
-            trip_ridership_analysis = None
-            trip_ridership_failure = _build_trip_ridership_analysis_failure_v1(
-                imported=unified_input,
-                scenario_b_fingerprint=scenario_b_fingerprint,
-                exc=exc,
-            )
-
-    protected_service_floor_assessment: ProtectedServiceFloorAssessmentV1 | None = None
-    protected_service_floor_failure: ProtectedServiceFloorFailureV1 | None = None
-    scenario_b_fingerprint = unified_result.normalized_inputs.scenario_b_fingerprint
-    try:
-        protected_service_floor_assessment = assess_protected_service_floors_v1(
-            unified_input,
-            unified_result.normalized_inputs.scenario_b,
-            trip_ridership_analysis,
-            protected_service_floor_policy_from_workbook_v1(unified_input),
-        )
-        if protected_service_floor_assessment.scenario_b_fingerprint != scenario_b_fingerprint:
-            raise ValueError(
-                "Protected-service-floor assessment is not bound to "
-                "the normalized Scenario B fingerprint"
-            )
-    except Exception as exc:
-        protected_service_floor_assessment = None
-        protected_service_floor_failure = _build_protected_service_floor_failure_v1(
-            imported=unified_input,
-            scenario_b_fingerprint=scenario_b_fingerprint,
-            exc=exc,
-        )
-
     try:
         demand_supply_figure = build_unified_demand_supply_figure_v1(presentation)
         departure_figure = build_unified_departure_figure_v1(presentation)
@@ -744,6 +866,12 @@ def run_unified_application_pipeline_v1(
             trip_ridership_failure=trip_ridership_failure,
             protected_service_floor_assessment=protected_service_floor_assessment,
             protected_service_floor_failure=protected_service_floor_failure,
+            protected_service_floor_enforcement_authority=(
+                protected_service_floor_enforcement_authority
+            ),
+            protected_service_floor_enforcement_failure=(
+                protected_service_floor_enforcement_failure
+            ),
         )
     except Exception as exc:
         return _failed_unified_run(
@@ -762,6 +890,12 @@ def run_unified_application_pipeline_v1(
             trip_ridership_failure=trip_ridership_failure,
             protected_service_floor_assessment=protected_service_floor_assessment,
             protected_service_floor_failure=protected_service_floor_failure,
+            protected_service_floor_enforcement_authority=(
+                protected_service_floor_enforcement_authority
+            ),
+            protected_service_floor_enforcement_failure=(
+                protected_service_floor_enforcement_failure
+            ),
         )
 
     return UnifiedApplicationRunV1(
@@ -779,6 +913,10 @@ def run_unified_application_pipeline_v1(
         trip_ridership_failure=trip_ridership_failure,
         protected_service_floor_assessment=protected_service_floor_assessment,
         protected_service_floor_failure=protected_service_floor_failure,
+        protected_service_floor_enforcement_authority=(
+            protected_service_floor_enforcement_authority
+        ),
+        protected_service_floor_enforcement_failure=(protected_service_floor_enforcement_failure),
     )
 
 

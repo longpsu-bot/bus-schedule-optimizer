@@ -848,13 +848,15 @@ def test_repeated_real_both_runs_are_deterministic(real_solver_case) -> None:
 def test_result_and_comparison_shapes_are_frozen_slotted_and_exported() -> None:
     assert BusScheduleOptimizationResult.__dataclass_params__.frozen is True
     assert "__slots__" in BusScheduleOptimizationResult.__dict__
-    assert [field.name for field in fields(BusScheduleOptimizationResult)][-6:] == [
+    assert [field.name for field in fields(BusScheduleOptimizationResult)][-8:] == [
         "heuristic_outcome",
         "ortools_outcome",
         "comparison",
         "recommended_outcome",
         "explanations",
         "limitations",
+        "protected_service_floor_enforcement_authority",
+        "protected_service_floor_enforcement_failure_code",
     ]
     assert SolverComparisonV1.__dataclass_params__.frozen is True
     assert "__slots__" in SolverComparisonV1.__dict__

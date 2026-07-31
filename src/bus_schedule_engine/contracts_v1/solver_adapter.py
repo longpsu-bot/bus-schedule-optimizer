@@ -1,7 +1,12 @@
 """Public additive facade for the Contract V1 solver boundary; no runtime cutover."""
 
 from bus_schedule_engine.c_config import ScenarioCConfig
-from bus_schedule_engine.models import DemandRecord, ScenarioParameters, Trip
+from bus_schedule_engine.models import (
+    DemandRecord,
+    ProtectedServiceFloorEnforcementAuthorityV1,
+    ScenarioParameters,
+    Trip,
+)
 
 from .evaluation import (
     ScenarioBEvaluationBundleV1,
@@ -33,6 +38,9 @@ def build_heuristic_schedule_request_v1(
     heuristic_config: ScenarioCConfig,
     evaluation_policy: ScenarioBEvaluationPolicyV1 | None = None,
     solver_policy: SolverPolicyV1 | None = None,
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None,
 ) -> tuple[ScheduleGenerationContextV1, HeuristicScheduleSolverAdapter]:
     if solver_policy is not None and any(
         value is not None
@@ -78,6 +86,7 @@ def build_heuristic_schedule_request_v1(
         normalized_inputs,
         b_evaluation,
         evaluation_policy,
+        protected_service_floor_enforcement_authority,
     )
     return (
         generation_context,

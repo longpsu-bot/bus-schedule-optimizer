@@ -3,6 +3,10 @@ from __future__ import annotations
 import time
 from dataclasses import replace
 
+from bus_schedule_engine.protected_service_floor_codes import (
+    PROTECTED_FLOOR_REJECTION_CODE_ORDER,
+)
+
 from .problem_validation import validate_schedule_generation_context_v1
 from .serialization import canonical_sha256
 from .solver_fingerprints import outcome_fingerprint_payload
@@ -36,6 +40,11 @@ def _validation_rejection_limitations(
         limitations.append(
             "WITHIN_REGIME_HEADWAY_NOT_UNIFORM: solved adjacent departures within "
             "at least one authoritative regime do not share one exact headway."
+        )
+    if any(code in rejection_codes for code in PROTECTED_FLOOR_REJECTION_CODE_ORDER):
+        limitations.append(
+            "Protected-service-floor acceptance enforcement rejected this solver-produced "
+            "candidate. Milestone 6A2B does not prove that no compliant candidate exists."
         )
     return tuple(limitations)
 
@@ -217,6 +226,16 @@ def run_schedule_solver_v1(
             candidate_fingerprint=run.candidate.candidate_fingerprint,
             rejection_codes=validation.rejection_codes,
             summary=validation.summary,
+            protected_service_floor_enforcement_fingerprint=(
+                validation.protected_service_floor_validation.enforcement_fingerprint
+                if validation.protected_service_floor_validation is not None
+                else None
+            ),
+            protected_service_floor_validation_fingerprint=(
+                validation.protected_service_floor_validation.validation_fingerprint
+                if validation.protected_service_floor_validation is not None
+                else None
+            ),
         )
         return _finalize_outcome(
             problem,
@@ -239,6 +258,16 @@ def run_schedule_solver_v1(
                         )
                     )
                 ),
+                protected_service_floor_enforcement_fingerprint=(
+                    validation.protected_service_floor_validation.enforcement_fingerprint
+                    if validation.protected_service_floor_validation is not None
+                    else None
+                ),
+                protected_service_floor_validation_fingerprint=(
+                    validation.protected_service_floor_validation.validation_fingerprint
+                    if validation.protected_service_floor_validation is not None
+                    else None
+                ),
             ),
         )
     return _finalize_outcome(
@@ -255,5 +284,15 @@ def run_schedule_solver_v1(
             diagnostic_candidate=None,
             explanations=run.explanations,
             limitations=run.limitations,
+            protected_service_floor_enforcement_fingerprint=(
+                validation.protected_service_floor_validation.enforcement_fingerprint
+                if validation.protected_service_floor_validation is not None
+                else None
+            ),
+            protected_service_floor_validation_fingerprint=(
+                validation.protected_service_floor_validation.validation_fingerprint
+                if validation.protected_service_floor_validation is not None
+                else None
+            ),
         ),
     )

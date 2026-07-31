@@ -549,6 +549,60 @@ class ProtectedServiceFloorFailureV1:
     trip_ridership_input_fingerprint: str | None
 
 
+@dataclass(frozen=True, slots=True)
+class ProtectedServiceFloorEnforcementRegimeV1:
+    regime_id: str
+    direction: TripRidershipDirectionV1
+    ordered_b_trip_ids: tuple[str, ...]
+    maximum_future_c_headway_minutes: int
+    minimum_future_c_trip_count: int
+    protected_window_start: int
+    protected_window_end: int
+    future_boundary_tolerance_minutes: int
+    donor_removal_prohibited: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedServiceFloorEnforcementAuthorityV1:
+    scenario_b_fingerprint: str
+    assessment_fingerprint: str
+    policy_fingerprint: str
+    regime_derivation_fingerprint: str
+    trip_ridership_input_fingerprint: str | None
+    trip_ridership_analysis_fingerprint: str | None
+    target_load_factor: float
+    maximum_load_factor: float
+    protected_regimes: tuple[ProtectedServiceFloorEnforcementRegimeV1, ...]
+    enforcement_profile: str
+    enforcement_fingerprint: str
+
+    @property
+    def has_enforceable_regimes(self) -> bool:
+        return bool(self.protected_regimes)
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedServiceFloorCandidateValidationV1:
+    enforcement_fingerprint: str
+    candidate_fingerprint: str
+    status: str
+    rejection_codes: tuple[str, ...]
+    validation_fingerprint: str
+
+    @property
+    def passed(self) -> bool:
+        return self.status == "ACCEPTED"
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedServiceFloorEnforcementFailureV1:
+    code: str
+    correlation_id: str
+    sanitized_message: str
+    scenario_b_fingerprint: str
+    assessment_fingerprint: str | None
+
+
 @dataclass(frozen=True)
 class ValidationIssue:
     code: str

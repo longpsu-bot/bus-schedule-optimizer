@@ -751,6 +751,8 @@ def test_unified_application_public_model_shape_and_default_solver() -> None:
         "trip_ridership_failure",
         "protected_service_floor_assessment",
         "protected_service_floor_failure",
+        "protected_service_floor_enforcement_authority",
+        "protected_service_floor_enforcement_failure",
     }
     assert UnifiedRuntimeFailureV1.__dataclass_params__.frozen is True
     assert tuple(status.value for status in UnifiedApplicationStatusV1) == (
@@ -891,7 +893,7 @@ def test_normalization_contract_validation_error_fails_at_normalization(
         raise issue_error
 
     monkeypatch.setattr(
-        optimization_service,
+        application,
         "normalize_imported_workbook_v1",
         fail,
     )

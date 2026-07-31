@@ -73,7 +73,7 @@ def _stock_event_to_dict(event: StockProfileEventV1) -> dict[str, object]:
 def schedule_solution_to_contract_dict(
     solution: ScheduleSolutionV1,
 ) -> dict[str, object]:
-    return {
+    payload: dict[str, object] = {
         "contract_version": solution.contract_version,
         "solver_status": solution.solver_status.value,
         "solver_adapter": solution.solver_adapter,
@@ -133,13 +133,21 @@ def schedule_solution_to_contract_dict(
         "explanations": list(solution.explanations),
         "limitations": list(solution.limitations),
     }
+    if solution.protected_service_floor_enforcement_fingerprint is not None:
+        payload["protected_service_floor_enforcement_fingerprint"] = (
+            solution.protected_service_floor_enforcement_fingerprint
+        )
+        payload["protected_service_floor_validation_fingerprint"] = (
+            solution.protected_service_floor_validation_fingerprint
+        )
+    return payload
 
 
 def schedule_outcome_to_contract_dict(
     outcome: ScheduleGenerationOutcomeV1,
 ) -> dict[str, object]:
     diagnostic = outcome.diagnostic_candidate
-    return {
+    payload: dict[str, object] = {
         "contract_version": outcome.contract_version,
         "result_status": outcome.result_status.value,
         "execution_status": outcome.execution_status.value,
@@ -160,6 +168,18 @@ def schedule_outcome_to_contract_dict(
                 "candidate_fingerprint": diagnostic.candidate_fingerprint,
                 "rejection_codes": list(diagnostic.rejection_codes),
                 "summary": diagnostic.summary,
+                **(
+                    {
+                        "protected_service_floor_enforcement_fingerprint": (
+                            diagnostic.protected_service_floor_enforcement_fingerprint
+                        ),
+                        "protected_service_floor_validation_fingerprint": (
+                            diagnostic.protected_service_floor_validation_fingerprint
+                        ),
+                    }
+                    if diagnostic.protected_service_floor_enforcement_fingerprint is not None
+                    else {}
+                ),
             }
             if diagnostic is not None
             else None
@@ -167,3 +187,11 @@ def schedule_outcome_to_contract_dict(
         "explanations": list(outcome.explanations),
         "limitations": list(outcome.limitations),
     }
+    if outcome.protected_service_floor_enforcement_fingerprint is not None:
+        payload["protected_service_floor_enforcement_fingerprint"] = (
+            outcome.protected_service_floor_enforcement_fingerprint
+        )
+        payload["protected_service_floor_validation_fingerprint"] = (
+            outcome.protected_service_floor_validation_fingerprint
+        )
+    return payload

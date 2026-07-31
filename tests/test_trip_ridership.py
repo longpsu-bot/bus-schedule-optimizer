@@ -1017,7 +1017,17 @@ def test_pipeline_contract_result_is_identical_with_supplemental_data(
 
     assert calls == 2
     assert baseline.status == supplemental.status == UnifiedApplicationStatusV1.COMPLETE
-    assert baseline.unified_result == supplemental.unified_result
+    assert replace(
+        baseline.unified_result,
+        protected_service_floor_enforcement_authority=None,
+    ) == replace(
+        supplemental.unified_result,
+        protected_service_floor_enforcement_authority=None,
+    )
+    assert (
+        not baseline.unified_result.protected_service_floor_enforcement_authority.protected_regimes
+    )
+    assert not supplemental.unified_result.protected_service_floor_enforcement_authority.protected_regimes
     assert baseline.unified_presentation == supplemental.unified_presentation
     assert read_unified_export_metadata_bytes_v1(
         baseline.unified_xlsx_bytes

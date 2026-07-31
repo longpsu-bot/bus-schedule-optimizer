@@ -25,6 +25,8 @@
     "solve_duration_seconds": {"type": "number", "minimum": 0},
     "solution_fingerprint": {"$ref": "#/$defs/fingerprint"},
     "source_b_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "protected_service_floor_enforcement_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "protected_service_floor_validation_fingerprint": {"$ref": "#/$defs/fingerprint"},
     "operating_parameter_locks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/lock"}},
     "c_block_supply_plan": {"type": "array", "minItems": 1, "items": {"$ref": "block_supply_plan.schema.json"}},
     "c_headway_regimes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/regime"}},

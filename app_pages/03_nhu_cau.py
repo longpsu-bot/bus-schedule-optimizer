@@ -4,6 +4,12 @@ from bus_schedule_engine.models import TripRidershipMatchStatusV1
 from bus_schedule_engine.protected_service_floor import (
     protected_service_floor_assessment_is_current_v1,
 )
+from bus_schedule_engine.protected_service_floor_codes import (
+    PROTECTED_FLOOR_CANDIDATE_ACCEPTED,
+    PROTECTED_FLOOR_CANDIDATE_REJECTED,
+    PROTECTED_FLOOR_ENFORCEMENT_AUTHORITY_CURRENT,
+    PROTECTED_FLOOR_ENFORCEMENT_NO_REGIMES,
+)
 from bus_schedule_engine.time_utils import format_hhmm
 from bus_schedule_engine.trip_ridership import trip_ridership_analysis_is_current_v1
 from bus_schedule_engine.ui_result_authority import (
@@ -309,7 +315,8 @@ if visible.uses_unified:
 
     st.subheader("Đánh giá regime cần bảo vệ")
     st.warning(
-        "Kết quả 6A2A chỉ xác định regime đề xuất bảo vệ; chưa áp dụng ràng buộc vào phương án C.",
+        "Kết quả 6A2A là bằng chứng và preview lịch sử. Trường "
+        "NOT_ENFORCED_IN_6A2A không bị thay đổi; 6A2B hiển thị trạng thái thực thi riêng.",
         icon=":material/info:",
     )
     protected_assessment = st.session_state.get("protected_service_floor_assessment")
@@ -458,3 +465,35 @@ if visible.uses_unified:
             )
         else:
             st.info("Không có regime nào đạt toàn bộ gate để tạo preview sàn dịch vụ.")
+
+    st.subheader("Trạng thái thực thi sàn dịch vụ 6A2B")
+    enforcement_authority = st.session_state.get("protected_service_floor_enforcement_authority")
+    enforcement_failure = st.session_state.get("protected_service_floor_enforcement_failure")
+    outcomes = tuple(
+        outcome
+        for outcome in (unified_result.heuristic_outcome, unified_result.ortools_outcome)
+        if outcome is not None
+    )
+    protected_rejection = any(
+        outcome.diagnostic_candidate is not None
+        and outcome.diagnostic_candidate.protected_service_floor_enforcement_fingerprint is not None
+        for outcome in outcomes
+    )
+    protected_acceptance = any(
+        outcome.solution is not None
+        and outcome.solution.protected_service_floor_enforcement_fingerprint is not None
+        for outcome in outcomes
+    )
+    if enforcement_failure is not None:
+        st.error(
+            f"{enforcement_failure.code}\n\nMã đối chiếu: {enforcement_failure.correlation_id}",
+            icon=":material/error:",
+        )
+    elif enforcement_authority is None or not enforcement_authority.has_enforceable_regimes:
+        st.info(PROTECTED_FLOOR_ENFORCEMENT_NO_REGIMES)
+    elif protected_acceptance:
+        st.success(PROTECTED_FLOOR_CANDIDATE_ACCEPTED, icon=":material/check_circle:")
+    elif protected_rejection:
+        st.warning(PROTECTED_FLOOR_CANDIDATE_REJECTED, icon=":material/warning:")
+    else:
+        st.info(PROTECTED_FLOOR_ENFORCEMENT_AUTHORITY_CURRENT)

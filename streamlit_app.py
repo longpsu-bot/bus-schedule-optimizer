@@ -32,6 +32,8 @@ for key, default in {
     "trip_ridership_failure": None,
     "protected_service_floor_assessment": None,
     "protected_service_floor_failure": None,
+    "protected_service_floor_enforcement_authority": None,
+    "protected_service_floor_enforcement_failure": None,
 }.items():
     st.session_state.setdefault(key, default)
 

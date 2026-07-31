@@ -34,14 +34,17 @@ This evidence is supplemental only: `SAN_LUONG` remains the sole Contract V1 dem
 trip records never enter `ObservedDemandInput`, solver requests and Scenario C are unchanged, and
 ordinary Streamlit remains Contract V1-only.
 
-Milestone 6A2A now derives current direction-separated Scenario B regimes and classifies which
+Milestone 6A2A derives current direction-separated Scenario B regimes and classifies which
 ones have regular short headways plus sufficient repeated P85 trip evidence for a future
-protected service floor. It returns review-only floor previews and every failed gate. It does
-not constrain or reject Scenario C, alter solver requests/outcomes, or change Page 05 artifacts;
-enforcement is reserved for Milestone 6A2B. See
+protected service floor. Its assessment remains review-only and its previews retain
+`NOT_ENFORCED_IN_6A2A`. Milestone 6A2B now promotes only a current 6A2A assessment into a separate,
+fingerprinted enforcement authority and rejects violating solver candidates at the common
+independent validator. Native heuristic and OR-Tools protected-floor search remains deferred. See
 [Milestone 6A1 trip-level ridership analysis](docs/engine/MILESTONE_6A1_TRIP_RIDERSHIP_ANALYSIS.md)
 and
-[Milestone 6A2A protected service-floor authority](docs/engine/MILESTONE_6A2A_PROTECTED_SERVICE_FLOOR_AUTHORITY.md).
+[Milestone 6A2A protected service-floor authority](docs/engine/MILESTONE_6A2A_PROTECTED_SERVICE_FLOOR_AUTHORITY.md)
+and
+[Milestone 6A2B protected service-floor acceptance enforcement](docs/engine/MILESTONE_6A2B_PROTECTED_SERVICE_FLOOR_ACCEPTANCE_ENFORCEMENT.md).
 
 ### Offline legacy regression oracle
 
@@ -201,8 +204,9 @@ Milestone 4C2C is complete. **Milestone 5A1 side-by-side result validation, Mile
 authoritative input readiness, Milestone 5A2B validation-only presentation adapters, Milestone
 5B1 Streamlit shadow execution, Milestone 5B2A unified result Pages 02–04, and Milestone 5B2B
 unified Page 05 artifacts are implemented and merged. Milestone 5C1 is merged and Milestone 5C2
-is merged. Milestone 6A1 supplemental trip-level ridership analysis and Milestone 6A2A
-protected service-floor authority are implemented**, but
+is merged. Milestone 6A1 supplemental trip-level ridership analysis, Milestone 6A2A
+protected service-floor authority, and Milestone 6A2B acceptance enforcement are implemented**,
+but
 Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
@@ -223,7 +227,8 @@ Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
     changing optimization authority.
 11. Milestone 6A2A: define deterministic protected high-demand service-floor authority and
     non-enforced previews (implemented).
-12. Milestone 6A2B: separately enforce reviewed service floors in Scenario C (not started).
+12. Milestone 6A2B: enforce reviewed service floors at independent candidate acceptance while
+    deferring solver-native protected-floor search (implemented).
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)

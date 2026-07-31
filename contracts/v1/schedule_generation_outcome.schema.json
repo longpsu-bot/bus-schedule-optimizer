@@ -46,6 +46,8 @@
     "solve_duration_seconds": {"type": "number", "minimum": 0},
     "outcome_fingerprint": {"$ref": "#/$defs/fingerprint"},
     "source_b_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "protected_service_floor_enforcement_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "protected_service_floor_validation_fingerprint": {"$ref": "#/$defs/fingerprint"},
     "solution": {
       "anyOf": [
         {"$ref": "schedule_solution.schema.json"},
@@ -165,6 +167,8 @@
       "required": ["candidate_fingerprint", "rejection_codes", "summary"],
       "properties": {
         "candidate_fingerprint": {"$ref": "#/$defs/fingerprint"},
+        "protected_service_floor_enforcement_fingerprint": {"$ref": "#/$defs/fingerprint"},
+        "protected_service_floor_validation_fingerprint": {"$ref": "#/$defs/fingerprint"},
         "rejection_codes": {
           "type": "array",
           "minItems": 1,
