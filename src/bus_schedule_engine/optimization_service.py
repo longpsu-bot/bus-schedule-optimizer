@@ -268,17 +268,12 @@ def analyze_and_optimize_schedule_v1(
         ProtectedServiceFloorEnforcementAuthorityV1 | None
     ) = None,
     protected_service_floor_enforcement_failure_code: str | None = None,
-    _normalized_inputs: NormalizedInputBundleV1 | None = None,
 ) -> BusScheduleOptimizationResult:
     """Normalize, assess, and conditionally run the selected canonical solver boundary."""
     _validate_solver_choice(solver_choice)
-    normalized_inputs = (
-        _normalized_inputs
-        if _normalized_inputs is not None
-        else _run_stage(
-            OptimizationExecutionStageV1.NORMALIZATION,
-            lambda: normalize_imported_workbook_v1(imported, normalization_options),
-        )
+    normalized_inputs = _run_stage(
+        OptimizationExecutionStageV1.NORMALIZATION,
+        lambda: normalize_imported_workbook_v1(imported, normalization_options),
     )
     return _analyze_normalized_and_optimize_schedule_v1(
         imported,

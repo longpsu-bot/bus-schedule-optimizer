@@ -28,6 +28,7 @@ from .protected_service_floor_codes import (
     PROTECTED_INTERNAL_HEADWAY_ABOVE_FLOOR,
     PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_INVALID,
     PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_MISMATCH,
+    PROTECTED_SOURCE_DIRECTION_VIOLATION,
     PROTECTED_SOURCE_ORDER_VIOLATION,
     PROTECTED_SOURCE_TRIP_MISSING_OR_DUPLICATED,
     PROTECTED_TRIP_COUNT_BELOW_FLOOR,
@@ -360,13 +361,23 @@ def validate_candidate_against_protected_service_floors_v1(
         candidate_by_source.setdefault(trip.source_b_trip_id, []).append(trip)
 
     for regime in authority.protected_regimes:
+        expected_direction = ContractDirection(regime.direction.value)
         mappings = {
             trip_id: candidate_by_source.get(trip_id, []) for trip_id in regime.ordered_b_trip_ids
         }
         if any(len(items) != 1 for items in mappings.values()):
             codes.add(PROTECTED_SOURCE_TRIP_MISSING_OR_DUPLICATED)
+        if any(
+            len(items) == 1 and items[0].direction != expected_direction
+            for items in mappings.values()
+        ):
+            codes.add(PROTECTED_SOURCE_DIRECTION_VIOLATION)
 
-        mapped_members = [items[0] for items in mappings.values() if len(items) == 1]
+        eligible_mappings = {
+            trip_id: (items if len(items) == 1 and items[0].direction == expected_direction else [])
+            for trip_id, items in mappings.items()
+        }
+        mapped_members = [items[0] for items in eligible_mappings.values() if len(items) == 1]
         tolerance_seconds = regime.future_boundary_tolerance_minutes * 60
         permitted_start = regime.protected_window_start - tolerance_seconds
         permitted_end = regime.protected_window_end + tolerance_seconds
@@ -406,8 +417,8 @@ def validate_candidate_against_protected_service_floors_v1(
         if abs(latest.c_departure_time - regime.protected_window_end) > tolerance_seconds:
             codes.add(PROTECTED_WINDOW_END_VIOLATION)
 
-        first_mapping = mappings[regime.ordered_b_trip_ids[0]]
-        last_mapping = mappings[regime.ordered_b_trip_ids[-1]]
+        first_mapping = eligible_mappings[regime.ordered_b_trip_ids[0]]
+        last_mapping = eligible_mappings[regime.ordered_b_trip_ids[-1]]
         if len(first_mapping) != 1 or len(last_mapping) != 1:
             codes.add(PROTECTED_TRIP_COUNT_BELOW_FLOOR)
             codes.add(PROTECTED_HEADWAY_NOT_MEASURABLE_OR_INVALID)
@@ -420,7 +431,6 @@ def validate_candidate_against_protected_service_floors_v1(
             codes.add(PROTECTED_HEADWAY_NOT_MEASURABLE_OR_INVALID)
             continue
 
-        expected_direction = ContractDirection(regime.direction.value)
         inside = tuple(
             sorted(
                 (

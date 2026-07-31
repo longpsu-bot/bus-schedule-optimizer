@@ -71,6 +71,7 @@ from bus_schedule_engine.protected_service_floor_codes import (
     PROTECTED_HEADWAY_NOT_MEASURABLE_OR_INVALID,
     PROTECTED_INTERNAL_HEADWAY_ABOVE_FLOOR,
     PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_MISMATCH,
+    PROTECTED_SOURCE_DIRECTION_VIOLATION,
     PROTECTED_SOURCE_ORDER_VIOLATION,
     PROTECTED_SOURCE_TRIP_MISSING_OR_DUPLICATED,
     PROTECTED_TRIP_COUNT_BELOW_FLOOR,
@@ -79,6 +80,7 @@ from bus_schedule_engine.protected_service_floor_codes import (
 )
 from bus_schedule_engine.protected_service_floor_enforcement import (
     PROTECTED_SERVICE_FLOOR_ENFORCEMENT_PROFILE,
+    PROTECTED_SERVICE_FLOOR_VALIDATION_PROFILE,
     ProtectedServiceFloorEnforcementAuthorityError,
     _authority_fingerprint_payload,
     build_protected_service_floor_enforcement_authority_v1,
@@ -257,22 +259,29 @@ def _candidate(
     scenario: ScenarioBInput,
     *,
     departures: dict[str, int] | None = None,
+    directions: dict[str, ContractDirection] | None = None,
     omitted: tuple[str, ...] = (),
     extras: tuple[tuple[str, str, ContractDirection, int], ...] = (),
     adapter: str = "heuristic_contract_v1",
 ) -> RawScheduleCandidateV1:
     departures = departures or {}
+    directions = directions or {}
     rows: list[RawCandidateTripV1] = []
     for source in scenario.exact_timetable:
         if source.trip_id in omitted:
             continue
         departure = departures.get(source.trip_id, source.departure_time)
+        direction = directions.get(source.trip_id, source.direction)
         rows.append(
             RawCandidateTripV1(
                 c_trip_id=f"C-{source.trip_id}",
                 source_b_trip_id=source.trip_id,
-                direction=source.direction,
-                departure_terminal=source.departure_terminal,
+                direction=direction,
+                departure_terminal=(
+                    DepartureTerminal.TERMINAL_1
+                    if direction == ContractDirection.OUTBOUND
+                    else DepartureTerminal.TERMINAL_2
+                ),
                 b_departure_time=source.departure_time,
                 c_departure_time=departure,
                 arrival_time=departure + source.runtime_minutes * 60,
@@ -419,6 +428,66 @@ def test_additional_same_direction_trip_is_allowed_and_opposite_direction_is_ign
         ),
     )
     assert result.passed
+
+
+def test_wrong_direction_protected_sources_are_ineligible_despite_replacements() -> None:
+    _, scenario, _, _, authority = _authority()
+    replacements = tuple(
+        (
+            f"C-REPLACEMENT-{source.trip_id}",
+            f"UNPROTECTED-{source.trip_id}",
+            ContractDirection.OUTBOUND,
+            source.departure_time,
+        )
+        for source in scenario.exact_timetable
+    )
+    directions = {source.trip_id: ContractDirection.INBOUND for source in scenario.exact_timetable}
+
+    results = tuple(
+        _validate(
+            authority,
+            scenario,
+            _candidate(
+                scenario,
+                directions=directions,
+                extras=replacements,
+                adapter=adapter,
+            ),
+        )
+        for adapter in ("heuristic_contract_v1", "ortools_cp_sat_quality_v1")
+    )
+
+    assert results[0] == results[1]
+    result = results[0]
+    assert not result.passed
+    assert result.status == "REJECTED"
+    assert PROTECTED_SOURCE_DIRECTION_VIOLATION in result.rejection_codes
+    assert result.validation_fingerprint == canonical_sha256(
+        {
+            "profile": PROTECTED_SERVICE_FLOOR_VALIDATION_PROFILE,
+            "enforcement_fingerprint": authority.enforcement_fingerprint,
+            "candidate_fingerprint": "a" * 64,
+            "status": "REJECTED",
+            "rejection_codes": list(result.rejection_codes),
+        }
+    )
+
+
+def test_unclaimed_opposite_direction_trip_does_not_supply_protected_count() -> None:
+    _, scenario, _, _, authority = _authority()
+    result = _validate(
+        authority,
+        scenario,
+        _candidate(
+            scenario,
+            omitted=("O02",),
+            extras=(("C-EXTRA-I", "UNPROTECTED-I", ContractDirection.INBOUND, BASE + 15 * 60),),
+        ),
+    )
+
+    assert PROTECTED_SOURCE_TRIP_MISSING_OR_DUPLICATED in result.rejection_codes
+    assert PROTECTED_TRIP_COUNT_BELOW_FLOOR in result.rejection_codes
+    assert PROTECTED_SOURCE_DIRECTION_VIOLATION not in result.rejection_codes
 
 
 def test_moved_protected_source_is_donor_removal_even_with_aggregate_replacement() -> None:
@@ -675,16 +744,92 @@ def test_common_contract_validator_rejects_same_floor_violation_for_every_adapte
     assert any("does not prove" in item for item in outcome.limitations)
 
 
+@pytest.mark.parametrize("adapter", ["heuristic_contract_v1", "ortools_cp_sat_quality_v1"])
+def test_common_validator_reports_contract_and_protected_direction_codes(
+    adapter: str,
+) -> None:
+    source_scenario = _scenario(inbound_minutes=(0, 15, 30))
+    imported = _imported(source_scenario)
+    normalized = normalize_imported_workbook_v1(
+        imported,
+        NormalizationOptions(
+            source_id="m6a2b-fixture",
+            imported_at=datetime(2026, 7, 31, tzinfo=UTC),
+            operating_day_type_b=OperatingDayType.WEEKDAY,
+            available_fleet_limit_b=20,
+            demand_confidence=DemandConfidence.UNKNOWN,
+        ),
+    )
+    scenario = normalized.scenario_b
+    analysis = analyze_trip_ridership_v1(imported, scenario)
+    assessment = assess_protected_service_floors_v1(
+        imported,
+        scenario,
+        analysis,
+        protected_service_floor_policy_from_workbook_v1(imported),
+    )
+    authority = build_protected_service_floor_enforcement_authority_v1(
+        imported, scenario, analysis, assessment
+    )
+    evaluation = evaluate_scenario_b_v1(normalized)
+    problem = build_schedule_problem_v1(
+        normalized,
+        evaluation,
+        solver_adapter=adapter,
+        adapter_context_fingerprint=empty_adapter_context_fingerprint(),
+    )
+    context = build_schedule_generation_context_v1(
+        problem,
+        normalized,
+        evaluation,
+        protected_service_floor_enforcement_authority=authority,
+    )
+    swapped_directions = {
+        trip.trip_id: (
+            ContractDirection.INBOUND
+            if trip.direction == ContractDirection.OUTBOUND
+            else ContractDirection.OUTBOUND
+        )
+        for trip in scenario.exact_timetable
+    }
+    candidate = _candidate(
+        scenario,
+        directions=swapped_directions,
+        adapter=adapter,
+    )
+    candidate = replace(
+        candidate,
+        candidate_fingerprint=candidate_fingerprint(
+            problem_fingerprint=problem.problem_fingerprint,
+            solver_adapter=adapter,
+            exact_timetable=candidate.exact_timetable,
+            headway_regimes=candidate.headway_regimes,
+        ),
+    )
+
+    result = validate_and_build_solution_v1(context, candidate)
+
+    assert not result.passed
+    assert PROTECTED_SOURCE_DIRECTION_VIOLATION in result.rejection_codes
+    assert "SOURCE_DIRECTION_LOCK_VIOLATION" in result.rejection_codes
+    assert result.protected_service_floor_validation is not None
+    assert result.protected_service_floor_validation.status == "REJECTED"
+    assert PROTECTED_SOURCE_DIRECTION_VIOLATION in (
+        result.protected_service_floor_validation.rejection_codes
+    )
+
+
 def test_ordinary_pipeline_normalizes_once_and_reuses_the_same_scenario_b(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     imported = _imported(_scenario(inbound_minutes=(0, 15, 30)))
-    calls = {"normalize": 0, "trip": 0, "assessment": 0, "optimization": 0}
+    calls = {"normalize": 0, "trip": 0, "assessment": 0, "authority": 0, "optimization": 0}
     observed: dict[str, object] = {}
     real_normalize = application_pipeline.normalize_imported_workbook_v1
     real_trip = application_pipeline.analyze_trip_ridership_v1
     real_assessment = application_pipeline.assess_protected_service_floors_v1
-    real_optimization = application_pipeline.analyze_and_optimize_schedule_v1
+    real_authority = application_pipeline.build_protected_service_floor_enforcement_authority_v1
+    real_optimization = application_pipeline._analyze_normalized_and_optimize_schedule_v1
 
     def normalization_spy(*args, **kwargs):
         calls["normalize"] += 1
@@ -702,15 +847,29 @@ def test_ordinary_pipeline_normalizes_once_and_reuses_the_same_scenario_b(
         assert scenario_b is observed["bundle"].scenario_b
         return real_assessment(workbook, scenario_b, analysis, policy)
 
-    def optimization_spy(*args, **kwargs):
+    def authority_spy(workbook, scenario_b, analysis, assessment):
+        calls["authority"] += 1
+        assert scenario_b is observed["bundle"].scenario_b
+        return real_authority(workbook, scenario_b, analysis, assessment)
+
+    def optimization_spy(workbook, normalized_inputs, **kwargs):
         calls["optimization"] += 1
-        assert kwargs["_normalized_inputs"] is observed["bundle"]
-        return real_optimization(*args, **kwargs)
+        assert normalized_inputs is observed["bundle"]
+        return real_optimization(workbook, normalized_inputs, **kwargs)
 
     monkeypatch.setattr(application_pipeline, "normalize_imported_workbook_v1", normalization_spy)
     monkeypatch.setattr(application_pipeline, "analyze_trip_ridership_v1", trip_spy)
     monkeypatch.setattr(application_pipeline, "assess_protected_service_floors_v1", assessment_spy)
-    monkeypatch.setattr(application_pipeline, "analyze_and_optimize_schedule_v1", optimization_spy)
+    monkeypatch.setattr(
+        application_pipeline,
+        "build_protected_service_floor_enforcement_authority_v1",
+        authority_spy,
+    )
+    monkeypatch.setattr(
+        application_pipeline,
+        "_analyze_normalized_and_optimize_schedule_v1",
+        optimization_spy,
+    )
 
     run = run_unified_application_pipeline_v1(
         imported,
@@ -719,7 +878,13 @@ def test_ordinary_pipeline_normalizes_once_and_reuses_the_same_scenario_b(
     )
 
     assert run.status == UnifiedApplicationStatusV1.COMPLETE
-    assert calls == {"normalize": 1, "trip": 1, "assessment": 1, "optimization": 1}
+    assert calls == {
+        "normalize": 1,
+        "trip": 1,
+        "assessment": 1,
+        "authority": 1,
+        "optimization": 1,
+    }
     assert run.unified_result.normalized_inputs is observed["bundle"]
 
 
@@ -783,7 +948,6 @@ def test_no_protected_regimes_preserve_solver_behavior_and_fingerprints(
         options,
         solver_choice=solver_choice,
         protected_service_floor_enforcement_authority=authority,
-        _normalized_inputs=normalized,
     )
 
     assert baseline.selected_action == enforced.selected_action
@@ -860,7 +1024,6 @@ def test_accepted_solver_outcomes_bind_enforcement_and_validation_fingerprints(
         options,
         solver_choice=solver_choice,
         protected_service_floor_enforcement_authority=authority,
-        _normalized_inputs=normalized,
     )
 
     outcomes = tuple(

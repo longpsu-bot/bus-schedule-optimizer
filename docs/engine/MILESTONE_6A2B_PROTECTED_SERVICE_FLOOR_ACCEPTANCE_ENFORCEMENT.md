@@ -22,9 +22,11 @@ The ordinary application path now performs these steps in order:
 7. independently validate any raw candidate against Contract V1 and 6A2B; and
 8. build presentation and artifacts from the verified result.
 
-`analyze_and_optimize_schedule_v1` remains the backward-compatible imported-workbook wrapper.
-The ordinary application supplies its already normalized bundle to the normalized execution
-path, so normalization is not repeated.
+`analyze_and_optimize_schedule_v1` remains the backward-compatible imported-workbook wrapper and
+always normalizes the supplied workbook with the supplied normalization options. The ordinary
+application calls the package-internal normalized execution path directly with its already
+verified bundle, so normalization is not repeated and callers cannot inject a normalized bundle
+through the public wrapper.
 
 ## 3. Enforcement authority
 
@@ -59,8 +61,11 @@ Every protected regime is evaluated independently and by direction.
 
 Every ordered protected Scenario B source trip must map to exactly one raw Scenario C trip.
 Missing and duplicated protected mappings are rejected even when Contract V1 also reports its
-one-to-one mapping codes. Reconciled protected members must preserve Scenario B order when sorted
-by `(c_departure_time, c_trip_id)`.
+one-to-one mapping codes. Every uniquely mapped protected source must independently retain the
+protected regime direction; a wrong-direction mapping is rejected and is ineligible for protected
+order, boundary, donor, count-window, or headway authority. Unrelated correctly directed trips do
+not cure that source-direction violation. Eligible protected members must preserve Scenario B
+order when sorted by `(c_departure_time, c_trip_id)`.
 
 ### Donor removal
 
@@ -105,14 +110,15 @@ Protected-floor codes are appended after deterministically sorted Contract V1 co
 stable order:
 
 1. `PROTECTED_SOURCE_TRIP_MISSING_OR_DUPLICATED`;
-2. `PROTECTED_SOURCE_ORDER_VIOLATION`;
-3. `PROTECTED_DONOR_REMOVAL`;
-4. `PROTECTED_WINDOW_START_VIOLATION`;
-5. `PROTECTED_WINDOW_END_VIOLATION`;
-6. `PROTECTED_TRIP_COUNT_BELOW_FLOOR`;
-7. `PROTECTED_INTERNAL_HEADWAY_ABOVE_FLOOR`;
-8. `PROTECTED_HEADWAY_NOT_MEASURABLE_OR_INVALID`; and
-9. `PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_MISMATCH`.
+2. `PROTECTED_SOURCE_DIRECTION_VIOLATION`;
+3. `PROTECTED_SOURCE_ORDER_VIOLATION`;
+4. `PROTECTED_DONOR_REMOVAL`;
+5. `PROTECTED_WINDOW_START_VIOLATION`;
+6. `PROTECTED_WINDOW_END_VIOLATION`;
+7. `PROTECTED_TRIP_COUNT_BELOW_FLOOR`;
+8. `PROTECTED_INTERNAL_HEADWAY_ABOVE_FLOOR`;
+9. `PROTECTED_HEADWAY_NOT_MEASURABLE_OR_INVALID`; and
+10. `PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_MISMATCH`.
 
 The validator collects every applicable protected failure; it does not stop at the first one.
 Existing Contract V1 validation and rejection codes continue to run.

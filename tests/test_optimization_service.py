@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import inspect
 from copy import deepcopy
 from dataclasses import replace
 from datetime import UTC, date, datetime
@@ -1108,6 +1109,59 @@ def test_invalid_solver_choice_type_fails_before_normalization(
             imported,
             options,
             solver_choice="HEURISTIC",  # type: ignore[arg-type]
+        )
+
+
+def test_public_wrapper_always_normalizes_and_delegates_its_derived_bundle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported, options = _fixture()
+    observed: dict[str, object] = {}
+    real_normalize = optimization_service.normalize_imported_workbook_v1
+    real_internal = optimization_service._analyze_normalized_and_optimize_schedule_v1
+
+    def normalization_spy(workbook, supplied_options):
+        bundle = real_normalize(workbook, supplied_options)
+        observed["normalized"] = bundle
+        return bundle
+
+    def internal_spy(workbook, normalized_inputs, **kwargs):
+        observed["internal"] = normalized_inputs
+        return real_internal(workbook, normalized_inputs, **kwargs)
+
+    monkeypatch.setattr(
+        optimization_service,
+        "normalize_imported_workbook_v1",
+        normalization_spy,
+    )
+    monkeypatch.setattr(
+        optimization_service,
+        "_analyze_normalized_and_optimize_schedule_v1",
+        internal_spy,
+    )
+
+    result = analyze_and_optimize_schedule_v1(imported, options)
+
+    assert observed["internal"] is observed["normalized"]
+    assert result.normalized_inputs is observed["normalized"]
+
+
+def test_public_wrapper_rejects_injected_normalized_bundle_from_another_workbook() -> None:
+    imported, options = _fixture()
+    foreign_imported = replace(
+        imported,
+        parameters_b=replace(imported.parameters_b, route_name="Foreign normalized authority"),
+    )
+    foreign_bundle = normalize_imported_workbook_v1(foreign_imported, options)
+
+    assert (
+        "_normalized_inputs" not in inspect.signature(analyze_and_optimize_schedule_v1).parameters
+    )
+    with pytest.raises(TypeError, match="unexpected keyword argument '_normalized_inputs'"):
+        analyze_and_optimize_schedule_v1(
+            imported,
+            options,
+            _normalized_inputs=foreign_bundle,  # type: ignore[call-arg]
         )
 
 

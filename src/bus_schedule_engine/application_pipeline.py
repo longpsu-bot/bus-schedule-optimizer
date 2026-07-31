@@ -37,6 +37,7 @@ from .optimization_service import (
     OptimizationExecutionErrorV1,
     OptimizationExecutionStageV1,
     SolverChoice,
+    _analyze_normalized_and_optimize_schedule_v1,
     analyze_and_optimize_schedule_v1,
 )
 from .protected_service_floor import (
@@ -756,9 +757,9 @@ def run_unified_application_pipeline_v1(
         )
 
     try:
-        unified_result = analyze_and_optimize_schedule_v1(
+        unified_result = _analyze_normalized_and_optimize_schedule_v1(
             unified_input,
-            normalization_options,
+            normalized_inputs,
             solver_choice=solver_choice,
             protected_service_floor_enforcement_authority=(
                 protected_service_floor_enforcement_authority
@@ -768,7 +769,6 @@ def run_unified_application_pipeline_v1(
                 if protected_service_floor_enforcement_failure is not None
                 else None
             ),
-            _normalized_inputs=normalized_inputs,
         )
     except OptimizationExecutionErrorV1 as exc:
         return _failed_unified_run(
