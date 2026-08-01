@@ -187,5 +187,5 @@ solver result continues to claim `FEASIBLE`.
 ## 13. OR-Tools deferral
 
 OR-Tools model constraints, objective stages, solver controls, outputs, and fingerprints are not
-changed in 6A2C. OR-Tools protected-floor hard constraints remain a separately reviewed future
-milestone because CP-SAT feasibility and proof semantics differ from bounded heuristic pruning.
+changed in 6A2C. [Milestone 6A2D](MILESTONE_6A2D_PROTECTED_SERVICE_FLOOR_ORTOOLS_CONSTRAINTS.md)
+now implements the separately reviewed CP-SAT hard constraints and proof semantics.

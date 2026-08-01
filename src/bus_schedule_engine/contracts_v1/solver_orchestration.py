@@ -47,6 +47,61 @@ def _is_heuristic_schedule_solver(solver: ScheduleSolver) -> bool:
     return isinstance(solver, HeuristicScheduleSolverAdapter)
 
 
+def _is_ortools_quality_solver(solver: ScheduleSolver) -> bool:
+    from .ortools_quality_solver import OrToolsCpSatServiceQualitySolver
+
+    return isinstance(solver, OrToolsCpSatServiceQualitySolver)
+
+
+def _ortools_protected_floor_authority_binding_mismatch(
+    context: ScheduleGenerationContextV1,
+    solver: ScheduleSolver,
+) -> bool:
+    if not _is_ortools_quality_solver(solver):
+        return False
+
+    from .ortools_quality_solver import (
+        _exact_demand_authority_is_self_consistent,
+        _ortools_quality_adapter_context_fingerprint,
+    )
+
+    authority = context.protected_service_floor_enforcement_authority
+    native_search_authority = solver.protected_service_floor_enforcement_authority
+    for candidate in (authority, native_search_authority):
+        if candidate is not None and not (
+            protected_service_floor_enforcement_authority_is_valid_v1(
+                candidate,
+                context.problem.scenario_b,
+            )
+        ):
+            return True
+
+    expected_fingerprint = (
+        authority.enforcement_fingerprint
+        if authority is not None and authority.has_enforceable_regimes
+        else None
+    )
+    native_search_fingerprint = solver.protected_service_floor_enforcement_fingerprint
+    if not all(
+        _valid_optional_enforcement_fingerprint(value)
+        for value in (expected_fingerprint, native_search_fingerprint)
+    ):
+        return True
+    if expected_fingerprint != native_search_fingerprint:
+        return True
+    if expected_fingerprint is not None and authority != native_search_authority:
+        return True
+
+    exact_demand_authority = solver.exact_demand_authority
+    if not _exact_demand_authority_is_self_consistent(exact_demand_authority):
+        return True
+    expected_adapter_context = _ortools_quality_adapter_context_fingerprint(
+        exact_demand_authority.authority_fingerprint,
+        expected_fingerprint,
+    )
+    return context.problem.adapter_context_fingerprint != expected_adapter_context
+
+
 def _heuristic_protected_floor_authority_binding_mismatch(
     context: ScheduleGenerationContextV1,
     solver: ScheduleSolver,
@@ -168,7 +223,12 @@ def run_schedule_solver_v1(
     problem = context.problem
     context_validation = validate_schedule_generation_context_v1(context)
     is_heuristic_solver = _is_heuristic_schedule_solver(solver)
+    is_ortools_quality_solver = _is_ortools_quality_solver(solver)
     heuristic_authority_mismatch = _heuristic_protected_floor_authority_binding_mismatch(
+        context,
+        solver,
+    )
+    ortools_authority_mismatch = _ortools_protected_floor_authority_binding_mismatch(
         context,
         solver,
     )
@@ -181,6 +241,14 @@ def run_schedule_solver_v1(
                 *explanations,
                 f"{HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH}: generation-context "
                 "authority does not match the heuristic native-search binding.",
+            )
+        if ortools_authority_mismatch:
+            from .ortools_quality_solver import ORTOOLS_PROTECTED_FLOOR_AUTHORITY_MISMATCH
+
+            explanations = (
+                *explanations,
+                f"{ORTOOLS_PROTECTED_FLOOR_AUTHORITY_MISMATCH}: generation-context "
+                "authority does not match the OR-Tools native-search binding.",
             )
         return _completed_without_solution(
             problem,
@@ -227,6 +295,24 @@ def run_schedule_solver_v1(
                 "integration defect; it supplies no domain-feasibility classification.",
             ),
         )
+    if ortools_authority_mismatch:
+        from .ortools_quality_solver import ORTOOLS_PROTECTED_FLOOR_AUTHORITY_MISMATCH
+
+        return _completed_without_solution(
+            problem,
+            result_status=GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID,
+            solver_status=NativeSolverStatus.MODEL_INVALID,
+            solver_adapter=solver.adapter_id,
+            solve_duration_seconds=0.0,
+            explanations=(
+                f"{ORTOOLS_PROTECTED_FLOOR_AUTHORITY_MISMATCH}: generation-context "
+                "authority does not match the OR-Tools native-search binding.",
+            ),
+            limitations=(
+                "MODEL_INVALID identifies a protected-floor or exact-demand authority "
+                "binding defect; it supplies no domain-feasibility classification of any kind.",
+            ),
+        )
     validation_context = (
         replace(
             context,
@@ -234,7 +320,7 @@ def run_schedule_solver_v1(
         )
         if context.protected_service_floor_enforcement_authority is not None
         and not context.protected_service_floor_enforcement_authority.has_enforceable_regimes
-        and is_heuristic_solver
+        and (is_heuristic_solver or is_ortools_quality_solver)
         else context
     )
 

@@ -14,10 +14,18 @@ from bus_schedule_engine.models import ProtectedServiceFloorEnforcementAuthority
 from .evaluation import ScenarioBEvaluationBundleV1, ScenarioBEvaluationPolicyV1
 from .exact_demand_authority import (
     _build_exact_demand_authority,
+    _canonical_authority_fingerprint,
     _ExactDemandAuthority,
     _ExactDemandAuthorityError,
 )
 from .models import ContractDirection, NormalizedInputBundleV1
+from .ortools_protected_floor import (
+    ORTOOLS_PROTECTED_FLOOR_PROJECTION_INVALID,
+    OrToolsProtectedFloorProjectionError,
+    OrToolsProtectedFloorProjectionV1,
+    build_ortools_protected_floor_projection_v1,
+    validate_ortools_protected_floor_projection_v1,
+)
 from .ortools_solver import (
     _adapter_capability_issues,
     _bounded_sum_var,
@@ -37,6 +45,7 @@ from .regime_headway_policy import (
     _RegimeHeadwayPolicyError,
     _SustainedServiceRegime,
 )
+from .serialization import canonical_sha256
 from .service_quality_metrics import (
     SERVICE_QUALITY_OBJECTIVE_NAMES_V1 as _QUALITY_OBJECTIVE_NAMES,
 )
@@ -73,6 +82,8 @@ ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY = (
     "ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY"
 )
 ORTOOLS_QUALITY_EXACT_DEMAND_CONTEXT_MISMATCH = "ORTOOLS_QUALITY_EXACT_DEMAND_CONTEXT_MISMATCH"
+ORTOOLS_PROTECTED_FLOOR_AUTHORITY_MISMATCH = "ORTOOLS_PROTECTED_FLOOR_AUTHORITY_MISMATCH"
+ORTOOLS_QUALITY_ADAPTER_CONTEXT_PROFILE = "ortools_quality_exact_demand_and_protected_floor_v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,6 +93,38 @@ class _QualityCpSatModelBundle:
     regime_headway_by_id: dict[str, cp_model.IntVar]
     exact_demand_authority: _ExactDemandAuthority | None
     stages: tuple[_DemandObjectiveStage, ...]
+    protected_enforcement_fingerprint: str | None = None
+    protected_regime_count: int = 0
+    protected_source_member_count: int = 0
+    protected_internal_pair_constraint_count: int = 0
+    protected_boundary_constraint_count: int = 0
+    protected_donor_constraint_count: int = 0
+
+
+def _ortools_quality_adapter_context_fingerprint(
+    exact_demand_authority_fingerprint: str,
+    protected_service_floor_enforcement_fingerprint: str | None = None,
+) -> str:
+    if protected_service_floor_enforcement_fingerprint is None:
+        return exact_demand_authority_fingerprint
+    return canonical_sha256(
+        {
+            "profile": ORTOOLS_QUALITY_ADAPTER_CONTEXT_PROFILE,
+            "service_quality_adapter_id": OrToolsCpSatServiceQualitySolver.adapter_id,
+            "exact_demand_authority_fingerprint": exact_demand_authority_fingerprint,
+            "protected_service_floor_enforcement_fingerprint": (
+                protected_service_floor_enforcement_fingerprint
+            ),
+        }
+    )
+
+
+def _exact_demand_authority_is_self_consistent(
+    authority: _ExactDemandAuthority | None,
+) -> bool:
+    return isinstance(authority, _ExactDemandAuthority) and authority.authority_fingerprint == (
+        _canonical_authority_fingerprint(authority.blocks)
+    )
 
 
 def _quality_problem_authority_issues(
@@ -176,13 +219,54 @@ def _first_or_last_member(
     return result
 
 
+def _add_protected_floor_constraints(
+    demand: _DemandCpSatModelBundle,
+    directional: dict[ContractDirection, tuple],
+    projection: OrToolsProtectedFloorProjectionV1,
+) -> None:
+    model = demand.hard.model
+    for regime in projection.regimes:
+        trips = directional[regime.direction]
+        protected_departures = tuple(
+            demand.hard.departure_by_source_id[source_id] for source_id in regime.ordered_b_trip_ids
+        )
+        if regime.donor_removal_prohibited:
+            donor_start = regime.protected_window_start_minutes - regime.boundary_tolerance_minutes
+            donor_end = regime.protected_window_end_minutes + regime.boundary_tolerance_minutes
+            for departure in protected_departures:
+                model.add(departure >= donor_start)
+                model.add(departure <= donor_end)
+
+        tolerance = regime.boundary_tolerance_minutes
+        model.add(protected_departures[0] >= regime.protected_window_start_minutes - tolerance)
+        model.add(protected_departures[0] <= regime.protected_window_start_minutes + tolerance)
+        model.add(protected_departures[-1] >= regime.protected_window_end_minutes - tolerance)
+        model.add(protected_departures[-1] <= regime.protected_window_end_minutes + tolerance)
+
+        source_slice = trips[regime.first_source_index : regime.last_source_index + 1]
+        for earlier, later in zip(source_slice, source_slice[1:], strict=False):
+            earlier_departure = demand.hard.departure_by_source_id[earlier.trip_id]
+            later_departure = demand.hard.departure_by_source_id[later.trip_id]
+            model.add(
+                later_departure - earlier_departure <= regime.maximum_future_c_headway_minutes
+            )
+
+
 def _build_quality_cp_sat_model(
     problem: ScheduleProblemV1,
     exact_demand_authority: _ExactDemandAuthority | None = None,
+    protected_floor_projection: OrToolsProtectedFloorProjectionV1 | None = None,
 ) -> _QualityCpSatModelBundle:
+    if protected_floor_projection is not None:
+        validate_ortools_protected_floor_projection_v1(
+            protected_floor_projection,
+            problem.scenario_b,
+        )
     demand = _build_demand_cp_sat_model(problem)
     model = demand.hard.model
     directional = _ordered_directional_trips(problem)
+    if protected_floor_projection is not None:
+        _add_protected_floor_constraints(demand, directional, protected_floor_projection)
     requirements = {item.block_id: item for item in problem.block_requirements}
     regimes = _derive_sustained_service_regimes(problem)
     scaled_demand = _scaled_directional_demand(problem, exact_demand_authority)
@@ -554,13 +638,44 @@ def _build_quality_cp_sat_model(
             _DemandObjectiveStage(name=name, value=value)
             for name, value in zip(_QUALITY_OBJECTIVE_NAMES, stage_values, strict=True)
         ),
+        protected_enforcement_fingerprint=(
+            protected_floor_projection.enforcement_fingerprint
+            if protected_floor_projection is not None
+            else None
+        ),
+        protected_regime_count=(
+            len(protected_floor_projection.regimes) if protected_floor_projection is not None else 0
+        ),
+        protected_source_member_count=(
+            protected_floor_projection.source_member_count
+            if protected_floor_projection is not None
+            else 0
+        ),
+        protected_internal_pair_constraint_count=(
+            protected_floor_projection.internal_pair_constraint_count
+            if protected_floor_projection is not None
+            else 0
+        ),
+        protected_boundary_constraint_count=(
+            protected_floor_projection.boundary_constraint_count
+            if protected_floor_projection is not None
+            else 0
+        ),
+        protected_donor_constraint_count=(
+            protected_floor_projection.donor_constraint_count
+            if protected_floor_projection is not None
+            else 0
+        ),
     )
 
 
-def _quality_solver_limitations(problem: ScheduleProblemV1) -> tuple[str, ...]:
+def _quality_solver_limitations(
+    problem: ScheduleProblemV1,
+    protected_enforcement_fingerprint: str | None = None,
+) -> tuple[str, ...]:
     time_limit, worker_count, random_seed = _solver_controls(problem)
     configured_time_limit = "none" if time_limit is None else f"{time_limit:g} seconds"
-    return (
+    limitations = (
         f"OR-Tools version {ortools.__version__}; total staged-solve time limit: "
         f"{configured_time_limit}; worker count: {worker_count}; random seed: {random_seed}.",
         "Milestone 4A2 optimizes fixed-resource demand protection, positive-demand "
@@ -571,6 +686,14 @@ def _quality_solver_limitations(problem: ScheduleProblemV1) -> tuple[str, ...]:
         "not optimized or integrated by this adapter.",
         "Sustained service regimes are derived from authoritative directional demand blocks "
         "and exact planning service-rate equality; they are not directly passenger-supplied.",
+    )
+    if protected_enforcement_fingerprint is None:
+        return limitations
+    return (
+        *limitations,
+        "The CP-SAT model encoded the exact bound protected-service-floor authority "
+        f"{protected_enforcement_fingerprint}; common independent 6A2B validation remains "
+        "the final candidate-acceptance authority.",
     )
 
 
@@ -682,7 +805,13 @@ def _build_quality_candidate(
         exact_timetable=exact_timetable,
         headway_regimes=regimes,
         explanation="Service-quality explanation pending independent recomputation.",
-        limitations=(*_quality_solver_limitations(problem), *extra_limitations),
+        limitations=(
+            *_quality_solver_limitations(
+                problem,
+                bundle.protected_enforcement_fingerprint,
+            ),
+            *extra_limitations,
+        ),
     )
     vector = _recompute_service_quality_objective_vector_with_authority_v1(
         problem,
@@ -726,6 +855,7 @@ def _quality_non_candidate_result(
     attempted: tuple[str, ...],
     proven: tuple[tuple[str, int], ...],
     detail: str,
+    protected_enforcement_fingerprint: str | None = None,
 ) -> SolverRunResultV1:
     return SolverRunResultV1(
         execution_status=SolverExecutionStatus.COMPLETED,
@@ -739,27 +869,60 @@ def _quality_non_candidate_result(
             "Objective stages proven optimal: "
             f"{', '.join(f'{name}={value}' for name, value in proven) if proven else 'none'}.",
         ),
-        limitations=_quality_solver_limitations(problem),
+        limitations=_quality_solver_limitations(
+            problem,
+            protected_enforcement_fingerprint,
+        ),
     )
 
 
 @dataclass(frozen=True, slots=True)
 class OrToolsCpSatServiceQualitySolver:
     exact_demand_authority: _ExactDemandAuthority | None = None
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None
     adapter_id: ClassVar[str] = "ortools_cp_sat_quality_v1"
+
+    @property
+    def protected_service_floor_enforcement_fingerprint(self) -> str | None:
+        authority = self.protected_service_floor_enforcement_authority
+        if (
+            isinstance(authority, ProtectedServiceFloorEnforcementAuthorityV1)
+            and authority.has_enforceable_regimes
+        ):
+            return authority.enforcement_fingerprint
+        return None
 
     def solve(self, problem: ScheduleProblemV1) -> SolverRunResultV1:
         started = time.perf_counter()
-        if (
-            self.exact_demand_authority is not None
-            and problem.adapter_context_fingerprint
-            != self.exact_demand_authority.authority_fingerprint
+        if self.exact_demand_authority is not None and not (
+            _exact_demand_authority_is_self_consistent(self.exact_demand_authority)
         ):
             return _model_invalid_result(
                 problem,
                 self.adapter_id,
                 started,
                 (ORTOOLS_QUALITY_EXACT_DEMAND_CONTEXT_MISMATCH,),
+            )
+        protected_fingerprint = self.protected_service_floor_enforcement_fingerprint
+        if (
+            self.exact_demand_authority is not None
+            and problem.adapter_context_fingerprint
+            != _ortools_quality_adapter_context_fingerprint(
+                self.exact_demand_authority.authority_fingerprint,
+                protected_fingerprint,
+            )
+        ):
+            return _model_invalid_result(
+                problem,
+                self.adapter_id,
+                started,
+                (
+                    ORTOOLS_PROTECTED_FLOOR_AUTHORITY_MISMATCH
+                    if protected_fingerprint is not None
+                    else ORTOOLS_QUALITY_EXACT_DEMAND_CONTEXT_MISMATCH,
+                ),
             )
         issues = (
             *_adapter_capability_issues(problem, self.adapter_id),
@@ -772,9 +935,26 @@ class OrToolsCpSatServiceQualitySolver:
         if issues:
             return _model_invalid_result(problem, self.adapter_id, started, issues)
         try:
+            protected_projection = (
+                build_ortools_protected_floor_projection_v1(
+                    self.protected_service_floor_enforcement_authority,
+                    problem.scenario_b,
+                )
+                if self.protected_service_floor_enforcement_authority is not None
+                else None
+            )
+        except OrToolsProtectedFloorProjectionError:
+            return _model_invalid_result(
+                problem,
+                self.adapter_id,
+                started,
+                (ORTOOLS_PROTECTED_FLOOR_PROJECTION_INVALID,),
+            )
+        try:
             bundle = _build_quality_cp_sat_model(
                 problem,
                 self.exact_demand_authority,
+                protected_projection,
             )
             model_error = bundle.demand.hard.model.validate()
             if model_error:
@@ -803,6 +983,9 @@ class OrToolsCpSatServiceQualitySolver:
                             attempted=tuple(attempted),
                             proven=tuple(proven),
                             detail="The adapter time budget expired before the first stage.",
+                            protected_enforcement_fingerprint=(
+                                bundle.protected_enforcement_fingerprint
+                            ),
                         )
                     candidate = _build_quality_candidate(
                         problem,
@@ -892,12 +1075,19 @@ class OrToolsCpSatServiceQualitySolver:
                             "CP-SAT returned UNKNOWN before finding a candidate."
                         ),
                         NativeSolverStatus.INFEASIBLE: (
-                            "CP-SAT proved the encoded fixed-resource quality model infeasible."
+                            "CP-SAT proved the complete encoded fixed-resource service-quality "
+                            "model infeasible under the current Scenario B operating locks, "
+                            "fixed trip count and direction, available-fleet and terminal "
+                            "constraints, demand/service-quality hard model, and exact bound "
+                            "protected-floor authority."
+                            if bundle.protected_enforcement_fingerprint is not None
+                            else "CP-SAT proved the encoded fixed-resource quality model infeasible."
                         ),
                         NativeSolverStatus.MODEL_INVALID: (
                             "CP-SAT reported that the encoded quality model is invalid."
                         ),
                     }[native_status],
+                    protected_enforcement_fingerprint=(bundle.protected_enforcement_fingerprint),
                 )
 
             duration = max(0.0, time.perf_counter() - started)
@@ -910,6 +1100,7 @@ class OrToolsCpSatServiceQualitySolver:
                     attempted=tuple(attempted),
                     proven=tuple(proven),
                     detail="No service-quality stage produced a candidate.",
+                    protected_enforcement_fingerprint=(bundle.protected_enforcement_fingerprint),
                 )
             candidate = _build_quality_candidate(
                 problem,
@@ -979,11 +1170,21 @@ def build_ortools_service_quality_request_v1(
                 exc.code,
             ),
         ) from exc
+    protected_enforcement_fingerprint = (
+        protected_service_floor_enforcement_authority.enforcement_fingerprint
+        if protected_service_floor_enforcement_authority is not None
+        and protected_service_floor_enforcement_authority.has_enforceable_regimes
+        else None
+    )
+    adapter_context_fingerprint = _ortools_quality_adapter_context_fingerprint(
+        exact_demand_authority.authority_fingerprint,
+        protected_enforcement_fingerprint,
+    )
     problem = build_schedule_problem_v1(
         normalized_inputs,
         b_evaluation,
         solver_adapter=OrToolsCpSatServiceQualitySolver.adapter_id,
-        adapter_context_fingerprint=(exact_demand_authority.authority_fingerprint),
+        adapter_context_fingerprint=adapter_context_fingerprint,
         evaluation_policy=effective_evaluation_policy,
         solver_policy=solver_policy,
         direction_trip_lock_mode=DirectionTripLockMode.FIXED_BY_DIRECTION,
@@ -1010,12 +1211,16 @@ def build_ortools_service_quality_request_v1(
         protected_service_floor_enforcement_authority,
     )
     return generation_context, OrToolsCpSatServiceQualitySolver(
-        exact_demand_authority=exact_demand_authority
+        exact_demand_authority=exact_demand_authority,
+        protected_service_floor_enforcement_authority=(
+            protected_service_floor_enforcement_authority
+        ),
     )
 
 
 __all__ = [
     "OrToolsCpSatServiceQualitySolver",
+    "ORTOOLS_PROTECTED_FLOOR_AUTHORITY_MISMATCH",
     "ORTOOLS_QUALITY_EXACT_DEMAND_CONTEXT_MISMATCH",
     "build_ortools_service_quality_request_v1",
 ]

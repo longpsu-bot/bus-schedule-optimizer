@@ -1064,5 +1064,8 @@ def test_preview_is_not_used_by_solver_candidate_or_legacy_paths(path: str) -> N
         assert "ProtectedServiceFloorEnforcementAuthorityV1" in source
         assert "build_heuristic_protected_floor_search_projection_v1" in source
         assert "protected_service_floor_policy_from_workbook_v1" not in source
+    elif path == "src/bus_schedule_engine/contracts_v1/ortools_quality_solver.py":
+        assert "OrToolsProtectedFloorProjectionV1" in source
+        assert "protected_service_floor_policy_from_workbook_v1" not in source
     else:
         assert "maximum_future_c_headway_minutes" not in source
