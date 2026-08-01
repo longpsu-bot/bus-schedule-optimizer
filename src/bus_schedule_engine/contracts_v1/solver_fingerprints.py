@@ -42,6 +42,10 @@ def solution_fingerprint_payload(
     payload = jsonable(asdict(solution))
     payload.pop("solution_fingerprint", None)
     payload.pop("solve_duration_seconds", None)
+    if payload.get("protected_service_floor_enforcement_fingerprint") is None:
+        payload.pop("protected_service_floor_enforcement_fingerprint", None)
+    if payload.get("protected_service_floor_validation_fingerprint") is None:
+        payload.pop("protected_service_floor_validation_fingerprint", None)
     return {
         "fingerprint_profile": SOLUTION_FINGERPRINT_PROFILE,
         "problem_fingerprint": problem_fingerprint,
@@ -57,9 +61,23 @@ def outcome_fingerprint_payload(
     payload = jsonable(asdict(outcome))
     payload.pop("outcome_fingerprint", None)
     payload.pop("solve_duration_seconds", None)
+    if payload.get("protected_service_floor_enforcement_fingerprint") is None:
+        payload.pop("protected_service_floor_enforcement_fingerprint", None)
+    if payload.get("protected_service_floor_validation_fingerprint") is None:
+        payload.pop("protected_service_floor_validation_fingerprint", None)
     solution = payload.get("solution")
     if isinstance(solution, dict):
         solution.pop("solve_duration_seconds", None)
+        if solution.get("protected_service_floor_enforcement_fingerprint") is None:
+            solution.pop("protected_service_floor_enforcement_fingerprint", None)
+        if solution.get("protected_service_floor_validation_fingerprint") is None:
+            solution.pop("protected_service_floor_validation_fingerprint", None)
+    diagnostic = payload.get("diagnostic_candidate")
+    if isinstance(diagnostic, dict):
+        if diagnostic.get("protected_service_floor_enforcement_fingerprint") is None:
+            diagnostic.pop("protected_service_floor_enforcement_fingerprint", None)
+        if diagnostic.get("protected_service_floor_validation_fingerprint") is None:
+            diagnostic.pop("protected_service_floor_validation_fingerprint", None)
     return {
         "fingerprint_profile": OUTCOME_FINGERPRINT_PROFILE,
         "problem_fingerprint": problem_fingerprint,

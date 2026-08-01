@@ -4,6 +4,13 @@ import math
 from collections import Counter
 from dataclasses import dataclass, replace
 
+from bus_schedule_engine.protected_service_floor_codes import (
+    PROTECTED_FLOOR_REJECTION_CODE_ORDER,
+)
+from bus_schedule_engine.protected_service_floor_enforcement import (
+    validate_candidate_against_protected_service_floors_v1,
+)
+
 from .demand_coverage import (
     DEMAND_COVERAGE_INCOMPLETE_FOR_AUTHORITATIVE_C,
     assess_demand_coverage_v1,
@@ -693,6 +700,20 @@ def _accepted_occupancy_explanations(assessment) -> tuple[str, ...]:
     return tuple(explanations)
 
 
+def _ordered_candidate_rejection_codes(
+    rejection_codes: list[str] | tuple[str, ...],
+    protected_rejection_codes: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    protected_code_set = set(PROTECTED_FLOOR_REJECTION_CODE_ORDER)
+    ordinary = tuple(sorted(set(rejection_codes) - protected_code_set))
+    protected = tuple(
+        code
+        for code in PROTECTED_FLOOR_REJECTION_CODE_ORDER
+        if code in set(rejection_codes) or code in protected_rejection_codes
+    )
+    return ordinary + protected
+
+
 def validate_and_build_solution_v1(
     context: ScheduleGenerationContextV1,
     candidate: RawScheduleCandidateV1,
@@ -727,6 +748,15 @@ def validate_and_build_solution_v1(
     )
     if candidate.candidate_fingerprint != expected_candidate_fingerprint:
         rejection_codes.append("CANDIDATE_FINGERPRINT_MISMATCH")
+    protected_validation = None
+    enforcement_authority = context.protected_service_floor_enforcement_authority
+    if enforcement_authority is not None:
+        protected_validation = validate_candidate_against_protected_service_floors_v1(
+            enforcement_authority,
+            context.normalized_inputs.scenario_b,
+            candidate,
+        )
+        rejection_codes.extend(protected_validation.rejection_codes)
     rejection_codes.extend(_source_lock_errors(problem, candidate))
     derived_trip_facts, trip_fact_errors = _derive_trip_facts(problem, candidate)
     rejection_codes.extend(trip_fact_errors)
@@ -790,13 +820,17 @@ def validate_and_build_solution_v1(
     rejection_codes.extend(occupancy.issue_codes)
 
     if rejection_codes:
-        codes = tuple(sorted(set(rejection_codes)))
+        codes = _ordered_candidate_rejection_codes(
+            rejection_codes,
+            (protected_validation.rejection_codes if protected_validation is not None else ()),
+        )
         return CandidateValidationResultV1(
             status=CandidateValidationStatus.REJECTED,
             rejection_codes=codes,
             summary=_candidate_rejection_summary(codes),
             fleet_assessment=fleet,
             solution=None,
+            protected_service_floor_validation=protected_validation,
         )
 
     if assignments is None:  # pragma: no cover - rejection path above guarantees this
@@ -842,6 +876,7 @@ def validate_and_build_solution_v1(
             summary=_candidate_rejection_summary(integrity_errors),
             fleet_assessment=fleet,
             solution=None,
+            protected_service_floor_validation=protected_validation,
         )
     block_supply = _candidate_block_supply(context, candidate)
     block_evaluation = tuple(
@@ -900,6 +935,16 @@ def validate_and_build_solution_v1(
             "solver_determined initial positioning only.",
         )
         + occupancy.limitations,
+        protected_service_floor_enforcement_fingerprint=(
+            protected_validation.enforcement_fingerprint
+            if protected_validation is not None
+            else None
+        ),
+        protected_service_floor_validation_fingerprint=(
+            protected_validation.validation_fingerprint
+            if protected_validation is not None
+            else None
+        ),
     )
     final_integrity_errors = _solution_headway_regime_integrity_errors(
         provisional.c_exact_timetable,
@@ -913,6 +958,7 @@ def validate_and_build_solution_v1(
             summary=_candidate_rejection_summary(final_integrity_errors),
             fleet_assessment=fleet,
             solution=None,
+            protected_service_floor_validation=protected_validation,
         )
     solution = replace(
         provisional,
@@ -926,7 +972,12 @@ def validate_and_build_solution_v1(
     return CandidateValidationResultV1(
         status=CandidateValidationStatus.ACCEPTED,
         rejection_codes=(),
-        summary="Candidate passed independent Contract V1 validation.",
+        summary=(
+            "Candidate passed independent Contract V1 and protected-service-floor validation."
+            if protected_validation is not None
+            else "Candidate passed independent Contract V1 validation."
+        ),
         fleet_assessment=fleet,
         solution=solution,
+        protected_service_floor_validation=protected_validation,
     )

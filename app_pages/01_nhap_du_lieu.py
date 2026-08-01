@@ -46,6 +46,8 @@ _UNIFIED_RESULT_STATE_KEYS = (
     "trip_ridership_failure",
     "protected_service_floor_assessment",
     "protected_service_floor_failure",
+    "protected_service_floor_enforcement_authority",
+    "protected_service_floor_enforcement_failure",
 )
 
 
@@ -339,6 +341,12 @@ if content:
             )
             st.session_state.protected_service_floor_failure = (
                 unified_run.protected_service_floor_failure
+            )
+            st.session_state.protected_service_floor_enforcement_authority = (
+                unified_run.protected_service_floor_enforcement_authority
+            )
+            st.session_state.protected_service_floor_enforcement_failure = (
+                unified_run.protected_service_floor_enforcement_failure
             )
             st.session_state.unified_optimization_result = unified_run.unified_result
             st.session_state.unified_presentation = unified_run.unified_presentation

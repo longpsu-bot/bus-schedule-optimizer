@@ -990,7 +990,7 @@ def test_pipeline_contract_result_is_identical_with_supplemental_data(
         trip_ridership_metadata=_metadata(),
         trip_ridership_observations=(_observation(),),
     )
-    original_runner = application_pipeline.analyze_and_optimize_schedule_v1
+    original_runner = application_pipeline._analyze_normalized_and_optimize_schedule_v1
     calls = 0
 
     def counted_runner(*args, **kwargs):
@@ -1000,7 +1000,7 @@ def test_pipeline_contract_result_is_identical_with_supplemental_data(
 
     monkeypatch.setattr(
         application_pipeline,
-        "analyze_and_optimize_schedule_v1",
+        "_analyze_normalized_and_optimize_schedule_v1",
         counted_runner,
     )
     imported_at = datetime(2026, 7, 31, tzinfo=UTC)
@@ -1017,7 +1017,17 @@ def test_pipeline_contract_result_is_identical_with_supplemental_data(
 
     assert calls == 2
     assert baseline.status == supplemental.status == UnifiedApplicationStatusV1.COMPLETE
-    assert baseline.unified_result == supplemental.unified_result
+    assert replace(
+        baseline.unified_result,
+        protected_service_floor_enforcement_authority=None,
+    ) == replace(
+        supplemental.unified_result,
+        protected_service_floor_enforcement_authority=None,
+    )
+    assert (
+        not baseline.unified_result.protected_service_floor_enforcement_authority.protected_regimes
+    )
+    assert not supplemental.unified_result.protected_service_floor_enforcement_authority.protected_regimes
     assert baseline.unified_presentation == supplemental.unified_presentation
     assert read_unified_export_metadata_bytes_v1(
         baseline.unified_xlsx_bytes

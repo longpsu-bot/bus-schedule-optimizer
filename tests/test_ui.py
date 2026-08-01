@@ -377,8 +377,9 @@ def test_page03_renders_supplemental_match_quality_and_trip_summaries(
     assert "Tổng hợp theo chiều" in markdown
     assert any(item.value == "Đánh giá regime cần bảo vệ" for item in app.subheader)
     assert any(
-        "Kết quả 6A2A chỉ xác định regime đề xuất bảo vệ" in item.value for item in app.warning
+        "Kết quả 6A2A là bằng chứng và preview lịch sử" in item.value for item in app.warning
     )
+    assert any(item.value == "Trạng thái thực thi sàn dịch vụ 6A2B" for item in app.subheader)
     assert "Ngưỡng chính sách 6A2A" in markdown
     assert "Preview sàn dịch vụ tương lai — chưa thực thi" in markdown
 

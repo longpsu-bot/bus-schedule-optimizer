@@ -4,6 +4,11 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
+from bus_schedule_engine.models import (
+    ProtectedServiceFloorCandidateValidationV1,
+    ProtectedServiceFloorEnforcementAuthorityV1,
+)
+
 from .demand_resolution import DemandAnalysisBlockV1, DemandResolutionContractV1
 from .evaluation import (
     BlockEvaluationV1,
@@ -254,6 +259,8 @@ class ScheduleSolutionV1:
     maximum_shift_minutes: float
     explanations: tuple[str, ...]
     limitations: tuple[str, ...]
+    protected_service_floor_enforcement_fingerprint: str | None = None
+    protected_service_floor_validation_fingerprint: str | None = None
 
     @property
     def contract_version(self) -> str:
@@ -269,6 +276,8 @@ class RejectedCandidateDiagnosticV1:
     candidate_fingerprint: str
     rejection_codes: tuple[str, ...]
     summary: str
+    protected_service_floor_enforcement_fingerprint: str | None = None
+    protected_service_floor_validation_fingerprint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,6 +287,7 @@ class CandidateValidationResultV1:
     summary: str
     fleet_assessment: FleetAssessmentV1 | None
     solution: ScheduleSolutionV1 | None
+    protected_service_floor_validation: ProtectedServiceFloorCandidateValidationV1 | None = None
 
     @property
     def passed(self) -> bool:
@@ -297,6 +307,8 @@ class ScheduleGenerationOutcomeV1:
     diagnostic_candidate: RejectedCandidateDiagnosticV1 | None
     explanations: tuple[str, ...]
     limitations: tuple[str, ...]
+    protected_service_floor_enforcement_fingerprint: str | None = None
+    protected_service_floor_validation_fingerprint: str | None = None
 
     @property
     def contract_version(self) -> str:
@@ -342,6 +354,9 @@ class ScheduleGenerationContextV1:
     normalized_inputs: NormalizedInputBundleV1
     b_evaluation: ScenarioBEvaluationBundleV1
     evaluation_policy: ScenarioBEvaluationPolicyV1
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None
 
     @property
     def problem_fingerprint(self) -> str:

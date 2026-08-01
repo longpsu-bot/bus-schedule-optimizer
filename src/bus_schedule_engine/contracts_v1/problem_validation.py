@@ -503,4 +503,22 @@ def validate_schedule_generation_context_v1(
             "PROBLEM_EVALUATION_FINGERPRINT_MISMATCH",
             "Problem ceilings do not match the authoritative evaluation policy.",
         )
+    enforcement_authority = context.protected_service_floor_enforcement_authority
+    if enforcement_authority is not None:
+        from bus_schedule_engine.protected_service_floor_codes import (
+            PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_MISMATCH,
+        )
+        from bus_schedule_engine.protected_service_floor_enforcement import (
+            protected_service_floor_enforcement_authority_is_valid_v1,
+        )
+
+        if not protected_service_floor_enforcement_authority_is_valid_v1(
+            enforcement_authority,
+            normalized.scenario_b,
+        ):
+            _issue(
+                issues,
+                PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_MISMATCH,
+                "Protected-service-floor authority does not match the generation context.",
+            )
     return ScheduleProblemValidationResultV1(tuple(issues))

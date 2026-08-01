@@ -9,6 +9,8 @@ from typing import ClassVar
 import ortools
 from ortools.sat.python import cp_model
 
+from bus_schedule_engine.models import ProtectedServiceFloorEnforcementAuthorityV1
+
 from .evaluation import ScenarioBEvaluationBundleV1, ScenarioBEvaluationPolicyV1
 from .exact_demand_authority import (
     _build_exact_demand_authority,
@@ -943,6 +945,9 @@ def build_ortools_service_quality_request_v1(
     *,
     evaluation_policy: ScenarioBEvaluationPolicyV1 | None = None,
     solver_policy: SolverPolicyV1 | None = None,
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None,
 ) -> tuple[
     ScheduleGenerationContextV1,
     OrToolsCpSatServiceQualitySolver,
@@ -1002,6 +1007,7 @@ def build_ortools_service_quality_request_v1(
         normalized_inputs,
         b_evaluation,
         evaluation_policy,
+        protected_service_floor_enforcement_authority,
     )
     return generation_context, OrToolsCpSatServiceQualitySolver(
         exact_demand_authority=exact_demand_authority

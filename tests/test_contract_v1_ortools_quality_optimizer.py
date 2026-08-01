@@ -523,6 +523,7 @@ def test_public_adapter_and_builder_signatures_are_exact() -> None:
         "b_evaluation",
         "evaluation_policy",
         "solver_policy",
+        "protected_service_floor_enforcement_authority",
     )
 
 

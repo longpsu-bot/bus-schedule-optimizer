@@ -558,7 +558,7 @@ def test_unified_pipeline_treats_candidate_rejection_as_complete(
     rejected_result, _report = rejected_result_and_report()
     monkeypatch.setattr(
         application,
-        "analyze_and_optimize_schedule_v1",
+        "_analyze_normalized_and_optimize_schedule_v1",
         lambda *args, **kwargs: rejected_result,
     )
 
@@ -751,6 +751,8 @@ def test_unified_application_public_model_shape_and_default_solver() -> None:
         "trip_ridership_failure",
         "protected_service_floor_assessment",
         "protected_service_floor_failure",
+        "protected_service_floor_enforcement_authority",
+        "protected_service_floor_enforcement_failure",
     }
     assert UnifiedRuntimeFailureV1.__dataclass_params__.frozen is True
     assert tuple(status.value for status in UnifiedApplicationStatusV1) == (
@@ -784,7 +786,11 @@ def test_unified_pipeline_stops_at_readiness_without_any_analysis_or_artifact(
         raise AssertionError("readiness blocker must stop the pipeline")
 
     monkeypatch.setattr(application, "normalization_options_from_workbook_v1", forbidden)
-    monkeypatch.setattr(application, "analyze_and_optimize_schedule_v1", forbidden)
+    monkeypatch.setattr(
+        application,
+        "_analyze_normalized_and_optimize_schedule_v1",
+        forbidden,
+    )
     monkeypatch.setattr(application, "run_and_build_artifacts", forbidden)
     monkeypatch.setattr(
         application,
@@ -816,7 +822,7 @@ def test_unified_pipeline_completes_without_loading_or_running_legacy(
 ) -> None:
     imported = _template_import(tmp_path)
     unified_calls = 0
-    real_unified = application.analyze_and_optimize_schedule_v1
+    real_unified = application._analyze_normalized_and_optimize_schedule_v1
 
     def unified_spy(*args, **kwargs):
         nonlocal unified_calls
@@ -826,7 +832,11 @@ def test_unified_pipeline_completes_without_loading_or_running_legacy(
     def forbidden(*args, **kwargs):
         raise AssertionError("ordinary unified runtime must not execute the oracle")
 
-    monkeypatch.setattr(application, "analyze_and_optimize_schedule_v1", unified_spy)
+    monkeypatch.setattr(
+        application,
+        "_analyze_normalized_and_optimize_schedule_v1",
+        unified_spy,
+    )
     monkeypatch.setattr(application, "run_and_build_artifacts", forbidden)
     monkeypatch.setattr(
         application,
@@ -865,7 +875,11 @@ def test_solver_exception_is_staged_and_fails_closed(
         )
         raise wrapped from original
 
-    monkeypatch.setattr(application, "analyze_and_optimize_schedule_v1", fail)
+    monkeypatch.setattr(
+        application,
+        "_analyze_normalized_and_optimize_schedule_v1",
+        fail,
+    )
     run = run_unified_application_pipeline_v1(
         imported,
         source_id=SOURCE_ID,
@@ -891,7 +905,7 @@ def test_normalization_contract_validation_error_fails_at_normalization(
         raise issue_error
 
     monkeypatch.setattr(
-        optimization_service,
+        application,
         "normalize_imported_workbook_v1",
         fail,
     )

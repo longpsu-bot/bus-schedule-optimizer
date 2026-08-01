@@ -5,6 +5,8 @@ from dataclasses import asdict, replace
 from enum import Enum
 from typing import Any
 
+from bus_schedule_engine.models import ProtectedServiceFloorEnforcementAuthorityV1
+
 from .evaluation import ScenarioBEvaluationBundleV1, ScenarioBEvaluationPolicyV1
 from .evaluation_fingerprints import evaluation_fingerprint
 from .evaluation_serialization import (
@@ -370,6 +372,9 @@ def build_schedule_generation_context_v1(
     normalized_inputs: NormalizedInputBundleV1,
     b_evaluation: ScenarioBEvaluationBundleV1,
     evaluation_policy: ScenarioBEvaluationPolicyV1 | None = None,
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None,
 ) -> ScheduleGenerationContextV1:
     effective_policy = evaluation_policy or ScenarioBEvaluationPolicyV1()
     authoritative_evaluation = evaluate_scenario_b_v1(
@@ -395,6 +400,12 @@ def build_schedule_generation_context_v1(
         normalized_inputs=normalized_inputs,
         b_evaluation=authoritative_evaluation,
         evaluation_policy=effective_policy,
+        protected_service_floor_enforcement_authority=(
+            protected_service_floor_enforcement_authority
+            if protected_service_floor_enforcement_authority is not None
+            and protected_service_floor_enforcement_authority.has_enforceable_regimes
+            else None
+        ),
     )
     from .problem_validation import validate_schedule_generation_context_v1
 

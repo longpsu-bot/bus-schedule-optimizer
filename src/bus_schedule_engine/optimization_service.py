@@ -28,6 +28,7 @@ from .contracts_v1 import (
     run_schedule_solver_v1,
 )
 from .importer import ImportedWorkbook
+from .models import ProtectedServiceFloorEnforcementAuthorityV1
 from .optimization_comparison import (
     SolverComparisonV1,
     compare_solver_outcomes_v1,
@@ -88,6 +89,10 @@ class BusScheduleOptimizationResult:
     recommended_outcome: ScheduleGenerationOutcomeV1 | None
     explanations: tuple[str, ...]
     limitations: tuple[str, ...]
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None
+    protected_service_floor_enforcement_failure_code: str | None = None
 
 
 _ACTION_BY_DECISION = {
@@ -121,6 +126,10 @@ _BOTH_SOLVER_BUDGET_LIMITATION = (
     "BOTH applies SolverPolicyV1.time_limit_seconds unchanged as a per-solver "
     "invocation budget; total wall-clock execution may be up to approximately "
     "two solver budgets plus application overhead."
+)
+_PROTECTED_AUTHORITY_FAILURE_LIMITATION = (
+    "Protected-service-floor enforcement authority is invalid. Scenario B evaluation remains "
+    "available, but Scenario C generation was blocked to prevent an unprotected fallback."
 )
 
 
@@ -198,6 +207,10 @@ def _result(
     comparison: SolverComparisonV1 | None,
     recommended_outcome: ScheduleGenerationOutcomeV1 | None,
     extra_limitations: tuple[str, ...] = (),
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None,
+    protected_service_floor_enforcement_failure_code: str | None = None,
 ) -> BusScheduleOptimizationResult:
     heuristic_explanations = heuristic_outcome.explanations if heuristic_outcome is not None else ()
     ortools_explanations = ortools_outcome.explanations if ortools_outcome is not None else ()
@@ -232,6 +245,12 @@ def _result(
                 *extra_limitations,
             )
         ),
+        protected_service_floor_enforcement_authority=(
+            protected_service_floor_enforcement_authority
+        ),
+        protected_service_floor_enforcement_failure_code=(
+            protected_service_floor_enforcement_failure_code
+        ),
     )
 
 
@@ -245,6 +264,10 @@ def analyze_and_optimize_schedule_v1(
     repeatability_evidence: RepeatabilityEvidenceV1 | None = None,
     heuristic_config: ScenarioCConfig | None = None,
     solver_policy: SolverPolicyV1 | None = None,
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None,
+    protected_service_floor_enforcement_failure_code: str | None = None,
 ) -> BusScheduleOptimizationResult:
     """Normalize, assess, and conditionally run the selected canonical solver boundary."""
     _validate_solver_choice(solver_choice)
@@ -252,6 +275,41 @@ def analyze_and_optimize_schedule_v1(
         OptimizationExecutionStageV1.NORMALIZATION,
         lambda: normalize_imported_workbook_v1(imported, normalization_options),
     )
+    return _analyze_normalized_and_optimize_schedule_v1(
+        imported,
+        normalized_inputs,
+        solver_choice=solver_choice,
+        evaluation_policy=evaluation_policy,
+        decision_policy=decision_policy,
+        repeatability_evidence=repeatability_evidence,
+        heuristic_config=heuristic_config,
+        solver_policy=solver_policy,
+        protected_service_floor_enforcement_authority=(
+            protected_service_floor_enforcement_authority
+        ),
+        protected_service_floor_enforcement_failure_code=(
+            protected_service_floor_enforcement_failure_code
+        ),
+    )
+
+
+def _analyze_normalized_and_optimize_schedule_v1(
+    imported: ImportedWorkbook,
+    normalized_inputs: NormalizedInputBundleV1,
+    *,
+    solver_choice: SolverChoice = SolverChoice.HEURISTIC,
+    evaluation_policy: ScenarioBEvaluationPolicyV1 | None = None,
+    decision_policy: ServiceAdjustmentDecisionPolicyV1 | None = None,
+    repeatability_evidence: RepeatabilityEvidenceV1 | None = None,
+    heuristic_config: ScenarioCConfig | None = None,
+    solver_policy: SolverPolicyV1 | None = None,
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None,
+    protected_service_floor_enforcement_failure_code: str | None = None,
+) -> BusScheduleOptimizationResult:
+    """Assess and optimize an already normalized, verified Contract V1 bundle."""
+    _validate_solver_choice(solver_choice)
     effective_evaluation_policy = evaluation_policy or ScenarioBEvaluationPolicyV1()
 
     def evaluate():
@@ -290,7 +348,26 @@ def analyze_and_optimize_schedule_v1(
         "adjustment_assessment": adjustment_assessment,
         "selected_action": selected_action,
         "solver_choice": solver_choice,
+        "protected_service_floor_enforcement_authority": (
+            protected_service_floor_enforcement_authority
+        ),
+        "protected_service_floor_enforcement_failure_code": (
+            protected_service_floor_enforcement_failure_code
+        ),
     }
+    if protected_service_floor_enforcement_failure_code is not None:
+        return _result(
+            **result_arguments,
+            solver_attempted=False,
+            heuristic_outcome=None,
+            ortools_outcome=None,
+            comparison=None,
+            recommended_outcome=None,
+            extra_limitations=(
+                f"{protected_service_floor_enforcement_failure_code}: "
+                f"{_PROTECTED_AUTHORITY_FAILURE_LIMITATION}",
+            ),
+        )
     if selected_action not in _FIXED_RESOURCE_ACTIONS:
         return _result(
             **result_arguments,
@@ -312,6 +389,18 @@ def analyze_and_optimize_schedule_v1(
             extra_limitations=(_DIRECTIONAL_SOLVING_UNAVAILABLE,),
         )
 
+    attached_enforcement_authority = (
+        protected_service_floor_enforcement_authority
+        if protected_service_floor_enforcement_authority is not None
+        and protected_service_floor_enforcement_authority.has_enforceable_regimes
+        else None
+    )
+    enforcement_request_arguments = (
+        {"protected_service_floor_enforcement_authority": (attached_enforcement_authority)}
+        if attached_enforcement_authority is not None
+        else {}
+    )
+
     if solver_choice == SolverChoice.HEURISTIC:
 
         def run_heuristic():
@@ -327,6 +416,7 @@ def analyze_and_optimize_schedule_v1(
                 effective_heuristic_config,
                 evaluation_policy=effective_evaluation_policy,
                 solver_policy=solver_policy,
+                **enforcement_request_arguments,
             )
             return run_schedule_solver_v1(
                 heuristic_context,
@@ -354,6 +444,7 @@ def analyze_and_optimize_schedule_v1(
                 b_evaluation,
                 evaluation_policy=effective_evaluation_policy,
                 solver_policy=solver_policy,
+                **enforcement_request_arguments,
             )
             return run_schedule_solver_v1(
                 ortools_context,
@@ -384,6 +475,7 @@ def analyze_and_optimize_schedule_v1(
             heuristic_config or ScenarioCConfig.from_mapping(imported.configuration),
             evaluation_policy=effective_evaluation_policy,
             solver_policy=solver_policy,
+            **enforcement_request_arguments,
         ),
     )
     ortools_context, ortools_solver = _run_stage(
@@ -393,6 +485,7 @@ def analyze_and_optimize_schedule_v1(
             b_evaluation,
             evaluation_policy=effective_evaluation_policy,
             solver_policy=solver_policy,
+            **enforcement_request_arguments,
         ),
     )
     heuristic_outcome = _run_stage(

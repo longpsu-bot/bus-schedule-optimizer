@@ -66,12 +66,10 @@ from bus_schedule_engine.protected_service_floor_codes import (
     NOT_PROTECTED_TOO_FEW_DEPARTURES,
     PROTECTED_HIGH_DEMAND_SERVICE_FLOOR,
     PROTECTED_SERVICE_FLOOR_ASSESSMENT_FAILED,
+    PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_INVALID,
     REGULAR,
 )
 from bus_schedule_engine.trip_ridership import analyze_trip_ridership_v1
-from bus_schedule_engine.unified_result_exporter import (
-    read_unified_export_metadata_bytes_v1,
-)
 
 BASE_SECONDS = 6 * 3600
 
@@ -982,7 +980,7 @@ def test_generated_template_declares_all_policy_defaults(tmp_path: Path) -> None
     )
 
 
-def test_supplemental_assessment_failure_does_not_change_contract_or_artifacts(
+def test_supplemental_assessment_failure_blocks_unprotected_c_but_retains_b(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1008,11 +1006,15 @@ def test_supplemental_assessment_failure_does_not_change_contract_or_artifacts(
     )
 
     assert baseline.status == isolated.status == UnifiedApplicationStatusV1.COMPLETE
-    assert baseline.unified_result == isolated.unified_result
-    assert baseline.unified_presentation == isolated.unified_presentation
-    assert read_unified_export_metadata_bytes_v1(
-        baseline.unified_xlsx_bytes,
-    ) == read_unified_export_metadata_bytes_v1(isolated.unified_xlsx_bytes)
+    assert isolated.unified_result.normalized_inputs == baseline.unified_result.normalized_inputs
+    assert isolated.unified_result.b_evaluation == baseline.unified_result.b_evaluation
+    assert isolated.unified_result.solver_attempted is False
+    assert isolated.unified_result.recommended_outcome is None
+    assert isolated.unified_result.protected_service_floor_enforcement_failure_code == (
+        PROTECTED_SERVICE_FLOOR_ENFORCEMENT_AUTHORITY_INVALID
+    )
+    assert isolated.protected_service_floor_enforcement_authority is None
+    assert isolated.protected_service_floor_enforcement_failure is not None
     assert isolated.protected_service_floor_assessment is None
     assert isolated.protected_service_floor_failure is not None
     assert isolated.protected_service_floor_failure.code == (
