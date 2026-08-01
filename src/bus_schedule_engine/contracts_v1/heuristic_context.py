@@ -43,6 +43,7 @@ class HeuristicCompatibilityContextV1:
     source_b_fingerprint: str
     observed_demand_fingerprint: str | None
     context_fingerprint: str
+    protected_service_floor_enforcement_fingerprint: str | None = None
 
 
 def _jsonable(value: Any) -> Any:
@@ -253,20 +254,24 @@ def heuristic_context_fingerprint(
     turnaround_bridge_value_minutes: int,
     source_b_fingerprint: str,
     observed_demand_fingerprint: str | None,
+    protected_service_floor_enforcement_fingerprint: str | None = None,
 ) -> str:
-    return canonical_sha256(
-        {
-            "fingerprint_profile": HEURISTIC_CONTEXT_FINGERPRINT_PROFILE,
-            "source_b_fingerprint": source_b_fingerprint,
-            "observed_demand_fingerprint": observed_demand_fingerprint,
-            "legacy_parameters": _jsonable(asdict(legacy_parameters)),
-            "legacy_trips_b": _canonical_trip_rows(legacy_trips_b),
-            "legacy_demand": _canonical_demand_rows(legacy_demand),
-            "heuristic_config": _jsonable(asdict(heuristic_config)),
-            "turnaround_bridge_mode": turnaround_bridge_mode,
-            "turnaround_bridge_value_minutes": turnaround_bridge_value_minutes,
-        }
-    )
+    payload = {
+        "fingerprint_profile": HEURISTIC_CONTEXT_FINGERPRINT_PROFILE,
+        "source_b_fingerprint": source_b_fingerprint,
+        "observed_demand_fingerprint": observed_demand_fingerprint,
+        "legacy_parameters": _jsonable(asdict(legacy_parameters)),
+        "legacy_trips_b": _canonical_trip_rows(legacy_trips_b),
+        "legacy_demand": _canonical_demand_rows(legacy_demand),
+        "heuristic_config": _jsonable(asdict(heuristic_config)),
+        "turnaround_bridge_mode": turnaround_bridge_mode,
+        "turnaround_bridge_value_minutes": turnaround_bridge_value_minutes,
+    }
+    if protected_service_floor_enforcement_fingerprint is not None:
+        payload["protected_service_floor_enforcement_fingerprint"] = (
+            protected_service_floor_enforcement_fingerprint
+        )
+    return canonical_sha256(payload)
 
 
 def build_heuristic_compatibility_context_v1(
@@ -275,6 +280,7 @@ def build_heuristic_compatibility_context_v1(
     legacy_trips_b: list[Trip] | tuple[Trip, ...],
     legacy_demand: list[DemandRecord] | tuple[DemandRecord, ...],
     heuristic_config: ScenarioCConfig,
+    protected_service_floor_enforcement_fingerprint: str | None = None,
 ) -> HeuristicCompatibilityContextV1:
     trips = tuple(
         sorted(
@@ -316,6 +322,9 @@ def build_heuristic_compatibility_context_v1(
         turnaround_bridge_value_minutes=bridge_value,
         source_b_fingerprint=normalized_inputs.scenario_b_fingerprint,
         observed_demand_fingerprint=normalized_inputs.observed_demand_fingerprint,
+        protected_service_floor_enforcement_fingerprint=(
+            protected_service_floor_enforcement_fingerprint
+        ),
     )
     return HeuristicCompatibilityContextV1(
         legacy_parameters=compatibility_parameters,
@@ -327,6 +336,9 @@ def build_heuristic_compatibility_context_v1(
         source_b_fingerprint=normalized_inputs.scenario_b_fingerprint,
         observed_demand_fingerprint=normalized_inputs.observed_demand_fingerprint,
         context_fingerprint=fingerprint,
+        protected_service_floor_enforcement_fingerprint=(
+            protected_service_floor_enforcement_fingerprint
+        ),
     )
 
 
@@ -344,6 +356,9 @@ def heuristic_context_mismatch_codes(
         turnaround_bridge_value_minutes=context.turnaround_bridge_value_minutes,
         source_b_fingerprint=context.source_b_fingerprint,
         observed_demand_fingerprint=context.observed_demand_fingerprint,
+        protected_service_floor_enforcement_fingerprint=(
+            context.protected_service_floor_enforcement_fingerprint
+        ),
     )
     if (
         context.context_fingerprint != expected_fingerprint

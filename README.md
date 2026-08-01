@@ -37,14 +37,18 @@ ordinary Streamlit remains Contract V1-only.
 Milestone 6A2A derives current direction-separated Scenario B regimes and classifies which
 ones have regular short headways plus sufficient repeated P85 trip evidence for a future
 protected service floor. Its assessment remains review-only and its previews retain
-`NOT_ENFORCED_IN_6A2A`. Milestone 6A2B now promotes only a current 6A2A assessment into a separate,
+`NOT_ENFORCED_IN_6A2A`. Milestone 6A2B promotes only a current 6A2A assessment into a separate,
 fingerprinted enforcement authority and rejects violating solver candidates at the common
-independent validator. Native heuristic and OR-Tools protected-floor search remains deferred. See
+independent validator. Milestone 6A2C now filters the legacy-compatible heuristic's direction
+plans against that exact authority before candidate combination; the common validator remains
+final. OR-Tools protected-floor hard constraints remain deferred. See
 [Milestone 6A1 trip-level ridership analysis](docs/engine/MILESTONE_6A1_TRIP_RIDERSHIP_ANALYSIS.md)
 and
 [Milestone 6A2A protected service-floor authority](docs/engine/MILESTONE_6A2A_PROTECTED_SERVICE_FLOOR_AUTHORITY.md)
 and
-[Milestone 6A2B protected service-floor acceptance enforcement](docs/engine/MILESTONE_6A2B_PROTECTED_SERVICE_FLOOR_ACCEPTANCE_ENFORCEMENT.md).
+[Milestone 6A2B protected service-floor acceptance enforcement](docs/engine/MILESTONE_6A2B_PROTECTED_SERVICE_FLOOR_ACCEPTANCE_ENFORCEMENT.md)
+and
+[Milestone 6A2C protected service-floor-aware heuristic search](docs/engine/MILESTONE_6A2C_PROTECTED_SERVICE_FLOOR_HEURISTIC_SEARCH.md).
 
 ### Offline legacy regression oracle
 
@@ -170,8 +174,7 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
 - Operational-timetable, ridership-forecast, or solver-quality approval of the anonymized
   real-route corpus.
 - Variable-trip-count optimization.
-- Enforcement of protected-regime headway, trip-count, service-window, or donor constraints
-  (reserved for Milestone 6A2B).
+- OR-Tools-native protected-regime headway, trip-count, service-window, or donor constraints.
 - Accepted zero-trip or one-trip headway regimes under the current public Contract V1 shape;
   supporting those cases requires a separately authorized future Contract revision.
 - Production implementation of the deferred V1-A1 structural demand-response workflow.
@@ -205,9 +208,9 @@ authoritative input readiness, Milestone 5A2B validation-only presentation adapt
 5B1 Streamlit shadow execution, Milestone 5B2A unified result Pages 02–04, and Milestone 5B2B
 unified Page 05 artifacts are implemented and merged. Milestone 5C1 is merged and Milestone 5C2
 is merged. Milestone 6A1 supplemental trip-level ridership analysis, Milestone 6A2A
-protected service-floor authority, and Milestone 6A2B acceptance enforcement are implemented**,
-but
-Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
+protected service-floor authority, Milestone 6A2B acceptance enforcement, and Milestone 6A2C
+heuristic search awareness are implemented**, but Milestone 5 and `LEGACY_RUNTIME_RETIRED` still
+require formal approval.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
 2. Milestone 5A2A: stabilize authoritative workbook input and readiness.
@@ -229,6 +232,9 @@ Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
     non-enforced previews (implemented).
 12. Milestone 6A2B: enforce reviewed service floors at independent candidate acceptance while
     deferring solver-native protected-floor search (implemented).
+13. Milestone 6A2C: filter bounded legacy-compatible heuristic direction plans against the exact
+    6A2B authority while keeping common validation final (implemented; OR-Tools hard constraints
+    remain deferred).
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)

@@ -9,6 +9,10 @@ evidence-bound protected Scenario B regime below its approved floor.
 This milestone enforces acceptance semantics only. It does not add protected-floor constraints
 or objectives to the heuristic or OR-Tools search implementations.
 
+Status note: [Milestone 6A2C](MILESTONE_6A2C_PROTECTED_SERVICE_FLOOR_HEURISTIC_SEARCH.md) now
+adds bounded heuristic search awareness while retaining this common validator as final authority.
+OR-Tools protected-floor hard constraints remain deferred.
+
 ## 2. Authoritative pre-solver sequence
 
 The ordinary application path now performs these steps in order:

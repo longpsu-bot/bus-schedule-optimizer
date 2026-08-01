@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import replace
 
+from bus_schedule_engine.c_generator import (
+    HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH,
+)
 from bus_schedule_engine.protected_service_floor_codes import (
     PROTECTED_FLOOR_REJECTION_CODE_ORDER,
 )
+from bus_schedule_engine.protected_service_floor_enforcement import (
+    protected_service_floor_enforcement_authority_is_valid_v1,
+)
 
+from .heuristic_context import heuristic_context_mismatch_codes
 from .problem_validation import validate_schedule_generation_context_v1
 from .serialization import canonical_sha256
 from .solver_fingerprints import outcome_fingerprint_payload
@@ -24,6 +32,67 @@ from .solver_validation import validate_and_build_solution_v1
 
 _HEADWAY_REGIME_NOT_REPRESENTABLE = "HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1"
 _WITHIN_REGIME_HEADWAY_NOT_UNIFORM = "WITHIN_REGIME_HEADWAY_NOT_UNIFORM"
+_ENFORCEMENT_FINGERPRINT_PATTERN = re.compile(r"[0-9a-f]{64}")
+
+
+def _valid_optional_enforcement_fingerprint(value: object) -> bool:
+    return value is None or (
+        isinstance(value, str) and _ENFORCEMENT_FINGERPRINT_PATTERN.fullmatch(value) is not None
+    )
+
+
+def _is_heuristic_schedule_solver(solver: ScheduleSolver) -> bool:
+    from .heuristic_solver import HeuristicScheduleSolverAdapter
+
+    return isinstance(solver, HeuristicScheduleSolverAdapter)
+
+
+def _heuristic_protected_floor_authority_binding_mismatch(
+    context: ScheduleGenerationContextV1,
+    solver: ScheduleSolver,
+) -> bool:
+    if not _is_heuristic_schedule_solver(solver):
+        return False
+
+    authority = context.protected_service_floor_enforcement_authority
+    if authority is not None and not protected_service_floor_enforcement_authority_is_valid_v1(
+        authority,
+        context.problem.scenario_b,
+    ):
+        return True
+    native_search_authority = solver.protected_service_floor_enforcement_authority
+    if (
+        native_search_authority is not None
+        and not protected_service_floor_enforcement_authority_is_valid_v1(
+            native_search_authority,
+            context.problem.scenario_b,
+        )
+    ):
+        return True
+    expected_fingerprint = (
+        authority.enforcement_fingerprint
+        if authority is not None and authority.has_enforceable_regimes
+        else None
+    )
+    native_search_fingerprint = solver.protected_service_floor_enforcement_fingerprint
+    compatibility_fingerprint = (
+        solver.compatibility_context.protected_service_floor_enforcement_fingerprint
+    )
+    if not all(
+        _valid_optional_enforcement_fingerprint(value)
+        for value in (
+            expected_fingerprint,
+            native_search_fingerprint,
+            compatibility_fingerprint,
+        )
+    ):
+        return True
+    if not (expected_fingerprint == native_search_fingerprint == compatibility_fingerprint):
+        return True
+    return "PROBLEM_ADAPTER_CONTEXT_MISMATCH" in heuristic_context_mismatch_codes(
+        context.problem,
+        solver.compatibility_context,
+    )
 
 
 def _validation_rejection_limitations(
@@ -98,16 +167,28 @@ def run_schedule_solver_v1(
 ) -> ScheduleGenerationOutcomeV1:
     problem = context.problem
     context_validation = validate_schedule_generation_context_v1(context)
+    is_heuristic_solver = _is_heuristic_schedule_solver(solver)
+    heuristic_authority_mismatch = _heuristic_protected_floor_authority_binding_mismatch(
+        context,
+        solver,
+    )
     if not context_validation.passed:
+        explanations = tuple(
+            f"{issue.code}: generation context rejected." for issue in context_validation.issues
+        )
+        if heuristic_authority_mismatch:
+            explanations = (
+                *explanations,
+                f"{HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH}: generation-context "
+                "authority does not match the heuristic native-search binding.",
+            )
         return _completed_without_solution(
             problem,
             result_status=(GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID),
             solver_status=NativeSolverStatus.MODEL_INVALID,
             solver_adapter=solver.adapter_id,
             solve_duration_seconds=0.0,
-            explanations=tuple(
-                f"{issue.code}: generation context rejected." for issue in context_validation.issues
-            ),
+            explanations=explanations,
             limitations=(
                 "MODEL_INVALID identifies a problem/context integration defect, "
                 "not route, demand, timetable, fleet, or parameter infeasibility.",
@@ -130,6 +211,32 @@ def run_schedule_solver_v1(
                 "infeasibility.",
             ),
         )
+    if heuristic_authority_mismatch:
+        return _completed_without_solution(
+            problem,
+            result_status=GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID,
+            solver_status=NativeSolverStatus.MODEL_INVALID,
+            solver_adapter=solver.adapter_id,
+            solve_duration_seconds=0.0,
+            explanations=(
+                f"{HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH}: generation-context "
+                "authority does not match the heuristic native-search binding.",
+            ),
+            limitations=(
+                "MODEL_INVALID identifies a protected-floor authority binding or "
+                "integration defect; it supplies no domain-feasibility classification.",
+            ),
+        )
+    validation_context = (
+        replace(
+            context,
+            protected_service_floor_enforcement_authority=None,
+        )
+        if context.protected_service_floor_enforcement_authority is not None
+        and not context.protected_service_floor_enforcement_authority.has_enforceable_regimes
+        and is_heuristic_solver
+        else context
+    )
 
     started = time.perf_counter()
     try:
@@ -220,7 +327,7 @@ def run_schedule_solver_v1(
             limitations=run.limitations,
         )
 
-    validation = validate_and_build_solution_v1(context, run.candidate)
+    validation = validate_and_build_solution_v1(validation_context, run.candidate)
     if not validation.passed or validation.solution is None:
         diagnostic = RejectedCandidateDiagnosticV1(
             candidate_fingerprint=run.candidate.candidate_fingerprint,

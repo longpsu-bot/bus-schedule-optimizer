@@ -54,6 +54,12 @@ def build_heuristic_schedule_request_v1(
             "The legacy heuristic adapter does not implement generic solver resource controls.",
             code="PROBLEM_POLICY_INVALID",
         )
+    enforcement_fingerprint = (
+        protected_service_floor_enforcement_authority.enforcement_fingerprint
+        if protected_service_floor_enforcement_authority is not None
+        and protected_service_floor_enforcement_authority.has_enforceable_regimes
+        else None
+    )
     try:
         compatibility_context = build_heuristic_compatibility_context_v1(
             normalized_inputs,
@@ -61,6 +67,7 @@ def build_heuristic_schedule_request_v1(
             legacy_trips_b,
             legacy_demand,
             heuristic_config,
+            protected_service_floor_enforcement_fingerprint=enforcement_fingerprint,
         )
     except HeuristicCompatibilityContextError as exc:
         raise ScheduleProblemError(
@@ -90,7 +97,10 @@ def build_heuristic_schedule_request_v1(
     )
     return (
         generation_context,
-        HeuristicScheduleSolverAdapter(compatibility_context),
+        HeuristicScheduleSolverAdapter(
+            compatibility_context,
+            protected_service_floor_enforcement_authority,
+        ),
     )
 
 
