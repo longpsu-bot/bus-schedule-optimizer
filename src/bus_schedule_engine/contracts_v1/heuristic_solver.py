@@ -139,6 +139,13 @@ class HeuristicScheduleSolverAdapter:
     ) = None
     adapter_id: ClassVar[str] = "legacy_heuristic_v1"
 
+    @property
+    def protected_service_floor_enforcement_fingerprint(self) -> str | None:
+        authority = self.protected_service_floor_enforcement_authority
+        if authority is None or not authority.has_enforceable_regimes:
+            return None
+        return authority.enforcement_fingerprint
+
     def solve(self, problem: ScheduleProblemV1) -> SolverRunResultV1:
         started = time.perf_counter()
         mismatch_codes = list(

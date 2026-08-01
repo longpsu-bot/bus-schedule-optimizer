@@ -49,6 +49,12 @@ protection is enforceable, its context fingerprint binds:
 The resulting context fingerprint remains `problem.adapter_context_fingerprint`, so the problem,
 compatibility context, and adapter-held authority reconcile before search.
 
+Solver orchestration also derives the enforceable fingerprint from the actual
+`ScheduleGenerationContextV1` supplied for execution and requires it to equal the heuristic
+adapter's native-search fingerprint and compatibility-context binding before calling the adapter.
+A mismatch returns `MODEL_INVALID` with `HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH`; the
+heuristic generator does not execute.
+
 ## 4. Conditional fingerprint compatibility
 
 The enforcement fingerprint field is added to the heuristic context fingerprint payload only

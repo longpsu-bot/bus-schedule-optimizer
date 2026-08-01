@@ -209,6 +209,21 @@ def _historical_context_fingerprint(context) -> str:
     )
 
 
+def _assert_orchestration_authority_mismatch(outcome) -> None:
+    assert outcome.result_status == GenerationResultStatus.C_NOT_GENERATED_MODEL_INVALID
+    assert outcome.solver_status == NativeSolverStatus.MODEL_INVALID
+    assert outcome.solution is None
+    assert outcome.diagnostic_candidate is None
+    assert any(
+        HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH in item for item in outcome.explanations
+    )
+    explanation = " ".join(outcome.explanations).lower()
+    assert "timetable infeasibility" not in explanation
+    assert "route infeasibility" not in explanation
+    assert "fleet infeasibility" not in explanation
+    assert "global infeasibility" not in explanation
+
+
 def test_no_authority_preserves_merged_6a2b_fingerprints() -> None:
     context, adapter, *_ = _request()
     run = adapter.solve(context.problem)
@@ -226,19 +241,36 @@ def test_no_authority_preserves_merged_6a2b_fingerprints() -> None:
 def test_valid_empty_authority_preserves_historical_identity_and_behavior() -> None:
     baseline_context, baseline_adapter, *_ = _request()
     empty_context, empty_adapter, *_ = _request("empty")
+    empty_authority = empty_adapter.protected_service_floor_enforcement_authority
+    assert empty_authority is not None
+    attached_empty_context = replace(
+        empty_context,
+        protected_service_floor_enforcement_authority=empty_authority,
+    )
     baseline_run = baseline_adapter.solve(baseline_context.problem)
     empty_run = empty_adapter.solve(empty_context.problem)
+    attached_empty_run = empty_adapter.solve(attached_empty_context.problem)
     baseline_outcome = run_schedule_solver_v1(baseline_context, baseline_adapter)
     empty_outcome = run_schedule_solver_v1(empty_context, empty_adapter)
+    attached_empty_outcome = run_schedule_solver_v1(attached_empty_context, empty_adapter)
 
     assert empty_context.protected_service_floor_enforcement_authority is None
-    assert empty_adapter.compatibility_context.context_fingerprint == (
-        baseline_adapter.compatibility_context.context_fingerprint
-    )
-    assert empty_context.problem.problem_fingerprint == baseline_context.problem.problem_fingerprint
+    assert not empty_authority.has_enforceable_regimes
+    assert empty_adapter.protected_service_floor_enforcement_fingerprint is None
+    assert empty_adapter.compatibility_context.context_fingerprint == _BASELINE_CONTEXT_FINGERPRINT
+    assert empty_context.problem.problem_fingerprint == _BASELINE_PROBLEM_FINGERPRINT
     assert empty_run.solver_status == baseline_run.solver_status
-    assert empty_run.candidate is not None and baseline_run.candidate is not None
-    assert empty_run.candidate.candidate_fingerprint == baseline_run.candidate.candidate_fingerprint
+    assert attached_empty_run.solver_status == baseline_run.solver_status
+    assert empty_run.candidate is not None
+    assert empty_run.candidate.candidate_fingerprint == _BASELINE_CANDIDATE_FINGERPRINT
+    assert attached_empty_run.candidate is not None
+    assert attached_empty_run.candidate.candidate_fingerprint == _BASELINE_CANDIDATE_FINGERPRINT
+    assert empty_outcome.solution is not None
+    assert empty_outcome.solution.solution_fingerprint == _BASELINE_SOLUTION_FINGERPRINT
+    assert attached_empty_outcome.solution is not None
+    assert attached_empty_outcome.solution.solution_fingerprint == _BASELINE_SOLUTION_FINGERPRINT
+    assert empty_outcome.outcome_fingerprint == _BASELINE_OUTCOME_FINGERPRINT
+    assert attached_empty_outcome.outcome_fingerprint == _BASELINE_OUTCOME_FINGERPRINT
     assert empty_outcome.outcome_fingerprint == baseline_outcome.outcome_fingerprint
 
 
@@ -250,8 +282,14 @@ def test_enforceable_authority_changes_context_deterministically_and_is_exactly_
 
     assert authority is not None
     assert first_context.protected_service_floor_enforcement_authority is authority
+    assert first_adapter.protected_service_floor_enforcement_fingerprint == (
+        authority.enforcement_fingerprint
+    )
     assert first_adapter.compatibility_context.protected_service_floor_enforcement_fingerprint == (
         authority.enforcement_fingerprint
+    )
+    assert first_context.problem.adapter_context_fingerprint == (
+        first_adapter.compatibility_context.context_fingerprint
     )
     assert first_adapter.compatibility_context.context_fingerprint != (
         baseline_adapter.compatibility_context.context_fingerprint
@@ -261,6 +299,164 @@ def test_enforceable_authority_changes_context_deterministically_and_is_exactly_
         second_adapter.compatibility_context.context_fingerprint
     )
     assert first_context.problem.problem_fingerprint == second_context.problem.problem_fingerprint
+
+
+def test_generation_context_authority_b_is_rejected_before_adapter_a_generator(
+    monkeypatch,
+) -> None:
+    context, adapter, *_, normalized = _request("enforceable")
+    authority_a = adapter.protected_service_floor_enforcement_authority
+    authority_b = _authority(normalized.scenario_b, assessment_fingerprint="f" * 64)
+    assert authority_a is not None
+    assert authority_b.enforcement_fingerprint != authority_a.enforcement_fingerprint
+    tampered_context = replace(
+        context,
+        protected_service_floor_enforcement_authority=authority_b,
+    )
+    generator_calls = 0
+
+    def counted_generator(*args, **kwargs):
+        nonlocal generator_calls
+        generator_calls += 1
+        raise AssertionError("generator must not execute")
+
+    monkeypatch.setattr(heuristic_solver_module, "generate_scenario_c", counted_generator)
+    outcome = run_schedule_solver_v1(tampered_context, adapter)
+
+    _assert_orchestration_authority_mismatch(outcome)
+    assert outcome.solve_duration_seconds == 0.0
+    assert generator_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("context_binding", "adapter_binding"),
+    (
+        ("enforceable", "none"),
+        ("none", "enforceable"),
+        ("empty", "enforceable"),
+        ("enforceable", "empty"),
+    ),
+)
+def test_missing_empty_and_enforceable_authority_mismatches_fail_before_generator(
+    monkeypatch,
+    context_binding,
+    adapter_binding,
+) -> None:
+    enforceable_context, enforceable_adapter, *_, normalized = _request("enforceable")
+    empty_authority = _authority(normalized.scenario_b, enforceable=False)
+    _, empty_adapter, *_ = _request(empty_authority)
+    context_authority = {
+        "enforceable": enforceable_context.protected_service_floor_enforcement_authority,
+        "none": None,
+        "empty": empty_authority,
+    }[context_binding]
+    context = replace(
+        enforceable_context,
+        protected_service_floor_enforcement_authority=context_authority,
+    )
+    if adapter_binding == "enforceable":
+        adapter = enforceable_adapter
+    elif adapter_binding == "empty":
+        adapter = empty_adapter
+    else:
+        adapter = replace(
+            enforceable_adapter,
+            protected_service_floor_enforcement_authority=None,
+        )
+    generator_calls = 0
+
+    def counted_generator(*args, **kwargs):
+        nonlocal generator_calls
+        generator_calls += 1
+        raise AssertionError("generator must not execute")
+
+    monkeypatch.setattr(heuristic_solver_module, "generate_scenario_c", counted_generator)
+    outcome = run_schedule_solver_v1(context, adapter)
+
+    _assert_orchestration_authority_mismatch(outcome)
+    assert generator_calls == 0
+
+
+@pytest.mark.parametrize(
+    "malformed_binding",
+    ("context", "adapter", "stale_adapter", "compatibility"),
+)
+def test_malformed_authority_fingerprints_fail_closed_before_generator(
+    monkeypatch,
+    malformed_binding,
+) -> None:
+    context, adapter, *_ = _request("enforceable")
+    authority = adapter.protected_service_floor_enforcement_authority
+    assert authority is not None
+    if malformed_binding == "context":
+        context = replace(
+            context,
+            protected_service_floor_enforcement_authority=replace(
+                authority,
+                enforcement_fingerprint="malformed",
+            ),
+        )
+    elif malformed_binding == "adapter":
+        adapter = replace(
+            adapter,
+            protected_service_floor_enforcement_authority=replace(
+                authority,
+                enforcement_fingerprint="malformed",
+            ),
+        )
+    elif malformed_binding == "stale_adapter":
+        adapter = replace(
+            adapter,
+            protected_service_floor_enforcement_authority=replace(
+                authority,
+                maximum_load_factor=0.95,
+            ),
+        )
+    else:
+        adapter = replace(
+            adapter,
+            compatibility_context=replace(
+                adapter.compatibility_context,
+                protected_service_floor_enforcement_fingerprint="malformed",
+            ),
+        )
+    generator_calls = 0
+
+    def counted_generator(*args, **kwargs):
+        nonlocal generator_calls
+        generator_calls += 1
+        raise AssertionError("generator must not execute")
+
+    monkeypatch.setattr(heuristic_solver_module, "generate_scenario_c", counted_generator)
+    outcome = run_schedule_solver_v1(context, adapter)
+
+    _assert_orchestration_authority_mismatch(outcome)
+    assert generator_calls == 0
+
+
+def test_problem_compatibility_binding_must_reconcile_with_authority_before_generator(
+    monkeypatch,
+) -> None:
+    context, adapter, *_ = _request("enforceable")
+    adapter = replace(
+        adapter,
+        compatibility_context=replace(
+            adapter.compatibility_context,
+            context_fingerprint="f" * 64,
+        ),
+    )
+    generator_calls = 0
+
+    def counted_generator(*args, **kwargs):
+        nonlocal generator_calls
+        generator_calls += 1
+        raise AssertionError("generator must not execute")
+
+    monkeypatch.setattr(heuristic_solver_module, "generate_scenario_c", counted_generator)
+    outcome = run_schedule_solver_v1(context, adapter)
+
+    _assert_orchestration_authority_mismatch(outcome)
+    assert generator_calls == 0
 
 
 def test_changing_valid_enforcement_fingerprint_changes_context_fingerprint() -> None:
