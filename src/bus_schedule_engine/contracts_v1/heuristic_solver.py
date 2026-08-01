@@ -4,8 +4,21 @@ import time
 from dataclasses import dataclass
 from typing import ClassVar
 
-from bus_schedule_engine.c_generator import generate_scenario_c
-from bus_schedule_engine.models import GeneratedScenario, ScenarioCStatus
+from bus_schedule_engine.c_generator import (
+    HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH,
+    HeuristicProtectedFloorAuthorityError,
+    build_heuristic_protected_floor_search_projection_v1,
+    generate_scenario_c,
+    validate_heuristic_protected_floor_search_projection_v1,
+)
+from bus_schedule_engine.models import (
+    GeneratedScenario,
+    ProtectedServiceFloorEnforcementAuthorityV1,
+    ScenarioCStatus,
+)
+from bus_schedule_engine.protected_service_floor_enforcement import (
+    protected_service_floor_enforcement_authority_is_valid_v1,
+)
 
 from .heuristic_context import (
     HEURISTIC_TURNAROUND_BRIDGE_MODE,
@@ -81,6 +94,16 @@ def _raw_candidate_from_generated(
         problem,
         tuple(trips),
     )
+    protected_limitations = (
+        (
+            "Native heuristic direction plans were filtered against the exact bound "
+            "protected-service-floor authority before candidate combination.",
+            "The common independent protected-service-floor validator remains final "
+            "acceptance authority.",
+        )
+        if context.protected_service_floor_enforcement_fingerprint is not None
+        else ()
+    )
     return RawScheduleCandidateV1(
         solver_status=NativeSolverStatus.FEASIBLE,
         solver_adapter=adapter_id,
@@ -103,6 +126,7 @@ def _raw_candidate_from_generated(
             "authoritative validation uses the exact arrival-terminal values "
             f"{problem.scenario_b.turnaround_minutes.terminal_1}/"
             f"{problem.scenario_b.turnaround_minutes.terminal_2}.",
+            *protected_limitations,
         ),
     )
 
@@ -110,6 +134,9 @@ def _raw_candidate_from_generated(
 @dataclass(frozen=True, slots=True)
 class HeuristicScheduleSolverAdapter:
     compatibility_context: HeuristicCompatibilityContextV1
+    protected_service_floor_enforcement_authority: (
+        ProtectedServiceFloorEnforcementAuthorityV1 | None
+    ) = None
     adapter_id: ClassVar[str] = "legacy_heuristic_v1"
 
     def solve(self, problem: ScheduleProblemV1) -> SolverRunResultV1:
@@ -122,6 +149,38 @@ class HeuristicScheduleSolverAdapter:
         )
         if problem.solver_adapter != self.adapter_id:
             mismatch_codes.append("PROBLEM_ADAPTER_CONTEXT_MISMATCH")
+        authority = self.protected_service_floor_enforcement_authority
+        context_enforcement_fingerprint = (
+            self.compatibility_context.protected_service_floor_enforcement_fingerprint
+        )
+        protected_projection = None
+        if authority is None:
+            if context_enforcement_fingerprint is not None:
+                mismatch_codes.append(HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH)
+        elif not protected_service_floor_enforcement_authority_is_valid_v1(
+            authority,
+            problem.scenario_b,
+        ):
+            mismatch_codes.append(HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH)
+        elif authority.has_enforceable_regimes:
+            if (
+                authority.scenario_b_fingerprint != problem.source_b_fingerprint
+                or context_enforcement_fingerprint != authority.enforcement_fingerprint
+            ):
+                mismatch_codes.append(HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH)
+            else:
+                try:
+                    protected_projection = build_heuristic_protected_floor_search_projection_v1(
+                        authority
+                    )
+                    validate_heuristic_protected_floor_search_projection_v1(
+                        protected_projection,
+                        self.compatibility_context.legacy_trips_b,
+                    )
+                except HeuristicProtectedFloorAuthorityError:
+                    mismatch_codes.append(HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH)
+        elif context_enforcement_fingerprint is not None:
+            mismatch_codes.append(HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH)
         if mismatch_codes:
             duration = max(0.0, time.perf_counter() - started)
             codes = tuple(sorted(set(mismatch_codes)))
@@ -148,6 +207,7 @@ class HeuristicScheduleSolverAdapter:
                 list(context.legacy_demand),
                 problem.scenario_b.available_fleet_limit,
                 context.heuristic_config,
+                protected_projection,
             )
             duration = max(0.0, time.perf_counter() - started)
             if generated.generation_status in _ACCEPTED_HEURISTIC_STATUSES:
@@ -167,6 +227,14 @@ class HeuristicScheduleSolverAdapter:
                     explanations=(generated.reason,),
                     limitations=candidate.limitations,
                 )
+            protected_limitations = (
+                (
+                    "The bounded heuristic search found no improving protected-floor-"
+                    "compliant candidate; this does not prove global infeasibility.",
+                )
+                if protected_projection is not None
+                else ()
+            )
             return SolverRunResultV1(
                 execution_status=SolverExecutionStatus.COMPLETED,
                 solver_status=NativeSolverStatus.UNKNOWN,
@@ -180,6 +248,24 @@ class HeuristicScheduleSolverAdapter:
                     f"Search used {HEURISTIC_TURNAROUND_BRIDGE_MODE} with scalar "
                     f"{context.turnaround_bridge_value_minutes} minutes and may "
                     "miss candidates that rely on the shorter terminal turnaround.",
+                    *protected_limitations,
+                ),
+            )
+        except HeuristicProtectedFloorAuthorityError:
+            duration = max(0.0, time.perf_counter() - started)
+            return SolverRunResultV1(
+                execution_status=SolverExecutionStatus.COMPLETED,
+                solver_status=NativeSolverStatus.MODEL_INVALID,
+                solver_adapter=self.adapter_id,
+                solve_duration_seconds=duration,
+                candidate=None,
+                explanations=(
+                    f"{HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH}: "
+                    "protected-floor search context rejected.",
+                ),
+                limitations=(
+                    "MODEL_INVALID identifies a protected-floor authority or "
+                    "integration defect, not timetable infeasibility.",
                 ),
             )
         except Exception:

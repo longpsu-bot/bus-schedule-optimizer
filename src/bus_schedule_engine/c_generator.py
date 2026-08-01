@@ -16,11 +16,13 @@ from .models import (
     HeadwayRegime,
     HeadwayType,
     OptimizationLog,
+    ProtectedServiceFloorEnforcementAuthorityV1,
     RegimeBoundaryReason,
     RegularityMetrics,
     ScenarioCStatus,
     ScenarioParameters,
     Trip,
+    TripRidershipDirectionV1,
     TripTrace,
 )
 from .time_utils import block_label
@@ -46,6 +48,257 @@ class _DirectionPlan:
     shifted_trip_count: int
     total_shift_minutes: float
     maximum_shift_minutes: float
+
+
+@dataclass(frozen=True, slots=True)
+class HeuristicProtectedFloorRegimeV1:
+    regime_id: str
+    direction: Direction
+    ordered_b_trip_ids: tuple[str, ...]
+    maximum_future_c_headway_minutes: int
+    minimum_future_c_trip_count: int
+    protected_window_start: int
+    protected_window_end: int
+    future_boundary_tolerance_minutes: int
+    donor_removal_prohibited: bool
+
+
+@dataclass(frozen=True, slots=True)
+class HeuristicProtectedFloorSearchProjectionV1:
+    enforcement_fingerprint: str
+    regimes: tuple[HeuristicProtectedFloorRegimeV1, ...]
+
+
+HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH = "HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH"
+PROTECTED_FLOOR_DIRECTION_PLANS_EVALUATED = "PROTECTED_FLOOR_DIRECTION_PLANS_EVALUATED"
+PROTECTED_FLOOR_DIRECTION_PLANS_FILTERED = "PROTECTED_FLOOR_DIRECTION_PLANS_FILTERED"
+PROTECTED_FLOOR_DONOR_WINDOW = "PROTECTED_FLOOR_DONOR_WINDOW"
+PROTECTED_FLOOR_BOUNDARY = "PROTECTED_FLOOR_BOUNDARY"
+PROTECTED_FLOOR_TRIP_COUNT = "PROTECTED_FLOOR_TRIP_COUNT"
+PROTECTED_FLOOR_INTERNAL_HEADWAY = "PROTECTED_FLOOR_INTERNAL_HEADWAY"
+PROTECTED_FLOOR_SOURCE_AUTHORITY = "PROTECTED_FLOOR_SOURCE_AUTHORITY"
+PROTECTED_FLOOR_NO_IMPROVING_COMPLIANT_CANDIDATE = (
+    "PROTECTED_FLOOR_NO_IMPROVING_COMPLIANT_CANDIDATE"
+)
+
+
+class HeuristicProtectedFloorAuthorityError(ValueError):
+    code = HEURISTIC_PROTECTED_FLOOR_AUTHORITY_MISMATCH
+
+
+def build_heuristic_protected_floor_search_projection_v1(
+    authority: ProtectedServiceFloorEnforcementAuthorityV1,
+) -> HeuristicProtectedFloorSearchProjectionV1:
+    direction_map = {
+        TripRidershipDirectionV1.OUTBOUND: Direction.TERMINAL_1_TO_2,
+        TripRidershipDirectionV1.INBOUND: Direction.TERMINAL_2_TO_1,
+    }
+    try:
+        regimes = tuple(
+            HeuristicProtectedFloorRegimeV1(
+                regime_id=regime.regime_id,
+                direction=direction_map[regime.direction],
+                ordered_b_trip_ids=regime.ordered_b_trip_ids,
+                maximum_future_c_headway_minutes=(regime.maximum_future_c_headway_minutes),
+                minimum_future_c_trip_count=regime.minimum_future_c_trip_count,
+                protected_window_start=regime.protected_window_start,
+                protected_window_end=regime.protected_window_end,
+                future_boundary_tolerance_minutes=(regime.future_boundary_tolerance_minutes),
+                donor_removal_prohibited=regime.donor_removal_prohibited,
+            )
+            for regime in authority.protected_regimes
+        )
+    except (KeyError, TypeError) as exc:
+        raise HeuristicProtectedFloorAuthorityError(
+            "Protected-floor authority cannot be projected for heuristic search."
+        ) from exc
+    return HeuristicProtectedFloorSearchProjectionV1(
+        enforcement_fingerprint=authority.enforcement_fingerprint,
+        regimes=regimes,
+    )
+
+
+def validate_heuristic_protected_floor_search_projection_v1(
+    projection: HeuristicProtectedFloorSearchProjectionV1,
+    trips_b: list[Trip] | tuple[Trip, ...],
+) -> None:
+    if not projection.enforcement_fingerprint or not projection.regimes:
+        raise HeuristicProtectedFloorAuthorityError(
+            "Protected-floor search projection has no enforceable authority."
+        )
+
+    directions = (Direction.TERMINAL_1_TO_2, Direction.TERMINAL_2_TO_1)
+    source_by_direction = {
+        direction: _ordered_direction_trips(list(trips_b), direction) for direction in directions
+    }
+    all_source_ids = [trip.trip_id for trip in trips_b]
+    if len(set(all_source_ids)) != len(all_source_ids):
+        raise HeuristicProtectedFloorAuthorityError(
+            "Scenario B contains duplicate source membership."
+        )
+    source_by_id = {trip.trip_id: trip for trip in trips_b}
+    direction_order = {
+        Direction.TERMINAL_1_TO_2: 0,
+        Direction.TERMINAL_2_TO_1: 1,
+    }
+    expected_regime_order = tuple(
+        sorted(
+            projection.regimes,
+            key=lambda item: (
+                direction_order.get(item.direction, 99),
+                item.protected_window_start,
+                item.protected_window_end,
+                item.regime_id,
+            ),
+        )
+    )
+    if projection.regimes != expected_regime_order:
+        raise HeuristicProtectedFloorAuthorityError(
+            "Protected-floor search regimes are not in authority order."
+        )
+
+    protected_ids: set[str] = set()
+    previous_end_by_direction: dict[Direction, int] = {}
+    for regime in projection.regimes:
+        if (
+            regime.direction not in directions
+            or not regime.regime_id
+            or not regime.ordered_b_trip_ids
+            or len(set(regime.ordered_b_trip_ids)) != len(regime.ordered_b_trip_ids)
+            or protected_ids.intersection(regime.ordered_b_trip_ids)
+            or regime.maximum_future_c_headway_minutes <= 0
+            or regime.minimum_future_c_trip_count != len(regime.ordered_b_trip_ids)
+            or regime.protected_window_start > regime.protected_window_end
+            or regime.future_boundary_tolerance_minutes < 0
+            or not regime.donor_removal_prohibited
+        ):
+            raise HeuristicProtectedFloorAuthorityError(
+                "Protected-floor search regime is malformed or overlaps another regime."
+            )
+        members = [source_by_id.get(trip_id) for trip_id in regime.ordered_b_trip_ids]
+        if any(member is None for member in members):
+            raise HeuristicProtectedFloorAuthorityError(
+                "Protected source membership is missing from Scenario B."
+            )
+        typed_members = [member for member in members if member is not None]
+        if any(member.direction != regime.direction for member in typed_members):
+            raise HeuristicProtectedFloorAuthorityError(
+                "Protected source direction does not match the authority projection."
+            )
+        direction_ids = [trip.trip_id for trip in source_by_direction[regime.direction]]
+        indices = [direction_ids.index(trip_id) for trip_id in regime.ordered_b_trip_ids]
+        if indices != sorted(indices):
+            raise HeuristicProtectedFloorAuthorityError(
+                "Protected source membership is not in Scenario B order."
+            )
+        if (
+            typed_members[0].departure_seconds != regime.protected_window_start
+            or typed_members[-1].departure_seconds != regime.protected_window_end
+        ):
+            raise HeuristicProtectedFloorAuthorityError(
+                "Protected boundaries do not match Scenario B."
+            )
+        gaps = [
+            later.departure_seconds - earlier.departure_seconds
+            for earlier, later in zip(typed_members, typed_members[1:], strict=False)
+        ]
+        if (
+            not gaps
+            or any(gap <= 0 or gap % 60 != 0 for gap in gaps)
+            or max(gaps) // 60 != regime.maximum_future_c_headway_minutes
+        ):
+            raise HeuristicProtectedFloorAuthorityError(
+                "Protected headway authority does not match Scenario B."
+            )
+        previous_end = previous_end_by_direction.get(regime.direction)
+        if previous_end is not None and regime.protected_window_start <= previous_end:
+            raise HeuristicProtectedFloorAuthorityError(
+                "Protected regimes overlap within one direction."
+            )
+        previous_end_by_direction[regime.direction] = regime.protected_window_end
+        protected_ids.update(regime.ordered_b_trip_ids)
+
+
+def _protected_floor_plan_rejection_reasons(
+    plan: _DirectionPlan,
+    source: list[Trip],
+    regimes: tuple[HeuristicProtectedFloorRegimeV1, ...],
+) -> tuple[str, ...]:
+    if plan.direction not in {
+        Direction.TERMINAL_1_TO_2,
+        Direction.TERMINAL_2_TO_1,
+    } or len(plan.times) != len(source):
+        raise HeuristicProtectedFloorAuthorityError(
+            "Direction plan cannot reconcile with Scenario B source order."
+        )
+    source_ids = [trip.trip_id for trip in source]
+    reasons: set[str] = set()
+    for regime in regimes:
+        if regime.direction != plan.direction:
+            raise HeuristicProtectedFloorAuthorityError(
+                "Protected direction was applied to the wrong direction plan."
+            )
+        try:
+            indices = [source_ids.index(trip_id) for trip_id in regime.ordered_b_trip_ids]
+        except ValueError as exc:
+            raise HeuristicProtectedFloorAuthorityError(
+                "Protected source membership is missing from a direction plan."
+            ) from exc
+        if indices != sorted(indices):
+            raise HeuristicProtectedFloorAuthorityError(
+                "Direction plan does not preserve protected Scenario B source order."
+            )
+        proposed = [plan.times[index] for index in indices]
+        gaps = [later - earlier for earlier, later in zip(proposed, proposed[1:], strict=False)]
+        if any(gap <= 0 for gap in gaps):
+            raise HeuristicProtectedFloorAuthorityError(
+                "Direction plan violates protected source order."
+            )
+        tolerance_seconds = regime.future_boundary_tolerance_minutes * 60
+        permitted_start = regime.protected_window_start - tolerance_seconds
+        permitted_end = regime.protected_window_end + tolerance_seconds
+        if regime.donor_removal_prohibited and any(
+            departure < permitted_start or departure > permitted_end for departure in proposed
+        ):
+            reasons.add(PROTECTED_FLOOR_DONOR_WINDOW)
+        if (
+            abs(proposed[0] - regime.protected_window_start) > tolerance_seconds
+            or abs(proposed[-1] - regime.protected_window_end) > tolerance_seconds
+        ):
+            reasons.add(PROTECTED_FLOOR_BOUNDARY)
+        if len(proposed) < regime.minimum_future_c_trip_count:
+            reasons.add(PROTECTED_FLOOR_TRIP_COUNT)
+        if any(gap % 60 != 0 for gap in gaps):
+            reasons.add(PROTECTED_FLOOR_SOURCE_AUTHORITY)
+        if any(
+            gap // 60 > regime.maximum_future_c_headway_minutes
+            for gap in gaps
+            if gap > 0 and gap % 60 == 0
+        ):
+            reasons.add(PROTECTED_FLOOR_INTERNAL_HEADWAY)
+    return tuple(sorted(reasons))
+
+
+def _filter_protected_direction_plans(
+    plans: list[_DirectionPlan],
+    source: list[Trip],
+    regimes: tuple[HeuristicProtectedFloorRegimeV1, ...],
+    rejection_counts: Counter[str] | None = None,
+    *,
+    maximum_plans: int = 18,
+) -> list[_DirectionPlan]:
+    compliant: list[_DirectionPlan] = []
+    for plan in plans:
+        if rejection_counts is not None:
+            rejection_counts[PROTECTED_FLOOR_DIRECTION_PLANS_EVALUATED] += 1
+        reasons = _protected_floor_plan_rejection_reasons(plan, source, regimes)
+        if reasons:
+            if rejection_counts is not None:
+                rejection_counts[PROTECTED_FLOOR_DIRECTION_PLANS_FILTERED] += 1
+                rejection_counts.update(reasons)
+            continue
+        compliant.append(plan)
+    return compliant[:maximum_plans]
 
 
 @dataclass
@@ -255,7 +508,12 @@ def _regime_drafts(
 
 
 def _direction_plans(
-    source: list[Trip], direction: Direction, demand: list[DemandRecord], config: ScenarioCConfig
+    source: list[Trip],
+    direction: Direction,
+    demand: list[DemandRecord],
+    config: ScenarioCConfig,
+    protected_regimes: tuple[HeuristicProtectedFloorRegimeV1, ...] = (),
+    protected_rejection_counts: Counter[str] | None = None,
 ) -> list[_DirectionPlan]:
     source_times = [trip.departure_seconds for trip in source]
     if len(source_times) < 2:
@@ -345,7 +603,7 @@ def _direction_plans(
                     maximum_shift_minutes=maximum_shift,
                 )
             )
-    return sorted(
+    ordered = sorted(
         plans,
         key=lambda plan: (
             plan.distance_to_demand_minutes,
@@ -354,7 +612,16 @@ def _direction_plans(
             plan.total_shift_minutes,
             plan.times,
         ),
-    )[:18]
+    )
+    if not protected_regimes:
+        return ordered[:18]
+
+    return _filter_protected_direction_plans(
+        ordered,
+        source,
+        protected_regimes,
+        protected_rejection_counts,
+    )
 
 
 def _build_candidate_trips(
@@ -755,6 +1022,7 @@ def generate_scenario_c(
     demand: list[DemandRecord],
     active_vehicle_count: int,
     config: ScenarioCConfig,
+    protected_floor_search_projection: (HeuristicProtectedFloorSearchProjectionV1 | None) = None,
 ) -> GeneratedScenario:
     baseline_hash = timetable_fingerprint(trips_b)
     baseline_copy = [replace(trip) for trip in trips_b]
@@ -776,10 +1044,50 @@ def generate_scenario_c(
     if active_vehicle_count <= 0:
         raise ValueError("Không xác định được số xe hoạt động của Scenario B")
 
+    rejection_counts: Counter[str] = Counter()
+    protected_regimes_by_direction: dict[Direction, tuple[HeuristicProtectedFloorRegimeV1, ...]] = {
+        direction: () for direction in directions
+    }
+    if protected_floor_search_projection is not None:
+        validate_heuristic_protected_floor_search_projection_v1(
+            protected_floor_search_projection,
+            baseline_copy,
+        )
+        protected_regimes_by_direction = {
+            direction: tuple(
+                regime
+                for regime in protected_floor_search_projection.regimes
+                if regime.direction == direction
+            )
+            for direction in directions
+        }
+        for label in (
+            PROTECTED_FLOOR_DIRECTION_PLANS_EVALUATED,
+            PROTECTED_FLOOR_DIRECTION_PLANS_FILTERED,
+            PROTECTED_FLOOR_DONOR_WINDOW,
+            PROTECTED_FLOOR_BOUNDARY,
+            PROTECTED_FLOOR_TRIP_COUNT,
+            PROTECTED_FLOOR_INTERNAL_HEADWAY,
+            PROTECTED_FLOOR_SOURCE_AUTHORITY,
+            PROTECTED_FLOOR_NO_IMPROVING_COMPLIANT_CANDIDATE,
+        ):
+            rejection_counts[label] = 0
+
     baseline_parameters = replace(parameters)
     baseline_validation = validate_schedule(trips_b, parameters)
     baseline_evaluation = evaluate_scenario("B", trips_b, demand, parameters, baseline_validation)
     fallback_plans = _fallback_plans(source_by_direction, config)
+    if protected_floor_search_projection is not None:
+        for direction in directions:
+            fallback_reasons = _protected_floor_plan_rejection_reasons(
+                fallback_plans[direction],
+                source_by_direction[direction],
+                protected_regimes_by_direction[direction],
+            )
+            if fallback_reasons:
+                raise HeuristicProtectedFloorAuthorityError(
+                    "Exact Scenario B fallback violates its protected-floor projection."
+                )
     fallback_trips = _build_fallback_trips(source_by_direction)
     fallback_regimes, fallback_regime_map, fallback_type_map = _build_regimes(
         fallback_trips, source_by_direction, fallback_plans, config
@@ -814,14 +1122,20 @@ def generate_scenario_c(
             reason,
             config,
             demand,
-            Counter(),
+            rejection_counts,
         )
 
     plans_by_direction = {
-        direction: _direction_plans(source_by_direction[direction], direction, demand, config)
+        direction: _direction_plans(
+            source_by_direction[direction],
+            direction,
+            demand,
+            config,
+            protected_regimes_by_direction[direction],
+            rejection_counts,
+        )
         for direction in directions
     }
-    rejection_counts: Counter[str] = Counter()
     candidate_count = 0
     accepted: list[_Candidate] = []
     for first_plan, second_plan in itertools.product(
@@ -890,6 +1204,8 @@ def generate_scenario_c(
         raise AssertionError("Scenario B đã bị thay đổi trong quá trình sinh Scenario C")
 
     if not accepted:
+        if protected_floor_search_projection is not None:
+            rejection_counts[PROTECTED_FLOOR_NO_IMPROVING_COMPLIANT_CANDIDATE] = 1
         status = ScenarioCStatus.NO_BETTER_REDISTRIBUTION
         if candidate_count and rejection_counts["FLEET_LIMIT"] == candidate_count:
             status = ScenarioCStatus.INFEASIBLE_FIXED_RESOURCES
@@ -897,6 +1213,11 @@ def generate_scenario_c(
             "Không tìm thấy phương án tái phân bổ vừa tốt hơn B, vừa đạt kiểm tra giãn cách "
             "và không vượt số xe hiện có; C được giữ bằng B và không được gắn nhãn khuyến nghị."
         )
+        if protected_floor_search_projection is not None:
+            reason += (
+                " Bounded heuristic search found no improving protected-floor-compliant "
+                "candidate; this does not prove global infeasibility."
+            )
         return _fallback_result(
             baseline_parameters,
             fallback_trips,
@@ -914,6 +1235,8 @@ def generate_scenario_c(
             candidate_count,
         )
 
+    if protected_floor_search_projection is not None:
+        rejection_counts[PROTECTED_FLOOR_NO_IMPROVING_COMPLIANT_CANDIDATE] = 0
     selected = min(accepted, key=lambda item: (item.objective, timetable_fingerprint(item.trips)))
     if (
         selected.evaluation.blocks_over_target == 0
