@@ -254,6 +254,7 @@ def test_both_builds_both_requests_then_runs_in_stable_order(
         solver_adapter="ortools_cp_sat_quality_v1",
         outcome_fingerprint="a" * 64,
     )
+    protected_authority = SimpleNamespace(has_enforceable_regimes=True)
     events: list[str] = []
 
     def heuristic_builder(*args, **kwargs):
@@ -261,6 +262,7 @@ def test_both_builds_both_requests_then_runs_in_stable_order(
         assert args[5] is heuristic_config
         assert kwargs["evaluation_policy"] is evaluation_policy
         assert kwargs["solver_policy"] is solver_policy
+        assert kwargs["protected_service_floor_enforcement_authority"] is protected_authority
         return heuristic_context, heuristic_solver
 
     def quality_builder(*args, **kwargs):
@@ -268,6 +270,7 @@ def test_both_builds_both_requests_then_runs_in_stable_order(
         assert len(args) == 2
         assert kwargs["evaluation_policy"] is evaluation_policy
         assert kwargs["solver_policy"] is solver_policy
+        assert kwargs["protected_service_floor_enforcement_authority"] is protected_authority
         assert "heuristic_config" not in kwargs
         return ortools_context, ortools_solver
 
@@ -309,6 +312,7 @@ def test_both_builds_both_requests_then_runs_in_stable_order(
         evaluation_policy=evaluation_policy,
         heuristic_config=heuristic_config,
         solver_policy=solver_policy,
+        protected_service_floor_enforcement_authority=protected_authority,
     )
 
     assert events == [

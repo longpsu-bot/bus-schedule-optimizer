@@ -11,7 +11,8 @@ or objectives to the heuristic or OR-Tools search implementations.
 
 Status note: [Milestone 6A2C](MILESTONE_6A2C_PROTECTED_SERVICE_FLOOR_HEURISTIC_SEARCH.md) now
 adds bounded heuristic search awareness while retaining this common validator as final authority.
-OR-Tools protected-floor hard constraints remain deferred.
+[Milestone 6A2D](MILESTONE_6A2D_PROTECTED_SERVICE_FLOOR_ORTOOLS_CONSTRAINTS.md) now adds hard
+constraints to the canonical OR-Tools service-quality model with the same final-validator rule.
 
 ## 2. Authoritative pre-solver sequence
 
