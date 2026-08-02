@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass, fields, is_dataclass, replace
 from enum import Enum, StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from statistics import mean, median
 
 from .contracts_v1.models import ContractDirection, DepartureTerminal, ExactTimetableTrip
@@ -48,13 +48,24 @@ TRIP_RUNTIME_OUTSIDE_ALLOWED_RANGE = "TRIP_RUNTIME_OUTSIDE_ALLOWED_RANGE"
 SOURCE_ASSIGNMENT_PARTIAL = "SOURCE_ASSIGNMENT_PARTIAL"
 SOURCE_ASSIGNMENT_OVERLAP_FREE = "SOURCE_ASSIGNMENT_OVERLAP_FREE"
 SOURCE_ASSIGNMENT_OVERLAP_DETECTED = "SOURCE_ASSIGNMENT_OVERLAP_DETECTED"
+SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY = "SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY"
+SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY_DETECTED = (
+    "SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY_DETECTED"
+)
 NO_SOLVER_CALLED = "NO_SOLVER_CALLED"
 RAW_PASSENGER_ROWS_EXCLUDED = "RAW_PASSENGER_ROWS_EXCLUDED"
 NO_AUTHORITY_INFERRED = "NO_AUTHORITY_INFERRED"
 EXTERNAL_APPROVAL_NOT_GRANTED_OR_REVOKED = "EXTERNAL_APPROVAL_NOT_GRANTED_OR_REVOKED"
 DRIVER_DEPOT_DEADHEAD_MAINTENANCE_OUTSIDE_SCOPE = "DRIVER_DEPOT_DEADHEAD_MAINTENANCE_OUTSIDE_SCOPE"
 
-_ABSOLUTE_PATH_PATTERN = re.compile(r"(?i)(?:[a-z]:[\\/]|\\\\)[^\s,;]+|(?:/[^/\s]+){2,}")
+_FORBIDDEN_PAYLOAD_FIELD_FRAGMENTS = (
+    "workbook_path",
+    "output_path",
+    "machine_identity",
+    "raw_passenger",
+    "passenger_count",
+    "wall_clock",
+)
 
 
 class PartialTimetableReviewStatusV1(StrEnum):
@@ -147,19 +158,27 @@ def calculate_partial_timetable_review_fingerprint_v1(
     return hashlib.sha256(_canonical_json_bytes(payload)).hexdigest()
 
 
-def _payload_respects_privacy(payload: Mapping[str, object]) -> bool:
-    content = _canonical_json_bytes(payload).decode("utf-8")
-    forbidden = (
-        "workbook_path",
-        "output_path",
-        "machine_identity",
-        "raw_passenger",
-        "passenger_count",
-        "wall_clock",
+def _is_absolute_path_string(value: str) -> bool:
+    candidate = value.strip()
+    return bool(candidate) and (
+        PureWindowsPath(candidate).is_absolute() or PurePosixPath(candidate).is_absolute()
     )
-    return not _ABSOLUTE_PATH_PATTERN.search(content) and all(
-        item not in content for item in forbidden
-    )
+
+
+def _payload_respects_privacy(value: object) -> bool:
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            normalized_key = str(key).casefold()
+            if any(fragment in normalized_key for fragment in _FORBIDDEN_PAYLOAD_FIELD_FRAGMENTS):
+                return False
+            if not _payload_respects_privacy(item):
+                return False
+        return True
+    if isinstance(value, (tuple, list)):
+        return all(_payload_respects_privacy(item) for item in value)
+    if isinstance(value, str):
+        return not _is_absolute_path_string(value)
+    return True
 
 
 def verify_partial_timetable_review_fingerprint_v1(review: PartialTimetableReviewV1) -> bool:
@@ -394,6 +413,7 @@ def _source_vehicle_cycle_review(
             "assigned_trip_count": 0,
             "unassigned_trip_count": len(imported.trips_b),
             "overlap_issues": (),
+            "terminal_discontinuity_issues": (),
             "observed_minimum_inter_trip_gap_by_vehicle": (),
             "observed_minimum_inter_trip_gap_minutes": None,
         }
@@ -411,6 +431,7 @@ def _source_vehicle_cycle_review(
         return cycle, turnaround
 
     overlap_issues: list[Mapping[str, object]] = []
+    terminal_discontinuity_issues: list[Mapping[str, object]] = []
     by_vehicle: list[Mapping[str, object]] = []
     all_gaps: list[float] = []
     for vehicle_id, trips in sorted(groups.items()):
@@ -429,6 +450,22 @@ def _source_vehicle_cycle_review(
                         "overlap_minutes": _round(-gap),
                     }
                 )
+            expected_departure_terminal = (
+                DepartureTerminal.TERMINAL_2
+                if current.direction == ContractDirection.OUTBOUND
+                else DepartureTerminal.TERMINAL_1
+            )
+            if following.departure_terminal != expected_departure_terminal:
+                terminal_discontinuity_issues.append(
+                    {
+                        "code": SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY,
+                        "vehicle_id": vehicle_id,
+                        "from_trip_id": current.trip_id,
+                        "to_trip_id": following.trip_id,
+                        "expected_departure_terminal": expected_departure_terminal.value,
+                        "actual_departure_terminal": following.departure_terminal.value,
+                    }
+                )
         by_vehicle.append(
             {
                 "vehicle_id": vehicle_id,
@@ -438,6 +475,8 @@ def _source_vehicle_cycle_review(
         )
     if overlap_issues:
         assignment_status = SOURCE_ASSIGNMENT_OVERLAP_DETECTED
+    elif terminal_discontinuity_issues:
+        assignment_status = SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY_DETECTED
     elif unassigned_trip_count:
         assignment_status = SOURCE_ASSIGNMENT_PARTIAL
     else:
@@ -446,7 +485,7 @@ def _source_vehicle_cycle_review(
     minimum_authority = imported.parameters_b.minimum_layover_minutes
     if minimum_authority is None or not all_gaps:
         compliance = TurnaroundComplianceStatusV1.NOT_EVALUATED
-    elif overlap_issues or min(all_gaps) < minimum_authority:
+    elif overlap_issues or terminal_discontinuity_issues or min(all_gaps) < minimum_authority:
         compliance = TurnaroundComplianceStatusV1.NON_COMPLIANT
     else:
         compliance = TurnaroundComplianceStatusV1.COMPLIANT
@@ -457,6 +496,7 @@ def _source_vehicle_cycle_review(
         "assigned_trip_count": assigned_trip_count,
         "unassigned_trip_count": unassigned_trip_count,
         "overlap_issues": tuple(overlap_issues),
+        "terminal_discontinuity_issues": tuple(terminal_discontinuity_issues),
         "observed_minimum_inter_trip_gap_by_vehicle": tuple(by_vehicle),
         "observed_minimum_inter_trip_gap_minutes": observed_minimum,
     }
@@ -660,6 +700,8 @@ def build_partial_timetable_review_v1(
     }
     if vehicle_cycles["assignment_status"] == SOURCE_VEHICLE_ASSIGNMENT_NOT_SUPPLIED:
         limitations.add(SOURCE_VEHICLE_ASSIGNMENT_NOT_SUPPLIED)
+    if vehicle_cycles["terminal_discontinuity_issues"]:
+        limitations.add(SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY)
 
     review = PartialTimetableReviewV1(
         profile=PARTIAL_REVIEW_PROFILE_V1,
@@ -860,6 +902,7 @@ def render_partial_timetable_review_markdown_v1(review: PartialTimetableReviewV1
         f"- Supplied vehicle cycles: {_md_value(cycles.get('supplied_vehicle_cycle_count'))}",
         f"- Observed minimum gaps by vehicle: {_md_value(cycles.get('observed_minimum_inter_trip_gap_by_vehicle'))}",
         f"- Overlap issues: {_md_value(cycles.get('overlap_issues'))}",
+        f"- Terminal-continuity issues: {_md_value(cycles.get('terminal_discontinuity_issues'))}",
         "- An overlap-free source assignment is not described as globally fleet-optimal.",
         "",
         "## 8. Turnaround authority",

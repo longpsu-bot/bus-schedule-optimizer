@@ -90,10 +90,13 @@ technical checks, and a technical review does not grant or revoke an external ap
 - limitations plus a canonical review fingerprint.
 
 The payload excludes workbook/output paths, machine identity, wall-clock timing, raw passenger
-rows, and inferred capacity, fleet, demand, turnaround, or terminal limits. Canonical JSON is
-serialized with sorted keys and compact separators. The fingerprint covers the complete review
-except the fingerprint field itself. Both the model and canonical bytes are verified before any
-filesystem mutation.
+rows, and inferred capacity, fleet, demand, turnaround, or terminal limits. Privacy validation
+recursively inspects payload field names and string values. A complete string that is a Windows
+drive path, UNC path, or POSIX absolute path is rejected; ordinary prose and slash-delimited
+authority references such as `147/QĐ-SXD-QLVT` remain valid. Canonical JSON is serialized with
+sorted keys and compact separators. The fingerprint covers the complete review except the
+fingerprint field itself. Both the model and canonical bytes are verified before any filesystem
+mutation.
 
 ## Canonical regime reuse
 
@@ -109,13 +112,19 @@ fingerprinting, and enforcement tests remain authoritative.
 ## Source vehicle-cycle review
 
 When exact source vehicle IDs exist, trips are grouped by the unchanged ID and sorted by
-departure time then trip ID. The review reports temporal overlaps, per-vehicle minimum
-arrival-to-next-departure gaps, and the overall minimum observed gap.
+departure time then trip ID. The review reports temporal overlaps, terminal discontinuities,
+per-vehicle minimum arrival-to-next-departure gaps, and the overall minimum observed gap. For
+each consecutive pair, the prior trip's direction determines its arrival terminal; a different
+next departure terminal produces `SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY` without inferring
+deadhead or repositioning.
 
-An overlap-free supplied assignment is labeled `SOURCE_ASSIGNMENT_OVERLAP_FREE`; it is not called
-globally fleet-optimal. Source IDs do not authorize an available-fleet limit. When IDs are absent,
-the result is `SOURCE_VEHICLE_ASSIGNMENT_NOT_SUPPLIED`; no assignments are fabricated and no fleet
-optimizer is called.
+Only a temporally overlap-free and terminal-continuous supplied assignment is labeled
+`SOURCE_ASSIGNMENT_OVERLAP_FREE`; it is not called globally fleet-optimal. A terminal discontinuity
+uses `SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY_DETECTED` and prevents a `COMPLIANT` turnaround
+result. Temporal overlaps and terminal discontinuities remain separately visible. Source IDs do
+not authorize an available-fleet limit. When IDs are absent, the result is
+`SOURCE_VEHICLE_ASSIGNMENT_NOT_SUPPLIED`; no assignments are fabricated and no fleet optimizer is
+called.
 
 The current-contract regulatory fallback may be displayed separately. It is not relabeled as an
 operator-supplied, terminal-specific turnaround authority. Without an explicit minimum turnaround,

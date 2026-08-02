@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import replace
 from datetime import UTC, date, datetime
@@ -45,11 +46,14 @@ from bus_schedule_engine.partial_timetable_review import (
     PARTIAL_REVIEW_PROFILE_V1,
     SOURCE_ASSIGNMENT_OVERLAP_DETECTED,
     SOURCE_ASSIGNMENT_OVERLAP_FREE,
+    SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY,
+    SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY_DETECTED,
     TRIP_RUNTIME_OUTSIDE_ALLOWED_RANGE,
     DataAuthorityReviewPackageV1,
     PartialTimetableReviewV1,
     TurnaroundComplianceStatusV1,
     build_partial_timetable_review_v1,
+    calculate_partial_timetable_review_fingerprint_v1,
     create_data_authority_review_package_v1,
     render_partial_timetable_review_markdown_v1,
     serialize_partial_timetable_review_v1,
@@ -79,11 +83,12 @@ def _demand(direction: Direction) -> DemandRecord:
 
 def _authority(
     status: TimetableAuthorityStatusV1 = TimetableAuthorityStatusV1.APPROVED_OPERATIONAL,
+    reference: str = "AUTHORITY-61-4-SYNTHETIC",
 ) -> WorkbookAuthorityMetadata:
     return WorkbookAuthorityMetadata(
         timetable_authority=TimetableAuthorityMetadataV1(
             status=status,
-            reference="AUTHORITY-61-4-SYNTHETIC",
+            reference=reference,
             effective_date=date(2026, 8, 1),
         ),
         demand_dataset_id="SYNTHETIC-COMBINED",
@@ -104,6 +109,7 @@ def _synthetic_61_4_like(
     authority_status: TimetableAuthorityStatusV1 = (
         TimetableAuthorityStatusV1.APPROVED_OPERATIONAL
     ),
+    authority_reference: str = "AUTHORITY-61-4-SYNTHETIC",
 ) -> ImportedWorkbook:
     trips: list[Trip] = []
     for vehicle_index in range(7):
@@ -159,7 +165,7 @@ def _synthetic_61_4_like(
         trips_b=trips,
         demand=list(demand) if demand is not None else [_demand(Direction.COMBINED)],
         configuration={},
-        authority_metadata=_authority(authority_status),
+        authority_metadata=_authority(authority_status, authority_reference),
     )
 
 
@@ -182,6 +188,7 @@ def test_61_4_like_review_has_46_trips_seven_overlap_free_cycles_and_ten_minute_
         SOURCE_ASSIGNMENT_OVERLAP_FREE
     )
     assert review.source_vehicle_cycle_review["overlap_issues"] == ()
+    assert review.source_vehicle_cycle_review["terminal_discontinuity_issues"] == ()
     assert review.source_vehicle_cycle_review["observed_minimum_inter_trip_gap_minutes"] == 10
     assert review.turnaround_review["compliance_status"] == (
         TurnaroundComplianceStatusV1.COMPLIANT.value
@@ -220,6 +227,66 @@ def test_overlapping_source_cycle_is_detected() -> None:
     assert review.source_vehicle_cycle_review["overlap_issues"][0]["overlap_minutes"] == 5
     assert review.turnaround_review["compliance_status"] == (
         TurnaroundComplianceStatusV1.NON_COMPLIANT.value
+    )
+
+
+def _review_with_terminal_discontinuity():
+    imported = _synthetic_61_4_like()
+    trips = list(imported.trips_b)
+    first_vehicle = sorted(
+        (trip for trip in trips if trip.vehicle_id == "BUS-01"),
+        key=lambda trip: (trip.departure_seconds, trip.trip_id),
+    )
+    following = first_vehicle[1]
+    trips[trips.index(following)] = replace(
+        following,
+        departure_terminal="Terminal 1",
+    )
+    return _review(replace(imported, trips_b=trips))
+
+
+def test_positive_gap_with_wrong_next_terminal_is_not_overlap_free() -> None:
+    review = _review_with_terminal_discontinuity()
+    cycles = review.source_vehicle_cycle_review
+
+    assert cycles["observed_minimum_inter_trip_gap_minutes"] == 10
+    assert cycles["overlap_issues"] == ()
+    assert cycles["assignment_status"] == (SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY_DETECTED)
+    assert cycles["assignment_status"] != SOURCE_ASSIGNMENT_OVERLAP_FREE
+
+
+def test_terminal_discontinuity_issue_fields_are_deterministic() -> None:
+    first = _review_with_terminal_discontinuity()
+    second = _review_with_terminal_discontinuity()
+    expected = (
+        {
+            "code": SOURCE_ASSIGNMENT_TERMINAL_DISCONTINUITY,
+            "vehicle_id": "BUS-01",
+            "from_trip_id": "B-01-01",
+            "to_trip_id": "B-01-02",
+            "expected_departure_terminal": "terminal_2",
+            "actual_departure_terminal": "terminal_1",
+        },
+    )
+
+    assert first.source_vehicle_cycle_review["terminal_discontinuity_issues"] == expected
+    assert second.source_vehicle_cycle_review["terminal_discontinuity_issues"] == expected
+
+
+def test_terminal_discontinuity_prevents_turnaround_compliant_status() -> None:
+    review = _review_with_terminal_discontinuity()
+
+    assert review.turnaround_review["compliance_status"] == (
+        TurnaroundComplianceStatusV1.NON_COMPLIANT.value
+    )
+
+
+def test_alternating_terminal_continuity_remains_overlap_free() -> None:
+    review = _review(_synthetic_61_4_like())
+
+    assert review.source_vehicle_cycle_review["terminal_discontinuity_issues"] == ()
+    assert review.source_vehicle_cycle_review["assignment_status"] == (
+        SOURCE_ASSIGNMENT_OVERLAP_FREE
     )
 
 
@@ -289,6 +356,102 @@ def test_timetable_authority_is_preserved_and_never_promoted(
         "effective_date": "2026-08-01",
         "source_approved": approved,
     }
+
+
+@pytest.mark.parametrize(
+    "reference",
+    (
+        "147/QĐ-SXD-QLVT",
+        "123/QĐ-SXD/2026",
+    ),
+)
+def test_slash_delimited_vietnamese_decision_reference_survives_serialization(
+    reference: str,
+) -> None:
+    review = _review(_synthetic_61_4_like(authority_reference=reference))
+    content = serialize_partial_timetable_review_v1(review)
+
+    assert review.timetable_authority["reference"] == reference
+    assert json.loads(content)["timetable_authority"]["reference"] == reference
+    assert verify_partial_timetable_review_json_bytes_v1(content) is True
+
+
+def test_sentence_containing_slash_delimited_reference_survives_serialization() -> None:
+    reference = "Văn bản số 42/CV-HTX ngày 29/07/2026"
+    review = _review(_synthetic_61_4_like(authority_reference=reference))
+    content = serialize_partial_timetable_review_v1(review)
+
+    assert review.timetable_authority["reference"] == reference
+    assert json.loads(content)["timetable_authority"]["reference"] == reference
+    assert verify_partial_timetable_review_json_bytes_v1(content) is True
+
+
+@pytest.mark.parametrize(
+    "absolute_path",
+    (
+        r"C:\private\route.xlsx",
+        r"\\server\share\route.xlsx",
+        "/private/route.xlsx",
+    ),
+    ids=("windows-drive", "windows-unc", "posix"),
+)
+def test_absolute_path_values_are_rejected_by_model_verification(absolute_path: str) -> None:
+    review = _review()
+    authority = {**review.timetable_authority, "reference": absolute_path}
+    invalid = replace(
+        review,
+        timetable_authority=authority,
+        review_fingerprint="0" * 64,
+    )
+    invalid = replace(
+        invalid,
+        review_fingerprint=calculate_partial_timetable_review_fingerprint_v1(invalid),
+    )
+
+    assert verify_partial_timetable_review_fingerprint_v1(invalid) is False
+    with pytest.raises(ValueError, match="fingerprint verification failed"):
+        serialize_partial_timetable_review_v1(invalid)
+
+
+@pytest.mark.parametrize(
+    "absolute_path",
+    (
+        r"C:\private\route.xlsx",
+        r"\\server\share\route.xlsx",
+        "/private/route.xlsx",
+    ),
+    ids=("windows-drive", "windows-unc", "posix"),
+)
+def test_recomputed_fingerprint_cannot_bypass_absolute_path_privacy(
+    absolute_path: str,
+) -> None:
+    payload = json.loads(serialize_partial_timetable_review_v1(_review()))
+    payload["timetable_authority"]["reference"] = absolute_path
+    payload.pop("review_fingerprint")
+    canonical_without_fingerprint = (
+        json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    payload["review_fingerprint"] = hashlib.sha256(canonical_without_fingerprint).hexdigest()
+    content = (
+        json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+
+    assert verify_partial_timetable_review_json_bytes_v1(content) is False
+
+
+def test_recomputed_fingerprint_cannot_restore_forbidden_raw_passenger_fields() -> None:
+    payload = json.loads(serialize_partial_timetable_review_v1(_review()))
+    payload["demand_authority_review"]["raw_passenger_rows"] = [{"passenger_count": 700}]
+    payload.pop("review_fingerprint")
+    canonical_without_fingerprint = (
+        json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    payload["review_fingerprint"] = hashlib.sha256(canonical_without_fingerprint).hexdigest()
+    content = (
+        json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+
+    assert verify_partial_timetable_review_json_bytes_v1(content) is False
 
 
 def test_declared_count_mismatch_is_reported() -> None:
