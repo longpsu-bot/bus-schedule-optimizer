@@ -59,6 +59,20 @@ Legacy analysis, chart/export code, and the side-by-side adapter remain availabl
 the explicit `python -m bus_schedule_engine.release_audit` command. They are not imported or
 executed by ordinary Streamlit. Broad legacy deletion has not started.
 
+### Milestone 5C2R retirement approval evidence
+
+Milestone 5C2R adds a deterministic repository audit and a human approval record for the
+`LEGACY_RUNTIME_RETIRED` decision. The audit can conclude that implementation is ready for formal
+review, but production approval remains `PENDING` until the Engineering Owner and QA/Release
+Owner sign off. Its ordinary-runtime proof follows a canonical, transitive repository production
+import/call graph from Streamlit through local helpers, records forbidden witness paths, fails
+closed for relevant unresolved dispatch, and derives 5C3-candidate consumers from source. The
+graph propagates bounded caller bindings, branch-union target sets, callable parameters, simple
+factory/tuple returns, and concrete protocol-method receivers; its evidence proves that both the
+heuristic and OR-Tools adapter `solve()` methods are ordinary-runtime reachable. No legacy code
+is deleted. See
+[Milestone 5C2R legacy runtime retirement approval evidence](docs/engine/MILESTONE_5C2R_LEGACY_RUNTIME_RETIREMENT_APPROVAL.md).
+
 ### Contract V1 domain and solver boundary
 
 `src/bus_schedule_engine/contracts_v1/` is a separately tested target boundary. It provides:
@@ -228,16 +242,18 @@ Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
 7. Milestone 5C1: define and approve the Option C legacy-runtime retirement gate (merged).
 8. Milestone 5C2: make Contract V1 the only ordinary Streamlit runtime and move side-by-side
    validation to an explicit offline release audit (implemented; formal approval pending).
-9. Milestone 5C3: separately remove authorized legacy code after approval (not started).
-10. Milestone 6A1: add supplemental, coverage-aware trip-level ridership analysis without
+9. Milestone 5C2R: generate deterministic implementation evidence for the formal retirement
+   decision (implemented by this audit milestone; production approval remains pending).
+10. Milestone 5C3: separately remove authorized legacy code after approval (not started).
+11. Milestone 6A1: add supplemental, coverage-aware trip-level ridership analysis without
     changing optimization authority.
-11. Milestone 6A2A: define deterministic protected high-demand service-floor authority and
+12. Milestone 6A2A: define deterministic protected high-demand service-floor authority and
     non-enforced previews (implemented).
-12. Milestone 6A2B: enforce reviewed service floors at independent candidate acceptance while
+13. Milestone 6A2B: enforce reviewed service floors at independent candidate acceptance while
     deferring solver-native protected-floor search (implemented).
-13. Milestone 6A2C: filter bounded legacy-compatible heuristic direction plans against the exact
+14. Milestone 6A2C: filter bounded legacy-compatible heuristic direction plans against the exact
     6A2B authority while keeping common validation final (implemented).
-14. Milestone 6A2D: encode the exact bound 6A2B authority in the canonical OR-Tools
+15. Milestone 6A2D: encode the exact bound 6A2B authority in the canonical OR-Tools
     service-quality model while keeping common validation final (implemented).
 
 See
@@ -300,6 +316,16 @@ Run the retained legacy comparison only as an explicit offline release audit:
   --workbook "Schedule template.xlsx" `
   --solver HEURISTIC `
   --output "outputs/release-audit.json"
+```
+
+Generate the repository-only 5C2R approval evidence without reading a workbook or starting
+Streamlit:
+
+```powershell
+$target = git rev-parse HEAD
+.\.venv\Scripts\python.exe -m bus_schedule_engine.legacy_retirement_audit `
+  --target-commit $target `
+  --output "outputs/legacy-runtime-retirement-evidence.json"
 ```
 
 ## Validate the repository
