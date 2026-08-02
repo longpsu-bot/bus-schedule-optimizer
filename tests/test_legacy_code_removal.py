@@ -78,10 +78,20 @@ RETIRED_RESULT_KEYS = (
 )
 TEMPLATE_SEMANTIC_FINGERPRINT = "8b1617679d5755e5fc0aae511f9e5eddc1b5ce4e9016f31222ca0cc6f38b82c2"
 BASELINE_MANIFEST_FINGERPRINTS = {
-    "heuristic_shared": "7e20328ebde747e574d7296b9e16dd25b1b518c56e174581c9f166d44ae47ed9",
-    "protected_solver": "49a5c3c5203b85a5109f930d6cf3a09cb962cf136f9cfb4aeedd8d794a4788b3",
-    "contract_schemas": "396b5418169c8e2d0ae90b0aa9ad2b9c8be9a86152273aca897a3ef4fafe43c6",
-    "route_corpus": "f57c3d042830d119e10a6e3ccd3b2161399f9dec6c781ed3a5861277fca54fc1",
+    "heuristic_shared": "3f84a077a719361e9d06032d4584056379e7ba461b7406a39afb10835fc2ae51",
+    "protected_solver": "5cf22b5f4248edd6c39bff30b72e6127e33970251f91fb1a86c959d502207291",
+    "contract_schemas": "a3499847598dc9209bd02c3263bf6ef4db5b2ccb5c38cb75b00edfbc892178ee",
+    "route_corpus": "4e50c1c1dad4c805ce7d1fc89323782eac02161c79d777659ab1fff890472294",
+}
+_TEXT_MANIFEST_SUFFIXES = {
+    ".csv",
+    ".json",
+    ".md",
+    ".py",
+    ".toml",
+    ".txt",
+    ".yaml",
+    ".yml",
 }
 
 
@@ -100,11 +110,18 @@ def _template_semantic_fingerprint(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _manifest_content(path: Path) -> bytes:
+    content = path.read_bytes()
+    if path.suffix.lower() in _TEXT_MANIFEST_SUFFIXES:
+        return content.replace(b"\r\n", b"\n")
+    return content
+
+
 def _manifest_fingerprint(paths: list[Path]) -> str:
     digest = hashlib.sha256()
-    for path in sorted(paths):
+    for path in sorted(paths, key=lambda candidate: candidate.relative_to(ROOT).as_posix()):
         relative = path.relative_to(ROOT).as_posix()
-        digest.update(relative.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
+        digest.update(relative.encode("utf-8") + b"\0" + _manifest_content(path) + b"\0")
     return digest.hexdigest()
 
 
