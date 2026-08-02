@@ -122,6 +122,14 @@ class ProductionGraphEvidenceV1:
     unresolved_relevant_sites: tuple[UnresolvedCallGraphSiteV1, ...]
     forbidden_witness_path_count: int
     forbidden_witness_paths: tuple[ForbiddenWitnessPathV1, ...]
+    interprocedural_binding_count: int
+    polymorphic_call_site_count: int
+    resolved_method_dispatch_count: int
+    unresolved_parameter_dispatch_site_count: int
+    unresolved_parameter_dispatch_sites: tuple[UnresolvedCallGraphSiteV1, ...]
+    concrete_solver_methods_reached: tuple[str, ...]
+    binding_analysis_limit: int
+    binding_analysis_limit_exceeded: bool
     ordinary_runtime_module_graph_fingerprint: str
     deletion_candidate_production_consumers: tuple[DeletionCandidateConsumerEvidenceV1, ...]
 
@@ -650,6 +658,9 @@ _GRAPH_MODULE_LIMIT = 512
 _GRAPH_SYMBOL_LIMIT = 4096
 _GRAPH_FINDING_LIMIT = 64
 _GRAPH_CONSUMER_LIMIT = 128
+_BINDING_ANALYSIS_LIMIT = 4096
+_BINDINGS_PER_SYMBOL_LIMIT = 64
+_TARGETS_PER_VALUE_LIMIT = 32
 _MODULE_SUFFIX = "::<module>"
 
 
@@ -658,7 +669,7 @@ class _DefinitionInfo:
     canonical: str
     module: str
     qualname: str
-    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
+    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | ast.Lambda
     kind: str
     parent_class: str | None
     local_definitions: dict[str, str]
@@ -673,6 +684,7 @@ class _ModuleInfo:
     bindings: dict[str, str]
     top_level_definitions: dict[str, str]
     definitions: dict[str, _DefinitionInfo]
+    lambda_definitions: dict[tuple[int, int], str]
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -710,6 +722,11 @@ class _ProductionGraphAnalysis:
     findings: set[_GraphFinding]
     unresolved: set[UnresolvedCallGraphSiteV1]
     references: tuple[_RepositoryReference, ...]
+    binding_specializations: set[str]
+    polymorphic_call_sites: set[str]
+    resolved_method_dispatches: set[tuple[str, str]]
+    unresolved_parameter_dispatch_sites: set[UnresolvedCallGraphSiteV1]
+    binding_analysis_limit_exceeded: bool
 
 
 def _module_node(module: str) -> str:
@@ -836,6 +853,42 @@ def _register_definitions(info: _ModuleInfo) -> None:
                 visit_statements(block, owner=owner, class_qualname=class_qualname)
 
     visit_statements(info.tree.body, owner=None, class_qualname=None)
+    named_functions = tuple(
+        definition for definition in info.definitions.values() if definition.kind == "function"
+    )
+    lambdas = sorted(
+        (node for node in ast.walk(info.tree) if isinstance(node, ast.Lambda)),
+        key=lambda node: (node.lineno, node.col_offset),
+    )
+    for node in lambdas:
+        owners = [
+            definition
+            for definition in named_functions
+            if getattr(definition.node, "lineno", 0)
+            <= node.lineno
+            <= getattr(definition.node, "end_lineno", 0)
+        ]
+        owner = min(
+            owners,
+            key=lambda item: (
+                getattr(item.node, "end_lineno", 0) - getattr(item.node, "lineno", 0),
+                item.canonical,
+            ),
+            default=None,
+        )
+        prefix = f"{owner.qualname}." if owner is not None else ""
+        qualname = f"{prefix}<lambda>@{node.lineno}_{node.col_offset}"
+        canonical = f"{info.name}.{qualname}"
+        info.definitions[canonical] = _DefinitionInfo(
+            canonical=canonical,
+            module=info.name,
+            qualname=qualname,
+            node=node,
+            kind="function",
+            parent_class=owner.parent_class if owner is not None else None,
+            local_definitions={},
+        )
+        info.lambda_definitions[(node.lineno, node.col_offset)] = canonical
 
 
 def _relative_import_module(info: _ModuleInfo, node: ast.ImportFrom) -> str:
@@ -923,14 +976,30 @@ def _is_nonruntime_guard(node: ast.If) -> bool:
 
 
 class _ExecutableScopeVisitor(ast.NodeVisitor):
-    def __init__(self, root: ast.Module | ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+    def __init__(
+        self,
+        root: ast.Module | ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda,
+    ) -> None:
         self.root = root
         self.nodes: list[ast.AST] = []
 
     def generic_visit(self, node: ast.AST) -> None:
         if node is not self.root and isinstance(
             node,
-            (ast.Import, ast.ImportFrom, ast.Assign, ast.AnnAssign, ast.NamedExpr, ast.Call),
+            (
+                ast.Import,
+                ast.ImportFrom,
+                ast.Assign,
+                ast.AnnAssign,
+                ast.NamedExpr,
+                ast.Call,
+                ast.Return,
+                ast.With,
+                ast.AsyncWith,
+                ast.For,
+                ast.AsyncFor,
+                ast.Attribute,
+            ),
         ):
             self.nodes.append(node)
         super().generic_visit(node)
@@ -975,9 +1044,13 @@ class _ExecutableScopeVisitor(ast.NodeVisitor):
         for statement in node.body:
             self.visit(statement)
 
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        if node is self.root:
+            self.visit(node.body)
+
 
 def _scope_nodes(
-    node: ast.Module | ast.FunctionDef | ast.AsyncFunctionDef,
+    node: ast.Module | ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda,
 ) -> tuple[ast.AST, ...]:
     visitor = _ExecutableScopeVisitor(node)
     visitor.visit(node)
@@ -1010,6 +1083,7 @@ def _index_production_modules(
             bindings={},
             top_level_definitions={},
             definitions={},
+            lambda_definitions={},
         )
         _register_definitions(info)
         modules[module] = info
@@ -1371,30 +1445,921 @@ def _literal_dynamic_module(call: ast.Call) -> str | None:
     return value.value if isinstance(value, ast.Constant) and isinstance(value.value, str) else None
 
 
+@dataclass(frozen=True, order=True, slots=True)
+class _AbstractValue:
+    targets: tuple[_TargetRef, ...] = ()
+    items: tuple[_AbstractValue, ...] = ()
+    relevant_unknown: bool = False
+
+
+@dataclass(frozen=True, order=True, slots=True)
+class _TargetRef:
+    canonical: str
+    kind: str
+    bindings: tuple[tuple[str, _AbstractValue], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class _CallCandidate:
+    target: _TargetRef
+    receiver: _AbstractValue | None
+    dispatch_kind: str
+
+
+def _value_signature(value: _AbstractValue) -> tuple[object, ...]:
+    return (
+        tuple(
+            (
+                target.canonical,
+                target.kind,
+                tuple((name, _value_signature(bound)) for name, bound in target.bindings),
+            )
+            for target in value.targets
+        ),
+        tuple(_value_signature(item) for item in value.items),
+        value.relevant_unknown,
+    )
+
+
+class _InterproceduralResolver:
+    def __init__(
+        self,
+        modules: Mapping[str, _ModuleInfo],
+        definitions: Mapping[str, _DefinitionInfo],
+    ) -> None:
+        self.modules = modules
+        self.definitions = definitions
+        self.base_module_environment_memo: dict[str, dict[str, _AbstractValue]] = {}
+        self.environment_memo: dict[_TargetRef, dict[str, _AbstractValue]] = {}
+        self.module_environment_memo: dict[str, dict[str, _AbstractValue]] = {}
+        self.scope_nodes_memo: dict[int, tuple[ast.AST, ...]] = {}
+        self.plain_value_memo: dict[str | None, _AbstractValue] = {}
+        self.class_bases_memo: dict[str, tuple[str, ...]] = {}
+        self.method_memo: dict[tuple[str, str], tuple[str, ...]] = {}
+        self.return_memo: dict[_TargetRef, _AbstractValue] = {}
+        self.return_in_progress: set[_TargetRef] = set()
+        self.free_names_memo: dict[str, tuple[str, ...]] = {}
+        self.specialization_key_memo: dict[_TargetRef, str] = {}
+        self.binding_specializations: set[str] = set()
+        self.specializations_by_symbol: dict[str, set[str]] = defaultdict(set)
+        self.polymorphic_call_sites: set[str] = set()
+        self.resolved_method_dispatches: set[tuple[str, str]] = set()
+        self.unresolved: set[UnresolvedCallGraphSiteV1] = set()
+        self.unresolved_parameter_dispatch_sites: set[UnresolvedCallGraphSiteV1] = set()
+        self.binding_analysis_limit_exceeded = False
+
+    @staticmethod
+    def _has_value(value: _AbstractValue) -> bool:
+        return bool(value.targets or value.items or value.relevant_unknown)
+
+    def _merge_values(self, *values: _AbstractValue) -> _AbstractValue:
+        targets = sorted({target for value in values for target in value.targets})
+        relevant_unknown = any(value.relevant_unknown for value in values)
+        if len(targets) > _TARGETS_PER_VALUE_LIMIT:
+            targets = targets[:_TARGETS_PER_VALUE_LIMIT]
+            relevant_unknown = True
+        item_lengths = {len(value.items) for value in values if value.items}
+        items: tuple[_AbstractValue, ...] = ()
+        if len(item_lengths) == 1:
+            length = next(iter(item_lengths))
+            items = tuple(
+                self._merge_values(
+                    *(value.items[index] for value in values if len(value.items) == length)
+                )
+                for index in range(length)
+            )
+        elif len(item_lengths) > 1:
+            relevant_unknown = True
+        return _AbstractValue(tuple(targets), items, relevant_unknown)
+
+    def _plain_value(self, raw: str | None) -> _AbstractValue:
+        if raw in self.plain_value_memo:
+            return self.plain_value_memo[raw]
+        if raw is not None and raw.startswith("external:"):
+            result = _AbstractValue((_TargetRef(raw, "external"),))
+            self.plain_value_memo[raw] = result
+            return result
+        canonical = _canonicalize_target(raw, self.modules, self.definitions)
+        if canonical is None:
+            result = _AbstractValue()
+            self.plain_value_memo[raw] = result
+            return result
+        module = _module_from_node(canonical)
+        if module is not None:
+            kind = "module"
+        else:
+            definition = self.definitions.get(canonical)
+            kind = "class" if definition is not None and definition.kind == "class" else "callable"
+        result = _AbstractValue((_TargetRef(canonical, kind),))
+        self.plain_value_memo[raw] = result
+        return result
+
+    def _module_environment(self, info: _ModuleInfo) -> dict[str, _AbstractValue]:
+        if info.name not in self.base_module_environment_memo:
+            self.base_module_environment_memo[info.name] = {
+                name: self._plain_value(raw)
+                for name, raw in {**info.bindings, **info.top_level_definitions}.items()
+            }
+        return dict(self.base_module_environment_memo[info.name])
+
+    def nodes_for_scope(
+        self,
+        node: ast.Module | ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda,
+    ) -> tuple[ast.AST, ...]:
+        key = id(node)
+        if key not in self.scope_nodes_memo:
+            self.scope_nodes_memo[key] = _scope_nodes(node)
+        return self.scope_nodes_memo[key]
+
+    @staticmethod
+    def _parameters(
+        definition: _DefinitionInfo,
+    ) -> tuple[ast.arg, ...]:
+        node = definition.node
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            return ()
+        return (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs)
+
+    def _is_protocol_annotation(self, annotation: ast.AST | None, info: _ModuleInfo) -> bool:
+        if annotation is None:
+            return False
+        raw = _dotted_name(annotation)
+        if raw is None:
+            return False
+        bound = info.bindings.get(raw.split(".", 1)[0], raw)
+        if "." in raw and bound != raw:
+            base_module = _module_from_node(bound)
+            bound = f"{base_module}.{raw.split('.', 1)[1]}" if base_module else bound
+        canonical = _canonicalize_target(bound, self.modules, self.definitions)
+        protocol = self.definitions.get(canonical or "")
+        if protocol is None or not isinstance(protocol.node, ast.ClassDef):
+            return False
+        return any(
+            (_dotted_name(base) or "").rsplit(".", 1)[-1] == "Protocol"
+            for base in protocol.node.bases
+        )
+
+    @staticmethod
+    def _parameter_map(definition: _DefinitionInfo) -> dict[str, ast.arg]:
+        return {
+            parameter.arg: parameter
+            for parameter in _InterproceduralResolver._parameters(definition)
+        }
+
+    def _unknown_dispatch_is_relevant(
+        self,
+        function: ast.AST,
+        definition: _DefinitionInfo | None,
+        info: _ModuleInfo,
+    ) -> bool:
+        if definition is None:
+            return False
+        parameters = self._parameter_map(definition)
+        if isinstance(function, ast.Name):
+            return function.id in parameters
+        if not isinstance(function, ast.Attribute):
+            return False
+        base = function.value
+        while isinstance(base, ast.Attribute):
+            base = base.value
+        if not isinstance(base, ast.Name) or base.id not in parameters:
+            return False
+        annotation = parameters[base.id].annotation
+        if self._is_protocol_annotation(annotation, info):
+            return True
+        return function.attr == "solve" or function.attr in _FORBIDDEN_CALL_LEAVES
+
+    def _unbound_dispatch_parameters(
+        self,
+        definition: _DefinitionInfo,
+        info: _ModuleInfo,
+    ) -> set[str]:
+        parameters = self._parameter_map(definition)
+        relevant: set[str] = set()
+        for node in self.nodes_for_scope(definition.node):
+            if not isinstance(node, ast.Call):
+                continue
+            if isinstance(node.func, ast.Name) and node.func.id in parameters:
+                relevant.add(node.func.id)
+            elif isinstance(node.func, ast.Attribute):
+                base = node.func.value
+                while isinstance(base, ast.Attribute):
+                    base = base.value
+                if (
+                    isinstance(base, ast.Name)
+                    and base.id in parameters
+                    and self._unknown_dispatch_is_relevant(node.func, definition, info)
+                ):
+                    relevant.add(base.id)
+        return relevant
+
+    def _free_names(self, definition: _DefinitionInfo) -> tuple[str, ...]:
+        if definition.canonical in self.free_names_memo:
+            return self.free_names_memo[definition.canonical]
+        node = definition.node
+        parameters = {argument.arg for argument in self._parameters(definition)}
+
+        class _FreeNameVisitor(ast.NodeVisitor):
+            def __init__(self, root: ast.AST) -> None:
+                self.root = root
+                self.assigned: set[str] = set()
+                self.loaded: set[str] = set()
+
+            def visit_Name(self, child: ast.Name) -> None:
+                if isinstance(child.ctx, ast.Load):
+                    self.loaded.add(child.id)
+                elif isinstance(child.ctx, (ast.Store, ast.Del)):
+                    self.assigned.add(child.id)
+
+            def _visit_function_header(self, child: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+                for decorator in child.decorator_list:
+                    self.visit(decorator)
+                for default in (*child.args.defaults, *child.args.kw_defaults):
+                    if default is not None:
+                        self.visit(default)
+
+            def visit_FunctionDef(self, child: ast.FunctionDef) -> None:
+                if child is self.root:
+                    for statement in child.body:
+                        self.visit(statement)
+                else:
+                    self.assigned.add(child.name)
+                    self._visit_function_header(child)
+
+            def visit_AsyncFunctionDef(self, child: ast.AsyncFunctionDef) -> None:
+                if child is self.root:
+                    for statement in child.body:
+                        self.visit(statement)
+                else:
+                    self.assigned.add(child.name)
+                    self._visit_function_header(child)
+
+            def visit_Lambda(self, child: ast.Lambda) -> None:
+                if child is self.root:
+                    self.visit(child.body)
+
+            def visit_ClassDef(self, child: ast.ClassDef) -> None:
+                self.assigned.add(child.name)
+                for decorator in child.decorator_list:
+                    self.visit(decorator)
+                for base in child.bases:
+                    self.visit(base)
+                for keyword in child.keywords:
+                    self.visit(keyword.value)
+
+        visitor = _FreeNameVisitor(node)
+        visitor.visit(node)
+        result = tuple(sorted(visitor.loaded - visitor.assigned - parameters))
+        self.free_names_memo[definition.canonical] = result
+        return result
+
+    def _capture_ref(
+        self,
+        canonical: str,
+        environment: Mapping[str, _AbstractValue],
+        info: _ModuleInfo,
+    ) -> _TargetRef:
+        definition = self.definitions[canonical]
+        if "<locals>" not in definition.qualname and "<lambda>" not in definition.qualname:
+            return _TargetRef(canonical, "callable")
+        bindings = tuple(
+            sorted(
+                (
+                    (name, environment[name])
+                    for name in self._free_names(definition)
+                    if name in environment
+                    and name not in info.bindings
+                    and self._has_value(environment[name])
+                ),
+                key=lambda item: item[0],
+            )
+        )
+        return _TargetRef(canonical, "callable", bindings)
+
+    def _class_bases(self, class_canonical: str) -> tuple[str, ...]:
+        if class_canonical in self.class_bases_memo:
+            return self.class_bases_memo[class_canonical]
+        definition = self.definitions.get(class_canonical)
+        if definition is None or not isinstance(definition.node, ast.ClassDef):
+            return ()
+        info = self.modules[definition.module]
+        environment = self._module_environment(info)
+        bases: set[str] = set()
+        for base in definition.node.bases:
+            value = self._expression_value(base, environment, info, definition)
+            bases.update(
+                target.canonical for target in value.targets if target.kind in {"class", "instance"}
+            )
+        result = tuple(sorted(bases))
+        self.class_bases_memo[class_canonical] = result
+        return result
+
+    def _resolve_method(self, class_canonical: str, name: str) -> tuple[str, ...]:
+        memo_key = (class_canonical, name)
+        if memo_key in self.method_memo:
+            return self.method_memo[memo_key]
+        pending = deque((class_canonical,))
+        visited: set[str] = set()
+        resolved: set[str] = set()
+        while pending:
+            current = pending.popleft()
+            if current in visited:
+                continue
+            visited.add(current)
+            candidate = f"{current}.{name}"
+            if candidate in self.definitions:
+                resolved.add(candidate)
+                continue
+            pending.extend(self._class_bases(current))
+        result = tuple(sorted(resolved))
+        self.method_memo[memo_key] = result
+        return result
+
+    def _is_property(self, canonical: str) -> bool:
+        definition = self.definitions.get(canonical)
+        return bool(
+            definition is not None
+            and isinstance(definition.node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and any(
+                (_dotted_name(item) or "").rsplit(".", 1)[-1] == "property"
+                for item in definition.node.decorator_list
+            )
+        )
+
+    def _bound_method_ref(
+        self,
+        canonical: str,
+        receiver: _AbstractValue,
+    ) -> _TargetRef:
+        parameters = self._parameters(self.definitions[canonical])
+        bindings = ((parameters[0].arg, receiver),) if parameters else ()
+        return _TargetRef(canonical, "callable", bindings)
+
+    def _expression_value(
+        self,
+        node: ast.AST,
+        environment: Mapping[str, _AbstractValue],
+        info: _ModuleInfo,
+        current_definition: _DefinitionInfo | None,
+    ) -> _AbstractValue:
+        if isinstance(node, ast.Name):
+            return environment.get(node.id, _AbstractValue())
+        if isinstance(node, ast.Lambda):
+            canonical = info.lambda_definitions.get((node.lineno, node.col_offset))
+            if canonical is None:
+                return _AbstractValue(relevant_unknown=True)
+            return _AbstractValue((self._capture_ref(canonical, environment, info),))
+        if isinstance(node, (ast.Tuple, ast.List)):
+            return _AbstractValue(
+                items=tuple(
+                    self._expression_value(item, environment, info, current_definition)
+                    for item in node.elts
+                )
+            )
+        if isinstance(node, ast.IfExp):
+            return self._merge_values(
+                self._expression_value(node.body, environment, info, current_definition),
+                self._expression_value(node.orelse, environment, info, current_definition),
+            )
+        if isinstance(node, (ast.BoolOp, ast.Set)):
+            values = node.values if isinstance(node, ast.BoolOp) else node.elts
+            return self._merge_values(
+                *(
+                    self._expression_value(item, environment, info, current_definition)
+                    for item in values
+                )
+            )
+        if isinstance(node, ast.Dict):
+            return self._merge_values(
+                *(
+                    self._expression_value(item, environment, info, current_definition)
+                    for item in node.values
+                )
+            )
+        if isinstance(node, ast.Subscript):
+            container = self._expression_value(node.value, environment, info, current_definition)
+            if (
+                container.items
+                and isinstance(node.slice, ast.Constant)
+                and isinstance(node.slice.value, int)
+            ):
+                index = node.slice.value
+                if -len(container.items) <= index < len(container.items):
+                    return container.items[index]
+            return container
+        if isinstance(node, ast.Attribute):
+            base = self._expression_value(node.value, environment, info, current_definition)
+            values: list[_AbstractValue] = []
+            for target in base.targets:
+                if target.kind == "module":
+                    module = _module_from_node(target.canonical)
+                    values.append(self._plain_value(f"{module}.{node.attr}" if module else None))
+                elif target.kind == "external":
+                    values.append(
+                        _AbstractValue((_TargetRef(f"{target.canonical}.{node.attr}", "external"),))
+                    )
+                elif target.kind in {"class", "instance"}:
+                    methods = self._resolve_method(target.canonical, node.attr)
+                    for method in methods:
+                        receiver = _AbstractValue((target,))
+                        bound = self._bound_method_ref(method, receiver)
+                        if target.kind == "instance" and self._is_property(method):
+                            values.append(self._infer_return_value(bound))
+                        else:
+                            values.append(_AbstractValue((bound,)))
+            if not values:
+                return _AbstractValue(relevant_unknown=base.relevant_unknown)
+            merged = self._merge_values(*values)
+            return replace(
+                merged,
+                relevant_unknown=merged.relevant_unknown or base.relevant_unknown,
+            )
+        if isinstance(node, ast.Call):
+            dotted = _dotted_name(node.func) or ""
+            if dotted.rsplit(".", 1)[-1] == "getattr" and len(node.args) >= 2:
+                base = self._expression_value(node.args[0], environment, info, current_definition)
+                if isinstance(node.args[1], ast.Constant) and isinstance(node.args[1].value, str):
+                    synthetic = ast.Attribute(value=node.args[0], attr=node.args[1].value)
+                    return self._expression_value(synthetic, environment, info, current_definition)
+                targets: list[_AbstractValue] = []
+                for item in base.targets:
+                    module = _module_from_node(item.canonical) if item.kind == "module" else None
+                    if module is not None:
+                        targets.extend(
+                            self._plain_value(candidate)
+                            for candidate in _forbidden_candidates_for_module(
+                                module, self.modules, self.definitions
+                            )
+                        )
+                merged = self._merge_values(*targets) if targets else _AbstractValue()
+                return replace(merged, relevant_unknown=True)
+            candidates, unresolved = self._call_candidates(
+                node.func,
+                environment,
+                info,
+                current_definition,
+            )
+            values: list[_AbstractValue] = []
+            for candidate in candidates:
+                if candidate.dispatch_kind == "constructor":
+                    values.append(
+                        _AbstractValue(
+                            (
+                                _TargetRef(
+                                    candidate.target.canonical,
+                                    "instance",
+                                    candidate.target.bindings,
+                                ),
+                            )
+                        )
+                    )
+                    continue
+                bound = self._bind_call_candidate(
+                    candidate,
+                    node,
+                    environment,
+                    info,
+                    current_definition,
+                )
+                values.append(self._infer_return_value(bound))
+            merged = self._merge_values(*values) if values else _AbstractValue()
+            return replace(
+                merged,
+                relevant_unknown=merged.relevant_unknown or unresolved,
+            )
+        return _AbstractValue()
+
+    def _super_method_candidates(
+        self,
+        node: ast.Attribute,
+        current_definition: _DefinitionInfo | None,
+    ) -> tuple[_CallCandidate, ...]:
+        if (
+            current_definition is None
+            or current_definition.parent_class is None
+            or not isinstance(node.value, ast.Call)
+            or (_dotted_name(node.value.func) or "").rsplit(".", 1)[-1] != "super"
+        ):
+            return ()
+        receiver = _AbstractValue((_TargetRef(current_definition.parent_class, "instance"),))
+        return tuple(
+            _CallCandidate(
+                self._bound_method_ref(method, receiver),
+                receiver,
+                "inherited-method",
+            )
+            for base in self._class_bases(current_definition.parent_class)
+            for method in self._resolve_method(base, node.attr)
+        )
+
+    def _call_candidates(
+        self,
+        function: ast.AST,
+        environment: Mapping[str, _AbstractValue],
+        info: _ModuleInfo,
+        current_definition: _DefinitionInfo | None,
+    ) -> tuple[tuple[_CallCandidate, ...], bool]:
+        if isinstance(function, ast.Attribute):
+            super_candidates = self._super_method_candidates(function, current_definition)
+            if super_candidates:
+                return super_candidates, False
+            base = self._expression_value(function.value, environment, info, current_definition)
+            candidates: set[_CallCandidate] = set()
+            for target in base.targets:
+                if target.kind == "module":
+                    module = _module_from_node(target.canonical)
+                    value = self._plain_value(f"{module}.{function.attr}" if module else None)
+                    candidates.update(
+                        _CallCandidate(item, None, "function")
+                        for item in value.targets
+                        if item.kind in {"callable", "class"}
+                    )
+                    continue
+                if target.kind not in {"class", "instance"}:
+                    continue
+                receiver = _AbstractValue((target,))
+                candidates.update(
+                    _CallCandidate(
+                        self._bound_method_ref(method, receiver),
+                        receiver,
+                        "method",
+                    )
+                    for method in self._resolve_method(target.canonical, function.attr)
+                )
+            return tuple(sorted(candidates, key=lambda item: item.target)), base.relevant_unknown
+
+        value = self._expression_value(function, environment, info, current_definition)
+        candidates: set[_CallCandidate] = set()
+        for target in value.targets:
+            if target.kind == "callable":
+                candidates.add(_CallCandidate(target, None, "function"))
+            elif target.kind == "class":
+                candidates.add(_CallCandidate(target, None, "constructor"))
+            elif target.kind == "instance":
+                receiver = _AbstractValue((target,))
+                candidates.update(
+                    _CallCandidate(
+                        self._bound_method_ref(method, receiver),
+                        receiver,
+                        "implicit-__call__",
+                    )
+                    for method in self._resolve_method(target.canonical, "__call__")
+                )
+        return tuple(sorted(candidates, key=lambda item: item.target)), value.relevant_unknown
+
+    def _bind_call_candidate(
+        self,
+        candidate: _CallCandidate,
+        call: ast.Call,
+        environment: Mapping[str, _AbstractValue],
+        info: _ModuleInfo,
+        current_definition: _DefinitionInfo | None,
+    ) -> _TargetRef:
+        definition = self.definitions.get(candidate.target.canonical)
+        if definition is None or definition.kind != "function":
+            return candidate.target
+        parameters = self._parameters(definition)
+        bindings = dict(candidate.target.bindings)
+        position = 0
+        if candidate.receiver is not None and parameters:
+            bindings[parameters[0].arg] = candidate.receiver
+            position = 1
+        positional: list[_AbstractValue] = []
+        for argument in call.args:
+            value = self._expression_value(
+                argument.value if isinstance(argument, ast.Starred) else argument,
+                environment,
+                info,
+                current_definition,
+            )
+            if isinstance(argument, ast.Starred) and value.items:
+                positional.extend(value.items)
+            else:
+                positional.append(value)
+        for parameter, value in zip(parameters[position:], positional, strict=False):
+            if self._has_value(value):
+                bindings[parameter.arg] = self._merge_values(
+                    bindings.get(parameter.arg, _AbstractValue()), value
+                )
+        parameter_names = {parameter.arg for parameter in parameters}
+        for keyword in call.keywords:
+            if keyword.arg is None or keyword.arg not in parameter_names:
+                continue
+            value = self._expression_value(keyword.value, environment, info, current_definition)
+            if self._has_value(value):
+                bindings[keyword.arg] = self._merge_values(
+                    bindings.get(keyword.arg, _AbstractValue()), value
+                )
+        return _TargetRef(
+            candidate.target.canonical,
+            "callable",
+            tuple(sorted(bindings.items(), key=lambda item: item[0])),
+        )
+
+    def _assign_value(
+        self,
+        target: ast.AST,
+        value: _AbstractValue,
+        environment: dict[str, _AbstractValue],
+    ) -> bool:
+        changed = False
+        if isinstance(target, ast.Name):
+            merged = self._merge_values(environment.get(target.id, _AbstractValue()), value)
+            if environment.get(target.id) != merged:
+                environment[target.id] = merged
+                changed = True
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            if len(value.items) == len(target.elts):
+                for item_target, item_value in zip(target.elts, value.items, strict=True):
+                    changed = self._assign_value(item_target, item_value, environment) or changed
+            elif value.relevant_unknown:
+                unknown = _AbstractValue(relevant_unknown=True)
+                for item_target in target.elts:
+                    changed = self._assign_value(item_target, unknown, environment) or changed
+        return changed
+
+    def _build_environment(self, target: _TargetRef) -> dict[str, _AbstractValue]:
+        if target in self.environment_memo:
+            return self.environment_memo[target]
+        definition = self.definitions[target.canonical]
+        info = self.modules[definition.module]
+        environment = self._module_environment(info)
+        environment.update(dict(target.bindings))
+        bound_names = set(dict(target.bindings))
+        dispatch_parameters = self._unbound_dispatch_parameters(definition, info)
+        for parameter in self._parameters(definition):
+            if parameter.arg not in bound_names and (
+                parameter.arg in dispatch_parameters
+                or self._is_protocol_annotation(parameter.annotation, info)
+            ):
+                environment[parameter.arg] = _AbstractValue(relevant_unknown=True)
+        if definition.parent_class is not None and "self" not in environment:
+            environment["self"] = _AbstractValue((_TargetRef(definition.parent_class, "instance"),))
+        for name, canonical in definition.local_definitions.items():
+            environment[name] = _AbstractValue((_TargetRef(canonical, "callable"),))
+        nodes = self.nodes_for_scope(definition.node)
+        for node in nodes:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                bindings, _loaded, _symbols, _wildcards = _import_bindings(info, node, self.modules)
+                for name, raw in bindings.items():
+                    environment[name] = self._plain_value(raw)
+
+        assignments = [
+            node
+            for node in nodes
+            if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
+            and node.value is not None
+        ]
+        for _pass in range(8):
+            changed = False
+            for name, canonical in definition.local_definitions.items():
+                captured = _AbstractValue((self._capture_ref(canonical, environment, info),))
+                if environment.get(name) != captured:
+                    environment[name] = captured
+                    changed = True
+            for assignment in assignments:
+                value = self._expression_value(assignment.value, environment, info, definition)
+                targets = (
+                    assignment.targets
+                    if isinstance(assignment, ast.Assign)
+                    else (assignment.target,)
+                )
+                for assignment_target in targets:
+                    changed = self._assign_value(assignment_target, value, environment) or changed
+            if not changed:
+                break
+        self.environment_memo[target] = environment
+        return environment
+
+    def module_environment(self, info: _ModuleInfo) -> dict[str, _AbstractValue]:
+        if info.name in self.module_environment_memo:
+            return self.module_environment_memo[info.name]
+        environment = self._module_environment(info)
+        nodes = self.nodes_for_scope(info.tree)
+        for node in nodes:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                bindings, _loaded, _symbols, _wildcards = _import_bindings(info, node, self.modules)
+                for name, raw in bindings.items():
+                    environment[name] = self._plain_value(raw)
+        assignments = [
+            node
+            for node in nodes
+            if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
+            and node.value is not None
+        ]
+        for _pass in range(8):
+            changed = False
+            for assignment in assignments:
+                value = self._expression_value(assignment.value, environment, info, None)
+                targets = (
+                    assignment.targets
+                    if isinstance(assignment, ast.Assign)
+                    else (assignment.target,)
+                )
+                for assignment_target in targets:
+                    changed = self._assign_value(assignment_target, value, environment) or changed
+            if not changed:
+                break
+        self.module_environment_memo[info.name] = environment
+        return environment
+
+    def _infer_return_value(self, target: _TargetRef) -> _AbstractValue:
+        if target in self.return_memo:
+            return self.return_memo[target]
+        if target in self.return_in_progress:
+            return _AbstractValue()
+        definition = self.definitions.get(target.canonical)
+        if definition is None or definition.kind != "function":
+            return _AbstractValue()
+        self.return_in_progress.add(target)
+        try:
+            environment = self._build_environment(target)
+            info = self.modules[definition.module]
+            if isinstance(definition.node, ast.Lambda):
+                result = self._expression_value(definition.node.body, environment, info, definition)
+            else:
+                returns = [
+                    self._expression_value(node.value, environment, info, definition)
+                    for node in self.nodes_for_scope(definition.node)
+                    if isinstance(node, ast.Return) and node.value is not None
+                ]
+                result = self._merge_values(*returns) if returns else _AbstractValue()
+            self.return_memo[target] = result
+            return result
+        finally:
+            self.return_in_progress.remove(target)
+
+    def specialization_key(self, target: _TargetRef) -> str:
+        if target in self.specialization_key_memo:
+            return self.specialization_key_memo[target]
+        signature = (
+            target.canonical,
+            tuple((name, _value_signature(value)) for name, value in target.bindings),
+        )
+        key = json.dumps(signature, ensure_ascii=True, separators=(",", ":"))
+        self.specialization_key_memo[target] = key
+        return key
+
+    def accept_specialization(
+        self,
+        target: _TargetRef,
+        *,
+        info: _ModuleInfo,
+        owner: str,
+        node: ast.AST,
+    ) -> bool:
+        key = self.specialization_key(target)
+        if key in self.binding_specializations:
+            return True
+        symbol_keys = self.specializations_by_symbol[target.canonical]
+        if (
+            len(self.binding_specializations) >= _BINDING_ANALYSIS_LIMIT
+            or len(symbol_keys) >= _BINDINGS_PER_SYMBOL_LIMIT
+        ):
+            self.binding_analysis_limit_exceeded = True
+            unresolved = _unresolved_site(
+                info,
+                owner,
+                node,
+                "interprocedural-binding-limit",
+                "bounded call specialization limit was exceeded on a reachable production path",
+            )
+            self.unresolved.add(unresolved)
+            self.unresolved_parameter_dispatch_sites.add(unresolved)
+            return False
+        self.binding_specializations.add(key)
+        symbol_keys.add(key)
+        return True
+
+    def environment_for(self, target: _TargetRef) -> dict[str, _AbstractValue]:
+        return self._build_environment(target)
+
+    def call_targets(
+        self,
+        call: ast.Call,
+        environment: Mapping[str, _AbstractValue],
+        info: _ModuleInfo,
+        definition: _DefinitionInfo | None,
+        *,
+        owner: str,
+    ) -> tuple[_TargetRef, ...]:
+        candidates, unresolved = self._call_candidates(call.func, environment, info, definition)
+        site = _site(info, owner, call)
+        if len(candidates) > 1:
+            self.polymorphic_call_sites.add(site)
+        targets: list[_TargetRef] = []
+        for candidate in candidates:
+            target = (
+                candidate.target
+                if candidate.dispatch_kind == "constructor"
+                else self._bind_call_candidate(
+                    candidate,
+                    call,
+                    environment,
+                    info,
+                    definition,
+                )
+            )
+            targets.append(target)
+            if candidate.dispatch_kind in {
+                "method",
+                "inherited-method",
+                "implicit-__call__",
+            }:
+                self.resolved_method_dispatches.add((site, target.canonical))
+        if unresolved and self._unknown_dispatch_is_relevant(call.func, definition, info):
+            unresolved_site = _unresolved_site(
+                info,
+                owner,
+                call,
+                "unresolved-parameter-dispatch",
+                "reachable callable or receiver target set may include a protected repository target",
+            )
+            self.unresolved.add(unresolved_site)
+            self.unresolved_parameter_dispatch_sites.add(unresolved_site)
+        return tuple(sorted(set(targets)))
+
+    def constructor_initializers(
+        self,
+        class_target: _TargetRef,
+        call: ast.Call,
+        environment: Mapping[str, _AbstractValue],
+        info: _ModuleInfo,
+        definition: _DefinitionInfo | None,
+    ) -> tuple[_TargetRef, ...]:
+        receiver = _AbstractValue(
+            (_TargetRef(class_target.canonical, "instance", class_target.bindings),)
+        )
+        return tuple(
+            sorted(
+                {
+                    self._bind_call_candidate(
+                        _CallCandidate(
+                            self._bound_method_ref(initializer, receiver),
+                            receiver,
+                            "method",
+                        ),
+                        call,
+                        environment,
+                        info,
+                        definition,
+                    )
+                    for initializer in self._resolve_method(class_target.canonical, "__init__")
+                }
+            )
+        )
+
+    def property_targets(
+        self,
+        attribute: ast.Attribute,
+        environment: Mapping[str, _AbstractValue],
+        info: _ModuleInfo,
+        definition: _DefinitionInfo | None,
+    ) -> tuple[_TargetRef, ...]:
+        base = self._expression_value(attribute.value, environment, info, definition)
+        targets: set[_TargetRef] = set()
+        for receiver in base.targets:
+            if receiver.kind != "instance":
+                continue
+            receiver_value = _AbstractValue((receiver,))
+            targets.update(
+                self._bound_method_ref(method, receiver_value)
+                for method in self._resolve_method(receiver.canonical, attribute.attr)
+                if self._is_property(method)
+            )
+        return tuple(sorted(targets))
+
+
 def _collect_repository_references(
     repo_root: Path,
     modules: Mapping[str, _ModuleInfo],
     definitions: Mapping[str, _DefinitionInfo],
 ) -> tuple[_RepositoryReference, ...]:
-    def source_for_node(info: _ModuleInfo, node: ast.AST) -> str:
-        line = getattr(node, "lineno", 0)
-        owners = [
-            definition
-            for definition in info.definitions.values()
-            if definition.kind == "function"
-            and getattr(definition.node, "lineno", 0)
-            <= line
-            <= getattr(definition.node, "end_lineno", 0)
-        ]
-        if not owners:
-            return _module_node(info.name)
-        return min(
-            owners,
+    owners_by_module: dict[str, dict[int, str]] = {}
+    for info in modules.values():
+        owners_by_line: dict[int, str] = {}
+        functions = sorted(
+            (
+                definition
+                for definition in info.definitions.values()
+                if definition.kind == "function"
+            ),
             key=lambda item: (
                 getattr(item.node, "end_lineno", 0) - getattr(item.node, "lineno", 0),
                 item.canonical,
             ),
-        ).canonical
+        )
+        for definition in functions:
+            for line in range(
+                getattr(definition.node, "lineno", 0),
+                getattr(definition.node, "end_lineno", 0) + 1,
+            ):
+                owners_by_line.setdefault(line, definition.canonical)
+        owners_by_module[info.name] = owners_by_line
+
+    def source_for_node(info: _ModuleInfo, node: ast.AST) -> str:
+        line = getattr(node, "lineno", 0)
+        return owners_by_module[info.name].get(line, _module_node(info.name))
 
     references: set[_RepositoryReference] = set()
     for info in modules.values():
@@ -1457,6 +2422,7 @@ def _collect_repository_references(
                 bindings={},
                 top_level_definitions={},
                 definitions={},
+                lambda_definitions={},
             )
             source = f"{kind}:{relative_path}::<module>"
             for node in ast.walk(tree):
@@ -1490,6 +2456,7 @@ def _collect_repository_references(
 
 def _build_production_graph(repo_root: Path) -> _ProductionGraphAnalysis:
     modules, definitions = _index_production_modules(repo_root)
+    resolver = _InterproceduralResolver(modules, definitions)
     root_modules = tuple(
         sorted(
             filter(
@@ -1506,21 +2473,65 @@ def _build_production_graph(repo_root: Path) -> _ProductionGraphAnalysis:
     edges: set[_GraphEdge] = set()
     findings: set[_GraphFinding] = set()
     unresolved: set[UnresolvedCallGraphSiteV1] = set()
-    pending = deque(roots)
+    pending = deque(_TargetRef(root, "module") for root in roots)
     processed: set[str] = set()
 
-    def add_edge(edge: _GraphEdge, *, traversable: bool = True) -> None:
+    def enqueue(
+        target: _TargetRef,
+        *,
+        info: _ModuleInfo,
+        owner: str,
+        node: ast.AST,
+    ) -> None:
+        if target.kind == "callable":
+            definition = definitions.get(target.canonical)
+            if definition is None or definition.kind != "function":
+                return
+            if not resolver.accept_specialization(target, info=info, owner=owner, node=node):
+                return
+        elif target.kind == "class":
+            definition = definitions.get(target.canonical)
+            if definition is None or definition.kind != "class":
+                return
+        elif target.kind == "module":
+            module = _module_from_node(target.canonical)
+            if module not in modules:
+                return
+        else:
+            return
+        reachable.add(target.canonical)
+        pending.append(target)
+
+    def add_edge(
+        edge: _GraphEdge,
+        *,
+        target: _TargetRef | None = None,
+        info: _ModuleInfo,
+        owner: str,
+        node: ast.AST,
+        traversable: bool = True,
+    ) -> None:
         edges.add(edge)
-        if traversable and edge.target not in reachable:
-            reachable.add(edge.target)
-            pending.append(edge.target)
+        if traversable and target is not None:
+            enqueue(target, info=info, owner=owner, node=node)
 
     while pending:
-        current = min(pending)
-        pending.remove(current)
-        if current in processed:
+        target_ref = min(
+            pending,
+            key=lambda item: (
+                item.canonical,
+                item.kind,
+                resolver.specialization_key(item) if item.kind == "callable" else item.canonical,
+            ),
+        )
+        pending.remove(target_ref)
+        current = target_ref.canonical
+        processed_key = (
+            resolver.specialization_key(target_ref) if target_ref.kind == "callable" else current
+        )
+        if processed_key in processed:
             continue
-        processed.add(current)
+        processed.add(processed_key)
         module_name = _module_from_node(current)
         definition = definitions.get(current)
         if module_name is None and definition is not None:
@@ -1529,20 +2540,15 @@ def _build_production_graph(repo_root: Path) -> _ProductionGraphAnalysis:
         if info is None:
             continue
         if definition is not None and definition.kind == "class":
-            initializer = f"{definition.canonical}.__init__"
-            if initializer in definitions:
-                add_edge(
-                    _GraphEdge(
-                        current,
-                        initializer,
-                        "constructor",
-                        f"{info.name}::{definition.qualname}:0",
-                    )
-                )
             continue
         scope = info.tree if definition is None else definition.node
-        nodes = _scope_nodes(scope)
-        environment, mappings, opaque = _node_environment(
+        nodes = resolver.nodes_for_scope(scope)
+        environment = (
+            resolver.module_environment(info)
+            if definition is None
+            else resolver.environment_for(target_ref)
+        )
+        legacy_environment, mappings, opaque = _node_environment(
             info, definition, nodes, modules, definitions
         )
         owner = "<module>" if definition is None else definition.qualname
@@ -1551,7 +2557,18 @@ def _build_production_graph(repo_root: Path) -> _ProductionGraphAnalysis:
                 _bindings, loaded, imported, wildcards = _import_bindings(info, node, modules)
                 for loaded_module in loaded:
                     terminal = _module_node(loaded_module)
-                    add_edge(_GraphEdge(current, terminal, "import", _site(info, owner, node)))
+                    add_edge(
+                        _GraphEdge(
+                            current,
+                            terminal,
+                            "import",
+                            _site(info, owner, node),
+                        ),
+                        target=_TargetRef(terminal, "module"),
+                        info=info,
+                        owner=owner,
+                        node=node,
+                    )
                     category = _category_for_imported_module(loaded_module)
                     if category is not None:
                         findings.add(
@@ -1581,6 +2598,9 @@ def _build_production_graph(repo_root: Path) -> _ProductionGraphAnalysis:
                                 "forbidden-import",
                                 _site(info, owner, node),
                             ),
+                            info=info,
+                            owner=owner,
+                            node=node,
                             traversable=False,
                         )
                         findings.add(_GraphFinding(category, terminal, current, terminal, "import"))
@@ -1598,13 +2618,30 @@ def _build_production_graph(repo_root: Path) -> _ProductionGraphAnalysis:
                             )
                         )
                 continue
+            if isinstance(node, ast.Attribute):
+                for property_target in resolver.property_targets(
+                    node, environment, info, definition
+                ):
+                    add_edge(
+                        _GraphEdge(
+                            current,
+                            property_target.canonical,
+                            "property",
+                            _site(info, owner, node),
+                        ),
+                        target=property_target,
+                        info=info,
+                        owner=owner,
+                        node=node,
+                    )
+                continue
             if not isinstance(node, ast.Call):
                 continue
             dynamic_unresolved = _dynamic_call_unresolved(
                 node,
                 info=info,
                 owner=owner,
-                environment=environment,
+                environment=legacy_environment,
                 mappings=mappings,
                 opaque=opaque,
                 modules=modules,
@@ -1614,23 +2651,68 @@ def _build_production_graph(repo_root: Path) -> _ProductionGraphAnalysis:
                 unresolved.add(dynamic_unresolved)
             literal_module = _literal_dynamic_module(node)
             if literal_module in modules:
+                terminal = _module_node(literal_module)
                 add_edge(
                     _GraphEdge(
                         current,
-                        _module_node(literal_module),
+                        terminal,
                         "literal-dynamic-import",
                         _site(info, owner, node),
-                    )
+                    ),
+                    target=_TargetRef(terminal, "module"),
+                    info=info,
+                    owner=owner,
+                    node=node,
                 )
-            target = _expression_target(node.func, environment, modules, definitions)
-            canonical = _canonicalize_target(target, modules, definitions)
-            if canonical is not None and canonical in definitions:
-                add_edge(_GraphEdge(current, canonical, "call", _site(info, owner, node)))
-                category = _category_for_target(canonical)
+            call_targets = resolver.call_targets(
+                node,
+                environment,
+                info,
+                definition,
+                owner=owner,
+            )
+            for call_target in call_targets:
+                canonical = call_target.canonical
+                add_edge(
+                    _GraphEdge(
+                        current,
+                        canonical,
+                        "call",
+                        _site(info, owner, node),
+                    ),
+                    target=call_target,
+                    info=info,
+                    owner=owner,
+                    node=node,
+                )
+                category = _category_for_target(call_target.canonical)
                 if category is not None:
                     findings.add(_GraphFinding(category, canonical, current, canonical, "call"))
+                if call_target.kind == "class":
+                    for initializer in resolver.constructor_initializers(
+                        call_target,
+                        node,
+                        environment,
+                        info,
+                        definition,
+                    ):
+                        add_edge(
+                            _GraphEdge(
+                                call_target.canonical,
+                                initializer.canonical,
+                                "constructor",
+                                _site(info, owner, node),
+                            ),
+                            target=initializer,
+                            info=info,
+                            owner=owner,
+                            node=node,
+                        )
+            if call_targets:
                 continue
-            raw = target or _dotted_name(node.func)
+            raw = _expression_target(
+                node.func, legacy_environment, modules, definitions
+            ) or _dotted_name(node.func)
             if raw and raw.rsplit(".", 1)[-1] in _FORBIDDEN_CALL_LEAVES:
                 terminal = f"unresolved:{raw}"
                 add_edge(
@@ -1640,6 +2722,9 @@ def _build_production_graph(repo_root: Path) -> _ProductionGraphAnalysis:
                         "conservative-leaf-call",
                         _site(info, owner, node),
                     ),
+                    info=info,
+                    owner=owner,
+                    node=node,
                     traversable=False,
                 )
                 leaf = raw.rsplit(".", 1)[-1]
@@ -1657,6 +2742,7 @@ def _build_production_graph(repo_root: Path) -> _ProductionGraphAnalysis:
                 )
                 findings.add(_GraphFinding(category, terminal, current, terminal, "call"))
 
+    unresolved.update(resolver.unresolved)
     references = _collect_repository_references(repo_root, modules, definitions)
     return _ProductionGraphAnalysis(
         modules=modules,
@@ -1667,6 +2753,11 @@ def _build_production_graph(repo_root: Path) -> _ProductionGraphAnalysis:
         findings=findings,
         unresolved=unresolved,
         references=references,
+        binding_specializations=resolver.binding_specializations,
+        polymorphic_call_sites=resolver.polymorphic_call_sites,
+        resolved_method_dispatches=resolver.resolved_method_dispatches,
+        unresolved_parameter_dispatch_sites=resolver.unresolved_parameter_dispatch_sites,
+        binding_analysis_limit_exceeded=resolver.binding_analysis_limit_exceeded,
     )
 
 
@@ -1799,6 +2890,22 @@ def _graph_evidence(
     unresolved = tuple(
         sorted(graph.unresolved, key=lambda item: (item.site, item.construct, item.risk))
     )
+    unresolved_parameter_dispatch = tuple(
+        sorted(
+            graph.unresolved_parameter_dispatch_sites,
+            key=lambda item: (item.site, item.construct, item.risk),
+        )
+    )
+    concrete_solver_methods = tuple(
+        sorted(
+            target
+            for _site_name, target in graph.resolved_method_dispatches
+            if target in graph.reachable
+            and target.rsplit(".", 1)[-1] == "solve"
+            and (definition := graph.definitions.get(target)) is not None
+            and definition.parent_class is not None
+        )
+    )
     paths = _shortest_witness_paths(graph)
     witnesses = tuple(
         sorted(
@@ -1823,6 +2930,13 @@ def _graph_evidence(
         "reachable": reachable_symbols,
         "edges": [(edge.source, edge.target, edge.kind, edge.site) for edge in sorted(graph.edges)],
         "unresolved": [asdict(item) for item in unresolved],
+        "interprocedural_bindings": tuple(sorted(graph.binding_specializations)),
+        "polymorphic_call_sites": tuple(sorted(graph.polymorphic_call_sites)),
+        "resolved_method_dispatches": tuple(sorted(graph.resolved_method_dispatches)),
+        "unresolved_parameter_dispatch": [asdict(item) for item in unresolved_parameter_dispatch],
+        "concrete_solver_methods": concrete_solver_methods,
+        "binding_analysis_limit": _BINDING_ANALYSIS_LIMIT,
+        "binding_analysis_limit_exceeded": graph.binding_analysis_limit_exceeded,
         "findings": [asdict(item) for item in witnesses],
     }
     fingerprint = hashlib.sha256(_canonical_payload(fingerprint_payload)).hexdigest()
@@ -1833,6 +2947,14 @@ def _graph_evidence(
         reachable_production_symbol_count=len(reachable_symbols),
         reachable_production_symbols=reachable_symbols[:_GRAPH_SYMBOL_LIMIT],
         resolved_edge_count=len(graph.edges),
+        interprocedural_binding_count=len(graph.binding_specializations),
+        polymorphic_call_site_count=len(graph.polymorphic_call_sites),
+        resolved_method_dispatch_count=len(graph.resolved_method_dispatches),
+        unresolved_parameter_dispatch_site_count=len(unresolved_parameter_dispatch),
+        unresolved_parameter_dispatch_sites=unresolved_parameter_dispatch[:_GRAPH_FINDING_LIMIT],
+        concrete_solver_methods_reached=concrete_solver_methods,
+        binding_analysis_limit=_BINDING_ANALYSIS_LIMIT,
+        binding_analysis_limit_exceeded=graph.binding_analysis_limit_exceeded,
         unresolved_relevant_site_count=len(unresolved),
         unresolved_relevant_sites=unresolved[:_GRAPH_FINDING_LIMIT],
         forbidden_witness_path_count=len(witnesses),

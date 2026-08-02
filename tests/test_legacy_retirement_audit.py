@@ -113,6 +113,17 @@ def test_m5c2r_current_ordinary_roots_have_no_forbidden_legacy_import_path(repor
     assert "bus_schedule_engine.contracts_v1.heuristic_solver" in (graph.audited_production_modules)
     assert graph.unresolved_relevant_sites == ()
     assert graph.unresolved_relevant_site_count == 0
+    assert graph.interprocedural_binding_count > 0
+    assert graph.resolved_method_dispatch_count >= 2
+    assert graph.unresolved_parameter_dispatch_site_count == 0
+    assert graph.unresolved_parameter_dispatch_sites == ()
+    assert graph.binding_analysis_limit > graph.interprocedural_binding_count
+    assert graph.binding_analysis_limit_exceeded is False
+    assert graph.concrete_solver_methods_reached == (
+        "bus_schedule_engine.contracts_v1.heuristic_solver.HeuristicScheduleSolverAdapter.solve",
+        "bus_schedule_engine.contracts_v1.ortools_quality_solver."
+        "OrToolsCpSatServiceQualitySolver.solve",
+    )
     assert graph.forbidden_witness_paths == ()
     assert graph.forbidden_witness_path_count == 0
     assert len(graph.ordinary_runtime_module_graph_fingerprint) == 64
@@ -403,6 +414,18 @@ def _inject_reachable_optimizer_call(
     return f"{imports}{injected}\n{helpers}"
 
 
+def _inject_forbidden_solver_method_call(source: str, signature: str) -> str:
+    future = "from __future__ import annotations\n"
+    assert future in source
+    source = source.replace(
+        future,
+        future + "\nfrom bus_schedule_engine.service import run_analysis\n",
+        1,
+    )
+    assert signature in source
+    return source.replace(signature, signature + "        run_analysis(problem)\n", 1)
+
+
 def _graph_witnesses(payload: dict[str, object]) -> list[dict[str, object]]:
     graph = payload["production_graph_evidence"]
     assert isinstance(graph, dict)
@@ -534,6 +557,302 @@ def _m5c2r_helper_a(imported):
     assert path[-1] == "bus_schedule_engine.service.run_analysis"
 
 
+@pytest.mark.parametrize(
+    ("relative_path", "signature", "solver_method"),
+    (
+        (
+            "src/bus_schedule_engine/contracts_v1/heuristic_solver.py",
+            ("    def solve(self, problem: ScheduleProblemV1) -> SolverRunResultV1:\n"),
+            (
+                "bus_schedule_engine.contracts_v1.heuristic_solver."
+                "HeuristicScheduleSolverAdapter.solve"
+            ),
+        ),
+        (
+            "src/bus_schedule_engine/contracts_v1/ortools_quality_solver.py",
+            ("    def solve(self, problem: ScheduleProblemV1) -> SolverRunResultV1:\n"),
+            (
+                "bus_schedule_engine.contracts_v1.ortools_quality_solver."
+                "OrToolsCpSatServiceQualitySolver.solve"
+            ),
+        ),
+    ),
+)
+def test_m5c2r_concrete_solver_method_forbidden_call_is_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    relative_path: str,
+    signature: str,
+    solver_method: str,
+) -> None:
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {relative_path: lambda source: _inject_forbidden_solver_method_call(source, signature)},
+    )
+
+    assert exit_code == 1
+    witness = next(
+        item
+        for item in _graph_witnesses(payload)
+        if item["target"] == "bus_schedule_engine.service.run_analysis"
+        and solver_method in item["path"]
+    )
+    path = witness["path"]
+    assert path[0] in payload["production_graph_evidence"]["root_symbols"]
+    assert any("optimization_service" in item for item in path)
+    assert "bus_schedule_engine.contracts_v1.solver_orchestration.run_schedule_solver_v1" in path
+    assert path.index(solver_method) < path.index("bus_schedule_engine.service.run_analysis")
+
+
+def test_m5c2r_protocol_parameter_dispatch_reaches_concrete_method(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    helper = """
+def _m5c2r_execute(solver):
+    return solver.solve(None)
+"""
+    solver_method = (
+        "bus_schedule_engine.contracts_v1.heuristic_solver.HeuristicScheduleSolverAdapter.solve"
+    )
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports=(
+                        "from bus_schedule_engine.contracts_v1.heuristic_solver "
+                        "import HeuristicScheduleSolverAdapter\n"
+                    ),
+                    call_source=("    _m5c2r_execute(HeuristicScheduleSolverAdapter(None))"),
+                    helpers=helper,
+                )
+            ),
+            "src/bus_schedule_engine/contracts_v1/heuristic_solver.py": lambda source: (
+                _inject_forbidden_solver_method_call(
+                    source,
+                    "    def solve(self, problem: ScheduleProblemV1) -> SolverRunResultV1:\n",
+                )
+            ),
+        },
+    )
+
+    assert exit_code == 1
+    witness = next(
+        item
+        for item in _graph_witnesses(payload)
+        if item["target"] == "bus_schedule_engine.service.run_analysis"
+        and solver_method in item["path"]
+        and "bus_schedule_engine.optimization_service._m5c2r_execute" in item["path"]
+    )
+    assert witness["path"].index(
+        "bus_schedule_engine.optimization_service._m5c2r_execute"
+    ) < witness["path"].index(solver_method)
+
+
+def test_m5c2r_branch_union_traverses_both_solver_methods(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    helper = """
+def _m5c2r_branch_solver(condition):
+    if condition:
+        solver = HeuristicScheduleSolverAdapter(None)
+    else:
+        solver = OrToolsCpSatServiceQualitySolver()
+    return solver.solve(None)
+"""
+    signature = "    def solve(self, problem: ScheduleProblemV1) -> SolverRunResultV1:\n"
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports=(
+                        "from bus_schedule_engine.contracts_v1.heuristic_solver "
+                        "import HeuristicScheduleSolverAdapter\n"
+                        "from bus_schedule_engine.contracts_v1.ortools_quality_solver "
+                        "import OrToolsCpSatServiceQualitySolver\n"
+                    ),
+                    call_source="    _m5c2r_branch_solver(bool(selected_action))",
+                    helpers=helper,
+                )
+            ),
+            "src/bus_schedule_engine/contracts_v1/heuristic_solver.py": lambda source: (
+                _inject_forbidden_solver_method_call(source, signature)
+            ),
+            "src/bus_schedule_engine/contracts_v1/ortools_quality_solver.py": lambda source: (
+                _inject_forbidden_solver_method_call(source, signature)
+            ),
+        },
+    )
+
+    assert exit_code == 1
+    solver_methods = {
+        "bus_schedule_engine.contracts_v1.heuristic_solver.HeuristicScheduleSolverAdapter.solve",
+        "bus_schedule_engine.contracts_v1.ortools_quality_solver."
+        "OrToolsCpSatServiceQualitySolver.solve",
+    }
+    witnessed = {
+        method
+        for method in solver_methods
+        if any(
+            item["target"] == "bus_schedule_engine.service.run_analysis"
+            and method in item["path"]
+            and "bus_schedule_engine.optimization_service._m5c2r_branch_solver" in item["path"]
+            for item in _graph_witnesses(payload)
+        )
+    }
+    assert witnessed == solver_methods
+    assert payload["production_graph_evidence"]["polymorphic_call_site_count"] >= 1
+
+
+def test_m5c2r_callable_parameter_forbidden_target_is_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    helper = """
+def _m5c2r_callback_wrapper(callback):
+    return callback()
+"""
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports="from bus_schedule_engine.service import run_analysis\n",
+                    call_source="    _m5c2r_callback_wrapper(run_analysis)",
+                    helpers=helper,
+                )
+            )
+        },
+    )
+
+    assert exit_code == 1
+    witness = next(
+        item
+        for item in _graph_witnesses(payload)
+        if item["target"] == "bus_schedule_engine.service.run_analysis"
+        and "bus_schedule_engine.optimization_service._m5c2r_callback_wrapper" in item["path"]
+    )
+    assert witness["path"][-2:] == [
+        "bus_schedule_engine.optimization_service._m5c2r_callback_wrapper",
+        "bus_schedule_engine.service.run_analysis",
+    ]
+
+
+def test_m5c2r_known_safe_callable_parameter_adds_no_blocker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    helpers = """
+def _m5c2r_safe_callback():
+    return None
+
+
+def _m5c2r_safe_wrapper(callback):
+    return callback()
+"""
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports="",
+                    call_source="    _m5c2r_safe_wrapper(_m5c2r_safe_callback)",
+                    helpers=helpers,
+                )
+            )
+        },
+    )
+
+    assert exit_code == 0
+    assert payload["blocker_codes"] == []
+    assert payload["production_graph_evidence"]["unresolved_parameter_dispatch_sites"] == []
+
+
+def test_m5c2r_unresolved_callable_parameter_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    helpers = """
+def _m5c2r_unknown_callback_wrapper(callback):
+    return callback(None)
+"""
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports="import bus_schedule_engine.service as legacy_service\n",
+                    call_source=(
+                        "    selected_callback = getattr(legacy_service, selected_action.value)\n"
+                        "    _m5c2r_unknown_callback_wrapper(selected_callback)"
+                    ),
+                    helpers=helpers,
+                )
+            )
+        },
+    )
+
+    assert exit_code == 1
+    assert "M5C2R_ORDINARY_RUNTIME_CALL_GRAPH_UNRESOLVED" in payload["blocker_codes"]
+    assert any(
+        site["construct"] == "unresolved-parameter-dispatch"
+        and "_m5c2r_unknown_callback_wrapper" in site["site"]
+        for site in payload["production_graph_evidence"]["unresolved_parameter_dispatch_sites"]
+    )
+
+
+def test_m5c2r_deletion_candidate_through_callback_is_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    helper = """
+def _m5c2r_deletion_callback(callback, imported):
+    return callback(imported)
+"""
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports=("from bus_schedule_engine.diagram import build_comparison_diagram\n"),
+                    call_source=(
+                        "    _m5c2r_deletion_callback(build_comparison_diagram, imported)"
+                    ),
+                    helpers=helper,
+                )
+            )
+        },
+    )
+
+    assert exit_code == 1
+    assert "M5C2R_SHARED_DEPENDENCY_MARKED_FOR_DELETION" in payload["blocker_codes"]
+    candidate = next(
+        item
+        for item in payload["production_graph_evidence"]["deletion_candidate_production_consumers"]
+        if item["target"] == "src/bus_schedule_engine/diagram.py::<module>"
+    )
+    assert any(
+        "_m5c2r_deletion_callback" in consumer
+        for consumer in candidate["ordinary_production_consumers"]
+    )
+
+
 def test_m5c2r_deletion_candidate_production_consumer_is_blocked(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -599,10 +918,13 @@ def test_m5c2r_nonproduction_forbidden_calls_remain_isolated(
 ) -> None:
     offline_helper = """
 
+def _m5c2r_offline_callback(callback, imported):
+    return callback(imported)
+
 def _m5c2r_offline_only(imported):
     from bus_schedule_engine.service import run_analysis
 
-    return run_analysis(imported)
+    return _m5c2r_offline_callback(run_analysis, imported)
 """
     exit_code, payload = _run_injected_audit(
         tmp_path,

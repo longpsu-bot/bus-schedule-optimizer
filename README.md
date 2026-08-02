@@ -66,8 +66,11 @@ Milestone 5C2R adds a deterministic repository audit and a human approval record
 review, but production approval remains `PENDING` until the Engineering Owner and QA/Release
 Owner sign off. Its ordinary-runtime proof follows a canonical, transitive repository production
 import/call graph from Streamlit through local helpers, records forbidden witness paths, fails
-closed for relevant unresolved dispatch, and derives 5C3-candidate consumers from source. No
-legacy code is deleted. See
+closed for relevant unresolved dispatch, and derives 5C3-candidate consumers from source. The
+graph propagates bounded caller bindings, branch-union target sets, callable parameters, simple
+factory/tuple returns, and concrete protocol-method receivers; its evidence proves that both the
+heuristic and OR-Tools adapter `solve()` methods are ordinary-runtime reachable. No legacy code
+is deleted. See
 [Milestone 5C2R legacy runtime retirement approval evidence](docs/engine/MILESTONE_5C2R_LEGACY_RUNTIME_RETIREMENT_APPROVAL.md).
 
 ### Contract V1 domain and solver boundary
