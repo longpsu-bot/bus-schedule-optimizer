@@ -28,8 +28,7 @@ def test_streamlit_input_helpers_do_not_eagerly_import_legacy_runtime() -> None:
         "import sys; import bus_schedule_engine.ui_utils; "
         "blocked = ("
         "'bus_schedule_engine.service', "
-        "'bus_schedule_engine.diagram', "
-        "'bus_schedule_engine.comparison_exporter'"
+        "'bus_schedule_engine.side_by_side_validation'"
         "); "
         "assert all(name not in sys.modules for name in blocked)"
     )
@@ -51,14 +50,8 @@ def test_streamlit_pages_have_no_ordinary_legacy_runtime_calls() -> None:
     }
     combined = "\n".join(sources.values())
     banned = (
-        "run_parallel_application_pipeline_v1",
-        "run_and_build_artifacts",
         "build_side_by_side_validation_report_v1",
         "run_side_by_side_validation_v1",
-        "build_comparison_diagram",
-        "build_departure_detail_diagram",
-        "supply_summary_frame",
-        "validation_frame",
         "demand_frame",
         "recommendation_frame",
         "assign_fleet",

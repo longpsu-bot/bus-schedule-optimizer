@@ -1,5 +1,10 @@
 # Milestone 5C1: Legacy Runtime Retirement Decision
 
+> **5C3 status (2 August 2026):** The user explicitly instructed “Proceed and remove the legacy,”
+> authorizing the bounded removal implemented in
+> [Milestone 5C3](MILESTONE_5C3_LEGACY_APPLICATION_CODE_REMOVAL.md). This update does not invent
+> approver identities or claim a rollback rehearsal.
+
 ## 1. Executive decision
 
 **Decision:** adopt **Option C — unified-only application runtime** as the target for Milestone 5.

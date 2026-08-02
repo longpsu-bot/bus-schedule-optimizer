@@ -55,13 +55,15 @@ and
 
 ### Offline legacy regression oracle
 
-Legacy analysis, chart/export code, and the side-by-side adapter remain available for tests and
-the explicit `python -m bus_schedule_engine.release_audit` command. They are not imported or
-executed by ordinary Streamlit. Broad legacy deletion has not started.
+Milestone 5C3 removes the retired legacy application compatibility layer, product chart builders,
+and result exporters. The legacy analysis service and side-by-side adapter remain intentionally
+available only for tests and the explicit `python -m bus_schedule_engine.release_audit` command.
+They are not imported or executed by ordinary Streamlit, which remains Contract V1-only. See
+[Milestone 5C3 legacy application code removal](docs/engine/MILESTONE_5C3_LEGACY_APPLICATION_CODE_REMOVAL.md).
 
 ### Milestone 5C2R retirement approval evidence
 
-Milestone 5C2R adds a deterministic repository audit and a human approval record for the
+Milestone 5C2R added a deterministic repository audit and a human approval record for the
 `LEGACY_RUNTIME_RETIRED` decision. The audit can conclude that implementation is ready for formal
 review, but production approval remains `PENDING` until the Engineering Owner and QA/Release
 Owner sign off. Its ordinary-runtime proof follows a canonical, transitive repository production
@@ -69,8 +71,9 @@ import/call graph from Streamlit through local helpers, records forbidden witnes
 closed for relevant unresolved dispatch, and derives 5C3-candidate consumers from source. The
 graph propagates bounded caller bindings, branch-union target sets, callable parameters, simple
 factory/tuple returns, and concrete protocol-method receivers; its evidence proves that both the
-heuristic and OR-Tools adapter `solve()` methods are ordinary-runtime reachable. No legacy code
-is deleted. See
+heuristic and OR-Tools adapter `solve()` methods are ordinary-runtime reachable. Its exact
+pre-deletion report is archived under `docs/engine/evidence/`; it is historical evidence and is
+not regenerated against the post-5C3 checkout. See
 [Milestone 5C2R legacy runtime retirement approval evidence](docs/engine/MILESTONE_5C2R_LEGACY_RUNTIME_RETIREMENT_APPROVAL.md).
 
 ### Contract V1 domain and solver boundary
@@ -110,7 +113,9 @@ and
 Milestone 5C1 is merged and selects Option C. Milestone 5C2 now implements the unified-only
 ordinary runtime: Streamlit performs no legacy analysis or per-submission comparison, while
 legacy remains an offline oracle. `LEGACY_RUNTIME_RETIRED` and Milestone 5 still await formal
-production approval, and `LEGACY_CODE_DELETED` is not claimed. See
+production approval. Milestone 5C3 has removed the authorized retired application/artifact
+surface, but unrestricted `LEGACY_CODE_DELETED` is not claimed because the offline oracle and
+shared production dependencies remain. See
 [Milestone 5C1 legacy runtime retirement decision](docs/engine/MILESTONE_5C1_LEGACY_RUNTIME_RETIREMENT_DECISION.md)
 and
 [Milestone 5C2 unified-first runtime](docs/engine/MILESTONE_5C2_UNIFIED_FIRST_RUNTIME.md).
@@ -155,11 +160,11 @@ event equation, CP-SAT model size, and independent reconstruction boundary.
   coverage-aware descriptive analysis that does not affect optimization.
 - Deterministic current-B service regimes and supplemental high-demand service-floor
   classification with review-only, explicitly non-enforced previews.
-- Legacy technical validation for totals, endpoints, runtime, turnaround, and declared vehicle
-  chains.
-- Multi-day demand normalization and legacy load-factor/headway evaluation.
+- Offline-oracle technical validation for totals, endpoints, runtime, turnaround, and declared
+  vehicle chains.
+- Multi-day demand normalization and retained offline-oracle load-factor/headway evaluation.
 - Deterministic fixed-total, fixed-direction heuristic re-spacing/redistribution.
-- B-to-C trip traceability and timetable fingerprints in the legacy runtime.
+- B-to-C trip traceability and timetable fingerprints in the retained offline oracle.
 - Plotly diagnostics and editable XLSX output.
 - Separately tested Contract V1 normalization, B evaluation, demand authority, canonical problem,
   heuristic adapter, raw-candidate validation, solution/outcome, and quantitative adjustment
@@ -244,7 +249,8 @@ Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
    validation to an explicit offline release audit (implemented; formal approval pending).
 9. Milestone 5C2R: generate deterministic implementation evidence for the formal retirement
    decision (implemented by this audit milestone; production approval remains pending).
-10. Milestone 5C3: separately remove authorized legacy code after approval (not started).
+10. Milestone 5C3: remove the authorized retired legacy application and artifact code while
+    retaining the offline oracle and shared solver dependencies (implemented; draft review).
 11. Milestone 6A1: add supplemental, coverage-aware trip-level ridership analysis without
     changing optimization authority.
 12. Milestone 6A2A: define deterministic protected high-demand service-floor authority and
@@ -318,15 +324,10 @@ Run the retained legacy comparison only as an explicit offline release audit:
   --output "outputs/release-audit.json"
 ```
 
-Generate the repository-only 5C2R approval evidence without reading a workbook or starting
-Streamlit:
-
-```powershell
-$target = git rev-parse HEAD
-.\.venv\Scripts\python.exe -m bus_schedule_engine.legacy_retirement_audit `
-  --target-commit $target `
-  --output "outputs/legacy-runtime-retirement-evidence.json"
-```
+The repository-only 5C2R approval package was generated at the exact pre-deletion commit
+`45b49791b1be734b89271e5700e8eeeb64deb2d4` and is archived as
+`docs/engine/evidence/M5C2R_LEGACY_RUNTIME_RETIREMENT_EVIDENCE_45B49791.json`. The original 5C2R
+CLI describes that historical candidate-bearing checkout; it is not a post-deletion status CLI.
 
 ## Validate the repository
 
@@ -339,7 +340,7 @@ git diff --check
 
 ## Current workbook conventions
 
-The legacy runtime requires:
+Workbook import and the Contract V1 runtime require:
 
 - `THONG_SO_B`;
 - `BIEU_DO_B`.

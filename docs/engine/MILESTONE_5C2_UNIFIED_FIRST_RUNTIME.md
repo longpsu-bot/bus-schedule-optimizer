@@ -1,5 +1,10 @@
 # Milestone 5C2 unified-first runtime
 
+> **5C3 status (2 August 2026):** The authorized retired application compatibility and artifact
+> code has been removed as documented in
+> [Milestone 5C3](MILESTONE_5C3_LEGACY_APPLICATION_CODE_REMOVAL.md). The Contract V1 ordinary
+> runtime described below is unchanged.
+
 ## 1. Purpose
 
 Milestone 5C2 implements the Option C boundary approved in Milestone 5C1: Contract V1 is the

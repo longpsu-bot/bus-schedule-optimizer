@@ -4,18 +4,11 @@ from collections import Counter
 from dataclasses import replace
 from datetime import date
 
-import pytest
-from openpyxl import load_workbook
-
 from bus_schedule_engine.c_generator import _balanced_times
-from bus_schedule_engine.comparison_exporter import export_bc_comparison, exported_c_fingerprint
 from bus_schedule_engine.demand import evaluate_scenario
-from bus_schedule_engine.diagram import build_comparison_diagram
-from bus_schedule_engine.excel_exporter import create_input_template
 from bus_schedule_engine.fingerprint import timetable_fingerprint
 from bus_schedule_engine.fleet import assign_fleet
 from bus_schedule_engine.generator import generate_recommendations
-from bus_schedule_engine.importer import import_workbook
 from bus_schedule_engine.models import (
     DemandRecord,
     Direction,
@@ -26,7 +19,6 @@ from bus_schedule_engine.models import (
     Trip,
     VolumeType,
 )
-from bus_schedule_engine.service import run_analysis
 from bus_schedule_engine.validator import validate_schedule
 
 
@@ -268,48 +260,3 @@ def test_repeated_runs_are_deterministic() -> None:
     ]
     assert first.headway_regimes == second.headway_regimes
     assert first.optimization_log == second.optimization_log
-
-
-def test_comparison_export_uses_authoritative_c_and_preserves_source(tmp_path) -> None:
-    source = create_input_template(tmp_path / "source.xlsx")
-    before = source.read_bytes()
-    bundle = run_analysis(import_workbook(source))
-    figure = build_comparison_diagram(bundle)
-    output = export_bc_comparison(bundle, tmp_path / "so_sanh_B_C_tai_phan_bo_on_dinh.xlsx")
-    assert source.read_bytes() == before
-    result_c = bundle.get("C")
-    assert figure.layout.meta["c_timetable_fingerprint"] == result_c.timetable_fingerprint
-    assert exported_c_fingerprint(output) == result_c.timetable_fingerprint
-
-    workbook = load_workbook(output, data_only=False)
-    assert workbook["B_BIEU_DO_GIO"]["E4"].number_format == "HH:mm"
-    assert workbook["C_BIEU_DO_GIO"]["Q4"].number_format == "0.0%"
-    c_sheet_ids = {
-        workbook["C_BIEU_DO_GIO"].cell(row, 3).value
-        for row in range(4, workbook["C_BIEU_DO_GIO"].max_row + 1)
-    }
-    assert c_sheet_ids == {trip.trip_id for trip in bundle.get("B").trips}
-    adjacent = workbook["C_GIAN_CACH_LIEN_KE"]
-
-    def hour(value) -> int:
-        return value.hour
-
-    assert any(
-        hour(adjacent.cell(row, 4).value) != hour(adjacent.cell(row, 5).value)
-        for row in range(4, adjacent.max_row + 1)
-    )
-    workbook.close()
-    output.unlink()
-    assert not output.exists()
-
-
-def test_export_rejects_a_duplicate_c_falsely_labeled_successful(tmp_path) -> None:
-    source = create_input_template(tmp_path / "source.xlsx")
-    bundle = run_analysis(import_workbook(source))
-    result_c = bundle.get("C")
-    assert sorted(trip.departure_seconds for trip in result_c.trips) == sorted(
-        trip.departure_seconds for trip in bundle.get("B").trips
-    )
-    result_c.generation_status = ScenarioCStatus.SUITABLE_REGULAR
-    with pytest.raises(ValueError, match="trùng B"):
-        export_bc_comparison(bundle, tmp_path / "invalid.xlsx")

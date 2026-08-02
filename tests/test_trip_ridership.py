@@ -1063,13 +1063,6 @@ def test_supplemental_failure_isolated_from_valid_contract_result(
         "analyze_trip_ridership_v1",
         fail_supplemental,
     )
-    monkeypatch.setattr(
-        application_pipeline,
-        "run_and_build_artifacts",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("legacy runtime must not run")
-        ),
-    )
     run = run_unified_application_pipeline_v1(
         with_trip,
         source_id="supplemental-failure",

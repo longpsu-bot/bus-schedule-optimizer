@@ -14,7 +14,6 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING
 
 from .contracts_v1 import GenerationResultStatus, normalize_imported_workbook_v1
 from .importer import ImportedWorkbook
@@ -24,7 +23,6 @@ from .input_authority import (
     normalization_options_from_workbook_v1,
 )
 from .models import (
-    AnalysisBundle,
     ProtectedServiceFloorAssessmentV1,
     ProtectedServiceFloorEnforcementAuthorityV1,
     ProtectedServiceFloorEnforcementFailureV1,
@@ -38,7 +36,6 @@ from .optimization_service import (
     OptimizationExecutionStageV1,
     SolverChoice,
     _analyze_normalized_and_optimize_schedule_v1,
-    analyze_and_optimize_schedule_v1,
 )
 from .protected_service_floor import (
     assess_protected_service_floors_v1,
@@ -63,7 +60,6 @@ from .unified_presentation import (
     UnifiedPresentationBundleV1,
     UnifiedPresentationConsistencyError,
     build_unified_application_presentation_v1,
-    build_unified_presentation_v1,
     verify_unified_presentation_integrity_v1,
 )
 from .unified_result_exporter import (
@@ -71,14 +67,8 @@ from .unified_result_exporter import (
     read_unified_export_metadata_v1,
 )
 
-if TYPE_CHECKING:
-    from .side_by_side_validation import SideBySideValidationReportV1
-else:
-    SideBySideValidationReportV1 = object
-
 LOGGER = logging.getLogger(__name__)
 
-UNIFIED_SHADOW_RUNTIME_FAILURE = "UNIFIED_SHADOW_RUNTIME_FAILED"
 WORKBOOK_IMPORT_INVALID = "WORKBOOK_IMPORT_INVALID"
 WORKBOOK_OPTIMIZATION_NOT_READY = "WORKBOOK_OPTIMIZATION_NOT_READY"
 CONTRACT_V1_NORMALIZATION_FAILED = "CONTRACT_V1_NORMALIZATION_FAILED"
@@ -160,27 +150,6 @@ class UnifiedApplicationRunV1:
     protected_service_floor_enforcement_failure: (
         ProtectedServiceFloorEnforcementFailureV1 | None
     ) = None
-
-
-def run_and_build_artifacts(
-    imported: ImportedWorkbook,
-) -> tuple[AnalysisBundle, object, Mapping[str, bytes]]:
-    """Load the legacy runtime only when the offline parallel adapter is invoked."""
-    from .ui_utils import run_and_build_artifacts as legacy_runner
-
-    return legacy_runner(imported)
-
-
-def build_side_by_side_validation_report_v1(
-    legacy_bundle: AnalysisBundle,
-    unified_result: BusScheduleOptimizationResult,
-) -> SideBySideValidationReportV1:
-    """Load comparison code only for explicit offline parallel validation."""
-    from .side_by_side_validation import (
-        build_side_by_side_validation_report_v1 as legacy_comparator,
-    )
-
-    return legacy_comparator(legacy_bundle, unified_result)
 
 
 def _sanitize_failure_message(exc: Exception) -> str:
@@ -438,31 +407,6 @@ def build_unified_runtime_failure_v1(
         failure.accepted_solution_fingerprint,
     )
     return failure
-
-
-class ParallelRuntimeStatusV1(StrEnum):
-    INPUT_NOT_READY = "INPUT_NOT_READY"
-    PARALLEL_VALIDATION_COMPLETE = "PARALLEL_VALIDATION_COMPLETE"
-    UNIFIED_RUNTIME_FAILED = "UNIFIED_RUNTIME_FAILED"
-
-
-@dataclass(frozen=True, slots=True)
-class ParallelApplicationRunV1:
-    status: ParallelRuntimeStatusV1
-    legacy_bundle: AnalysisBundle
-    legacy_figure: object
-    legacy_artifacts: Mapping[str, bytes]
-    input_readiness: WorkbookInputReadinessV1 | None
-    unified_result: BusScheduleOptimizationResult | None
-    side_by_side_report: SideBySideValidationReportV1 | None
-    unified_presentation: UnifiedPresentationBundleV1 | None
-    unified_demand_supply_figure: object | None
-    unified_departure_figure: object | None
-    unified_xlsx_bytes: bytes | None
-    source_id: str
-    imported_at: datetime
-    failure_code: str | None
-    failure_message: str | None
 
 
 class UnifiedArtifactAlignmentError(ValueError):
@@ -920,143 +864,12 @@ def run_unified_application_pipeline_v1(
     )
 
 
-def _failed_shadow_run(
-    *,
-    legacy_bundle: AnalysisBundle,
-    legacy_figure: object,
-    legacy_artifacts: Mapping[str, bytes],
-    input_readiness: WorkbookInputReadinessV1 | None,
-    source_id: str,
-    imported_at: datetime,
-    exc: Exception,
-) -> ParallelApplicationRunV1:
-    message = " ".join(str(exc).split()) or exc.__class__.__name__
-    return ParallelApplicationRunV1(
-        status=ParallelRuntimeStatusV1.UNIFIED_RUNTIME_FAILED,
-        legacy_bundle=legacy_bundle,
-        legacy_figure=legacy_figure,
-        legacy_artifacts=legacy_artifacts,
-        input_readiness=input_readiness,
-        unified_result=None,
-        side_by_side_report=None,
-        unified_presentation=None,
-        unified_demand_supply_figure=None,
-        unified_departure_figure=None,
-        unified_xlsx_bytes=None,
-        source_id=source_id,
-        imported_at=imported_at,
-        failure_code=UNIFIED_SHADOW_RUNTIME_FAILURE,
-        failure_message=message,
-    )
-
-
-def run_parallel_application_pipeline_v1(
-    imported: ImportedWorkbook,
-    *,
-    source_id: str,
-    imported_at: datetime,
-    solver_choice: SolverChoice = SolverChoice.HEURISTIC,
-) -> ParallelApplicationRunV1:
-    """Run legacy once, then build non-authoritative unified evidence when ready."""
-    legacy_input = deepcopy(imported)
-    unified_input = deepcopy(imported)
-    legacy_bundle, legacy_figure, legacy_artifacts = run_and_build_artifacts(legacy_input)
-    input_readiness: WorkbookInputReadinessV1 | None = None
-
-    try:
-        input_readiness = assess_workbook_input_readiness_v1(unified_input)
-        if not input_readiness.optimization_ready:
-            return ParallelApplicationRunV1(
-                status=ParallelRuntimeStatusV1.INPUT_NOT_READY,
-                legacy_bundle=legacy_bundle,
-                legacy_figure=legacy_figure,
-                legacy_artifacts=legacy_artifacts,
-                input_readiness=input_readiness,
-                unified_result=None,
-                side_by_side_report=None,
-                unified_presentation=None,
-                unified_demand_supply_figure=None,
-                unified_departure_figure=None,
-                unified_xlsx_bytes=None,
-                source_id=source_id,
-                imported_at=imported_at,
-                failure_code=None,
-                failure_message=None,
-            )
-        normalization_options = normalization_options_from_workbook_v1(
-            unified_input,
-            source_id=source_id,
-            imported_at=imported_at,
-        )
-        unified_result = analyze_and_optimize_schedule_v1(
-            unified_input,
-            normalization_options,
-            solver_choice=solver_choice,
-        )
-        side_by_side_report = build_side_by_side_validation_report_v1(
-            legacy_bundle,
-            unified_result,
-        )
-        presentation = build_unified_presentation_v1(
-            unified_result,
-            side_by_side_report,
-        )
-        demand_supply_figure = build_unified_demand_supply_figure_v1(presentation)
-        departure_figure = build_unified_departure_figure_v1(presentation)
-        with TemporaryDirectory(prefix="bus_schedule_unified_shadow_") as directory:
-            xlsx_path = export_unified_result_workbook_v1(
-                presentation,
-                Path(directory) / "Bus_Schedule_Contract_V1_Validation.xlsx",
-                overwrite=False,
-            )
-            _verify_unified_artifact_alignment_v1(
-                unified_result,
-                presentation,
-                demand_supply_figure,
-                departure_figure,
-                xlsx_path,
-                source_id=source_id,
-            )
-            xlsx_bytes = xlsx_path.read_bytes()
-    except Exception as exc:
-        return _failed_shadow_run(
-            legacy_bundle=legacy_bundle,
-            legacy_figure=legacy_figure,
-            legacy_artifacts=legacy_artifacts,
-            input_readiness=input_readiness,
-            source_id=source_id,
-            imported_at=imported_at,
-            exc=exc,
-        )
-
-    return ParallelApplicationRunV1(
-        status=ParallelRuntimeStatusV1.PARALLEL_VALIDATION_COMPLETE,
-        legacy_bundle=legacy_bundle,
-        legacy_figure=legacy_figure,
-        legacy_artifacts=legacy_artifacts,
-        input_readiness=input_readiness,
-        unified_result=unified_result,
-        side_by_side_report=side_by_side_report,
-        unified_presentation=presentation,
-        unified_demand_supply_figure=demand_supply_figure,
-        unified_departure_figure=departure_figure,
-        unified_xlsx_bytes=xlsx_bytes,
-        source_id=source_id,
-        imported_at=imported_at,
-        failure_code=None,
-        failure_message=None,
-    )
-
-
 __all__ = [
     "CONTRACT_V1_APPLICATION_ERROR",
     "CONTRACT_V1_ARTIFACT_FAILED",
     "CONTRACT_V1_NORMALIZATION_FAILED",
     "CONTRACT_V1_SEMANTIC_INTEGRITY_MISMATCH",
     "CONTRACT_V1_SOLVER_FAILED",
-    "ParallelApplicationRunV1",
-    "ParallelRuntimeStatusV1",
-    "UNIFIED_SHADOW_RUNTIME_FAILURE",
     "UnifiedApplicationRunV1",
     "UnifiedApplicationStatusV1",
     "UnifiedArtifactAlignmentError",
@@ -1064,7 +877,6 @@ __all__ = [
     "WORKBOOK_IMPORT_INVALID",
     "WORKBOOK_OPTIMIZATION_NOT_READY",
     "build_unified_runtime_failure_v1",
-    "run_parallel_application_pipeline_v1",
     "run_unified_application_pipeline_v1",
     "sanitize_import_error_message_v1",
 ]
