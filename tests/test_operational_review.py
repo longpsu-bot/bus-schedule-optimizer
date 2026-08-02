@@ -46,7 +46,12 @@ from bus_schedule_engine.optimization_service import (
     analyze_and_optimize_schedule_v1,
 )
 from bus_schedule_engine.real_route_review import main as cli_main
-from bus_schedule_engine.unified_page5_artifacts import UnifiedPage5ArtifactsV1
+from bus_schedule_engine.unified_page5_artifacts import (
+    UNIFIED_PAGE5_HTML_FILENAME,
+    UNIFIED_PAGE5_PNG_FILENAME,
+    UNIFIED_PAGE5_XLSX_FILENAME,
+    UnifiedPage5ArtifactsV1,
+)
 from bus_schedule_engine.unified_presentation import build_unified_application_presentation_v1
 
 READY = WorkbookInputReadinessV1(
@@ -56,6 +61,16 @@ READY = WorkbookInputReadinessV1(
     missing_optimization_authority_codes=(),
     optional_limitations=(),
 )
+APPROVED_ARTIFACT_FILENAMES = (
+    UNIFIED_PAGE5_XLSX_FILENAME,
+    UNIFIED_PAGE5_HTML_FILENAME,
+    UNIFIED_PAGE5_PNG_FILENAME,
+)
+APPROVED_OUTPUT_FILENAMES = {
+    "operational-review.json",
+    "operational-review.md",
+    *APPROVED_ARTIFACT_FILENAMES,
+}
 
 
 def _run_from_result(result) -> UnifiedApplicationRunV1:
@@ -96,18 +111,29 @@ def _fast_artifacts(presentation, demand_figure, departure_figure, xlsx_bytes, *
         presentation_fingerprint=presentation.presentation_fingerprint,
         b_fingerprint=presentation.source_b_fingerprint,
         accepted_solution_fingerprint=presentation.accepted_solution_fingerprint,
-        xlsx_filename="Bus_Schedule_Contract_V1_Result.xlsx",
-        html_filename="Bus_Schedule_Contract_V1_Charts.html",
-        png_filename="Bus_Schedule_Contract_V1_Overview.png",
+        xlsx_filename=UNIFIED_PAGE5_XLSX_FILENAME,
+        html_filename=UNIFIED_PAGE5_HTML_FILENAME,
+        png_filename=UNIFIED_PAGE5_PNG_FILENAME,
     )
 
 
+def _artifacts_with_filename(field: str, value: str):
+    def builder(*args, **kwargs):
+        return replace(_fast_artifacts(*args, **kwargs), **{field: value})
+
+    return builder
+
+
 @pytest.fixture(scope="module")
-def completed_package(tmp_path_factory):
-    root = tmp_path_factory.mktemp("m6a2e-complete")
-    workbook = create_input_template(root / "input.xlsx")
+def review_workbook(tmp_path_factory):
+    root = tmp_path_factory.mktemp("m6a2e-workbook")
+    return create_input_template(root / "input.xlsx")
+
+
+@pytest.fixture(scope="module")
+def completed_package(review_workbook):
     return create_operational_review_package_v1(
-        workbook,
+        review_workbook,
         source_id="synthetic-complete-review",
         solver_choice=SolverChoice.BOTH,
         artifact_builder=_fast_artifacts,
@@ -159,13 +185,12 @@ def test_complete_package_writes_exact_bounded_outputs(completed_package, tmp_pa
     written = write_operational_review_package_v1(completed_package, tmp_path)
     assert completed_package.exit_code == 0
     assert completed_package.review.pipeline_status == ReviewPipelineStatusV1.REVIEW_COMPLETE
-    assert {item.name for item in written} == {
-        "operational-review.json",
-        "operational-review.md",
-        "Bus_Schedule_Contract_V1_Result.xlsx",
-        "Bus_Schedule_Contract_V1_Charts.html",
-        "Bus_Schedule_Contract_V1_Overview.png",
-    }
+    assert {item.name for item in written} == APPROVED_OUTPUT_FILENAMES
+    assert completed_package.review.artifact_metadata["files"] == (
+        {"filename": UNIFIED_PAGE5_XLSX_FILENAME, "kind": "XLSX"},
+        {"filename": UNIFIED_PAGE5_HTML_FILENAME, "kind": "HTML"},
+        {"filename": UNIFIED_PAGE5_PNG_FILENAME, "kind": "PNG"},
+    )
     assert verify_operational_review_json_bytes_v1(
         (tmp_path / "operational-review.json").read_bytes()
     )
@@ -187,6 +212,130 @@ def test_complete_package_writes_exact_bounded_outputs(completed_package, tmp_pa
         "14. Artifact and fingerprint references",
     ):
         assert heading in markdown
+
+
+def test_parent_traversal_artifact_builder_fails_closed(review_workbook, tmp_path) -> None:
+    outside = tmp_path / "outside.xlsx"
+    output = tmp_path / "review"
+    package = create_operational_review_package_v1(
+        review_workbook,
+        source_id="parent-traversal-artifact-review",
+        solver_choice=SolverChoice.BOTH,
+        artifact_builder=_artifacts_with_filename("xlsx_filename", "../outside.xlsx"),
+    )
+
+    assert package.exit_code == 4
+    assert package.review.pipeline_status == ReviewPipelineStatusV1.ARTIFACT_FAILED
+    assert package.artifacts is None
+    assert package.review.artifact_metadata["files"] == ()
+    written = write_operational_review_package_v1(package, output)
+    assert {path.name for path in written} == {
+        "operational-review.json",
+        "operational-review.md",
+    }
+    assert {path.name for path in output.iterdir()} == {
+        "operational-review.json",
+        "operational-review.md",
+    }
+    assert not outside.exists()
+
+
+def test_absolute_artifact_filename_fails_closed(review_workbook, tmp_path) -> None:
+    outside = (tmp_path / "absolute-result.xlsx").resolve()
+    package = create_operational_review_package_v1(
+        review_workbook,
+        source_id="absolute-artifact-review",
+        solver_choice=SolverChoice.BOTH,
+        artifact_builder=_artifacts_with_filename("xlsx_filename", str(outside)),
+    )
+
+    assert package.exit_code == 4
+    assert package.review.pipeline_status == ReviewPipelineStatusV1.ARTIFACT_FAILED
+    assert package.artifacts is None
+    assert package.review.artifact_metadata["files"] == ()
+    assert not outside.exists()
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "candidate"),
+    (
+        ("xlsx_filename", "subdir/result.xlsx", Path("review/subdir/result.xlsx")),
+        ("html_filename", "subdir/result.html", Path("review/subdir/result.html")),
+        ("png_filename", "../outside.png", Path("outside.png")),
+    ),
+    ids=("nested-xlsx", "invalid-html", "invalid-png"),
+)
+def test_invalid_artifact_filename_fields_fail_identically(
+    review_workbook,
+    tmp_path,
+    field: str,
+    value: str,
+    candidate: Path,
+) -> None:
+    output = tmp_path / "review"
+    package = create_operational_review_package_v1(
+        review_workbook,
+        source_id=f"invalid-{field}-review",
+        solver_choice=SolverChoice.BOTH,
+        artifact_builder=_artifacts_with_filename(field, value),
+    )
+
+    assert package.exit_code == 4
+    assert package.review.pipeline_status == ReviewPipelineStatusV1.ARTIFACT_FAILED
+    assert package.artifacts is None
+    assert package.review.artifact_metadata["files"] == ()
+    written = write_operational_review_package_v1(package, output)
+    assert {path.name for path in written} == {
+        "operational-review.json",
+        "operational-review.md",
+    }
+    assert not (tmp_path / candidate).exists()
+
+
+def test_writer_rejects_tampered_artifact_filename_before_mutation(
+    completed_package, tmp_path
+) -> None:
+    assert completed_package.artifacts is not None
+    output = tmp_path / "review"
+    output.mkdir()
+    for index, name in enumerate(sorted(APPROVED_OUTPUT_FILENAMES)):
+        (output / name).write_bytes(f"sentinel-{index}".encode())
+    unrelated = output / "unrelated.keep"
+    unrelated.write_bytes(b"preserve me")
+    before = {path.name: path.read_bytes() for path in output.iterdir()}
+    outside = tmp_path / "outside.xlsx"
+    tampered = replace(
+        completed_package,
+        artifacts=replace(
+            completed_package.artifacts,
+            xlsx_filename="../outside.xlsx",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="approved Contract V1 basename"):
+        write_operational_review_package_v1(tampered, output, overwrite=True)
+
+    assert {path.name: path.read_bytes() for path in output.iterdir()} == before
+    assert not outside.exists()
+
+
+def test_overwrite_replaces_only_five_approved_bounded_files(completed_package, tmp_path) -> None:
+    output = tmp_path / "review"
+    output.mkdir()
+    for name in APPROVED_OUTPUT_FILENAMES:
+        (output / name).write_bytes(b"stale")
+    unrelated = output / "outside.xlsx"
+    unrelated.write_bytes(b"preserve me")
+
+    written = write_operational_review_package_v1(completed_package, output, overwrite=True)
+
+    assert {path.name for path in written} == APPROVED_OUTPUT_FILENAMES
+    assert unrelated.read_bytes() == b"preserve me"
+    assert {path.name for path in output.iterdir()} == {
+        *APPROVED_OUTPUT_FILENAMES,
+        unrelated.name,
+    }
+    assert all((output / name).read_bytes() != b"stale" for name in APPROVED_OUTPUT_FILENAMES)
 
 
 def test_same_workbook_source_solver_and_controls_repeat_review_bytes(tmp_path) -> None:

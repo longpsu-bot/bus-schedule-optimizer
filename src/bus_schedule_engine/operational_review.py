@@ -1222,9 +1222,9 @@ def _artifact_metadata(
         "contract_v1_artifacts_available": artifacts is not None,
         "files": (
             (
-                {"filename": artifacts.xlsx_filename, "kind": "XLSX"},
-                {"filename": artifacts.html_filename, "kind": "HTML"},
-                {"filename": artifacts.png_filename, "kind": "PNG"},
+                {"filename": UNIFIED_PAGE5_XLSX_FILENAME, "kind": "XLSX"},
+                {"filename": UNIFIED_PAGE5_HTML_FILENAME, "kind": "HTML"},
+                {"filename": UNIFIED_PAGE5_PNG_FILENAME, "kind": "PNG"},
             )
             if artifacts is not None
             else ()
@@ -1594,6 +1594,27 @@ def _unready_import() -> WorkbookInputReadinessV1:
     )
 
 
+def _verify_bounded_artifact_filenames(artifacts: UnifiedPage5ArtifactsV1) -> None:
+    filenames = (
+        ("XLSX", artifacts.xlsx_filename, UNIFIED_PAGE5_XLSX_FILENAME),
+        ("HTML", artifacts.html_filename, UNIFIED_PAGE5_HTML_FILENAME),
+        ("PNG", artifacts.png_filename, UNIFIED_PAGE5_PNG_FILENAME),
+    )
+    for artifact_kind, value, expected in filenames:
+        if not isinstance(value, str):
+            raise TypeError(f"{artifact_kind} artifact filename must be a string")
+        if (
+            value != expected
+            or value in {".", ".."}
+            or "/" in value
+            or "\\" in value
+            or Path(value).name != value
+        ):
+            raise ValueError(
+                f"{artifact_kind} artifact filename must be the approved Contract V1 basename"
+            )
+
+
 def _page5_artifacts(
     run: UnifiedApplicationRunV1,
     builder: Callable[..., UnifiedPage5ArtifactsV1],
@@ -1608,13 +1629,15 @@ def _page5_artifacts(
         raise ValueError("complete unified artifact inputs are unavailable")
     directions = available_unified_directions_v1(presentation)
     selected = "outbound" if "outbound" in directions else directions[0]
-    return builder(
+    artifacts = builder(
         presentation,
         run.unified_demand_supply_figure,
         run.unified_departure_figure,
         run.unified_xlsx_bytes,
         selected_direction=selected,
     )
+    _verify_bounded_artifact_filenames(artifacts)
+    return artifacts
 
 
 def create_operational_review_package_v1(
@@ -1725,6 +1748,8 @@ def write_operational_review_package_v1(
     """Write only bounded filenames, removing stale Contract artifacts on failed reruns."""
     if not isinstance(package, OperationalReviewPackageV1):
         raise TypeError("package must be an OperationalReviewPackageV1")
+    if package.artifacts is not None:
+        _verify_bounded_artifact_filenames(package.artifacts)
     if not verify_operational_review_json_bytes_v1(package.json_bytes):
         raise ValueError("review package JSON failed integrity verification")
     target = Path(output_dir)
@@ -1750,9 +1775,9 @@ def write_operational_review_package_v1(
         written.append(path)
     if package.artifacts is not None:
         for name, content in (
-            (package.artifacts.xlsx_filename, package.artifacts.xlsx_bytes),
-            (package.artifacts.html_filename, package.artifacts.html_bytes),
-            (package.artifacts.png_filename, package.artifacts.png_bytes),
+            (UNIFIED_PAGE5_XLSX_FILENAME, package.artifacts.xlsx_bytes),
+            (UNIFIED_PAGE5_HTML_FILENAME, package.artifacts.html_bytes),
+            (UNIFIED_PAGE5_PNG_FILENAME, package.artifacts.png_bytes),
         ):
             path = target / name
             path.write_bytes(content)
