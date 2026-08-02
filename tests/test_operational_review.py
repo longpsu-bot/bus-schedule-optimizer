@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import fields, replace
 from datetime import UTC, datetime
@@ -30,12 +31,16 @@ from bus_schedule_engine.operational_review import (
     EXPERT_REVIEW_REQUIRED,
     REVIEW_PROFILE_V1,
     NextDecisionCategoryV1,
+    OperationalReviewPackageV1,
     RealRouteOperationalReviewV1,
     ReviewDispositionV1,
     ReviewPipelineStatusV1,
     build_operational_review_v1,
+    calculate_operational_review_fingerprint_v1,
     create_operational_review_package_v1,
     operational_review_to_dict_v1,
+    render_operational_review_markdown_v1,
+    serialize_operational_review_v1,
     verify_operational_review_fingerprint_v1,
     verify_operational_review_json_bytes_v1,
     write_operational_review_package_v1,
@@ -71,6 +76,11 @@ APPROVED_OUTPUT_FILENAMES = {
     "operational-review.md",
     *APPROVED_ARTIFACT_FILENAMES,
 }
+APPROVED_ARTIFACT_METADATA_FILES = (
+    {"filename": UNIFIED_PAGE5_XLSX_FILENAME, "kind": "XLSX"},
+    {"filename": UNIFIED_PAGE5_HTML_FILENAME, "kind": "HTML"},
+    {"filename": UNIFIED_PAGE5_PNG_FILENAME, "kind": "PNG"},
+)
 
 
 def _run_from_result(result) -> UnifiedApplicationRunV1:
@@ -124,6 +134,63 @@ def _artifacts_with_filename(field: str, value: str):
     return builder
 
 
+def _canonical_test_json_bytes(payload: dict[str, object]) -> bytes:
+    return (
+        json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode()
+
+
+def _recomputed_json_with_source(package: OperationalReviewPackageV1, source_id: str) -> bytes:
+    payload = json.loads(package.json_bytes)
+    payload.pop("review_fingerprint")
+    payload["source_id"] = source_id
+    payload["review_fingerprint"] = hashlib.sha256(_canonical_test_json_bytes(payload)).hexdigest()
+    return _canonical_test_json_bytes(payload)
+
+
+def _rebind_package_to_review(
+    package: OperationalReviewPackageV1,
+    review: RealRouteOperationalReviewV1,
+) -> OperationalReviewPackageV1:
+    review = replace(
+        review,
+        review_fingerprint=calculate_operational_review_fingerprint_v1(review),
+    )
+    return replace(
+        package,
+        review=review,
+        json_bytes=serialize_operational_review_v1(review),
+        markdown_bytes=render_operational_review_markdown_v1(review),
+    )
+
+
+def _assert_writer_rejects_without_mutation(
+    package: OperationalReviewPackageV1,
+    tmp_path: Path,
+    *outside_candidates: Path,
+) -> None:
+    output = tmp_path / "review"
+    output.mkdir()
+    for index, name in enumerate(sorted(APPROVED_OUTPUT_FILENAMES)):
+        (output / name).write_bytes(f"sentinel-{index}".encode())
+    unrelated = output / "unrelated.keep"
+    unrelated.write_bytes(b"preserve me")
+    before = {path.name: path.read_bytes() for path in output.iterdir()}
+
+    with pytest.raises((TypeError, ValueError)):
+        write_operational_review_package_v1(package, output, overwrite=True)
+
+    assert {path.name: path.read_bytes() for path in output.iterdir()} == before
+    assert not (output / "subdir").exists()
+    for candidate in (
+        tmp_path / "outside.xlsx",
+        tmp_path / "outside.html",
+        tmp_path / "outside.png",
+        *outside_candidates,
+    ):
+        assert not candidate.exists()
+
+
 @pytest.fixture(scope="module")
 def review_workbook(tmp_path_factory):
     root = tmp_path_factory.mktemp("m6a2e-workbook")
@@ -137,6 +204,53 @@ def completed_package(review_workbook):
         source_id="synthetic-complete-review",
         solver_choice=SolverChoice.BOTH,
         artifact_builder=_fast_artifacts,
+    )
+
+
+@pytest.fixture(scope="module")
+def alternate_completed_package(review_workbook):
+    return create_operational_review_package_v1(
+        review_workbook,
+        source_id="alternate-complete-review",
+        solver_choice=SolverChoice.BOTH,
+        artifact_builder=_fast_artifacts,
+    )
+
+
+@pytest.fixture(scope="module")
+def input_not_ready_package():
+    return create_operational_review_package_v1(
+        b"not an xlsx",
+        source_id="fixture-input-not-ready-review",
+        solver_choice=SolverChoice.HEURISTIC,
+    )
+
+
+@pytest.fixture(scope="module")
+def pipeline_failed_package(review_workbook):
+    def fail_pipeline(*args, **kwargs):
+        del args, kwargs
+        raise RuntimeError("bounded pipeline failure")
+
+    return create_operational_review_package_v1(
+        review_workbook,
+        source_id="fixture-pipeline-failed-review",
+        solver_choice=SolverChoice.OR_TOOLS,
+        pipeline_runner=fail_pipeline,
+    )
+
+
+@pytest.fixture(scope="module")
+def artifact_failed_package(review_workbook):
+    def fail_artifacts(*args, **kwargs):
+        del args, kwargs
+        raise RuntimeError("bounded artifact failure")
+
+    return create_operational_review_package_v1(
+        review_workbook,
+        source_id="fixture-artifact-failed-review",
+        solver_choice=SolverChoice.BOTH,
+        artifact_builder=fail_artifacts,
     )
 
 
@@ -186,11 +300,7 @@ def test_complete_package_writes_exact_bounded_outputs(completed_package, tmp_pa
     assert completed_package.exit_code == 0
     assert completed_package.review.pipeline_status == ReviewPipelineStatusV1.REVIEW_COMPLETE
     assert {item.name for item in written} == APPROVED_OUTPUT_FILENAMES
-    assert completed_package.review.artifact_metadata["files"] == (
-        {"filename": UNIFIED_PAGE5_XLSX_FILENAME, "kind": "XLSX"},
-        {"filename": UNIFIED_PAGE5_HTML_FILENAME, "kind": "HTML"},
-        {"filename": UNIFIED_PAGE5_PNG_FILENAME, "kind": "PNG"},
-    )
+    assert completed_package.review.artifact_metadata["files"] == APPROVED_ARTIFACT_METADATA_FILES
     assert verify_operational_review_json_bytes_v1(
         (tmp_path / "operational-review.json").read_bytes()
     )
@@ -296,13 +406,6 @@ def test_writer_rejects_tampered_artifact_filename_before_mutation(
     completed_package, tmp_path
 ) -> None:
     assert completed_package.artifacts is not None
-    output = tmp_path / "review"
-    output.mkdir()
-    for index, name in enumerate(sorted(APPROVED_OUTPUT_FILENAMES)):
-        (output / name).write_bytes(f"sentinel-{index}".encode())
-    unrelated = output / "unrelated.keep"
-    unrelated.write_bytes(b"preserve me")
-    before = {path.name: path.read_bytes() for path in output.iterdir()}
     outside = tmp_path / "outside.xlsx"
     tampered = replace(
         completed_package,
@@ -312,11 +415,163 @@ def test_writer_rejects_tampered_artifact_filename_before_mutation(
         ),
     )
 
-    with pytest.raises(ValueError, match="approved Contract V1 basename"):
-        write_operational_review_package_v1(tampered, output, overwrite=True)
+    _assert_writer_rejects_without_mutation(tampered, tmp_path, outside)
 
-    assert {path.name: path.read_bytes() for path in output.iterdir()} == before
-    assert not outside.exists()
+
+def test_writer_rejects_json_from_another_valid_review(
+    completed_package, alternate_completed_package, tmp_path
+) -> None:
+    tampered = replace(completed_package, json_bytes=alternate_completed_package.json_bytes)
+
+    _assert_writer_rejects_without_mutation(tampered, tmp_path)
+
+
+def test_writer_rejects_markdown_from_another_valid_review(
+    completed_package, alternate_completed_package, tmp_path
+) -> None:
+    tampered = replace(
+        completed_package,
+        markdown_bytes=alternate_completed_package.markdown_bytes,
+    )
+
+    _assert_writer_rejects_without_mutation(tampered, tmp_path)
+
+
+@pytest.mark.parametrize(
+    "markdown_bytes",
+    (b"# arbitrary review\n", b"# operationally_approved\n"),
+    ids=("arbitrary-markdown", "forbidden-approval-markdown"),
+)
+def test_writer_rejects_noncanonical_markdown(
+    completed_package, tmp_path, markdown_bytes: bytes
+) -> None:
+    tampered = replace(completed_package, markdown_bytes=markdown_bytes)
+
+    _assert_writer_rejects_without_mutation(tampered, tmp_path)
+
+
+@pytest.mark.parametrize(
+    "prohibited_value",
+    (r"C:\private\route\review.xlsx", "/private/route/review.xlsx", "operationally_approved"),
+    ids=("absolute-windows-path", "absolute-posix-path", "forbidden-approval-json"),
+)
+def test_recomputed_prohibited_json_fails_privacy_and_package_verification(
+    completed_package,
+    tmp_path,
+    prohibited_value: str,
+) -> None:
+    tampered_json = _recomputed_json_with_source(completed_package, prohibited_value)
+    tampered = replace(completed_package, json_bytes=tampered_json)
+
+    assert not verify_operational_review_json_bytes_v1(tampered_json)
+    _assert_writer_rejects_without_mutation(tampered, tmp_path)
+
+
+def test_writer_rejects_stale_review_fingerprint(completed_package, tmp_path) -> None:
+    stale_review = replace(completed_package.review, source_id="stale-review-model")
+    tampered = replace(completed_package, review=stale_review)
+
+    assert not verify_operational_review_fingerprint_v1(stale_review)
+    _assert_writer_rejects_without_mutation(tampered, tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("fixture_name", "wrong_exit_code"),
+    (
+        ("completed_package", 2),
+        ("input_not_ready_package", 0),
+    ),
+    ids=("completed-as-input-not-ready", "input-not-ready-as-completed"),
+)
+def test_writer_rejects_exit_code_status_mismatch(
+    request,
+    tmp_path,
+    fixture_name: str,
+    wrong_exit_code: int,
+) -> None:
+    package = request.getfixturevalue(fixture_name)
+    tampered = replace(package, exit_code=wrong_exit_code)
+
+    _assert_writer_rejects_without_mutation(tampered, tmp_path)
+
+
+def test_writer_rejects_artifact_free_completed_package(completed_package, tmp_path) -> None:
+    tampered = replace(completed_package, artifacts=None)
+
+    _assert_writer_rejects_without_mutation(tampered, tmp_path)
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    ("input_not_ready_package", "pipeline_failed_package", "artifact_failed_package"),
+    ids=("input-not-ready", "pipeline-failed", "artifact-failed"),
+)
+def test_writer_rejects_artifact_bearing_failed_packages(
+    request,
+    completed_package,
+    tmp_path,
+    fixture_name: str,
+) -> None:
+    assert completed_package.artifacts is not None
+    failed_package = request.getfixturevalue(fixture_name)
+    tampered = replace(failed_package, artifacts=completed_package.artifacts)
+
+    _assert_writer_rejects_without_mutation(tampered, tmp_path)
+
+
+@pytest.mark.parametrize(
+    "metadata_mismatch",
+    ("unavailable", "empty-files", "different-filename"),
+    ids=("artifacts-marked-unavailable", "artifacts-without-files", "unapproved-file-list"),
+)
+def test_writer_rejects_completed_artifact_metadata_mismatch(
+    completed_package,
+    tmp_path,
+    metadata_mismatch: str,
+) -> None:
+    metadata = dict(completed_package.review.artifact_metadata)
+    if metadata_mismatch == "unavailable":
+        metadata["contract_v1_artifacts_available"] = False
+    elif metadata_mismatch == "empty-files":
+        metadata["files"] = ()
+    else:
+        metadata["files"] = (
+            {"filename": "different.xlsx", "kind": "XLSX"},
+            *APPROVED_ARTIFACT_METADATA_FILES[1:],
+        )
+    review = replace(completed_package.review, artifact_metadata=metadata)
+    tampered = _rebind_package_to_review(completed_package, review)
+
+    _assert_writer_rejects_without_mutation(tampered, tmp_path)
+
+
+def test_writer_rejects_artifact_filename_metadata_when_artifacts_are_absent(
+    artifact_failed_package, tmp_path
+) -> None:
+    metadata = dict(artifact_failed_package.review.artifact_metadata)
+    metadata["files"] = APPROVED_ARTIFACT_METADATA_FILES
+    review = replace(artifact_failed_package.review, artifact_metadata=metadata)
+    tampered = _rebind_package_to_review(artifact_failed_package, review)
+
+    _assert_writer_rejects_without_mutation(tampered, tmp_path)
+
+
+@pytest.mark.parametrize(
+    "fingerprint_field",
+    ("presentation_fingerprint", "scenario_b_fingerprint", "accepted_solution_fingerprint"),
+    ids=("presentation", "scenario-b", "accepted-solution"),
+)
+def test_writer_rejects_artifact_fingerprint_metadata_mismatch(
+    completed_package,
+    tmp_path,
+    fingerprint_field: str,
+) -> None:
+    metadata = dict(completed_package.review.artifact_metadata)
+    metadata[fingerprint_field] = "tampered-fingerprint"
+    review = replace(completed_package.review, artifact_metadata=metadata)
+    tampered = _rebind_package_to_review(completed_package, review)
+
+    _assert_writer_rejects_without_mutation(tampered, tmp_path)
 
 
 def test_overwrite_replaces_only_five_approved_bounded_files(completed_package, tmp_path) -> None:
@@ -388,6 +643,13 @@ def test_pipeline_failure_is_sanitized_and_returns_three(tmp_path) -> None:
     assert package.exit_code == 3
     assert package.review.pipeline_status == ReviewPipelineStatusV1.PIPELINE_FAILED
     assert "CONTRACT_V1_APPLICATION_ERROR" in package.review.reason_codes
+    # No solver-semantic change is authorized until the sanitized failure is diagnosed.
+    assert package.review.next_decision_category == NextDecisionCategoryV1.NO_ENGINE_CHANGE_REQUIRED
+    assert package.review.next_decision_reason == (
+        "The sanitized pipeline failure requires diagnosis before an engine-change category is chosen."
+    )
+    written = write_operational_review_package_v1(package, tmp_path / "review")
+    assert {item.name for item in written} == {"operational-review.json", "operational-review.md"}
     assert str(tmp_path) not in package.json_bytes.decode()
 
 
@@ -407,9 +669,11 @@ def test_artifact_failure_after_verified_result_keeps_review_and_returns_four(tm
     written = write_operational_review_package_v1(package, tmp_path / "review")
     assert package.exit_code == 4
     assert package.review.pipeline_status == ReviewPipelineStatusV1.ARTIFACT_FAILED
+    assert package.artifacts is None
     assert "CONTRACT_V1_ARTIFACT_FAILED" in package.review.reason_codes
     assert package.review.scenario_b_operational_summary["total_trips"] == 24
     assert package.review.artifact_metadata["contract_v1_artifacts_available"] is False
+    assert package.review.artifact_metadata["files"] == ()
     assert {item.name for item in written} == {"operational-review.json", "operational-review.md"}
     assert str(tmp_path) not in package.json_bytes.decode()
 

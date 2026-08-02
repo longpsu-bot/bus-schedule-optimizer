@@ -65,6 +65,14 @@ class ReviewPipelineStatusV1(StrEnum):
     ARTIFACT_FAILED = "ARTIFACT_FAILED"
 
 
+_REVIEW_EXIT_CODE_BY_STATUS_V1 = {
+    ReviewPipelineStatusV1.REVIEW_COMPLETE: 0,
+    ReviewPipelineStatusV1.INPUT_NOT_READY: 2,
+    ReviewPipelineStatusV1.PIPELINE_FAILED: 3,
+    ReviewPipelineStatusV1.ARTIFACT_FAILED: 4,
+}
+
+
 class ReviewDispositionV1(StrEnum):
     CURRENT_B_RETAINED = "CURRENT_B_RETAINED"
     ACCEPTED_CANDIDATE_AVAILABLE = "ACCEPTED_CANDIDATE_AVAILABLE"
@@ -194,16 +202,22 @@ def calculate_operational_review_fingerprint_v1(review: RealRouteOperationalRevi
     return hashlib.sha256(_canonical_json_bytes(_fingerprint_payload(review))).hexdigest()
 
 
+def _review_payload_respects_content_invariants(payload: Mapping[str, object]) -> bool:
+    payload_text = _canonical_json_bytes(payload).decode("utf-8")
+    return not _ABSOLUTE_PATH_PATTERN.search(payload_text) and (
+        "operationally" + "_approved" not in payload_text.lower()
+    )
+
+
 def verify_operational_review_fingerprint_v1(review: RealRouteOperationalReviewV1) -> bool:
     """Verify a review model's stored fingerprint and bounded privacy invariants."""
+    if not isinstance(review, RealRouteOperationalReviewV1):
+        return False
     if review.profile != REVIEW_PROFILE_V1 or not re.fullmatch(
         r"[0-9a-f]{64}", review.review_fingerprint
     ):
         return False
-    payload_text = _canonical_json_bytes(operational_review_to_dict_v1(review)).decode("utf-8")
-    if _ABSOLUTE_PATH_PATTERN.search(payload_text):
-        return False
-    if "operationally" + "_approved" in payload_text.lower():
+    if not _review_payload_respects_content_invariants(operational_review_to_dict_v1(review)):
         return False
     return calculate_operational_review_fingerprint_v1(review) == review.review_fingerprint
 
@@ -219,7 +233,11 @@ def verify_operational_review_json_bytes_v1(content: bytes) -> bool:
             return False
         expected = hashlib.sha256(_canonical_json_bytes(payload)).hexdigest()
         restored = {**payload, "review_fingerprint": fingerprint}
-        return expected == fingerprint and content == _canonical_json_bytes(restored)
+        return (
+            expected == fingerprint
+            and _review_payload_respects_content_invariants(restored)
+            and content == _canonical_json_bytes(restored)
+        )
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return False
 
@@ -1053,6 +1071,7 @@ def _next_decision(
             "Verified analysis exists, but the bounded artifact package could not be completed.",
         )
     if status == ReviewPipelineStatusV1.PIPELINE_FAILED:
+        # No solver-semantic change is authorized until the sanitized failure is diagnosed.
         return (
             NextDecisionCategoryV1.NO_ENGINE_CHANGE_REQUIRED,
             "The sanitized pipeline failure requires diagnosis before an engine-change category is chosen.",
@@ -1214,21 +1233,21 @@ def _checklist(
     return tuple(ExpertChecklistItemV1(*item) for item in items)
 
 
+def _approved_artifact_metadata_files() -> tuple[Mapping[str, str], ...]:
+    return (
+        {"filename": UNIFIED_PAGE5_XLSX_FILENAME, "kind": "XLSX"},
+        {"filename": UNIFIED_PAGE5_HTML_FILENAME, "kind": "HTML"},
+        {"filename": UNIFIED_PAGE5_PNG_FILENAME, "kind": "PNG"},
+    )
+
+
 def _artifact_metadata(
     artifacts: UnifiedPage5ArtifactsV1 | None,
     presentation: UnifiedPresentationBundleV1 | None,
 ) -> Mapping[str, object]:
     return {
         "contract_v1_artifacts_available": artifacts is not None,
-        "files": (
-            (
-                {"filename": UNIFIED_PAGE5_XLSX_FILENAME, "kind": "XLSX"},
-                {"filename": UNIFIED_PAGE5_HTML_FILENAME, "kind": "HTML"},
-                {"filename": UNIFIED_PAGE5_PNG_FILENAME, "kind": "PNG"},
-            )
-            if artifacts is not None
-            else ()
-        ),
+        "files": (_approved_artifact_metadata_files() if artifacts is not None else ()),
         "presentation_fingerprint": (
             presentation.presentation_fingerprint if presentation is not None else None
         ),
@@ -1595,6 +1614,8 @@ def _unready_import() -> WorkbookInputReadinessV1:
 
 
 def _verify_bounded_artifact_filenames(artifacts: UnifiedPage5ArtifactsV1) -> None:
+    if not isinstance(artifacts, UnifiedPage5ArtifactsV1):
+        raise TypeError("artifacts must be a UnifiedPage5ArtifactsV1")
     filenames = (
         ("XLSX", artifacts.xlsx_filename, UNIFIED_PAGE5_XLSX_FILENAME),
         ("HTML", artifacts.html_filename, UNIFIED_PAGE5_HTML_FILENAME),
@@ -1673,7 +1694,7 @@ def create_operational_review_package_v1(
             json_bytes=serialize_operational_review_v1(review),
             markdown_bytes=render_operational_review_markdown_v1(review),
             artifacts=None,
-            exit_code=2,
+            exit_code=_REVIEW_EXIT_CODE_BY_STATUS_V1[review.pipeline_status],
         )
 
     try:
@@ -1697,7 +1718,7 @@ def create_operational_review_package_v1(
             json_bytes=serialize_operational_review_v1(review),
             markdown_bytes=render_operational_review_markdown_v1(review),
             artifacts=None,
-            exit_code=3,
+            exit_code=_REVIEW_EXIT_CODE_BY_STATUS_V1[review.pipeline_status],
         )
     artifacts = None
     page5_failed = False
@@ -1714,12 +1735,7 @@ def create_operational_review_package_v1(
         artifacts=artifacts,
         page5_failed=page5_failed,
     )
-    exit_code = {
-        ReviewPipelineStatusV1.REVIEW_COMPLETE: 0,
-        ReviewPipelineStatusV1.INPUT_NOT_READY: 2,
-        ReviewPipelineStatusV1.PIPELINE_FAILED: 3,
-        ReviewPipelineStatusV1.ARTIFACT_FAILED: 4,
-    }[review.pipeline_status]
+    exit_code = _REVIEW_EXIT_CODE_BY_STATUS_V1[review.pipeline_status]
     return OperationalReviewPackageV1(
         review=review,
         json_bytes=serialize_operational_review_v1(review),
@@ -1739,6 +1755,53 @@ def output_filenames_v1() -> tuple[str, ...]:
     )
 
 
+def _verify_operational_review_package(package: OperationalReviewPackageV1) -> None:
+    if not isinstance(package, OperationalReviewPackageV1):
+        raise TypeError("package must be an OperationalReviewPackageV1")
+    review = package.review
+    if not verify_operational_review_fingerprint_v1(review):
+        raise ValueError("review package model failed fingerprint or content verification")
+    if package.json_bytes != serialize_operational_review_v1(review):
+        raise ValueError("review package JSON does not belong to the supplied review")
+    if package.markdown_bytes != render_operational_review_markdown_v1(review):
+        raise ValueError("review package Markdown does not belong to the supplied review")
+    try:
+        expected_exit_code = _REVIEW_EXIT_CODE_BY_STATUS_V1[review.pipeline_status]
+    except (KeyError, TypeError) as exc:
+        raise ValueError("review package has an unsupported pipeline status") from exc
+    if type(package.exit_code) is not int or package.exit_code != expected_exit_code:
+        raise ValueError("review package exit code does not match its pipeline status")
+
+    artifacts_expected = review.pipeline_status == ReviewPipelineStatusV1.REVIEW_COMPLETE
+    artifacts_available = package.artifacts is not None
+    if artifacts_available != artifacts_expected:
+        raise ValueError("review package artifact presence does not match its pipeline status")
+    metadata = review.artifact_metadata
+    if not isinstance(metadata, Mapping):
+        raise TypeError("review artifact metadata must be a mapping")
+    if metadata.get("contract_v1_artifacts_available") is not artifacts_available:
+        raise ValueError("review artifact availability metadata does not match the package")
+    if metadata.get("artifact_boundary") != "EXISTING_UNIFIED_PAGE_05":
+        raise ValueError("review artifact boundary metadata is invalid")
+
+    if package.artifacts is None:
+        if metadata.get("files") != ():
+            raise ValueError("artifact-free review package must not list artifact filenames")
+        return
+
+    _verify_bounded_artifact_filenames(package.artifacts)
+    expected_metadata = {
+        "contract_v1_artifacts_available": True,
+        "files": _approved_artifact_metadata_files(),
+        "presentation_fingerprint": package.artifacts.presentation_fingerprint,
+        "scenario_b_fingerprint": package.artifacts.b_fingerprint,
+        "accepted_solution_fingerprint": package.artifacts.accepted_solution_fingerprint,
+        "artifact_boundary": "EXISTING_UNIFIED_PAGE_05",
+    }
+    if metadata != expected_metadata:
+        raise ValueError("review artifact metadata does not match the bounded artifact bundle")
+
+
 def write_operational_review_package_v1(
     package: OperationalReviewPackageV1,
     output_dir: str | Path,
@@ -1746,12 +1809,7 @@ def write_operational_review_package_v1(
     overwrite: bool = False,
 ) -> tuple[Path, ...]:
     """Write only bounded filenames, removing stale Contract artifacts on failed reruns."""
-    if not isinstance(package, OperationalReviewPackageV1):
-        raise TypeError("package must be an OperationalReviewPackageV1")
-    if package.artifacts is not None:
-        _verify_bounded_artifact_filenames(package.artifacts)
-    if not verify_operational_review_json_bytes_v1(package.json_bytes):
-        raise ValueError("review package JSON failed integrity verification")
+    _verify_operational_review_package(package)
     target = Path(output_dir)
     collisions = tuple(target / name for name in output_filenames_v1() if (target / name).exists())
     if collisions and not overwrite:
