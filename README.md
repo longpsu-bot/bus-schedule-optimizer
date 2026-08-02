@@ -53,9 +53,17 @@ and
 and
 [Milestone 6A2D protected service-floor OR-Tools constraints](docs/engine/MILESTONE_6A2D_PROTECTED_SERVICE_FLOOR_ORTOOLS_CONSTRAINTS.md).
 
+### Active next milestone: real-route operational review
+
+Milestone 6A2E adds a one-workbook offline CLI that consumes the unchanged unified Contract V1
+pipeline and existing Page 05 artifact boundary. It writes deterministic JSON and Markdown
+expert-review evidence plus the three aligned Contract V1 artifacts when available. Every review
+is `EXPERT_REVIEW_REQUIRED`; it is not an operational timetable approval. See
+[Milestone 6A2E real-route operational review](docs/engine/MILESTONE_6A2E_REAL_ROUTE_OPERATIONAL_REVIEW.md).
+
 ### Offline legacy regression oracle
 
-Milestone 5C3 removes the retired legacy application compatibility layer, product chart builders,
+Milestone 5C3 is merged and removes the retired legacy application compatibility layer, product chart builders,
 and result exporters. The legacy analysis service and side-by-side adapter remain intentionally
 available only for tests and the explicit `python -m bus_schedule_engine.release_audit` command.
 They are not imported or executed by ordinary Streamlit, which remains Contract V1-only. See
@@ -113,7 +121,7 @@ and
 Milestone 5C1 is merged and selects Option C. Milestone 5C2 now implements the unified-only
 ordinary runtime: Streamlit performs no legacy analysis or per-submission comparison, while
 legacy remains an offline oracle. `LEGACY_RUNTIME_RETIRED` and Milestone 5 still await formal
-production approval. Milestone 5C3 has removed the authorized retired application/artifact
+production approval. Milestone 5C3 is merged and has removed the authorized retired application/artifact
 surface, but unrestricted `LEGACY_CODE_DELETED` is not claimed because the offline oracle and
 shared production dependencies remain. See
 [Milestone 5C1 legacy runtime retirement decision](docs/engine/MILESTONE_5C1_LEGACY_RUNTIME_RETIREMENT_DECISION.md)
@@ -232,7 +240,8 @@ unified Page 05 artifacts are implemented and merged. Milestone 5C1 is merged an
 is merged. Milestone 6A1 supplemental trip-level ridership analysis, Milestone 6A2A
 protected service-floor authority, Milestone 6A2B acceptance enforcement, and Milestone 6A2C
 heuristic search awareness, and Milestone 6A2D OR-Tools hard constraints are implemented**, but
-Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
+Milestone 5C3 is merged. **Milestone 6A2E real-route operational review is the active next
+milestone.** `LEGACY_RUNTIME_RETIRED` still requires formal production approval.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
 2. Milestone 5A2A: stabilize authoritative workbook input and readiness.
@@ -250,7 +259,7 @@ Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
 9. Milestone 5C2R: generate deterministic implementation evidence for the formal retirement
    decision (implemented by this audit milestone; production approval remains pending).
 10. Milestone 5C3: remove the authorized retired legacy application and artifact code while
-    retaining the offline oracle and shared solver dependencies (implemented; draft review).
+    retaining the offline oracle and shared solver dependencies (merged).
 11. Milestone 6A1: add supplemental, coverage-aware trip-level ridership analysis without
     changing optimization authority.
 12. Milestone 6A2A: define deterministic protected high-demand service-floor authority and
@@ -261,6 +270,8 @@ Milestone 5 and `LEGACY_RUNTIME_RETIRED` still require formal approval.
     6A2B authority while keeping common validation final (implemented).
 15. Milestone 6A2D: encode the exact bound 6A2B authority in the canonical OR-Tools
     service-quality model while keeping common validation final (implemented).
+16. Milestone 6A2E: generate deterministic, bounded real-route operational review packs through
+    the existing unified pipeline and Page 05 artifact boundary (active next milestone).
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)
@@ -314,6 +325,20 @@ python -m venv .venv
 
 The five Vietnamese UI pages cover input, technical checks, demand evaluation,
 recommendations, and chart/XLSX export.
+
+Run the offline one-route expert-review pack without changing the Streamlit runtime:
+
+```powershell
+.\.venv\Scripts\python.exe -m bus_schedule_engine.real_route_review `
+  --workbook "private/route.xlsx" `
+  --source-id "route-review-2026-08" `
+  --solver BOTH `
+  --output-dir "outputs/route-review"
+```
+
+The review is always `EXPERT_REVIEW_REQUIRED`. Complete runs add the existing Contract V1 XLSX,
+HTML, and PNG artifacts; incomplete or failed runs retain only the deterministic JSON and
+Markdown review evidence.
 
 Run the retained legacy comparison only as an explicit offline release audit:
 
