@@ -436,7 +436,6 @@ def test_page5_sources_reference_no_execution_entrypoints() -> None:
 
     for prohibited in (
         "run_analysis(",
-        "run_and_build_artifacts(",
         "analyze_and_optimize_schedule_v1(",
         "run_side_by_side_validation_v1(",
         "build_side_by_side_validation_report_v1(",

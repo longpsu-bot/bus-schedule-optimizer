@@ -322,29 +322,6 @@ def test_legacy_and_unified_paths_receive_separate_isolated_inputs(
     assert received[0].trips_b[0] is not received[1].trips_b[0]
 
 
-def test_adapter_invokes_no_chart_xlsx_or_ui_artifact_builder(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from bus_schedule_engine import comparison_exporter, diagram, excel_exporter, ui_utils
-
-    imported, options = _small_fixed_resource_fixture()
-
-    def forbidden(*args, **kwargs):
-        raise AssertionError("artifact code must not be invoked")
-
-    for module, name in (
-        (diagram, "build_comparison_diagram"),
-        (diagram, "build_departure_detail_diagram"),
-        (diagram, "diagram_png_bytes"),
-        (excel_exporter, "export_results"),
-        (comparison_exporter, "export_bc_comparison"),
-        (ui_utils, "run_and_build_artifacts"),
-    ):
-        monkeypatch.setattr(module, name, forbidden)
-
-    run_side_by_side_validation_v1(imported, options)
-
-
 def test_adapter_writes_no_files(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

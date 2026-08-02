@@ -1,5 +1,12 @@
 # Milestone 5C2R: Legacy runtime retirement approval evidence
 
+> **5C3 status (2 August 2026):** The exact pre-deletion report for commit `45b49791...` is now
+> archived at
+> [`evidence/M5C2R_LEGACY_RUNTIME_RETIREMENT_EVIDENCE_45B49791.json`](evidence/M5C2R_LEGACY_RUNTIME_RETIREMENT_EVIDENCE_45B49791.json),
+> and the authorized removal is documented in
+> [Milestone 5C3](MILESTONE_5C3_LEGACY_APPLICATION_CODE_REMOVAL.md). Its historical production
+> approval remains `PENDING`; no approver identities or rollback rehearsal are inferred.
+
 ## 1. Decision boundary
 
 Milestone 5C2R prepares deterministic repository evidence for the human production decision

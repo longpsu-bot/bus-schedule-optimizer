@@ -16,7 +16,6 @@ from presentation_support import (
 )
 
 import bus_schedule_engine.unified_presentation as unified_presentation
-from bus_schedule_engine import comparison_exporter, excel_exporter
 from bus_schedule_engine.optimization_service import SolverChoice
 from bus_schedule_engine.unified_diagram import (
     build_unified_demand_supply_figure_v1,
@@ -629,19 +628,3 @@ def test_source_input_bytes_are_unchanged_when_different_output_is_overwritten(
 
     assert hashlib.sha256(source.read_bytes()).hexdigest() == before
     assert target.read_bytes() != b"replaceable output"
-
-
-def test_exporter_does_not_call_legacy_exporters(
-    monkeypatch,
-    tmp_path: Path,
-    accepted_presentation,
-) -> None:
-    def forbidden(*args, **kwargs):
-        raise AssertionError("legacy exporter must not be invoked")
-
-    monkeypatch.setattr(excel_exporter, "export_results", forbidden)
-    monkeypatch.setattr(comparison_exporter, "export_bc_comparison", forbidden)
-    export_unified_result_workbook_v1(
-        accepted_presentation,
-        tmp_path / "isolated.xlsx",
-    )

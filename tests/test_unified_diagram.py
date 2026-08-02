@@ -10,7 +10,6 @@ from presentation_support import (
 )
 
 import bus_schedule_engine.unified_presentation as unified_presentation
-from bus_schedule_engine import diagram
 from bus_schedule_engine.unified_diagram import (
     available_unified_directions_v1,
     build_unified_demand_supply_figure_for_direction_v1,
@@ -317,16 +316,3 @@ def test_midnight_crossing_axis_is_continuous_and_chronological(
     assert max(trace.x) > 24 * 3600
     assert any(str(value).startswith("24:") for value in figure.layout.xaxis.ticktext)
     assert any(str(value).startswith("25:") for value in figure.layout.xaxis.ticktext)
-
-
-def test_chart_builders_do_not_call_legacy_figure_builders(
-    monkeypatch,
-    accepted_presentation,
-) -> None:
-    def forbidden(*args, **kwargs):
-        raise AssertionError("legacy figure builder must not be invoked")
-
-    monkeypatch.setattr(diagram, "build_comparison_diagram", forbidden)
-    monkeypatch.setattr(diagram, "build_departure_detail_diagram", forbidden)
-    build_unified_demand_supply_figure_v1(accepted_presentation)
-    build_unified_departure_figure_v1(accepted_presentation)
