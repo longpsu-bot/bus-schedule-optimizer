@@ -19,6 +19,7 @@ from bus_schedule_engine.excel_exporter import create_input_template
 from bus_schedule_engine.fleet import assign_fleet
 from bus_schedule_engine.importer import import_workbook
 from bus_schedule_engine.input_authority import (
+    AVAILABLE_FLEET_LIMIT_REQUIRED_FOR_FLEET_FEASIBILITY,
     AVAILABLE_FLEET_LIMIT_REQUIRED_FOR_OPTIMIZATION,
     DEMAND_CONFIDENCE_REQUIRED_FOR_OPTIMIZATION,
     DEMAND_RESPONSE_MODE_REQUIRED_FOR_OPTIMIZATION,
@@ -26,7 +27,16 @@ from bus_schedule_engine.input_authority import (
     OPERATING_DAY_TYPE_REQUIRED_FOR_OPTIMIZATION,
     SCENARIO_A_AVAILABLE_FLEET_LIMIT_REQUIRED_FOR_OPTIMIZATION,
     SCENARIO_A_OPERATING_DAY_TYPE_REQUIRED_FOR_OPTIMIZATION,
+    SCENARIO_A_VEHICLE_CAPACITY_REQUIRED_FOR_OPTIMIZATION,
+    TURNAROUND_AUTHORITY_REQUIRED_FOR_COMPLIANCE,
+    VEHICLE_CAPACITY_REQUIRED_FOR_DEMAND_EVALUATION,
+    VEHICLE_CAPACITY_REQUIRED_FOR_OPTIMIZATION,
+    CapabilityReadinessStatusV1,
+    CapabilityReadinessV1,
+    DataAuthorityCapabilityV1,
+    LayeredDataAuthorityReadinessV1,
     WorkbookOptimizationAuthorityError,
+    assess_layered_data_authority_v1,
     assess_workbook_input_readiness_v1,
     normalization_options_from_workbook_v1,
 )
@@ -75,6 +85,7 @@ def test_blank_available_fleet_imports_and_blocks_strict_builder_without_inferen
     original_trips = list(imported.trips_b)
     minimum_fleet = assign_fleet(imported.trips_b, imported.parameters_b).minimum_vehicles
     readiness = assess_workbook_input_readiness_v1(imported)
+    layered = assess_layered_data_authority_v1(imported)
 
     assert imported.parameters_b.available_fleet_limit is None
     assert minimum_fleet >= 1
@@ -83,6 +94,12 @@ def test_blank_available_fleet_imports_and_blocks_strict_builder_without_inferen
     assert readiness.missing_optimization_authority_codes == (
         AVAILABLE_FLEET_LIMIT_REQUIRED_FOR_OPTIMIZATION,
     )
+    assert layered.for_capability(DataAuthorityCapabilityV1.TIMETABLE_REVIEW).ready is True
+    assert layered.for_capability(DataAuthorityCapabilityV1.DEMAND_EVALUATION).ready is True
+    assert layered.for_capability(DataAuthorityCapabilityV1.TURNAROUND_COMPLIANCE).ready is True
+    assert layered.for_capability(
+        DataAuthorityCapabilityV1.FLEET_FEASIBILITY
+    ).missing_authority_codes == (AVAILABLE_FLEET_LIMIT_REQUIRED_FOR_FLEET_FEASIBILITY,)
     assert imported.trips_b == original_trips
     assert not hasattr(imported, "scenario_c")
 
@@ -93,6 +110,58 @@ def test_blank_available_fleet_imports_and_blocks_strict_builder_without_inferen
             imported_at=IMPORTED_AT,
         )
     assert exc_info.value.codes == (AVAILABLE_FLEET_LIMIT_REQUIRED_FOR_OPTIMIZATION,)
+
+
+def test_blank_capacity_blocks_demand_and_optimization_but_not_timetable_review(
+    tmp_path,
+) -> None:
+    path = create_input_template(tmp_path / "blank-capacity.xlsx")
+    workbook = load_workbook(path)
+    _set_parameter(workbook["THONG_SO_B"], "vehicle_capacity_passengers", None)
+    workbook.save(path)
+    workbook.close()
+
+    imported = import_workbook(path)
+    layered = assess_layered_data_authority_v1(imported)
+    strict = assess_workbook_input_readiness_v1(imported)
+
+    assert CapabilityReadinessV1.__dataclass_params__.frozen is True
+    assert "__slots__" in CapabilityReadinessV1.__dict__
+    assert LayeredDataAuthorityReadinessV1.__dataclass_params__.frozen is True
+    assert "__slots__" in LayeredDataAuthorityReadinessV1.__dict__
+    assert layered.for_capability(DataAuthorityCapabilityV1.TIMETABLE_REVIEW).ready is True
+    demand = layered.for_capability(DataAuthorityCapabilityV1.DEMAND_EVALUATION)
+    assert demand.status == CapabilityReadinessStatusV1.BLOCKED
+    assert VEHICLE_CAPACITY_REQUIRED_FOR_DEMAND_EVALUATION in demand.missing_authority_codes
+    optimization = layered.for_capability(DataAuthorityCapabilityV1.OPTIMIZATION)
+    assert optimization.status == CapabilityReadinessStatusV1.BLOCKED
+    assert VEHICLE_CAPACITY_REQUIRED_FOR_OPTIMIZATION in optimization.missing_authority_codes
+    assert strict.missing_optimization_authority_codes == (
+        VEHICLE_CAPACITY_REQUIRED_FOR_OPTIMIZATION,
+    )
+
+
+def test_missing_fleet_and_turnaround_block_only_dependent_capabilities(tmp_path) -> None:
+    path = create_input_template(tmp_path / "layered-gaps.xlsx")
+    workbook = load_workbook(path)
+    _set_parameter(workbook["THONG_SO_B"], "available_fleet_limit", None)
+    _set_parameter(workbook["THONG_SO_B"], "minimum_layover_minutes", None)
+    workbook.save(path)
+    workbook.close()
+
+    layered = assess_layered_data_authority_v1(import_workbook(path))
+
+    assert layered.for_capability(DataAuthorityCapabilityV1.TIMETABLE_REVIEW).ready is True
+    assert layered.for_capability(DataAuthorityCapabilityV1.DEMAND_EVALUATION).ready is True
+    fleet = layered.for_capability(DataAuthorityCapabilityV1.FLEET_FEASIBILITY)
+    assert fleet.status == CapabilityReadinessStatusV1.BLOCKED
+    assert fleet.missing_authority_codes == (
+        AVAILABLE_FLEET_LIMIT_REQUIRED_FOR_FLEET_FEASIBILITY,
+        TURNAROUND_AUTHORITY_REQUIRED_FOR_COMPLIANCE,
+    )
+    assert layered.for_capability(
+        DataAuthorityCapabilityV1.TURNAROUND_COMPLIANCE
+    ).missing_authority_codes == (TURNAROUND_AUTHORITY_REQUIRED_FOR_COMPLIANCE,)
 
 
 def test_supplied_fleet_round_trips_and_minimum_fleet_remains_separate(tmp_path) -> None:
@@ -178,6 +247,7 @@ def test_present_scenario_a_requires_its_optimization_authority(tmp_path) -> Non
     workbook = load_workbook(path)
     _set_parameter(workbook["THONG_SO_A"], "available_fleet_limit", None)
     _set_parameter(workbook["THONG_SO_A"], "operating_day_type", None)
+    _set_parameter(workbook["THONG_SO_A"], "vehicle_capacity_passengers", None)
     workbook.save(path)
     workbook.close()
 
@@ -186,6 +256,7 @@ def test_present_scenario_a_requires_its_optimization_authority(tmp_path) -> Non
     assert readiness.missing_optimization_authority_codes == (
         SCENARIO_A_AVAILABLE_FLEET_LIMIT_REQUIRED_FOR_OPTIMIZATION,
         SCENARIO_A_OPERATING_DAY_TYPE_REQUIRED_FOR_OPTIMIZATION,
+        SCENARIO_A_VEHICLE_CAPACITY_REQUIRED_FOR_OPTIMIZATION,
     )
 
 

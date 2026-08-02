@@ -26,6 +26,7 @@ from bus_schedule_engine.excel_exporter import create_input_template
 from bus_schedule_engine.importer import ImportedWorkbook, import_workbook
 from bus_schedule_engine.input_authority import (
     AVAILABLE_FLEET_LIMIT_REQUIRED_FOR_OPTIMIZATION,
+    VEHICLE_CAPACITY_REQUIRED_FOR_OPTIMIZATION,
     WorkbookInputReadinessV1,
 )
 from bus_schedule_engine.optimization_service import (
@@ -119,6 +120,41 @@ def test_unified_pipeline_stops_at_readiness_without_any_analysis_or_artifact(
     assert run.unified_presentation is None
     assert run.unified_xlsx_bytes is None
     assert run.failure is None
+
+
+def test_blank_capacity_stops_strict_pipeline_before_normalization_or_solver(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    imported = _template_import(tmp_path, "blank-capacity.xlsx")
+    imported = replace(
+        imported,
+        parameters_b=replace(
+            imported.parameters_b,
+            vehicle_capacity_passengers=None,
+        ),
+    )
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("blank capacity must stop the strict optimization pipeline")
+
+    monkeypatch.setattr(application, "normalization_options_from_workbook_v1", forbidden)
+    monkeypatch.setattr(
+        application,
+        "_analyze_normalized_and_optimize_schedule_v1",
+        forbidden,
+    )
+
+    run = run_unified_application_pipeline_v1(
+        imported,
+        source_id=SOURCE_ID,
+        imported_at=IMPORTED_AT,
+    )
+
+    assert run.status == UnifiedApplicationStatusV1.INPUT_NOT_READY
+    assert run.input_readiness.missing_optimization_authority_codes == (
+        VEHICLE_CAPACITY_REQUIRED_FOR_OPTIMIZATION,
+    )
 
 
 def test_unified_pipeline_completes_without_loading_or_running_legacy(

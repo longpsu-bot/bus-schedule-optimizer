@@ -53,13 +53,21 @@ and
 and
 [Milestone 6A2D protected service-floor OR-Tools constraints](docs/engine/MILESTONE_6A2D_PROTECTED_SERVICE_FLOOR_ORTOOLS_CONSTRAINTS.md).
 
-### Active next milestone: real-route operational review
+### Active milestone: layered data-authority workflow
 
-Milestone 6A2E adds a one-workbook offline CLI that consumes the unchanged unified Contract V1
+Milestone 6A2E is merged. It adds a one-workbook offline CLI that consumes the unchanged unified Contract V1
 pipeline and existing Page 05 artifact boundary. It writes deterministic JSON and Markdown
 expert-review evidence plus the three aligned Contract V1 artifacts when available. Every review
-is `EXPERT_REVIEW_REQUIRED`; it is not an operational timetable approval. See
-[Milestone 6A2E real-route operational review](docs/engine/MILESTONE_6A2E_REAL_ROUTE_OPERATIONAL_REVIEW.md).
+is `EXPERT_REVIEW_REQUIRED`; it is not an operational timetable approval.
+
+Milestone 6A2F is active. Its no-solver `data_authority_review` command evaluates exact timetable
+facts first and reports readiness separately for timetable, turnaround, demand, fleet,
+optimization, and terminal-capacity capabilities. Optimization-only gaps no longer suppress
+lower-level timetable review. The intended workflow is to run the authority review, supply the
+identified missing authority, and then run the strict 6A2E optimization review. See
+[Milestone 6A2E real-route operational review](docs/engine/MILESTONE_6A2E_REAL_ROUTE_OPERATIONAL_REVIEW.md)
+and
+[Milestone 6A2F layered data-authority workflow](docs/engine/MILESTONE_6A2F_LAYERED_DATA_AUTHORITY_WORKFLOW.md).
 
 ### Offline legacy regression oracle
 
@@ -240,8 +248,8 @@ unified Page 05 artifacts are implemented and merged. Milestone 5C1 is merged an
 is merged. Milestone 6A1 supplemental trip-level ridership analysis, Milestone 6A2A
 protected service-floor authority, Milestone 6A2B acceptance enforcement, and Milestone 6A2C
 heuristic search awareness, and Milestone 6A2D OR-Tools hard constraints are implemented**, but
-Milestone 5C3 is merged. **Milestone 6A2E real-route operational review is the active next
-milestone.** `LEGACY_RUNTIME_RETIRED` still requires formal production approval.
+Milestone 5C3 and Milestone 6A2E are merged. **Milestone 6A2F layered data-authority workflow is
+the active milestone.** `LEGACY_RUNTIME_RETIRED` still requires formal production approval.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
 2. Milestone 5A2A: stabilize authoritative workbook input and readiness.
@@ -271,7 +279,9 @@ milestone.** `LEGACY_RUNTIME_RETIRED` still requires formal production approval.
 15. Milestone 6A2D: encode the exact bound 6A2B authority in the canonical OR-Tools
     service-quality model while keeping common validation final (implemented).
 16. Milestone 6A2E: generate deterministic, bounded real-route operational review packs through
-    the existing unified pipeline and Page 05 artifact boundary (active next milestone).
+    the existing unified pipeline and Page 05 artifact boundary (merged).
+17. Milestone 6A2F: review exact timetable facts before optimization, expose capability-specific
+    authority gaps, then hand optimization-ready workbooks to the strict 6A2E workflow (active).
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)
@@ -325,6 +335,19 @@ python -m venv .venv
 
 The five Vietnamese UI pages cover input, technical checks, demand evaluation,
 recommendations, and chart/XLSX export.
+
+Run the offline no-solver authority review first, including for workbooks that lack capacity or
+other optimization-only authority:
+
+```powershell
+.\.venv\Scripts\python.exe -m bus_schedule_engine.data_authority_review `
+  --workbook "private/route.xlsx" `
+  --source-id "route-authority-review-2026-08" `
+  --output-dir "outputs/authority-review"
+```
+
+It writes only `data-authority-review.json` and `data-authority-review.md`. After supplying the
+reported optimization authority, run the strict 6A2E expert-review workflow:
 
 Run the offline one-route expert-review pack without changing the Streamlit runtime:
 
@@ -381,11 +404,17 @@ Optional sheets are:
 - `CAU_HINH`.
 
 `total_daily_trips` is the total across both directions.
-`vehicle_capacity_passengers` is required. Times use `HH:mm`; dates use `dd/mm/yyyy`.
+Blank `vehicle_capacity_passengers` imports as `None`: timetable review remains available, while
+capacity-based demand evaluation and optimization stay blocked. A nonblank capacity must be a
+positive integer. Times use `HH:mm`; dates use `dd/mm/yyyy`.
 `allowed_trip_runtime_minutes` accepts an inclusive integer range such as `55,65` or `55;65`.
 Blank `available_fleet_limit` or `operating_day_type` permits import but blocks authoritative
 fixed-resource optimization. Demand source type, confidence, and response mode become required
 for optimization only when `SAN_LUONG` has observations.
+`THONG_TIN_DU_LIEU` may declare `timetable_authority_status`,
+`timetable_authority_reference`, and `timetable_effective_date`. Only explicit
+`approved_operational` status is reported as source-approved; the engine does not grant or revoke
+external approval.
 `THONG_SO_B` may optionally include `terminal_1_max_occupancy_vehicles` and
 `terminal_2_max_occupancy_vehicles`; each supplied value must be an integer of at least one.
 Either key may be omitted, and no current workbook is required to contain either key.

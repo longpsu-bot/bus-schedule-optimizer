@@ -93,6 +93,24 @@ class RegimeBoundaryReason(StrEnum):
     OPERATING_WINDOW_BOUNDARY = "OPERATING_WINDOW_BOUNDARY"
 
 
+class TimetableAuthorityStatusV1(StrEnum):
+    APPROVED_OPERATIONAL = "approved_operational"
+    CURRENT_OPERATIONAL = "current_operational"
+    PROPOSED = "proposed"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True, slots=True)
+class TimetableAuthorityMetadataV1:
+    status: TimetableAuthorityStatusV1 = TimetableAuthorityStatusV1.UNKNOWN
+    reference: str | None = None
+    effective_date: date | None = None
+
+    @property
+    def source_approved(self) -> bool:
+        return self.status == TimetableAuthorityStatusV1.APPROVED_OPERATIONAL
+
+
 @dataclass(frozen=True)
 class ScenarioParameters:
     route_id: str
