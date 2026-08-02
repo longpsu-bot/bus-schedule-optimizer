@@ -30,6 +30,7 @@ THIN_GRAY = Side(style="thin", color="CBD5E1")
 
 REQUIRED_LABEL = "BẮT BUỘC"
 REQUIRED_FOR_OPTIMIZATION_LABEL = "BẮT BUỘC ĐỂ TỐI ƯU"
+REQUIRED_FOR_DEMAND_AND_OPTIMIZATION_LABEL = "BẮT BUỘC ĐỂ ĐÁNH GIÁ NHU CẦU/TỐI ƯU"
 CONDITIONAL_DEMAND_LABEL = "BẮT BUỘC ĐỂ TỐI ƯU KHI CÓ SẢN LƯỢNG"
 CONDITIONAL_TRIP_RIDERSHIP_LABEL = "BẮT BUỘC KHI CÓ SAN_LUONG_CHUYEN"
 OPTIONAL_LABEL = "TÙY CHỌN"
@@ -72,6 +73,7 @@ def _style_requirement_rows(ws, start_row: int, end_row: int, level_column: int)
     fills = {
         REQUIRED_LABEL: PatternFill("solid", fgColor=RED),
         REQUIRED_FOR_OPTIMIZATION_LABEL: PatternFill("solid", fgColor=AMBER),
+        REQUIRED_FOR_DEMAND_AND_OPTIMIZATION_LABEL: PatternFill("solid", fgColor=AMBER),
         CONDITIONAL_DEMAND_LABEL: PatternFill("solid", fgColor=AMBER),
         CONDITIONAL_TRIP_RIDERSHIP_LABEL: PatternFill("solid", fgColor=AMBER),
         OPTIONAL_LABEL: PatternFill("solid", fgColor=LIGHT_BLUE),
@@ -279,9 +281,9 @@ def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) ->
         ),
         (
             "vehicle_capacity_passengers",
-            parameters.capacity,
-            REQUIRED_LABEL,
-            "Sức chứa hợp pháp; không tự suy đoán",
+            parameters.vehicle_capacity_passengers,
+            REQUIRED_FOR_DEMAND_AND_OPTIMIZATION_LABEL,
+            "Có thể để trống để review biểu đồ; bắt buộc cho tải cung/cầu và tối ưu, không tự suy đoán",
         ),
         (
             "available_fleet_limit",
@@ -399,10 +401,10 @@ def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) ->
     route_type_validation.add(ws.cell(key_rows["route_type"], 2))
     block_validation.add(ws.cell(key_rows["time_block_minutes"], 2))
     operating_day_validation.add(ws.cell(key_rows["operating_day_type"], 2))
-    for key in ("total_daily_trips", "vehicle_capacity_passengers"):
-        required_positive_integer.add(ws.cell(key_rows[key], 2))
+    required_positive_integer.add(ws.cell(key_rows["total_daily_trips"], 2))
     for key in (
         "trip_runtime_minutes",
+        "vehicle_capacity_passengers",
         "minimum_layover_minutes",
         "available_fleet_limit",
         "approved_active_fleet",
@@ -421,6 +423,24 @@ def _write_authority_metadata_sheet(ws) -> None:
     _title(ws, "THÔNG TIN THẨM QUYỀN DỮ LIỆU", 4)
     _table_header(ws, 3, ["Tham số", "Giá trị", "Mức độ", "Diễn giải"])
     rows = [
+        (
+            "timetable_authority_status",
+            "proposed",
+            OPTIONAL_LABEL,
+            "approved_operational, current_operational, proposed hoặc unknown; chỉ giá trị khai báo rõ ràng mới được bảo toàn",
+        ),
+        (
+            "timetable_authority_reference",
+            "SYNTHETIC-SAMPLE",
+            OPTIONAL_LABEL,
+            "Số quyết định, tài liệu hoặc tham chiếu do người dùng khai báo; không dùng để tự suy trạng thái",
+        ),
+        (
+            "timetable_effective_date",
+            date(2026, 8, 1),
+            OPTIONAL_LABEL,
+            "Ngày hiệu lực của biểu đồ do nguồn khai báo; không thay thế loại ngày vận hành",
+        ),
         (
             "demand_dataset_id",
             "MVP-01-DEMAND-SAMPLE",
@@ -471,10 +491,18 @@ def _write_authority_metadata_sheet(ws) -> None:
         formula1='"static,elasticity_scenario,calibrated"',
         allow_blank=True,
     )
+    timetable_status_validation = DataValidation(
+        type="list",
+        formula1='"approved_operational,current_operational,proposed,unknown"',
+        allow_blank=True,
+    )
+    ws.add_data_validation(timetable_status_validation)
     ws.add_data_validation(source_type_validation)
     ws.add_data_validation(confidence_validation)
     ws.add_data_validation(response_validation)
     key_rows = {ws.cell(row, 1).value: row for row in range(4, 4 + len(rows))}
+    timetable_status_validation.add(ws.cell(key_rows["timetable_authority_status"], 2))
+    ws.cell(key_rows["timetable_effective_date"], 2).number_format = "DD/MM/YYYY"
     source_type_validation.add(ws.cell(key_rows["demand_source_type"], 2))
     confidence_validation.add(ws.cell(key_rows["demand_confidence"], 2))
     response_validation.add(ws.cell(key_rows["demand_response_mode"], 2))
@@ -684,8 +712,18 @@ def create_input_template(path: str | Path) -> Path:
     guide_rows = [
         (
             "Ba mức yêu cầu",
-            "BẮT BUỘC để import; BẮT BUỘC ĐỂ TỐI ƯU có thể để trống khi import; TÙY CHỌN không chặn tối ưu.",
+            "BẮT BUỘC để import; các trường cho đánh giá nhu cầu/tối ưu có thể để trống khi review biểu đồ; TÙY CHỌN không chặn review.",
             "Đọc nhãn Mức độ, không chỉ dựa vào màu ô.",
+        ),
+        (
+            "Review biểu đồ trước tối ưu",
+            "Thiếu sức chứa hoặc thẩm quyền tối ưu không chặn kiểm tra số chuyến, bến, thời gian, runtime, headway và chuỗi xe nguồn.",
+            "Chạy data_authority_review trước; chỉ chạy real_route_review khi OPTIMIZATION sẵn sàng.",
+        ),
+        (
+            "Thẩm quyền biểu đồ",
+            "Chỉ timetable_authority_status = approved_operational mới được báo cáo là nguồn đã phê duyệt.",
+            "Review kỹ thuật không cấp hoặc thu hồi phê duyệt bên ngoài; proposed/unknown không được tự nâng cấp.",
         ),
         (
             "Giới hạn đội xe",

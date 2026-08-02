@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from openpyxl import load_workbook
 
@@ -13,6 +15,10 @@ from bus_schedule_engine.importer import (
     InputDataError,
     WorkbookAuthorityMetadata,
     import_workbook,
+)
+from bus_schedule_engine.models import (
+    TimetableAuthorityMetadataV1,
+    TimetableAuthorityStatusV1,
 )
 
 
@@ -71,6 +77,11 @@ def test_authority_metadata_round_trips_declared_values(tmp_path) -> None:
     imported = import_workbook(path)
 
     assert imported.authority_metadata == WorkbookAuthorityMetadata(
+        timetable_authority=TimetableAuthorityMetadataV1(
+            status=TimetableAuthorityStatusV1.PROPOSED,
+            reference="SYNTHETIC-SAMPLE",
+            effective_date=date(2026, 8, 1),
+        ),
         demand_dataset_id="DEMAND-42",
         demand_source_type=DemandSourceType.APC,
         demand_confidence=DemandConfidence.LOW,
@@ -94,8 +105,20 @@ def test_blank_optional_metadata_remains_none(tmp_path) -> None:
     assert imported.authority_metadata.source_notes is None
 
 
-@pytest.mark.parametrize("value", [None, 0, -1, True, 60.5, "not-a-number"])
-def test_scenario_b_vehicle_capacity_must_be_a_positive_integer(
+def test_blank_scenario_b_vehicle_capacity_imports_as_none(tmp_path) -> None:
+    path = create_input_template(tmp_path / "blank-b-capacity.xlsx")
+    workbook = load_workbook(path)
+    _set_parameter(workbook["THONG_SO_B"], "vehicle_capacity_passengers", None)
+    workbook.save(path)
+    workbook.close()
+
+    imported = import_workbook(path)
+
+    assert imported.parameters_b.vehicle_capacity_passengers is None
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 60.5, "not-a-number"])
+def test_scenario_b_nonblank_vehicle_capacity_must_be_a_positive_integer(
     tmp_path,
     value: object,
 ) -> None:
@@ -139,8 +162,21 @@ def test_scenario_a_absent_does_not_require_its_vehicle_capacity(tmp_path) -> No
     assert imported.parameters_a is None
 
 
-@pytest.mark.parametrize("value", [None, 60.5])
-def test_scenario_a_present_requires_valid_vehicle_capacity(
+def test_scenario_a_present_allows_blank_vehicle_capacity(tmp_path) -> None:
+    path = create_input_template(tmp_path / "blank-a-capacity.xlsx")
+    workbook = load_workbook(path)
+    _set_parameter(workbook["THONG_SO_A"], "vehicle_capacity_passengers", None)
+    workbook.save(path)
+    workbook.close()
+
+    imported = import_workbook(path)
+
+    assert imported.parameters_a is not None
+    assert imported.parameters_a.vehicle_capacity_passengers is None
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 60.5, "not-a-number"])
+def test_scenario_a_present_rejects_invalid_nonblank_vehicle_capacity(
     tmp_path,
     value: object,
 ) -> None:
@@ -207,3 +243,51 @@ def test_preferred_runtime_keeps_precedence_when_both_fields_are_valid(tmp_path)
 
     assert imported.parameters_b.runtime_options == (55, 65)
     assert imported.parameters_b.default_trip_runtime_minutes == 65
+
+
+@pytest.mark.parametrize(
+    ("status", "source_approved"),
+    [
+        ("approved_operational", True),
+        ("current_operational", False),
+        ("proposed", False),
+        ("unknown", False),
+        (None, False),
+    ],
+)
+def test_timetable_authority_metadata_preserves_only_explicit_approval(
+    tmp_path,
+    status: str | None,
+    source_approved: bool,
+) -> None:
+    path = create_input_template(tmp_path / "timetable-authority.xlsx")
+    workbook = load_workbook(path)
+    sheet = workbook["THONG_TIN_DU_LIEU"]
+    _set_parameter(sheet, "timetable_authority_status", status)
+    _set_parameter(sheet, "timetable_authority_reference", "AUTH-42")
+    _set_parameter(sheet, "timetable_effective_date", "01/08/2026")
+    workbook.save(path)
+    workbook.close()
+
+    authority = import_workbook(path).authority_metadata.timetable_authority
+
+    assert authority.status == TimetableAuthorityStatusV1(status or "unknown")
+    assert authority.reference == "AUTH-42"
+    assert authority.effective_date is not None
+    assert authority.effective_date.isoformat() == "2026-08-01"
+    assert authority.source_approved is source_approved
+
+
+def test_invalid_timetable_authority_status_blocks_import(tmp_path) -> None:
+    path = create_input_template(tmp_path / "invalid-timetable-authority.xlsx")
+    workbook = load_workbook(path)
+    _set_parameter(
+        workbook["THONG_TIN_DU_LIEU"],
+        "timetable_authority_status",
+        "self-approved",
+    )
+    workbook.save(path)
+    workbook.close()
+
+    with pytest.raises(InputDataError, match="timetable_authority_status"):
+        import_workbook(path)

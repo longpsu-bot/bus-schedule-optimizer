@@ -6,6 +6,7 @@ from bus_schedule_engine.excel_exporter import (
     CONDITIONAL_DEMAND_LABEL,
     CONDITIONAL_TRIP_RIDERSHIP_LABEL,
     OPTIONAL_LABEL,
+    REQUIRED_FOR_DEMAND_AND_OPTIMIZATION_LABEL,
     REQUIRED_FOR_OPTIMIZATION_LABEL,
     REQUIRED_LABEL,
     create_input_template,
@@ -48,6 +49,7 @@ def test_generated_template_displays_all_requirement_levels(tmp_path) -> None:
 
     assert REQUIRED_LABEL in levels
     assert REQUIRED_FOR_OPTIMIZATION_LABEL in levels
+    assert REQUIRED_FOR_DEMAND_AND_OPTIMIZATION_LABEL in levels
     assert OPTIONAL_LABEL in levels
     assert CONDITIONAL_DEMAND_LABEL in levels
     assert workbook["THONG_SO_B"].cell(3, 3).value == "Mức độ"
@@ -63,12 +65,22 @@ def test_generated_template_classifies_authority_and_optional_fields(tmp_path) -
     metadata = _rows_by_key(workbook["THONG_TIN_DU_LIEU"])
 
     for parameters in (parameters_a, parameters_b):
+        assert (
+            parameters["vehicle_capacity_passengers"][1]
+            == REQUIRED_FOR_DEMAND_AND_OPTIMIZATION_LABEL
+        )
         assert parameters["available_fleet_limit"][1] == REQUIRED_FOR_OPTIMIZATION_LABEL
         assert parameters["operating_day_type"][1] == REQUIRED_FOR_OPTIMIZATION_LABEL
         assert parameters["approved_active_fleet"][1] == OPTIONAL_LABEL
 
     assert parameters_b["terminal_1_max_occupancy_vehicles"][1] == OPTIONAL_LABEL
     assert parameters_b["terminal_2_max_occupancy_vehicles"][1] == OPTIONAL_LABEL
+    for key in (
+        "timetable_authority_status",
+        "timetable_authority_reference",
+        "timetable_effective_date",
+    ):
+        assert metadata[key][1] == OPTIONAL_LABEL
     for key in (
         "demand_source_type",
         "demand_confidence",
@@ -106,13 +118,14 @@ def test_required_and_blank_permitted_integer_cells_have_separate_validations(
 
     for sheet_name in ("THONG_SO_A", "THONG_SO_B"):
         sheet = workbook[sheet_name]
-        for key in ("vehicle_capacity_passengers", "total_daily_trips"):
+        for key in ("total_daily_trips",):
             validation = _validation_for_cell(sheet, _value_cell(sheet, key).coordinate)
             assert validation.type == "whole"
             assert validation.operator == "greaterThan"
             assert validation.formula1 == "0"
             assert validation.allow_blank is False
         for key in (
+            "vehicle_capacity_passengers",
             "available_fleet_limit",
             "approved_active_fleet",
             "minimum_layover_minutes",
@@ -129,6 +142,30 @@ def test_required_and_blank_permitted_integer_cells_have_separate_validations(
         validation = _validation_for_cell(sheet_b, _value_cell(sheet_b, key).coordinate)
         assert validation.type == "whole"
         assert validation.allow_blank is True
+    workbook.close()
+
+
+def test_template_declares_timetable_authority_and_layered_review_guidance(tmp_path) -> None:
+    path = create_input_template(tmp_path / "input.xlsx")
+    workbook = load_workbook(path)
+    metadata = _rows_by_key(workbook["THONG_TIN_DU_LIEU"])
+    guide = " ".join(
+        str(cell.value)
+        for row in workbook["HUONG_DAN"].iter_rows(min_row=4)
+        for cell in row
+        if cell.value is not None
+    )
+
+    assert metadata["timetable_authority_status"][0] == "proposed"
+    assert metadata["timetable_authority_reference"][0] == "SYNTHETIC-SAMPLE"
+    assert metadata["timetable_effective_date"][0] is not None
+    validation = _validation_for_cell(
+        workbook["THONG_TIN_DU_LIEU"],
+        _value_cell(workbook["THONG_TIN_DU_LIEU"], "timetable_authority_status").coordinate,
+    )
+    assert "approved_operational" in validation.formula1
+    assert "data_authority_review" in guide
+    assert "không cấp hoặc thu hồi phê duyệt" in guide
     workbook.close()
 
 

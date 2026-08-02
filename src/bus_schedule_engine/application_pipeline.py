@@ -99,6 +99,7 @@ _SAFE_IMPORT_FIELD_PATTERN = re.compile(
     r"period_start|period_end|observation_days|time_block_start|time_block_end|"
     r"passenger_volume|volume_type|demand_dataset_id|demand_source_type|"
     r"demand_confidence|demand_response_mode|source_notes|observation_id|"
+    r"timetable_authority_status|timetable_authority_reference|timetable_effective_date|"
     r"service_date|source_trip_id|scheduled_trip_id|scheduled_departure_time|"
     r"actual_departure_time|passenger_count|trip_ridership_dataset_id|"
     r"trip_ridership_source_type|trip_ridership_confidence|"

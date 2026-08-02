@@ -7,12 +7,15 @@ presentation adapters. It adds explicit field classifications and a deterministi
 assessment. It does not cut over Streamlit, change a solver, revise Contract V1, or redesign
 result workbooks.
 
-## Three requirement levels
+## Requirement levels
 
 Every parameter or authority field shown in the generated template has a text label as well as
-distinct formatting:
+distinct formatting. Milestone 6A2F adds a fourth classification for fields that are required
+for capacity-based demand evaluation and optimization but not timetable review:
 
 - `BẮT BUỘC`: absence prevents meaningful import and continues to raise `InputDataError`.
+- `BẮT BUỘC ĐỂ ĐÁNH GIÁ NHU CẦU/TỐI ƯU`: absence permits timetable review, but blocks
+  capacity-based demand evaluation and optimization.
 - `BẮT BUỘC ĐỂ TỐI ƯU`: absence permits import and preview, but blocks authoritative fixed-resource
   normalization and optimization.
 - `TÙY CHỌN`: absence does not block import or fixed-resource optimization.
@@ -21,9 +24,12 @@ Demand source type, confidence, and response mode use the conditional label
 `BẮT BUỘC ĐỂ TỐI ƯU KHI CÓ SẢN LƯỢNG`. They are optimization authority only when `SAN_LUONG`
 contains observations.
 
-`vehicle_capacity_passengers` and `total_daily_trips` are import-required positive integers.
-Blank, boolean, zero, negative, non-integral, and non-numeric values fail at import; integer
-numeric text such as `"60"` is accepted. Runtime authority remains a one-of rule:
+`total_daily_trips` is an import-required positive integer. As of Milestone 6A2F,
+`vehicle_capacity_passengers` may be blank and then imports as `None`, allowing lower-level
+timetable review while demand evaluation and optimization remain blocked. A nonblank capacity
+and `total_daily_trips` must be positive integers; boolean, zero, negative, non-integral, and
+nonnumeric values fail at import; integer numeric text such as `"60"` is accepted. Runtime
+authority remains a one-of rule:
 `allowed_trip_runtime_minutes` is preferred, while `trip_runtime_minutes` remains the legacy
 fallback.
 

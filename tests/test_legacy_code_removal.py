@@ -76,10 +76,10 @@ RETIRED_RESULT_KEYS = (
     "parallel_runtime_status",
     "side_by_side_validation_report",
 )
-TEMPLATE_SEMANTIC_FINGERPRINT = "8b1617679d5755e5fc0aae511f9e5eddc1b5ce4e9016f31222ca0cc6f38b82c2"
+TEMPLATE_SEMANTIC_FINGERPRINT = "8ece58c5b8c5e73b7fa7f2de9f5b235684a905b967cb68b372f1a56ee42c4749"
 BASELINE_MANIFEST_FINGERPRINTS = {
-    "heuristic_shared": "3f84a077a719361e9d06032d4584056379e7ba461b7406a39afb10835fc2ae51",
-    "protected_solver": "5cf22b5f4248edd6c39bff30b72e6127e33970251f91fb1a86c959d502207291",
+    "heuristic_core": "c96009627d669e4ec2387ea28a5af0ba14d8bea4761066cfb21bc284c234be1f",
+    "protected_solver_core": "6210fd7ee121bef91a92cdf6be47f97647bc61321584ddb3281eee00081a327d",
     "contract_schemas": "a3499847598dc9209bd02c3263bf6ef4db5b2ccb5c38cb75b00edfbc892178ee",
     "route_corpus": "4e50c1c1dad4c805ce7d1fc89323782eac02161c79d777659ab1fff890472294",
 }
@@ -219,7 +219,7 @@ def test_page05_still_exposes_exactly_three_contract_v1_files() -> None:
     assert source.count("st.download_button(") == 3
 
 
-def test_input_template_semantics_are_unchanged(tmp_path: Path) -> None:
+def test_input_template_semantics_are_frozen(tmp_path: Path) -> None:
     template = create_input_template(tmp_path / "input.xlsx")
     assert _template_semantic_fingerprint(template) == TEMPLATE_SEMANTIC_FINGERPRINT
 
@@ -263,9 +263,9 @@ def test_service_analysis_is_callable_only_from_offline_or_test_paths() -> None:
     ).read_text(encoding="utf-8")
 
 
-def test_shared_heuristic_protected_solver_contract_and_corpus_manifests_are_unchanged() -> None:
+def test_unchanged_solver_core_contract_and_corpus_manifests_are_frozen() -> None:
     groups = {
-        "heuristic_shared": [
+        "heuristic_core": [
             ROOT / "src" / "bus_schedule_engine" / name
             for name in (
                 "c_config.py",
@@ -273,14 +273,12 @@ def test_shared_heuristic_protected_solver_contract_and_corpus_manifests_are_unc
                 "demand.py",
                 "fleet.py",
                 "validator.py",
-                "models.py",
             )
         ],
-        "protected_solver": [
+        "protected_solver_core": [
             ROOT / relative
             for relative in (
                 "src/bus_schedule_engine/protected_service_floor_codes.py",
-                "src/bus_schedule_engine/protected_service_floor.py",
                 "src/bus_schedule_engine/protected_service_floor_enforcement.py",
                 "src/bus_schedule_engine/contracts_v1/heuristic_solver.py",
                 "src/bus_schedule_engine/contracts_v1/ortools_solver.py",

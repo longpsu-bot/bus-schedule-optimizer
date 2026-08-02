@@ -16,6 +16,8 @@ from .models import (
     Direction,
     RouteType,
     ScenarioParameters,
+    TimetableAuthorityMetadataV1,
+    TimetableAuthorityStatusV1,
     Trip,
     TripRidershipDatasetMetadataV1,
     TripRidershipDirectionV1,
@@ -49,8 +51,11 @@ class InputDataError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class WorkbookAuthorityMetadata:
-    """Workbook-owned demand authority; runtime provenance is intentionally excluded."""
+    """Workbook-owned timetable and demand authority; runtime provenance is excluded."""
 
+    timetable_authority: TimetableAuthorityMetadataV1 = field(
+        default_factory=TimetableAuthorityMetadataV1
+    )
     demand_dataset_id: str | None = None
     demand_source_type: DemandSourceType | None = None
     demand_confidence: DemandConfidence | None = None
@@ -253,7 +258,7 @@ def _parameters(frame: pd.DataFrame, scenario: str) -> ScenarioParameters:
         route_type = RouteType(str(_required(values, "route_type", sheet_name)).strip())
     except ValueError as exc:
         raise InputDataError("route_type phải là intra_provincial hoặc inter_provincial") from exc
-    capacity = _required_positive_integer(
+    capacity = _optional_positive_integer(
         values.get("vehicle_capacity_passengers"),
         key="vehicle_capacity_passengers",
         sheet_name=sheet_name,
@@ -369,6 +374,20 @@ def _authority_metadata(frame: pd.DataFrame) -> WorkbookAuthorityMetadata:
             raise InputDataError(f"{key} trong {sheet_name} phải là một trong: {allowed}") from exc
 
     return WorkbookAuthorityMetadata(
+        timetable_authority=TimetableAuthorityMetadataV1(
+            status=optional_enum("timetable_authority_status", TimetableAuthorityStatusV1)
+            or TimetableAuthorityStatusV1.UNKNOWN,
+            reference=(
+                None
+                if values.get("timetable_authority_reference") is None
+                else str(values["timetable_authority_reference"]).strip()
+            ),
+            effective_date=(
+                None
+                if values.get("timetable_effective_date") is None
+                else _date(values["timetable_effective_date"])
+            ),
+        ),
         demand_dataset_id=(
             None
             if values.get("demand_dataset_id") is None

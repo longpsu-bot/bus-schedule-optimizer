@@ -13,7 +13,7 @@ from statistics import mean, median
 from typing import Any
 
 from .contracts_v1.headway_regimes import segment_continuous_headway_regimes_v1
-from .contracts_v1.models import ContractDirection, ScenarioBInput
+from .contracts_v1.models import ContractDirection, ExactTimetableTrip, ScenarioBInput
 from .contracts_v1.serialization import scenario_fingerprint
 from .importer import ImportedWorkbook
 from .models import (
@@ -181,16 +181,16 @@ def _is_single_gap_fluctuation(
     return False
 
 
-def derive_current_b_service_regimes_v1(
-    scenario_b: ScenarioBInput,
+def derive_exact_timetable_service_regimes_v1(
+    exact_timetable: tuple[ExactTimetableTrip, ...],
     policy: ProtectedServiceFloorPolicyV1,
 ) -> tuple[CurrentBServiceRegimeV1, ...]:
-    """Derive non-overlapping current-B regimes via the canonical exact-B boundary service."""
+    """Derive canonical non-overlapping regimes from an exact timetable only."""
     regimes: list[CurrentBServiceRegimeV1] = []
     for direction in _DIRECTION_ORDER:
         trips = tuple(
             sorted(
-                (trip for trip in scenario_b.exact_timetable if trip.direction == direction),
+                (trip for trip in exact_timetable if trip.direction == direction),
                 key=lambda item: (item.departure_time, item.trip_id),
             )
         )
@@ -279,6 +279,14 @@ def derive_current_b_service_regimes_v1(
                 )
             )
     return tuple(regimes)
+
+
+def derive_current_b_service_regimes_v1(
+    scenario_b: ScenarioBInput,
+    policy: ProtectedServiceFloorPolicyV1,
+) -> tuple[CurrentBServiceRegimeV1, ...]:
+    """Derive non-overlapping current-B regimes via the canonical exact-B boundary service."""
+    return derive_exact_timetable_service_regimes_v1(scenario_b.exact_timetable, policy)
 
 
 def _coerce_policy_value(name: str, value: object) -> object:
@@ -884,6 +892,7 @@ __all__ = [
     "PROTECTED_SERVICE_FLOOR_POLICY_PROFILE",
     "assess_protected_service_floors_v1",
     "derive_current_b_service_regimes_v1",
+    "derive_exact_timetable_service_regimes_v1",
     "protected_service_floor_assessment_is_current_v1",
     "protected_service_floor_policy_from_workbook_v1",
 ]
