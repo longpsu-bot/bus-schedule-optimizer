@@ -64,7 +64,10 @@ executed by ordinary Streamlit. Broad legacy deletion has not started.
 Milestone 5C2R adds a deterministic repository audit and a human approval record for the
 `LEGACY_RUNTIME_RETIRED` decision. The audit can conclude that implementation is ready for formal
 review, but production approval remains `PENDING` until the Engineering Owner and QA/Release
-Owner sign off. No legacy code is deleted. See
+Owner sign off. Its ordinary-runtime proof follows a canonical, transitive repository production
+import/call graph from Streamlit through local helpers, records forbidden witness paths, fails
+closed for relevant unresolved dispatch, and derives 5C3-candidate consumers from source. No
+legacy code is deleted. See
 [Milestone 5C2R legacy runtime retirement approval evidence](docs/engine/MILESTONE_5C2R_LEGACY_RUNTIME_RETIREMENT_APPROVAL.md).
 
 ### Contract V1 domain and solver boundary

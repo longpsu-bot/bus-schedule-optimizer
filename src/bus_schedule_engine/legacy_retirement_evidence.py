@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import subprocess
+from collections import defaultdict, deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
@@ -89,6 +90,43 @@ class OrdinaryRuntimeEvidenceV1:
 
 
 @dataclass(frozen=True, slots=True)
+class UnresolvedCallGraphSiteV1:
+    site: str
+    construct: str
+    risk: str
+
+
+@dataclass(frozen=True, slots=True)
+class ForbiddenWitnessPathV1:
+    category: str
+    target: str
+    path: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DeletionCandidateConsumerEvidenceV1:
+    target: str
+    ordinary_production_consumers: tuple[str, ...]
+    allowed_remaining_consumers: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ProductionGraphEvidenceV1:
+    root_symbols: tuple[str, ...]
+    audited_production_module_count: int
+    audited_production_modules: tuple[str, ...]
+    reachable_production_symbol_count: int
+    reachable_production_symbols: tuple[str, ...]
+    resolved_edge_count: int
+    unresolved_relevant_site_count: int
+    unresolved_relevant_sites: tuple[UnresolvedCallGraphSiteV1, ...]
+    forbidden_witness_path_count: int
+    forbidden_witness_paths: tuple[ForbiddenWitnessPathV1, ...]
+    ordinary_runtime_module_graph_fingerprint: str
+    deletion_candidate_production_consumers: tuple[DeletionCandidateConsumerEvidenceV1, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class SessionStateEvidenceV1:
     retired_keys: tuple[str, ...]
     retired_key_write_sites: tuple[str, ...]
@@ -140,6 +178,7 @@ class LegacyRuntimeRetirementEvidenceV1:
     blocker_codes: tuple[str, ...]
     warning_codes: tuple[str, ...]
     ordinary_runtime_evidence: OrdinaryRuntimeEvidenceV1
+    production_graph_evidence: ProductionGraphEvidenceV1
     session_state_evidence: SessionStateEvidenceV1
     offline_oracle_evidence: OfflineOracleEvidenceV1
     retained_dependency_inventory: tuple[DependencyInventoryEntryV1, ...]
@@ -196,6 +235,7 @@ _BLOCKER_CODES = {
     "target": "M5C2R_TARGET_COMMIT_MISMATCH",
     "documents": "M5C2R_GOVERNING_DOCUMENT_MISSING",
     "inventory": "M5C2R_DEPENDENCY_INVENTORY_STALE",
+    "unresolved_graph": "M5C2R_ORDINARY_RUNTIME_CALL_GRAPH_UNRESOLVED",
 }
 
 _REQUIRED_CHARACTERIZATION_TESTS = (
@@ -234,6 +274,13 @@ _REQUIRED_CHARACTERIZATION_TESTS = (
     "tests/test_legacy_retirement_audit.py::test_m5c2r_post_5c2_protected_floor_paths_remain_unified_only",
     "tests/test_legacy_retirement_audit.py::test_m5c2r_cli_exits_zero_for_current_checkout",
     "tests/test_legacy_retirement_audit.py::test_m5c2r_injected_forbidden_import_makes_cli_nonzero",
+    "tests/test_legacy_retirement_audit.py::test_m5c2r_transitive_direct_import_is_blocked",
+    "tests/test_legacy_retirement_audit.py::test_m5c2r_transitive_module_alias_is_blocked",
+    "tests/test_legacy_retirement_audit.py::test_m5c2r_reexported_forbidden_symbol_is_blocked",
+    "tests/test_legacy_retirement_audit.py::test_m5c2r_wrapper_chain_has_complete_witness_path",
+    "tests/test_legacy_retirement_audit.py::test_m5c2r_deletion_candidate_production_consumer_is_blocked",
+    "tests/test_legacy_retirement_audit.py::test_m5c2r_unresolved_relevant_dispatch_fails_closed",
+    "tests/test_legacy_retirement_audit.py::test_m5c2r_nonproduction_forbidden_calls_remain_isolated",
     "tests/test_legacy_retirement_audit.py::test_m5c2r_production_approval_and_signoffs_remain_pending",
     "tests/test_legacy_retirement_audit.py::test_m5c2r_no_production_code_declares_legacy_code_deleted",
     "tests/test_legacy_retirement_audit.py::test_m5c2r_existing_release_audit_behavior_source_is_unchanged",
@@ -347,32 +394,32 @@ def _inventory() -> tuple[DependencyInventoryEntryV1, ...]:
         DependencyInventoryEntryV1(
             "src/bus_schedule_engine/ui_utils.py::validation_frame",
             DependencyClassificationV1.AUTHORIZED_5C3_DELETION_CANDIDATE,
-            ("legacy UI tests",),
-            "Legacy-only presentation helper.",
+            ("no current repository consumers",),
+            "Legacy-only presentation helper with no current source consumer.",
         ),
         DependencyInventoryEntryV1(
             "src/bus_schedule_engine/ui_utils.py::block_frame",
             DependencyClassificationV1.AUTHORIZED_5C3_DELETION_CANDIDATE,
-            ("legacy UI tests",),
-            "Legacy-only presentation helper.",
+            ("no current repository consumers",),
+            "Legacy-only presentation helper with no current source consumer.",
         ),
         DependencyInventoryEntryV1(
             "src/bus_schedule_engine/ui_utils.py::scenario_frame",
             DependencyClassificationV1.AUTHORIZED_5C3_DELETION_CANDIDATE,
-            ("legacy UI tests",),
-            "Legacy-only presentation helper.",
+            ("no current repository consumers",),
+            "Legacy-only presentation helper with no current source consumer.",
         ),
         DependencyInventoryEntryV1(
             "src/bus_schedule_engine/ui_utils.py::supply_summary_frame",
             DependencyClassificationV1.AUTHORIZED_5C3_DELETION_CANDIDATE,
-            ("legacy UI tests",),
-            "Legacy-only presentation helper.",
+            ("no current repository consumers",),
+            "Legacy-only presentation helper with no current source consumer.",
         ),
         DependencyInventoryEntryV1(
             "src/bus_schedule_engine/ui_utils.py::regime_frame",
             DependencyClassificationV1.AUTHORIZED_5C3_DELETION_CANDIDATE,
-            ("legacy UI tests",),
-            "Legacy-only presentation helper.",
+            ("no current repository consumers",),
+            "Legacy-only presentation helper with no current source consumer.",
         ),
         DependencyInventoryEntryV1(
             "src/bus_schedule_engine/ui_utils.py::<module>",
@@ -599,6 +646,1202 @@ def _read_source(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+_GRAPH_MODULE_LIMIT = 512
+_GRAPH_SYMBOL_LIMIT = 4096
+_GRAPH_FINDING_LIMIT = 64
+_GRAPH_CONSUMER_LIMIT = 128
+_MODULE_SUFFIX = "::<module>"
+
+
+@dataclass(slots=True)
+class _DefinitionInfo:
+    canonical: str
+    module: str
+    qualname: str
+    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
+    kind: str
+    parent_class: str | None
+    local_definitions: dict[str, str]
+
+
+@dataclass(slots=True)
+class _ModuleInfo:
+    name: str
+    relative_path: str
+    tree: ast.Module
+    is_package: bool
+    bindings: dict[str, str]
+    top_level_definitions: dict[str, str]
+    definitions: dict[str, _DefinitionInfo]
+
+
+@dataclass(frozen=True, order=True, slots=True)
+class _GraphEdge:
+    source: str
+    target: str
+    kind: str
+    site: str
+
+
+@dataclass(frozen=True, order=True, slots=True)
+class _GraphFinding:
+    category: str
+    target: str
+    source: str
+    terminal: str
+    kind: str
+
+
+@dataclass(frozen=True, order=True, slots=True)
+class _RepositoryReference:
+    source: str
+    target: str
+    kind: str
+    site: str
+
+
+@dataclass(slots=True)
+class _ProductionGraphAnalysis:
+    modules: dict[str, _ModuleInfo]
+    definitions: dict[str, _DefinitionInfo]
+    roots: tuple[str, ...]
+    reachable: set[str]
+    edges: set[_GraphEdge]
+    findings: set[_GraphFinding]
+    unresolved: set[UnresolvedCallGraphSiteV1]
+    references: tuple[_RepositoryReference, ...]
+
+
+def _module_node(module: str) -> str:
+    return f"{module}{_MODULE_SUFFIX}"
+
+
+def _module_from_node(node: str) -> str | None:
+    return node[: -len(_MODULE_SUFFIX)] if node.endswith(_MODULE_SUFFIX) else None
+
+
+def _module_name_for_path(repo_root: Path, path: Path) -> str | None:
+    relative = path.relative_to(repo_root)
+    parts = list(relative.parts)
+    if parts[0] == "src":
+        parts = parts[1:]
+    elif relative.as_posix() in ORDINARY_RUNTIME_ROOTS:
+        return relative.with_suffix("").as_posix().replace("/", ".")
+    elif len(parts) == 1 and path.suffix == ".py":
+        return path.stem
+    elif not any(
+        (repo_root / Path(*parts[:index]) / "__init__.py").is_file()
+        for index in range(1, len(parts))
+    ):
+        return None
+    if not parts or Path(parts[-1]).suffix != ".py":
+        return None
+    parts[-1] = Path(parts[-1]).stem
+    if parts[-1] == "__init__":
+        parts.pop()
+    return ".".join(parts) if parts else None
+
+
+def _production_python_paths(repo_root: Path) -> tuple[Path, ...]:
+    paths = {repo_root / relative_path for relative_path in ORDINARY_RUNTIME_ROOTS}
+    paths.update((repo_root / "src").rglob("*.py"))
+    excluded = {
+        ".git",
+        ".github",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        "docs",
+        "examples",
+        "outputs",
+        "scripts",
+        "tests",
+        "tools",
+    }
+    for child in repo_root.iterdir():
+        if not child.is_dir() or child.name in excluded or not (child / "__init__.py").is_file():
+            continue
+        paths.update(child.rglob("*.py"))
+    return tuple(
+        sorted((path for path in paths if path.is_file()), key=lambda item: item.as_posix())
+    )
+
+
+def _statement_child_blocks(statement: ast.stmt) -> Iterable[list[ast.stmt]]:
+    for _field, value in ast.iter_fields(statement):
+        if isinstance(value, list) and value and all(isinstance(item, ast.stmt) for item in value):
+            yield value
+
+
+def _register_definitions(info: _ModuleInfo) -> None:
+    def visit_statements(
+        statements: Sequence[ast.stmt],
+        *,
+        owner: _DefinitionInfo | None,
+        class_qualname: str | None,
+    ) -> None:
+        for statement in statements:
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if class_qualname is not None and owner is None:
+                    qualname = f"{class_qualname}.{statement.name}"
+                    parent_class = f"{info.name}.{class_qualname}"
+                elif owner is not None:
+                    qualname = f"{owner.qualname}.<locals>.{statement.name}"
+                    parent_class = owner.parent_class
+                else:
+                    qualname = statement.name
+                    parent_class = None
+                canonical = f"{info.name}.{qualname}"
+                definition = _DefinitionInfo(
+                    canonical=canonical,
+                    module=info.name,
+                    qualname=qualname,
+                    node=statement,
+                    kind="function",
+                    parent_class=parent_class,
+                    local_definitions={},
+                )
+                info.definitions[canonical] = definition
+                if owner is not None:
+                    owner.local_definitions[statement.name] = canonical
+                elif class_qualname is None:
+                    info.top_level_definitions[statement.name] = canonical
+                visit_statements(statement.body, owner=definition, class_qualname=None)
+                continue
+            if isinstance(statement, ast.ClassDef):
+                if class_qualname is not None and owner is None:
+                    qualname = f"{class_qualname}.{statement.name}"
+                elif owner is not None:
+                    qualname = f"{owner.qualname}.<locals>.{statement.name}"
+                else:
+                    qualname = statement.name
+                canonical = f"{info.name}.{qualname}"
+                definition = _DefinitionInfo(
+                    canonical=canonical,
+                    module=info.name,
+                    qualname=qualname,
+                    node=statement,
+                    kind="class",
+                    parent_class=None,
+                    local_definitions={},
+                )
+                info.definitions[canonical] = definition
+                if owner is not None:
+                    owner.local_definitions[statement.name] = canonical
+                elif class_qualname is None:
+                    info.top_level_definitions[statement.name] = canonical
+                visit_statements(statement.body, owner=None, class_qualname=qualname)
+                continue
+            for block in _statement_child_blocks(statement):
+                visit_statements(block, owner=owner, class_qualname=class_qualname)
+
+    visit_statements(info.tree.body, owner=None, class_qualname=None)
+
+
+def _relative_import_module(info: _ModuleInfo, node: ast.ImportFrom) -> str:
+    if not node.level:
+        return node.module or ""
+    package_parts = info.name.split(".") if info.is_package else info.name.split(".")[:-1]
+    retained = max(0, len(package_parts) - (node.level - 1))
+    parts = package_parts[:retained]
+    if node.module:
+        parts.extend(node.module.split("."))
+    return ".".join(parts)
+
+
+def _import_bindings(
+    info: _ModuleInfo,
+    node: ast.Import | ast.ImportFrom,
+    modules: Mapping[str, _ModuleInfo],
+) -> tuple[dict[str, str], tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    bindings: dict[str, str] = {}
+    loaded: set[str] = set()
+    imported_symbols: set[str] = set()
+    wildcards: set[str] = set()
+    if isinstance(node, ast.Import):
+        for alias in node.names:
+            module = alias.name
+            if module in modules:
+                loaded.add(module)
+            local_name = alias.asname or module.split(".", 1)[0]
+            binding_module = module if alias.asname else module.split(".", 1)[0]
+            bindings[local_name] = (
+                _module_node(binding_module)
+                if binding_module in modules
+                else f"external:{binding_module}"
+            )
+    else:
+        module = _relative_import_module(info, node)
+        if module in modules:
+            loaded.add(module)
+        for alias in node.names:
+            if alias.name == "*":
+                wildcards.add(module)
+                continue
+            submodule = f"{module}.{alias.name}" if module else alias.name
+            if submodule in modules:
+                target = _module_node(submodule)
+                loaded.add(submodule)
+            elif module in modules:
+                target = f"{module}.{alias.name}"
+                imported_symbols.add(target)
+            else:
+                target = f"external:{submodule}"
+            bindings[alias.asname or alias.name] = target
+    expanded_loaded: set[str] = set()
+    for module in loaded:
+        parts = module.split(".")
+        for index in range(1, len(parts) + 1):
+            candidate = ".".join(parts[:index])
+            if candidate in modules:
+                expanded_loaded.add(candidate)
+    return (
+        bindings,
+        tuple(sorted(expanded_loaded)),
+        tuple(sorted(imported_symbols)),
+        tuple(sorted(wildcards)),
+    )
+
+
+def _is_nonruntime_guard(node: ast.If) -> bool:
+    test = node.test
+    if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+        return True
+    if (
+        isinstance(test, ast.Attribute)
+        and isinstance(test.value, ast.Name)
+        and test.value.id == "typing"
+        and test.attr == "TYPE_CHECKING"
+    ):
+        return True
+    if not isinstance(test, ast.Compare) or len(test.ops) != 1 or len(test.comparators) != 1:
+        return False
+    operands = (test.left, test.comparators[0])
+    return any(isinstance(item, ast.Name) and item.id == "__name__" for item in operands) and any(
+        isinstance(item, ast.Constant) and item.value == "__main__" for item in operands
+    )
+
+
+class _ExecutableScopeVisitor(ast.NodeVisitor):
+    def __init__(self, root: ast.Module | ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        self.root = root
+        self.nodes: list[ast.AST] = []
+
+    def generic_visit(self, node: ast.AST) -> None:
+        if node is not self.root and isinstance(
+            node,
+            (ast.Import, ast.ImportFrom, ast.Assign, ast.AnnAssign, ast.NamedExpr, ast.Call),
+        ):
+            self.nodes.append(node)
+        super().generic_visit(node)
+
+    def visit_If(self, node: ast.If) -> None:
+        self.visit(node.test)
+        branches = node.orelse if _is_nonruntime_guard(node) else [*node.body, *node.orelse]
+        for statement in branches:
+            self.visit(statement)
+
+    def _visit_definition_header(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
+    ) -> None:
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        for default in (*node.args.defaults, *node.args.kw_defaults):
+            if default is not None:
+                self.visit(default)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        if node is self.root:
+            for statement in node.body:
+                self.visit(statement)
+        else:
+            self._visit_definition_header(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        if node is self.root:
+            for statement in node.body:
+                self.visit(statement)
+        else:
+            self._visit_definition_header(node)
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        for decorator in node.decorator_list:
+            self.visit(decorator)
+        for base in node.bases:
+            self.visit(base)
+        for keyword in node.keywords:
+            self.visit(keyword.value)
+        for statement in node.body:
+            self.visit(statement)
+
+
+def _scope_nodes(
+    node: ast.Module | ast.FunctionDef | ast.AsyncFunctionDef,
+) -> tuple[ast.AST, ...]:
+    visitor = _ExecutableScopeVisitor(node)
+    visitor.visit(node)
+    return tuple(
+        sorted(
+            visitor.nodes,
+            key=lambda item: (
+                getattr(item, "lineno", 0),
+                getattr(item, "col_offset", 0),
+                type(item).__name__,
+            ),
+        )
+    )
+
+
+def _index_production_modules(
+    repo_root: Path,
+) -> tuple[dict[str, _ModuleInfo], dict[str, _DefinitionInfo]]:
+    modules: dict[str, _ModuleInfo] = {}
+    for path in _production_python_paths(repo_root):
+        module = _module_name_for_path(repo_root, path)
+        if module is None:
+            continue
+        relative_path = path.relative_to(repo_root).as_posix()
+        info = _ModuleInfo(
+            name=module,
+            relative_path=relative_path,
+            tree=ast.parse(_read_source(path), filename=relative_path),
+            is_package=path.name == "__init__.py",
+            bindings={},
+            top_level_definitions={},
+            definitions={},
+        )
+        _register_definitions(info)
+        modules[module] = info
+    for info in modules.values():
+        for node in _scope_nodes(info.tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                bindings, _loaded, _symbols, _wildcards = _import_bindings(info, node, modules)
+                info.bindings.update(bindings)
+        info.bindings.update(info.top_level_definitions)
+    definitions = {
+        canonical: definition
+        for info in modules.values()
+        for canonical, definition in info.definitions.items()
+    }
+    ordered_modules = dict(sorted(modules.items(), key=lambda item: (-len(item[0]), item[0])))
+    return ordered_modules, definitions
+
+
+def _canonicalize_target(
+    target: str | None,
+    modules: Mapping[str, _ModuleInfo],
+    definitions: Mapping[str, _DefinitionInfo],
+    *,
+    seen: frozenset[str] = frozenset(),
+) -> str | None:
+    if not target or target.startswith("external:") or target in seen:
+        return None
+    if target in definitions:
+        return target
+    module_target = _module_from_node(target)
+    if module_target is not None:
+        return target if module_target in modules else None
+    for module in modules:
+        if target == module:
+            return _module_node(module)
+        if not target.startswith(f"{module}."):
+            continue
+        remainder = target[len(module) + 1 :]
+        exact_module = f"{module}.{remainder}"
+        if exact_module in modules:
+            return _module_node(exact_module)
+        exact_definition = f"{module}.{remainder}"
+        if exact_definition in definitions:
+            return exact_definition
+        first, separator, rest = remainder.partition(".")
+        binding = modules[module].bindings.get(first)
+        if binding is None:
+            return None
+        substituted = binding
+        if separator:
+            bound_module = _module_from_node(binding)
+            substituted = (
+                f"{bound_module}.{rest}" if bound_module is not None else f"{binding}.{rest}"
+            )
+        return _canonicalize_target(
+            substituted,
+            modules,
+            definitions,
+            seen=seen | {target},
+        )
+    return None
+
+
+def _expression_target(
+    node: ast.AST,
+    environment: Mapping[str, str],
+    modules: Mapping[str, _ModuleInfo],
+    definitions: Mapping[str, _DefinitionInfo],
+) -> str | None:
+    if isinstance(node, ast.Name):
+        raw = environment.get(node.id, node.id)
+        return _canonicalize_target(raw, modules, definitions) or raw
+    if isinstance(node, ast.Attribute):
+        base = _expression_target(node.value, environment, modules, definitions)
+        if base is None:
+            return None
+        base_module = _module_from_node(base)
+        raw = f"{base_module}.{node.attr}" if base_module is not None else f"{base}.{node.attr}"
+        return _canonicalize_target(raw, modules, definitions) or raw
+    return None
+
+
+def _assigned_names(node: ast.Assign | ast.AnnAssign | ast.NamedExpr) -> tuple[str, ...]:
+    targets: Sequence[ast.AST] = node.targets if isinstance(node, ast.Assign) else (node.target,)
+    names: list[str] = []
+    for target in targets:
+        if isinstance(target, ast.Name):
+            names.append(target.id)
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            names.extend(item.id for item in target.elts if isinstance(item, ast.Name))
+    return tuple(names)
+
+
+def _forbidden_candidates_for_module(
+    module: str,
+    modules: Mapping[str, _ModuleInfo],
+    definitions: Mapping[str, _DefinitionInfo],
+) -> tuple[str, ...]:
+    candidates = {
+        symbol
+        for symbol in (
+            _FORBIDDEN_ANALYSIS_SYMBOLS
+            | _FORBIDDEN_ARTIFACT_SYMBOLS
+            | _FORBIDDEN_COMPARISON_SYMBOLS
+            | _FORBIDDEN_AUTHORITY_SYMBOLS
+        )
+        if symbol.startswith(f"{module}.")
+    }
+    info = modules.get(module)
+    if info is not None:
+        for binding in info.bindings.values():
+            canonical = _canonicalize_target(binding, modules, definitions)
+            if canonical in (
+                _FORBIDDEN_ANALYSIS_SYMBOLS
+                | _FORBIDDEN_ARTIFACT_SYMBOLS
+                | _FORBIDDEN_COMPARISON_SYMBOLS
+                | _FORBIDDEN_AUTHORITY_SYMBOLS
+            ):
+                candidates.add(canonical)
+    return tuple(sorted(candidates))
+
+
+def _node_environment(
+    info: _ModuleInfo,
+    definition: _DefinitionInfo | None,
+    scope_nodes: Sequence[ast.AST],
+    modules: Mapping[str, _ModuleInfo],
+    definitions: Mapping[str, _DefinitionInfo],
+) -> tuple[dict[str, str], dict[str, dict[object, str]], dict[str, tuple[str, ...]]]:
+    environment = dict(info.bindings)
+    environment.update(info.top_level_definitions)
+    if definition is not None:
+        environment.update(definition.local_definitions)
+        if definition.parent_class is not None:
+            environment.update({"self": definition.parent_class, "cls": definition.parent_class})
+    for node in scope_nodes:
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            bindings, _loaded, _symbols, _wildcards = _import_bindings(info, node, modules)
+            environment.update(bindings)
+
+    mappings: dict[str, dict[object, str]] = {}
+    opaque: dict[str, tuple[str, ...]] = {}
+    assignments = [
+        node
+        for node in scope_nodes
+        if isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr)) and node.value is not None
+    ]
+    for _pass in range(4):
+        changed = False
+        for assignment in assignments:
+            names = _assigned_names(assignment)
+            if not names:
+                continue
+            value = assignment.value
+            if isinstance(value, ast.Dict):
+                resolved: dict[object, str] = {}
+                for key, item in zip(value.keys, value.values, strict=True):
+                    if key is None:
+                        continue
+                    target = _expression_target(item, environment, modules, definitions)
+                    canonical = _canonicalize_target(target, modules, definitions)
+                    if canonical is None:
+                        continue
+                    literal_key = key.value if isinstance(key, ast.Constant) else None
+                    resolved[literal_key] = canonical
+                for name in names:
+                    if resolved and mappings.get(name) != resolved:
+                        mappings[name] = resolved
+                        changed = True
+                continue
+            if isinstance(value, ast.Subscript) and isinstance(value.value, ast.Name):
+                choices = mappings.get(value.value.id, {})
+                literal_key = value.slice.value if isinstance(value.slice, ast.Constant) else None
+                selected = choices.get(literal_key)
+                for name in names:
+                    if selected is not None and environment.get(name) != selected:
+                        environment[name] = selected
+                        changed = True
+                    elif choices and literal_key is None:
+                        candidates = tuple(sorted(set(choices.values())))
+                        if opaque.get(name) != candidates:
+                            opaque[name] = candidates
+                            changed = True
+                continue
+            if (
+                isinstance(value, ast.Call)
+                and _dotted_name(value.func) is not None
+                and _dotted_name(value.func).rsplit(".", 1)[-1] == "getattr"
+                and len(value.args) >= 2
+                and not isinstance(value.args[1], ast.Constant)
+            ):
+                base = _expression_target(value.args[0], environment, modules, definitions)
+                base_module = _module_from_node(base or "")
+                if base_module is not None:
+                    candidates = _forbidden_candidates_for_module(base_module, modules, definitions)
+                    for name in names:
+                        if candidates and opaque.get(name) != candidates:
+                            opaque[name] = candidates
+                            changed = True
+                continue
+            target = _expression_target(value, environment, modules, definitions)
+            canonical = _canonicalize_target(target, modules, definitions)
+            if canonical is None and isinstance(value, ast.Call):
+                called = _expression_target(value.func, environment, modules, definitions)
+                called = _canonicalize_target(called, modules, definitions)
+                called_definition = definitions.get(called or "")
+                if called_definition is not None and called_definition.kind == "class":
+                    canonical = called
+            if canonical is None:
+                continue
+            for name in names:
+                if environment.get(name) != canonical:
+                    environment[name] = canonical
+                    changed = True
+        if not changed:
+            break
+    return environment, mappings, opaque
+
+
+def _category_for_target(target: str) -> str | None:
+    if target in _FORBIDDEN_ANALYSIS_SYMBOLS:
+        return "legacy_analysis"
+    if target in _FORBIDDEN_ARTIFACT_SYMBOLS:
+        return "legacy_artifact"
+    if target in _FORBIDDEN_COMPARISON_SYMBOLS:
+        return "side_by_side"
+    if target in _FORBIDDEN_AUTHORITY_SYMBOLS:
+        return "legacy_authority"
+    if target == "bus_schedule_engine.release_audit" or target.startswith(
+        "bus_schedule_engine.release_audit."
+    ):
+        return "release_audit"
+    return None
+
+
+def _category_for_imported_module(module: str) -> str | None:
+    if module == "bus_schedule_engine.service":
+        return "legacy_analysis"
+    if module == "bus_schedule_engine.side_by_side_validation":
+        return "side_by_side"
+    if module == "bus_schedule_engine.release_audit":
+        return "release_audit"
+    if module in {
+        "bus_schedule_engine.block_supply",
+        "bus_schedule_engine.comparison_exporter",
+        "bus_schedule_engine.diagram",
+    }:
+        return "legacy_artifact"
+    return None
+
+
+def _site(info: _ModuleInfo, owner: str, node: ast.AST) -> str:
+    return f"{info.name}::{owner}:{getattr(node, 'lineno', 0)}"
+
+
+def _unresolved_site(
+    info: _ModuleInfo,
+    owner: str,
+    node: ast.AST,
+    construct: str,
+    risk: str,
+) -> UnresolvedCallGraphSiteV1:
+    return UnresolvedCallGraphSiteV1(
+        site=_site(info, owner, node),
+        construct=construct,
+        risk=risk,
+    )
+
+
+def _dynamic_call_unresolved(
+    call: ast.Call,
+    *,
+    info: _ModuleInfo,
+    owner: str,
+    environment: Mapping[str, str],
+    mappings: Mapping[str, Mapping[object, str]],
+    opaque: Mapping[str, tuple[str, ...]],
+    modules: Mapping[str, _ModuleInfo],
+    definitions: Mapping[str, _DefinitionInfo],
+) -> UnresolvedCallGraphSiteV1 | None:
+    dotted = _dotted_name(call.func) or ""
+    leaf = dotted.rsplit(".", 1)[-1]
+    if leaf in {"import_module", "__import__"} and (
+        not call.args
+        or not isinstance(call.args[0], ast.Constant)
+        or not isinstance(call.args[0].value, str)
+    ):
+        return _unresolved_site(
+            info,
+            owner,
+            call,
+            "dynamic-import",
+            "runtime module selection could load a forbidden legacy or release-audit target",
+        )
+    if leaf == "getattr" and len(call.args) >= 2 and not isinstance(call.args[1], ast.Constant):
+        base = _expression_target(call.args[0], environment, modules, definitions)
+        base_module = _module_from_node(base or "")
+        if base_module is not None and _forbidden_candidates_for_module(
+            base_module, modules, definitions
+        ):
+            return _unresolved_site(
+                info,
+                owner,
+                call,
+                "nonliteral-getattr",
+                f"dynamic attribute selection on {base_module} could select a forbidden target",
+            )
+    if isinstance(call.func, ast.Name) and call.func.id in opaque:
+        candidates = opaque[call.func.id]
+        if any(_category_for_target(candidate) is not None for candidate in candidates):
+            return _unresolved_site(
+                info,
+                owner,
+                call,
+                "opaque-callable-alias",
+                "runtime callable selection includes a forbidden target candidate",
+            )
+    if isinstance(call.func, ast.Subscript) and isinstance(call.func.value, ast.Name):
+        choices = mappings.get(call.func.value.id, {})
+        literal_key = call.func.slice.value if isinstance(call.func.slice, ast.Constant) else None
+        if literal_key is None and any(
+            _category_for_target(candidate) is not None for candidate in choices.values()
+        ):
+            return _unresolved_site(
+                info,
+                owner,
+                call,
+                "opaque-callable-mapping",
+                "runtime mapping selection includes a forbidden target candidate",
+            )
+    if leaf == "setattr" and len(call.args) >= 2:
+        base = _expression_target(call.args[0], environment, modules, definitions)
+        base_module = _module_from_node(base or "")
+        name = call.args[1].value if isinstance(call.args[1], ast.Constant) else None
+        candidates = (
+            _forbidden_candidates_for_module(base_module, modules, definitions)
+            if base_module is not None
+            else ()
+        )
+        if candidates and (
+            not isinstance(name, str)
+            or any(candidate.endswith(f".{name}") for candidate in candidates)
+        ):
+            return _unresolved_site(
+                info,
+                owner,
+                call,
+                "callable-global-mutation",
+                "runtime mutation could redirect a forbidden production callable",
+            )
+    return None
+
+
+def _literal_dynamic_module(call: ast.Call) -> str | None:
+    dotted = _dotted_name(call.func) or ""
+    if dotted.rsplit(".", 1)[-1] not in {"import_module", "__import__"} or not call.args:
+        return None
+    value = call.args[0]
+    return value.value if isinstance(value, ast.Constant) and isinstance(value.value, str) else None
+
+
+def _collect_repository_references(
+    repo_root: Path,
+    modules: Mapping[str, _ModuleInfo],
+    definitions: Mapping[str, _DefinitionInfo],
+) -> tuple[_RepositoryReference, ...]:
+    def source_for_node(info: _ModuleInfo, node: ast.AST) -> str:
+        line = getattr(node, "lineno", 0)
+        owners = [
+            definition
+            for definition in info.definitions.values()
+            if definition.kind == "function"
+            and getattr(definition.node, "lineno", 0)
+            <= line
+            <= getattr(definition.node, "end_lineno", 0)
+        ]
+        if not owners:
+            return _module_node(info.name)
+        return min(
+            owners,
+            key=lambda item: (
+                getattr(item.node, "end_lineno", 0) - getattr(item.node, "lineno", 0),
+                item.canonical,
+            ),
+        ).canonical
+
+    references: set[_RepositoryReference] = set()
+    for info in modules.values():
+        environment = {**info.bindings, **info.top_level_definitions}
+        for node in ast.walk(info.tree):
+            source = source_for_node(info, node)
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                bindings, loaded, imported, _wildcards = _import_bindings(info, node, modules)
+                for module in loaded:
+                    references.add(
+                        _RepositoryReference(
+                            source,
+                            _module_node(module),
+                            "import-module",
+                            _site(info, "<repository-reference>", node),
+                        )
+                    )
+                for raw in (*bindings.values(), *imported):
+                    canonical = _canonicalize_target(raw, modules, definitions)
+                    if canonical is None or _module_from_node(canonical) is not None:
+                        continue
+                    kind = (
+                        "compatibility-reexport"
+                        if info.is_package and node in info.tree.body
+                        else "import-symbol"
+                    )
+                    references.add(
+                        _RepositoryReference(
+                            source,
+                            canonical,
+                            kind,
+                            _site(info, "<repository-reference>", node),
+                        )
+                    )
+            elif isinstance(node, ast.Call):
+                target = _expression_target(node.func, environment, modules, definitions)
+                canonical = _canonicalize_target(target, modules, definitions)
+                if canonical is not None:
+                    references.add(
+                        _RepositoryReference(
+                            source,
+                            canonical,
+                            "call-reference",
+                            _site(info, "<repository-reference>", node),
+                        )
+                    )
+
+    for directory, kind in (("tests", "test-support"), ("scripts", "developer-script")):
+        base = repo_root / directory
+        if not base.is_dir():
+            continue
+        for path in sorted(base.rglob("*.py")):
+            relative_path = path.relative_to(repo_root).as_posix()
+            tree = ast.parse(_read_source(path), filename=relative_path)
+            pseudo = _ModuleInfo(
+                name=relative_path.removesuffix(".py").replace("/", "."),
+                relative_path=relative_path,
+                tree=tree,
+                is_package=path.name == "__init__.py",
+                bindings={},
+                top_level_definitions={},
+                definitions={},
+            )
+            source = f"{kind}:{relative_path}::<module>"
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.Import, ast.ImportFrom)):
+                    continue
+                bindings, loaded, imported, _wildcards = _import_bindings(pseudo, node, modules)
+                pseudo.bindings.update(bindings)
+                site = f"{relative_path}:<module>:{node.lineno}"
+                for module in loaded:
+                    references.add(_RepositoryReference(source, _module_node(module), kind, site))
+                for raw in (*bindings.values(), *imported):
+                    canonical = _canonicalize_target(raw, modules, definitions)
+                    if canonical is not None:
+                        references.add(_RepositoryReference(source, canonical, kind, site))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                target = _expression_target(node.func, pseudo.bindings, modules, definitions)
+                canonical = _canonicalize_target(target, modules, definitions)
+                if canonical is not None:
+                    references.add(
+                        _RepositoryReference(
+                            source,
+                            canonical,
+                            kind,
+                            f"{relative_path}:<module>:{node.lineno}",
+                        )
+                    )
+    return tuple(sorted(references))
+
+
+def _build_production_graph(repo_root: Path) -> _ProductionGraphAnalysis:
+    modules, definitions = _index_production_modules(repo_root)
+    root_modules = tuple(
+        sorted(
+            filter(
+                None,
+                (
+                    _module_name_for_path(repo_root, repo_root / relative_path)
+                    for relative_path in ORDINARY_RUNTIME_ROOTS
+                ),
+            )
+        )
+    )
+    roots = tuple(_module_node(module) for module in root_modules)
+    reachable: set[str] = set(roots)
+    edges: set[_GraphEdge] = set()
+    findings: set[_GraphFinding] = set()
+    unresolved: set[UnresolvedCallGraphSiteV1] = set()
+    pending = deque(roots)
+    processed: set[str] = set()
+
+    def add_edge(edge: _GraphEdge, *, traversable: bool = True) -> None:
+        edges.add(edge)
+        if traversable and edge.target not in reachable:
+            reachable.add(edge.target)
+            pending.append(edge.target)
+
+    while pending:
+        current = min(pending)
+        pending.remove(current)
+        if current in processed:
+            continue
+        processed.add(current)
+        module_name = _module_from_node(current)
+        definition = definitions.get(current)
+        if module_name is None and definition is not None:
+            module_name = definition.module
+        info = modules.get(module_name or "")
+        if info is None:
+            continue
+        if definition is not None and definition.kind == "class":
+            initializer = f"{definition.canonical}.__init__"
+            if initializer in definitions:
+                add_edge(
+                    _GraphEdge(
+                        current,
+                        initializer,
+                        "constructor",
+                        f"{info.name}::{definition.qualname}:0",
+                    )
+                )
+            continue
+        scope = info.tree if definition is None else definition.node
+        nodes = _scope_nodes(scope)
+        environment, mappings, opaque = _node_environment(
+            info, definition, nodes, modules, definitions
+        )
+        owner = "<module>" if definition is None else definition.qualname
+        for node in nodes:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                _bindings, loaded, imported, wildcards = _import_bindings(info, node, modules)
+                for loaded_module in loaded:
+                    terminal = _module_node(loaded_module)
+                    add_edge(_GraphEdge(current, terminal, "import", _site(info, owner, node)))
+                    category = _category_for_imported_module(loaded_module)
+                    if category is not None:
+                        findings.add(
+                            _GraphFinding(category, loaded_module, current, terminal, "import")
+                        )
+                for imported_target in imported:
+                    canonical = _canonicalize_target(imported_target, modules, definitions)
+                    category = _category_for_target(canonical or imported_target)
+                    compatibility_reexport = (
+                        definition is None
+                        and info.name == "bus_schedule_engine"
+                        and info.is_package
+                    )
+                    type_import_without_root_authority = (
+                        category == "legacy_authority" and current not in roots
+                    )
+                    if (
+                        category is not None
+                        and not compatibility_reexport
+                        and not type_import_without_root_authority
+                    ):
+                        terminal = canonical or imported_target
+                        add_edge(
+                            _GraphEdge(
+                                current,
+                                terminal,
+                                "forbidden-import",
+                                _site(info, owner, node),
+                            ),
+                            traversable=False,
+                        )
+                        findings.add(_GraphFinding(category, terminal, current, terminal, "import"))
+                for wildcard_module in wildcards:
+                    if wildcard_module in modules and _forbidden_candidates_for_module(
+                        wildcard_module, modules, definitions
+                    ):
+                        unresolved.add(
+                            _unresolved_site(
+                                info,
+                                owner,
+                                node,
+                                "wildcard-import",
+                                f"wildcard import from {wildcard_module} can bind a forbidden target",
+                            )
+                        )
+                continue
+            if not isinstance(node, ast.Call):
+                continue
+            dynamic_unresolved = _dynamic_call_unresolved(
+                node,
+                info=info,
+                owner=owner,
+                environment=environment,
+                mappings=mappings,
+                opaque=opaque,
+                modules=modules,
+                definitions=definitions,
+            )
+            if dynamic_unresolved is not None:
+                unresolved.add(dynamic_unresolved)
+            literal_module = _literal_dynamic_module(node)
+            if literal_module in modules:
+                add_edge(
+                    _GraphEdge(
+                        current,
+                        _module_node(literal_module),
+                        "literal-dynamic-import",
+                        _site(info, owner, node),
+                    )
+                )
+            target = _expression_target(node.func, environment, modules, definitions)
+            canonical = _canonicalize_target(target, modules, definitions)
+            if canonical is not None and canonical in definitions:
+                add_edge(_GraphEdge(current, canonical, "call", _site(info, owner, node)))
+                category = _category_for_target(canonical)
+                if category is not None:
+                    findings.add(_GraphFinding(category, canonical, current, canonical, "call"))
+                continue
+            raw = target or _dotted_name(node.func)
+            if raw and raw.rsplit(".", 1)[-1] in _FORBIDDEN_CALL_LEAVES:
+                terminal = f"unresolved:{raw}"
+                add_edge(
+                    _GraphEdge(
+                        current,
+                        terminal,
+                        "conservative-leaf-call",
+                        _site(info, owner, node),
+                    ),
+                    traversable=False,
+                )
+                leaf = raw.rsplit(".", 1)[-1]
+                category = next(
+                    (
+                        candidate_category
+                        for candidate_category, symbols in (
+                            ("legacy_analysis", _FORBIDDEN_ANALYSIS_SYMBOLS),
+                            ("legacy_artifact", _FORBIDDEN_ARTIFACT_SYMBOLS),
+                            ("side_by_side", _FORBIDDEN_COMPARISON_SYMBOLS),
+                        )
+                        if leaf in {symbol.rsplit(".", 1)[-1] for symbol in symbols}
+                    ),
+                    "legacy_analysis",
+                )
+                findings.add(_GraphFinding(category, terminal, current, terminal, "call"))
+
+    references = _collect_repository_references(repo_root, modules, definitions)
+    return _ProductionGraphAnalysis(
+        modules=modules,
+        definitions=definitions,
+        roots=roots,
+        reachable=reachable,
+        edges=edges,
+        findings=findings,
+        unresolved=unresolved,
+        references=references,
+    )
+
+
+def _shortest_witness_paths(graph: _ProductionGraphAnalysis) -> dict[str, tuple[str, ...]]:
+    adjacency: dict[str, set[str]] = defaultdict(set)
+    for edge in graph.edges:
+        adjacency[edge.source].add(edge.target)
+    paths: dict[str, tuple[str, ...]] = {root: (root,) for root in graph.roots}
+    pending = deque(sorted(graph.roots))
+    while pending:
+        source = pending.popleft()
+        for target in sorted(adjacency.get(source, ())):
+            candidate = (*paths[source], target)
+            existing = paths.get(target)
+            if existing is None or (len(candidate), candidate) < (len(existing), existing):
+                paths[target] = candidate
+                pending.append(target)
+    return paths
+
+
+def _inventory_target_canonical(
+    target: str,
+    modules: Mapping[str, _ModuleInfo],
+) -> str:
+    relative_path, _separator, symbol = target.partition("::")
+    module = next(
+        (info.name for info in modules.values() if info.relative_path == relative_path),
+        None,
+    )
+    if module is None:
+        return target
+    return _module_node(module) if symbol == "<module>" else f"{module}.{symbol}"
+
+
+def _reference_matches_inventory_target(reference: str, target: str) -> bool:
+    module = _module_from_node(target)
+    if module is not None:
+        reference_module = _module_from_node(reference)
+        return reference_module == module or reference.startswith(f"{module}.")
+    return reference == target
+
+
+def _consumer_label(reference: _RepositoryReference) -> str:
+    return f"{reference.source} [{reference.kind} at {reference.site}]"
+
+
+def _reconcile_inventory_consumers(
+    graph: _ProductionGraphAnalysis,
+    inventory: Sequence[DependencyInventoryEntryV1],
+) -> tuple[
+    tuple[DeletionCandidateConsumerEvidenceV1, ...],
+    tuple[str, ...],
+    tuple[str, ...],
+]:
+    candidate_targets = {
+        _inventory_target_canonical(item.target, graph.modules): item.target
+        for item in inventory
+        if item.classification == DependencyClassificationV1.AUTHORIZED_5C3_DELETION_CANDIDATE
+    }
+    evidence: list[DeletionCandidateConsumerEvidenceV1] = []
+    unsafe: set[str] = set()
+    overflow: set[str] = set()
+    for canonical, target in sorted(candidate_targets.items(), key=lambda item: item[1]):
+        ordinary = {
+            f"{edge.source} [{edge.kind} at {edge.site}]"
+            for edge in graph.edges
+            if edge.source in graph.reachable
+            and _reference_matches_inventory_target(edge.target, canonical)
+            and not _reference_matches_inventory_target(edge.source, canonical)
+        }
+        allowed: set[str] = set()
+        for reference in graph.references:
+            if not _reference_matches_inventory_target(reference.target, canonical):
+                continue
+            if _reference_matches_inventory_target(reference.source, canonical):
+                continue
+            label = _consumer_label(reference)
+            source_is_candidate = any(
+                _reference_matches_inventory_target(reference.source, candidate)
+                for candidate in candidate_targets
+            )
+            if reference.kind == "compatibility-reexport" or source_is_candidate:
+                allowed.add(f"compatibility-wrapper:{label}")
+            elif reference.source.startswith(("test-support:", "developer-script:")):
+                allowed.add(label)
+            else:
+                allowed.add(f"nonordinary-production:{label}")
+        if ordinary:
+            unsafe.add(target)
+        if len(ordinary) > _GRAPH_CONSUMER_LIMIT or len(allowed) > _GRAPH_CONSUMER_LIMIT:
+            overflow.add(target)
+        evidence.append(
+            DeletionCandidateConsumerEvidenceV1(
+                target=target,
+                ordinary_production_consumers=tuple(sorted(ordinary))[:_GRAPH_CONSUMER_LIMIT],
+                allowed_remaining_consumers=tuple(sorted(allowed))[:_GRAPH_CONSUMER_LIMIT],
+            )
+        )
+    return tuple(evidence), tuple(sorted(unsafe)), tuple(sorted(overflow))
+
+
+def _missing_shared_consumers(
+    graph: _ProductionGraphAnalysis,
+    inventory: Sequence[DependencyInventoryEntryV1],
+) -> tuple[str, ...]:
+    missing: list[str] = []
+    for item in inventory:
+        if item.classification != DependencyClassificationV1.MUST_REMAIN_SHARED_DEPENDENCY:
+            continue
+        canonical = _inventory_target_canonical(item.target, graph.modules)
+        has_consumer = canonical in graph.reachable or any(
+            _reference_matches_inventory_target(reference.target, canonical)
+            and not _reference_matches_inventory_target(reference.source, canonical)
+            and not reference.source.startswith(("test-support:", "developer-script:"))
+            for reference in graph.references
+        )
+        if not has_consumer:
+            missing.append(item.target)
+    return tuple(sorted(missing))
+
+
+def _graph_evidence(
+    graph: _ProductionGraphAnalysis,
+    consumer_evidence: tuple[DeletionCandidateConsumerEvidenceV1, ...],
+) -> ProductionGraphEvidenceV1:
+    audited_modules = tuple(
+        sorted(module for module in graph.modules if _module_node(module) in graph.reachable)
+    )
+    reachable_symbols = tuple(sorted(graph.reachable))
+    unresolved = tuple(
+        sorted(graph.unresolved, key=lambda item: (item.site, item.construct, item.risk))
+    )
+    paths = _shortest_witness_paths(graph)
+    witnesses = tuple(
+        sorted(
+            (
+                ForbiddenWitnessPathV1(
+                    category=finding.category,
+                    target=finding.target,
+                    path=(
+                        (*paths[finding.source], finding.terminal)
+                        if finding.source in paths
+                        else (finding.terminal,)
+                    ),
+                )
+                for finding in graph.findings
+            ),
+            key=lambda item: (item.category, item.target, item.path),
+        )
+    )
+    fingerprint_payload = {
+        "roots": graph.roots,
+        "modules": audited_modules,
+        "reachable": reachable_symbols,
+        "edges": [(edge.source, edge.target, edge.kind, edge.site) for edge in sorted(graph.edges)],
+        "unresolved": [asdict(item) for item in unresolved],
+        "findings": [asdict(item) for item in witnesses],
+    }
+    fingerprint = hashlib.sha256(_canonical_payload(fingerprint_payload)).hexdigest()
+    return ProductionGraphEvidenceV1(
+        root_symbols=graph.roots,
+        audited_production_module_count=len(audited_modules),
+        audited_production_modules=audited_modules[:_GRAPH_MODULE_LIMIT],
+        reachable_production_symbol_count=len(reachable_symbols),
+        reachable_production_symbols=reachable_symbols[:_GRAPH_SYMBOL_LIMIT],
+        resolved_edge_count=len(graph.edges),
+        unresolved_relevant_site_count=len(unresolved),
+        unresolved_relevant_sites=unresolved[:_GRAPH_FINDING_LIMIT],
+        forbidden_witness_path_count=len(witnesses),
+        forbidden_witness_paths=witnesses[:_GRAPH_FINDING_LIMIT],
+        ordinary_runtime_module_graph_fingerprint=fingerprint,
+        deletion_candidate_production_consumers=consumer_evidence,
+    )
+
+
 def _tree(repo_root: Path, relative_path: str) -> ast.Module:
     return ast.parse(_read_source(repo_root / relative_path), filename=relative_path)
 
@@ -628,34 +1871,6 @@ def _imports_and_calls(tree: ast.AST) -> tuple[set[str], set[str]]:
     return imports, calls
 
 
-def _ordinary_source_audit(repo_root: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    imports: set[str] = set()
-    calls: set[str] = set()
-    for relative_path in ORDINARY_RUNTIME_ROOTS:
-        file_imports, file_calls = _imports_and_calls(_tree(repo_root, relative_path))
-        imports.update(file_imports)
-        calls.update(file_calls)
-    forbidden_symbols = (
-        _FORBIDDEN_ANALYSIS_SYMBOLS
-        | _FORBIDDEN_ARTIFACT_SYMBOLS
-        | _FORBIDDEN_COMPARISON_SYMBOLS
-        | _FORBIDDEN_AUTHORITY_SYMBOLS
-    )
-    forbidden_imports = {
-        imported
-        for imported in imports
-        if imported in forbidden_symbols
-        or any(
-            imported == module or imported.startswith(f"{module}.")
-            for module in _FORBIDDEN_RELEASE_MODULES
-        )
-        or imported
-        in {"bus_schedule_engine.service", "bus_schedule_engine.side_by_side_validation"}
-    }
-    forbidden_calls = {call for call in calls if call.rsplit(".", 1)[-1] in _FORBIDDEN_CALL_LEAVES}
-    return tuple(sorted(forbidden_imports)), tuple(sorted(forbidden_calls))
-
-
 def _function_definitions(tree: ast.Module) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
     return {
         node.name: node
@@ -681,21 +1896,6 @@ def _local_call_closure(tree: ast.Module, root_name: str) -> tuple[str, ...]:
             if leaf in definitions and leaf not in reached:
                 pending.append(leaf)
     return tuple(sorted(reached))
-
-
-def _calls_in_functions(tree: ast.Module, names: Iterable[str]) -> set[str]:
-    definitions = _function_definitions(tree)
-    calls: set[str] = set()
-    for name in names:
-        definition = definitions.get(name)
-        if definition is None:
-            continue
-        for node in ast.walk(definition):
-            if isinstance(node, ast.Call):
-                dotted = _dotted_name(node.func)
-                if dotted:
-                    calls.add(dotted)
-    return calls
 
 
 def _readiness_precedes_analysis(tree: ast.Module) -> bool:
@@ -1087,51 +2287,49 @@ def build_legacy_retirement_evidence_v1(
     if _git_output(repo_root, "status", "--porcelain"):
         warnings.add("M5C2R_WORKTREE_HAS_UNCOMMITTED_CHANGES")
 
-    forbidden_imports, forbidden_calls = _ordinary_source_audit(repo_root)
-    all_ordinary_imports: set[str] = set()
-    for relative_path in ORDINARY_RUNTIME_ROOTS:
-        imports, _calls = _imports_and_calls(_tree(repo_root, relative_path))
-        all_ordinary_imports.update(imports)
+    graph = _build_production_graph(repo_root)
+    if graph.unresolved:
+        blockers.add(_BLOCKER_CODES["unresolved_graph"])
+    reachable_module_count = sum(
+        _module_node(module) in graph.reachable for module in graph.modules
+    )
+    if len(graph.reachable) > _GRAPH_SYMBOL_LIMIT or reachable_module_count > _GRAPH_MODULE_LIMIT:
+        graph.unresolved.add(
+            UnresolvedCallGraphSiteV1(
+                site="ordinary-runtime::<graph>:0",
+                construct="reachable-symbol-evidence-limit",
+                risk="the bounded evidence representation cannot retain every reachable symbol",
+            )
+        )
+        blockers.add(_BLOCKER_CODES["unresolved_graph"])
 
+    forbidden_imports = tuple(
+        sorted(finding.target for finding in graph.findings if finding.kind == "import")
+    )
+    forbidden_calls = tuple(
+        sorted(finding.target for finding in graph.findings if finding.kind == "call")
+    )
     analysis_pipeline_tree = _tree(repo_root, "src/bus_schedule_engine/application_pipeline.py")
     call_closure = _local_call_closure(
         analysis_pipeline_tree,
         "run_unified_application_pipeline_v1",
     )
-    reachable_calls = _calls_in_functions(analysis_pipeline_tree, call_closure)
-    reachable_forbidden = {
-        call for call in reachable_calls if call.rsplit(".", 1)[-1] in _FORBIDDEN_CALL_LEAVES
-    }
-    forbidden_calls = tuple(sorted({*forbidden_calls, *reachable_forbidden}))
+    reachable_forbidden = set(forbidden_calls)
 
     analysis_findings = {
-        finding
-        for finding in (*forbidden_imports, *forbidden_calls)
-        if finding.rsplit(".", 1)[-1]
-        in {symbol.rsplit(".", 1)[-1] for symbol in _FORBIDDEN_ANALYSIS_SYMBOLS}
+        finding for finding in graph.findings if finding.category == "legacy_analysis"
     }
     artifact_findings = {
-        finding
-        for finding in (*forbidden_imports, *forbidden_calls)
-        if finding.rsplit(".", 1)[-1]
-        in {symbol.rsplit(".", 1)[-1] for symbol in _FORBIDDEN_ARTIFACT_SYMBOLS}
+        finding for finding in graph.findings if finding.category == "legacy_artifact"
     }
     comparison_findings = {
-        finding
-        for finding in (*forbidden_imports, *forbidden_calls)
-        if finding.rsplit(".", 1)[-1]
-        in {symbol.rsplit(".", 1)[-1] for symbol in _FORBIDDEN_COMPARISON_SYMBOLS}
+        finding for finding in graph.findings if finding.category == "side_by_side"
     }
     authority_findings = {
-        finding for finding in forbidden_imports if finding in _FORBIDDEN_AUTHORITY_SYMBOLS
+        finding for finding in graph.findings if finding.category == "legacy_authority"
     }
     release_findings = {
-        finding
-        for finding in forbidden_imports
-        if any(
-            finding == module or finding.startswith(f"{module}.")
-            for module in _FORBIDDEN_RELEASE_MODULES
-        )
+        finding for finding in graph.findings if finding.category == "release_audit"
     }
     if analysis_findings:
         blockers.add(_BLOCKER_CODES["analysis"])
@@ -1199,7 +2397,11 @@ def build_legacy_retirement_evidence_v1(
     if retired_writes or retired_reads:
         blockers.add(_BLOCKER_CODES["authority"])
 
-    offline = _offline_oracle_evidence(repo_root, tuple(sorted(all_ordinary_imports)))
+    ordinary_modules = tuple(
+        sorted(module for module in graph.modules if _module_node(module) in graph.reachable)
+    )
+    offline = _offline_oracle_evidence(repo_root, ordinary_modules)
+    offline = replace(offline, reachable_from_ordinary_runtime=bool(release_findings))
     if offline.reachable_from_ordinary_runtime:
         blockers.add(_BLOCKER_CODES["release"])
     if not (
@@ -1230,6 +2432,18 @@ def build_legacy_retirement_evidence_v1(
     if shared_misclassified:
         blockers.add(_BLOCKER_CODES["shared"])
 
+    consumer_evidence, unsafe_candidates, consumer_overflow = _reconcile_inventory_consumers(
+        graph, inventory
+    )
+    if unsafe_candidates:
+        blockers.add(_BLOCKER_CODES["shared"])
+    missing_shared_consumers = _missing_shared_consumers(graph, inventory)
+    if missing_shared_consumers:
+        blockers.add(_BLOCKER_CODES["shared"])
+    if consumer_overflow:
+        blockers.add(_BLOCKER_CODES["inventory"])
+    production_graph = _graph_evidence(graph, consumer_evidence)
+
     test_functions = _test_functions(repo_root)
     missing_tests = tuple(
         test_id for test_id in _REQUIRED_CHARACTERIZATION_TESTS if test_id not in test_functions
@@ -1250,9 +2464,8 @@ def build_legacy_retirement_evidence_v1(
         "build_protected_service_floor_enforcement_authority_v1",
         "_analyze_normalized_and_optimize_schedule_v1",
     }
-    if not required_protected_call_leaves.issubset(
-        {call.rsplit(".", 1)[-1] for call in reachable_calls}
-    ):
+    reachable_graph_leaves = {symbol.rsplit(".", 1)[-1] for symbol in graph.reachable}
+    if not required_protected_call_leaves.issubset(reachable_graph_leaves):
         blockers.add(_BLOCKER_CODES["coverage"])
 
     ordinary = OrdinaryRuntimeEvidenceV1(
@@ -1324,6 +2537,7 @@ def build_legacy_retirement_evidence_v1(
         blocker_codes=sorted_blockers,
         warning_codes=tuple(sorted(warnings)),
         ordinary_runtime_evidence=ordinary,
+        production_graph_evidence=production_graph,
         session_state_evidence=session,
         offline_oracle_evidence=offline,
         retained_dependency_inventory=inventory,
@@ -1339,18 +2553,22 @@ __all__ = [
     "APPROVED_PAGE5_FILENAMES",
     "AUTHORITATIVE_BASELINE_COMMIT",
     "DependencyClassificationV1",
+    "DeletionCandidateConsumerEvidenceV1",
     "DependencyInventoryEntryV1",
     "EVIDENCE_PROFILE_V1",
     "GOVERNING_DOCUMENT_PATHS",
     "HumanSignoffV1",
     "ImplementationConclusionV1",
     "LegacyRuntimeRetirementEvidenceV1",
+    "ForbiddenWitnessPathV1",
     "OfflineOracleEvidenceV1",
     "ORDINARY_RUNTIME_ROOTS",
     "OrdinaryRuntimeEvidenceV1",
     "ProductionApprovalStatusV1",
+    "ProductionGraphEvidenceV1",
     "RETIRED_SESSION_KEYS",
     "SessionStateEvidenceV1",
+    "UnresolvedCallGraphSiteV1",
     "build_legacy_retirement_evidence_v1",
     "evidence_to_dict_v1",
     "evidence_to_json_v1",

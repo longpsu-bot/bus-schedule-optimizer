@@ -100,11 +100,26 @@ def test_m5c2r_fingerprint_detects_tampering(report) -> None:
 
 def test_m5c2r_current_ordinary_roots_have_no_forbidden_legacy_import_path(report) -> None:
     ordinary = report.ordinary_runtime_evidence
+    graph = report.production_graph_evidence
 
     assert ordinary.forbidden_imports == ()
     assert ordinary.forbidden_calls == ()
     assert ordinary.analysis_bundle_is_result_authority is False
     assert ordinary.authoritative_entrypoint.endswith("run_unified_application_pipeline_v1")
+    assert graph.audited_production_module_count == len(graph.audited_production_modules)
+    assert graph.reachable_production_symbol_count == len(graph.reachable_production_symbols)
+    assert graph.resolved_edge_count > graph.reachable_production_symbol_count
+    assert "bus_schedule_engine.optimization_service" in graph.audited_production_modules
+    assert "bus_schedule_engine.contracts_v1.heuristic_solver" in (graph.audited_production_modules)
+    assert graph.unresolved_relevant_sites == ()
+    assert graph.unresolved_relevant_site_count == 0
+    assert graph.forbidden_witness_paths == ()
+    assert graph.forbidden_witness_path_count == 0
+    assert len(graph.ordinary_runtime_module_graph_fingerprint) == 64
+    assert all(
+        not candidate.ordinary_production_consumers
+        for candidate in graph.deletion_candidate_production_consumers
+    )
 
 
 def test_m5c2r_ready_input_invokes_no_legacy_entry_point(
@@ -240,6 +255,7 @@ def test_m5c2r_release_audit_remains_offline_only(report) -> None:
 def test_m5c2r_evidence_json_omits_sensitive_content_and_absolute_paths(report) -> None:
     serialized = evidence_to_json_v1(report)
 
+    assert len(serialized.encode("utf-8")) < 512_000
     for prohibited in (
         '"legacy_value"',
         '"unified_value"',
@@ -341,6 +357,267 @@ def test_m5c2r_injected_forbidden_import_makes_cli_nonzero(
     assert exit_code == 1
     assert payload["implementation_conclusion"] == "BLOCKED_FROM_FORMAL_APPROVAL"
     assert "M5C2R_ORDINARY_RUNTIME_LEGACY_ANALYSIS_REACHABLE" in payload["blocker_codes"]
+
+
+def _run_injected_audit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    injections,
+) -> tuple[int, dict[str, object]]:
+    output = tmp_path / "injected-evidence.json"
+    real_read_source = evidence_module._read_source
+    resolved_injections = {
+        (ROOT / relative_path).resolve(): transform
+        for relative_path, transform in injections.items()
+    }
+
+    def injected_read_source(path: Path) -> str:
+        source = real_read_source(path)
+        transform = resolved_injections.get(path.resolve())
+        return transform(source) if transform is not None else source
+
+    monkeypatch.setattr(evidence_module, "_read_source", injected_read_source)
+    exit_code = main(
+        [
+            "--repo-root",
+            str(ROOT),
+            "--target-commit",
+            _head_commit(),
+            "--output",
+            str(output),
+        ]
+    )
+    return exit_code, json.loads(output.read_text(encoding="utf-8"))
+
+
+def _inject_reachable_optimizer_call(
+    source: str,
+    *,
+    imports: str,
+    call_source: str,
+    helpers: str = "",
+) -> str:
+    marker = '    """Assess and optimize an already normalized, verified Contract V1 bundle."""'
+    assert marker in source
+    injected = source.replace(marker, f"{marker}\n{call_source}", 1)
+    return f"{imports}{injected}\n{helpers}"
+
+
+def _graph_witnesses(payload: dict[str, object]) -> list[dict[str, object]]:
+    graph = payload["production_graph_evidence"]
+    assert isinstance(graph, dict)
+    witnesses = graph["forbidden_witness_paths"]
+    assert isinstance(witnesses, list)
+    return witnesses
+
+
+def test_m5c2r_transitive_direct_import_is_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports="from bus_schedule_engine.service import run_analysis\n",
+                    call_source="    run_analysis(imported)",
+                )
+            )
+        },
+    )
+
+    assert exit_code == 1
+    assert "M5C2R_ORDINARY_RUNTIME_LEGACY_ANALYSIS_REACHABLE" in payload["blocker_codes"]
+    assert any(
+        witness["target"] == "bus_schedule_engine.service.run_analysis"
+        for witness in _graph_witnesses(payload)
+    )
+
+
+def test_m5c2r_transitive_module_alias_is_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports="import bus_schedule_engine.service as legacy_service\n",
+                    call_source=(
+                        "    legacy_runner = legacy_service.run_analysis\n"
+                        "    legacy_runner(imported)"
+                    ),
+                )
+            )
+        },
+    )
+
+    assert exit_code == 1
+    assert any(
+        witness["target"] == "bus_schedule_engine.service.run_analysis"
+        for witness in _graph_witnesses(payload)
+    )
+
+
+def test_m5c2r_reexported_forbidden_symbol_is_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/__init__.py": lambda source: (
+                "from .service import run_analysis as retired_analysis\n" + source
+            ),
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports="from bus_schedule_engine import retired_analysis\n",
+                    call_source="    retired_analysis(imported)",
+                )
+            ),
+        },
+    )
+
+    assert exit_code == 1
+    assert any(
+        witness["target"] == "bus_schedule_engine.service.run_analysis"
+        for witness in _graph_witnesses(payload)
+    )
+
+
+def test_m5c2r_wrapper_chain_has_complete_witness_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    helpers = """
+def _m5c2r_helper_b(imported):
+    return run_analysis(imported)
+
+
+def _m5c2r_helper_a(imported):
+    return _m5c2r_helper_b(imported)
+"""
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports="from bus_schedule_engine.service import run_analysis\n",
+                    call_source="    _m5c2r_helper_a(imported)",
+                    helpers=helpers,
+                )
+            )
+        },
+    )
+
+    assert exit_code == 1
+    witness = next(
+        item
+        for item in _graph_witnesses(payload)
+        if item["target"] == "bus_schedule_engine.service.run_analysis"
+        and "bus_schedule_engine.optimization_service._m5c2r_helper_a" in item["path"]
+    )
+    path = witness["path"]
+    assert path.index("bus_schedule_engine.optimization_service._m5c2r_helper_a") < path.index(
+        "bus_schedule_engine.optimization_service._m5c2r_helper_b"
+    )
+    assert path[-1] == "bus_schedule_engine.service.run_analysis"
+
+
+def test_m5c2r_deletion_candidate_production_consumer_is_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports=("from bus_schedule_engine.diagram import build_comparison_diagram\n"),
+                    call_source="    build_comparison_diagram(imported)",
+                )
+            )
+        },
+    )
+
+    assert exit_code == 1
+    assert "M5C2R_SHARED_DEPENDENCY_MARKED_FOR_DELETION" in payload["blocker_codes"]
+    graph = payload["production_graph_evidence"]
+    candidate = next(
+        item
+        for item in graph["deletion_candidate_production_consumers"]
+        if item["target"] == "src/bus_schedule_engine/diagram.py::<module>"
+    )
+    assert candidate["ordinary_production_consumers"]
+
+
+def test_m5c2r_unresolved_relevant_dispatch_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/optimization_service.py": lambda source: (
+                _inject_reachable_optimizer_call(
+                    source,
+                    imports="import bus_schedule_engine.service as legacy_service\n",
+                    call_source=(
+                        "    selected = getattr(legacy_service, selected_legacy_name)\n"
+                        "    selected(imported)"
+                    ),
+                )
+            )
+        },
+    )
+
+    assert exit_code == 1
+    assert "M5C2R_ORDINARY_RUNTIME_CALL_GRAPH_UNRESOLVED" in payload["blocker_codes"]
+    graph = payload["production_graph_evidence"]
+    assert any(
+        site["construct"] in {"nonliteral-getattr", "opaque-callable-alias"}
+        for site in graph["unresolved_relevant_sites"]
+    )
+
+
+def test_m5c2r_nonproduction_forbidden_calls_remain_isolated(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    offline_helper = """
+
+def _m5c2r_offline_only(imported):
+    from bus_schedule_engine.service import run_analysis
+
+    return run_analysis(imported)
+"""
+    exit_code, payload = _run_injected_audit(
+        tmp_path,
+        monkeypatch,
+        {
+            "src/bus_schedule_engine/release_audit.py": lambda source: source + offline_helper,
+            "scripts/build_sample_artifacts.py": lambda source: source + offline_helper,
+            "tests/test_legacy_retirement_audit.py": lambda source: source + offline_helper,
+        },
+    )
+
+    assert exit_code == 0
+    assert payload["implementation_conclusion"] == "READY_FOR_FORMAL_APPROVAL"
+    assert payload["blocker_codes"] == []
+    assert payload["production_graph_evidence"]["forbidden_witness_paths"] == []
 
 
 def test_m5c2r_production_approval_and_signoffs_remain_pending(report) -> None:

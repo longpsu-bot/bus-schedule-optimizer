@@ -66,13 +66,28 @@ Streamlit, test, README, and governing-document inputs. A dirty tree is recorded
 that the final review package can require a clean committed target without making focused tests
 depend on repository staging state.
 
+The ordinary-runtime proof is a repository-level production import/call graph rooted at
+`streamlit_app.py` and Pages 01–05. It indexes repository production modules, canonicalizes local
+modules and symbols, and follows executable module imports and statically resolved function,
+constructor, and method calls. Resolution covers absolute and relative imports, import aliases,
+directly imported symbols, module-attribute calls, package `__init__.py` re-exports, and local
+callable/instance aliases. Tests, scripts, and explicit offline CLI modules are indexed as
+consumer evidence but are not ordinary roots.
+
+The bounded graph evidence records root symbols, audited-module and reachable-symbol counts and
+sorted values, resolved-edge count, relevant unresolved sites, forbidden witness paths, a
+canonical graph fingerprint, and derived consumer evidence for every proposed deletion
+candidate. The canonical report fingerprint covers all of these fields. If a bounded limit would
+omit a fact needed for the conclusion, the audit fails closed instead of silently truncating the
+proof.
+
 ## 4. Implementation-gate evidence
 
 | Gate | Evidence and conclusion |
 | --- | --- |
-| Ordinary runtime | AST inspection of `streamlit_app.py` and Pages 01–05 finds one analysis entry point: `run_unified_application_pipeline_v1`. No ordinary import or reachable call uses legacy analysis, the parallel adapter, side-by-side comparison, legacy chart/export builders, or `AnalysisBundle` result authority. |
+| Ordinary runtime | The transitive repository production graph rooted at `streamlit_app.py` and Pages 01–05 reaches the unified application, optimization, solver, presentation, and artifact helpers through canonical import and call edges. No reachable path uses legacy analysis, the parallel adapter, side-by-side comparison, legacy chart/export builders, `AnalysisBundle` result authority, or release tooling. |
 | Readiness and import failure | The unified pipeline assesses readiness before normalization or analysis. Existing behavioral tests prove import-invalid input never enters the pipeline and not-ready input returns readiness facts only. |
-| Fail-closed behavior | Normalization, evaluation, solver, presentation, semantic-integrity, and artifact failures retain Contract V1 failure semantics. The reachable unified call closure contains no legacy fallback entry point. |
+| Fail-closed behavior | Normalization, evaluation, solver, presentation, semantic-integrity, and artifact failures retain Contract V1 failure semantics. Relevant nonliteral `getattr`, dynamic import, wildcard import, opaque callable mapping/alias, and callable-global mutation sites block approval when they can conceal or redirect a forbidden target. |
 | Completed outcomes | Candidate rejection remains a completed no-authoritative-C result. `SolverChoice.BOTH` retains one accepted authoritative C when another candidate is rejected. |
 | Visible authority | `VisibleResultModeV1` contains only `NO_RESULT`, `INPUT_NOT_READY`, `UNIFIED_CONTRACT_V1`, `UNIFIED_ARTIFACT_FAILED`, and `CONTRACT_V1_FAILED`; Pages 02–05 reference no legacy mode. |
 | Page 05 | Only `Bus_Schedule_Contract_V1_Result.xlsx`, `Bus_Schedule_Contract_V1_Charts.html`, and `Bus_Schedule_Contract_V1_Overview.png` are exposed. |
@@ -107,6 +122,7 @@ finding.
 | `M5C2R_TARGET_COMMIT_MISMATCH` | The supplied target is not a full SHA equal to inspected `HEAD`. |
 | `M5C2R_GOVERNING_DOCUMENT_MISSING` | An authoritative 5C or 6A document is absent. |
 | `M5C2R_DEPENDENCY_INVENTORY_STALE` | An inventoried retained target no longer exists at the audited checkout. |
+| `M5C2R_ORDINARY_RUNTIME_CALL_GRAPH_UNRESOLVED` | A reachable dynamic or unsupported dispatch site could conceal or redirect a forbidden legacy, artifact, comparison, fallback, or release-audit target. |
 
 ## 6. Warning codes
 
@@ -155,6 +171,15 @@ separately reviewed change that preserves Contract V1 behavior:
 The whole `models.py`, `ui_utils.py`, and `excel_exporter.py` files are blocked from deletion
 because each contains current production dependencies. In particular,
 `excel_exporter.py::create_input_template` and the Page 01 input helpers remain required.
+
+These classifications are reconciled against repository references rather than accepted from
+the inventory's prose `consumers` fields. Every `MUST_REMAIN_SHARED_DEPENDENCY` must be reachable
+or have a current non-test production reference. Every authorized 5C3 candidate must have zero
+consumers on the ordinary executable graph. Remaining references are recorded only when they are
+test support, developer/offline validation, regression-oracle code, or an explicitly removable
+compatibility wrapper such as the package re-export that a later 5C3 change must remove with its
+target. Any ordinary consumer changes the conclusion to `BLOCKED_FROM_FORMAL_APPROVAL` with
+`M5C2R_SHARED_DEPENDENCY_MARKED_FOR_DELETION`.
 
 ## 9. Exact proposed Milestone 5C3 deletion scope
 
@@ -205,4 +230,3 @@ the rollback does not mix authorities within one request.
 No names or decisions were supplied. This document records no approval on behalf of either role.
 Production approval is explicitly `PENDING`, even when the implementation conclusion is
 `READY_FOR_FORMAL_APPROVAL`.
-
