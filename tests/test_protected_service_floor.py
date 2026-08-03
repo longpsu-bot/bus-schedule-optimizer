@@ -413,6 +413,25 @@ def test_missing_trip_dataset_is_not_evaluated() -> None:
     assert assessment.protected_previews == ()
 
 
+def test_specific_day_evidence_remains_eligible_for_all_days_timetable() -> None:
+    scenario = replace(
+        _scenario((0, 15, 30)),
+        operating_day_type=OperatingDayType.ALL_DAYS,
+    )
+    counts = {trip.trip_id: (85, 85, 85) for trip in scenario.exact_timetable}
+    imported = _imported(scenario, passenger_counts=counts)
+    analysis = analyze_trip_ridership_v1(imported, scenario)
+
+    assessment = assess_protected_service_floors_v1(
+        imported,
+        scenario,
+        analysis,
+        ProtectedServiceFloorPolicyV1(),
+    )
+
+    assert assessment.decisions[0].classification == PROTECTED_HIGH_DEMAND_SERVICE_FLOOR
+
+
 def test_stale_trip_analysis_is_not_evaluated() -> None:
     imported, scenario, analysis, _current = _assessment()
     assert analysis is not None

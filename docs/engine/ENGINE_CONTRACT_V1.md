@@ -65,7 +65,16 @@ Machine-readable drafts are in `contracts/v1/`. Adapters MAY accept legacy UI or
 
 Directions are `outbound`, `inbound`, or, for demand only, `combined`. A timetable departure MUST be directional. Each trip has a unique trip ID, direction, departure terminal, exact departure time, runtime or exact arrival consistent with runtime, and optional existing vehicle assignment.
 
-Route type is `intra_provincial` or `inter_provincial`. Operating-day type is an explicit controlled value or documented operator code; it MUST NOT be inferred from dates alone.
+Route type is `intra_provincial` or `inter_provincial`. Operating-day type is one of
+`weekday`, `saturday`, `sunday`, `holiday`, `special`, or `all_days`; it MUST NOT be
+inferred from dates alone.
+
+`all_days` means one authoritative timetable applies identically across weekday, Saturday,
+Sunday, holiday, and special calendar-day classifications, with no separate timetable variant.
+It is timetable authority only. It MUST NOT assert identical passenger demand, expand the day
+types covered by demand observations, equate holiday and weekday demand, imply year-round route
+policy, identify a calendar date, or authorize combining or fabricating day-specific demand.
+Demand evidence bound to an `all_days` timetable MUST retain one concrete observed day type.
 
 Source metadata MUST identify at least source type, source ID or file fingerprint, extraction/import timestamp, and optional notes. Sensitive personal information MUST NOT be embedded in fingerprints or examples.
 
@@ -462,7 +471,7 @@ Breaking semantic changes require a new contract major version. Additive optiona
 
 The following remain deliberate review decisions rather than hidden defaults:
 
-1. controlled vocabulary for `operating_day_type` beyond a small portable core;
+1. operator-specific extensions beyond the controlled `operating_day_type` vocabulary;
 2. service-day encoding for cross-midnight schedules;
 3. confidence scale calibration and the threshold for reliable directional demand;
 4. minimum-service policy and donor-period protection by route class;

@@ -12,7 +12,7 @@ from bus_schedule_engine.application_pipeline import (
     run_unified_application_pipeline_v1,
 )
 from bus_schedule_engine.contracts_v1.adapters import normalize_imported_workbook_v1
-from bus_schedule_engine.contracts_v1.models import DemandResolutionType
+from bus_schedule_engine.contracts_v1.models import DemandResolutionType, OperatingDayType
 from bus_schedule_engine.excel_exporter import create_input_template
 from bus_schedule_engine.importer import ImportedWorkbook, InputDataError, import_workbook
 from bus_schedule_engine.input_authority import normalization_options_from_workbook_v1
@@ -53,6 +53,12 @@ from bus_schedule_engine.unified_result_exporter import (
 
 def _set_metadata(workbook, key: str, value: object) -> None:
     sheet = workbook["THONG_TIN_SAN_LUONG_CHUYEN"]
+    row = next(cell.row for cell in sheet["A"] if cell.value == key)
+    sheet.cell(row, 2).value = value
+
+
+def _set_parameter(workbook, sheet_name: str, key: str, value: object) -> None:
+    sheet = workbook[sheet_name]
     row = next(cell.row for cell in sheet["A"] if cell.value == key)
     sheet.cell(row, 2).value = value
 
@@ -285,6 +291,54 @@ def test_operating_day_and_tolerance_metadata_are_strict(tmp_path) -> None:
         workbook.close()
         with pytest.raises(InputDataError, match=TRIP_RIDERSHIP_MATCH_TOLERANCE_INVALID):
             import_workbook(path)
+
+
+def test_all_days_timetable_keeps_trip_ridership_day_specific(tmp_path) -> None:
+    path = _workbook_with_observations(tmp_path, [{}])
+    workbook = load_workbook(path)
+    _set_parameter(workbook, "THONG_SO_B", "operating_day_type", "all_days")
+    _set_metadata(workbook, "operating_day_type", "saturday")
+    workbook.save(path)
+    workbook.close()
+
+    imported = import_workbook(path)
+    assert imported.parameters_b.operating_day_type == "all_days"
+    assert imported.trip_ridership_metadata is not None
+    assert imported.trip_ridership_metadata.operating_day_type == "saturday"
+
+    workbook = load_workbook(path)
+    _set_metadata(workbook, "operating_day_type", "all_days")
+    workbook.save(path)
+    workbook.close()
+    with pytest.raises(InputDataError, match=TRIP_RIDERSHIP_OPERATING_DAY_TYPE_MISMATCH):
+        import_workbook(path)
+
+
+def test_specific_day_ridership_analysis_binds_to_all_days_timetable(
+    normalized_context,
+) -> None:
+    imported, scenario_b = normalized_context
+    all_days_scenario = replace(
+        scenario_b,
+        operating_day_type=OperatingDayType.ALL_DAYS,
+    )
+    with_observations = replace(
+        imported,
+        trip_ridership_metadata=_metadata(),
+        trip_ridership_observations=(_observation(),),
+    )
+
+    analysis = analyze_trip_ridership_v1(with_observations, all_days_scenario)
+
+    assert analysis.operating_day_type == "weekday"
+
+    all_days_metadata = replace(_metadata(), operating_day_type="all_days")
+    with_all_days_metadata = replace(
+        with_observations,
+        trip_ridership_metadata=all_days_metadata,
+    )
+    with pytest.raises(ValueError, match=TRIP_RIDERSHIP_OPERATING_DAY_TYPE_MISMATCH):
+        analyze_trip_ridership_v1(with_all_days_metadata, all_days_scenario)
 
 
 @pytest.mark.parametrize(

@@ -312,13 +312,24 @@ def test_validator_rejects_naive_source_timestamp(make_parameters, make_valid_tr
         )
 
 
-def test_optional_contract_fields_are_read_from_parameter_sheet(tmp_path) -> None:
+@pytest.mark.parametrize(
+    ("workbook_day_type", "expected_day_type"),
+    [
+        ("saturday", OperatingDayType.SATURDAY),
+        (" ALL_DAYS ", OperatingDayType.ALL_DAYS),
+    ],
+)
+def test_optional_contract_fields_are_read_from_parameter_sheet(
+    tmp_path,
+    workbook_day_type: str,
+    expected_day_type: OperatingDayType,
+) -> None:
     source = create_input_template(tmp_path / "contract-input.xlsx")
     workbook = load_workbook(source)
     additions = {
         "available_fleet_limit": 8,
         "approved_active_fleet": 7,
-        "operating_day_type": "saturday",
+        "operating_day_type": workbook_day_type,
     }
     for sheet_name in ("THONG_SO_A", "THONG_SO_B"):
         sheet = workbook[sheet_name]
@@ -333,7 +344,7 @@ def test_optional_contract_fields_are_read_from_parameter_sheet(tmp_path) -> Non
 
     assert imported.parameters_b.available_fleet_limit == 8
     assert imported.parameters_b.approved_active_fleet == 7
-    assert imported.parameters_b.operating_day_type == "saturday"
+    assert imported.parameters_b.operating_day_type == expected_day_type.value
 
     bundle = normalize_imported_workbook_v1(
         imported,
@@ -344,10 +355,13 @@ def test_optional_contract_fields_are_read_from_parameter_sheet(tmp_path) -> Non
     )
     assert bundle.scenario_a is not None
     assert bundle.scenario_a.available_fleet_limit == 8
-    assert bundle.scenario_a.operating_day_type == OperatingDayType.SATURDAY
+    assert bundle.scenario_a.operating_day_type == expected_day_type
     assert bundle.scenario_b.available_fleet_limit == 8
     assert bundle.scenario_b.approved_active_fleet == 7
-    assert bundle.scenario_b.operating_day_type == OperatingDayType.SATURDAY
+    assert bundle.scenario_b.operating_day_type == expected_day_type
+    serialized_b = scenario_to_contract_dict(bundle.scenario_b)
+    assert serialized_b["operating_day_type"] == expected_day_type.value
+    assert _schema_errors(serialized_b, "scenario_b_input.schema.json") == []
 
 
 def test_normalization_does_not_mutate_legacy_trips(make_parameters, make_valid_trips) -> None:

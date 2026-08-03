@@ -92,7 +92,8 @@ SUPPORTED_SHEETS = REQUIRED_SHEETS | {
     "CAU_HINH",
 }
 
-OPERATING_DAY_TYPES = {"weekday", "saturday", "sunday", "holiday", "special"}
+OPERATING_DAY_TYPES = {"weekday", "saturday", "sunday", "holiday", "special", "all_days"}
+TRIP_RIDERSHIP_OPERATING_DAY_TYPES = OPERATING_DAY_TYPES - {"all_days"}
 TRIP_RIDERSHIP_SOURCE_TYPES = {"ticketing", "manual_count", "apc", "survey", "other"}
 TRIP_RIDERSHIP_CONFIDENCE_VALUES = {"high", "medium", "low", "unknown"}
 TRIP_RIDERSHIP_REQUIRED_COLUMNS = {
@@ -523,13 +524,14 @@ def _trip_ridership_metadata(
         )
 
     operating_day_type = str(_trip_metadata_required(values, "operating_day_type")).strip().lower()
-    if (
-        operating_day_type not in OPERATING_DAY_TYPES
-        or operating_day_type != parameters_b.operating_day_type
+    timetable_day_type = parameters_b.operating_day_type
+    if operating_day_type not in TRIP_RIDERSHIP_OPERATING_DAY_TYPES or not (
+        timetable_day_type == "all_days" or operating_day_type == timetable_day_type
     ):
         raise InputDataError(
             f"{TRIP_RIDERSHIP_OPERATING_DAY_TYPE_MISMATCH}: operating_day_type "
-            "phải trùng với Scenario B; không suy từ ngày lịch"
+            "phải là một loại ngày cụ thể tương thích với Scenario B; "
+            "all_days chỉ mô tả biểu đồ chạy xe và không được suy từ ngày lịch"
         )
 
     tolerance_raw = _trip_metadata_required(values, "match_tolerance_minutes")

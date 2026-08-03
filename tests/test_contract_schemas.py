@@ -148,6 +148,22 @@ def test_available_fleet_limit_is_required_and_positive(schema_name: str) -> Non
         ("scenario_b_input.schema.json", "scenario_b_input.example.json"),
     ],
 )
+def test_all_days_is_an_exact_operating_day_type(schema_name: str, example_name: str) -> None:
+    scenario = _load(EXAMPLE_DIR / example_name)
+    scenario["operating_day_type"] = "all_days"
+    assert _schema_errors(scenario, schema_name) == []
+
+    scenario["operating_day_type"] = "daily"
+    assert _schema_errors(scenario, schema_name)
+
+
+@pytest.mark.parametrize(
+    ("schema_name", "example_name"),
+    [
+        ("scenario_a_input.schema.json", "scenario_a_input.example.json"),
+        ("scenario_b_input.schema.json", "scenario_b_input.example.json"),
+    ],
+)
 def test_approved_active_fleet_may_be_omitted_or_null(schema_name: str, example_name: str) -> None:
     scenario = _load(EXAMPLE_DIR / example_name)
     scenario.pop("approved_active_fleet", None)

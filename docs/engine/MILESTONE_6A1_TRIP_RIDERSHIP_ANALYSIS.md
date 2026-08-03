@@ -41,12 +41,15 @@ Records require:
 - `trip_ridership_source_type`;
 - `trip_ridership_confidence`;
 - `observed_schedule_scenario`, fixed to `B`;
-- `operating_day_type`, exactly equal to Scenario B;
+- `operating_day_type`, one concrete day type exactly equal to Scenario B, except that any one
+  concrete day type is compatible when Scenario B is `all_days`;
 - `match_tolerance_minutes`, an integer from 0 through 30 inclusive.
 
 `source_notes` is optional and is excluded from fingerprints. Source types are `ticketing`,
 `manual_count`, `apc`, `survey`, or `other`; aggregate route reports are not accepted.
-Operating-day type is never inferred from calendar dates.
+Operating-day type is never inferred from calendar dates. Trip-ridership metadata never accepts
+`all_days`: the dataset retains one specific observed day classification, even when the same
+Scenario B timetable applies on every day. No demand days are combined or fabricated.
 
 ## 6. Observation contract
 

@@ -12,7 +12,12 @@ from enum import Enum
 from statistics import mean, median
 from typing import TYPE_CHECKING, Any
 
-from .contracts_v1.models import ContractDirection, DepartureTerminal, ScenarioBInput
+from .contracts_v1.models import (
+    ContractDirection,
+    DepartureTerminal,
+    OperatingDayType,
+    ScenarioBInput,
+)
 from .contracts_v1.serialization import scenario_fingerprint
 from .models import (
     TripRidershipAnalysisV1,
@@ -70,6 +75,20 @@ _DIRECTION_ORDER = (
     TripRidershipDirectionV1.OUTBOUND,
     TripRidershipDirectionV1.INBOUND,
 )
+_CONCRETE_OPERATING_DAY_TYPES = frozenset(
+    day_type.value for day_type in OperatingDayType if day_type != OperatingDayType.ALL_DAYS
+)
+
+
+def trip_ridership_day_type_matches_timetable_v1(
+    ridership_day_type: str,
+    timetable_day_type: OperatingDayType,
+) -> bool:
+    """Bind one concrete demand day type without broadening its coverage authority."""
+    return ridership_day_type in _CONCRETE_OPERATING_DAY_TYPES and (
+        timetable_day_type == OperatingDayType.ALL_DAYS
+        or ridership_day_type == timetable_day_type.value
+    )
 
 
 def _canonical_value(value: Any) -> Any:
@@ -653,7 +672,10 @@ def analyze_trip_ridership_v1(
         raise ValueError(
             f"{TRIP_RIDERSHIP_MATCH_TOLERANCE_INVALID}: tolerance must be from 0 to 30"
         )
-    if metadata.operating_day_type != scenario_b.operating_day_type.value:
+    if not trip_ridership_day_type_matches_timetable_v1(
+        metadata.operating_day_type,
+        scenario_b.operating_day_type,
+    ):
         raise ValueError(
             f"{TRIP_RIDERSHIP_OPERATING_DAY_TYPE_MISMATCH}: dataset and Scenario B differ"
         )
@@ -827,5 +849,6 @@ __all__ = [
     "TRIP_RIDERSHIP_SOURCE_TYPE_INVALID",
     "analyze_trip_ridership_v1",
     "trip_ridership_analysis_is_current_v1",
+    "trip_ridership_day_type_matches_timetable_v1",
     "trip_ridership_input_fingerprint_v1",
 ]

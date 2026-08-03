@@ -76,11 +76,11 @@ RETIRED_RESULT_KEYS = (
     "parallel_runtime_status",
     "side_by_side_validation_report",
 )
-TEMPLATE_SEMANTIC_FINGERPRINT = "8ece58c5b8c5e73b7fa7f2de9f5b235684a905b967cb68b372f1a56ee42c4749"
+TEMPLATE_SEMANTIC_FINGERPRINT = "96f9f240613f4ec511855e085a8a1a791bb9c50993b7e4338620d7a8ead809c7"
 BASELINE_MANIFEST_FINGERPRINTS = {
     "heuristic_core": "c96009627d669e4ec2387ea28a5af0ba14d8bea4761066cfb21bc284c234be1f",
     "protected_solver_core": "6210fd7ee121bef91a92cdf6be47f97647bc61321584ddb3281eee00081a327d",
-    "contract_schemas": "a3499847598dc9209bd02c3263bf6ef4db5b2ccb5c38cb75b00edfbc892178ee",
+    "contract_schemas": "27c42bc441aa035bc1db47865f925257f5c3ce9e5f3308ec40e4dc8d5aeb9584",
     "route_corpus": "4e50c1c1dad4c805ce7d1fc89323782eac02161c79d777659ab1fff890472294",
 }
 _TEXT_MANIFEST_SUFFIXES = {

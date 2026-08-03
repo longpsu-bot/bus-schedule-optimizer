@@ -47,7 +47,10 @@
       },
       "description": "Optional authoritative physical vehicle-occupancy capacities; missing terminal values are not inferred."
     },
-    "operating_day_type": {"enum": ["weekday", "saturday", "sunday", "holiday", "special"]},
+    "operating_day_type": {
+      "enum": ["weekday", "saturday", "sunday", "holiday", "special", "all_days"],
+      "description": "all_days means one authoritative timetable applies identically across all listed day classifications; it grants no demand-coverage or calendar-date inference."
+    },
     "exact_timetable": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/trip"}},
     "source_metadata": {"$ref": "#/$defs/sourceMetadata"}
   },

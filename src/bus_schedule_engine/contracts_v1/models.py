@@ -32,6 +32,7 @@ class OperatingDayType(StrEnum):
     SUNDAY = "sunday"
     HOLIDAY = "holiday"
     SPECIAL = "special"
+    ALL_DAYS = "all_days"
 
 
 class InputSourceType(StrEnum):
