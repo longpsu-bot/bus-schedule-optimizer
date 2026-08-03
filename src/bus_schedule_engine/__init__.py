@@ -137,6 +137,7 @@ from .protected_service_floor_enforcement import (
 from .trip_ridership import (
     analyze_trip_ridership_v1,
     trip_ridership_analysis_is_current_v1,
+    trip_ridership_day_type_matches_timetable_v1,
     trip_ridership_input_fingerprint_v1,
 )
 from .trip_ridership_codes import (
@@ -435,6 +436,7 @@ __all__ = [
     "technical_dimension_rows_v1",
     "technical_summary_v1",
     "trip_ridership_analysis_is_current_v1",
+    "trip_ridership_day_type_matches_timetable_v1",
     "trip_ridership_input_fingerprint_v1",
     "verify_partial_timetable_review_fingerprint_v1",
     "verify_partial_timetable_review_json_bytes_v1",

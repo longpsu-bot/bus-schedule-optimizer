@@ -66,6 +66,7 @@ from .protected_service_floor_codes import (
 )
 from .trip_ridership import (
     trip_ridership_analysis_is_current_v1,
+    trip_ridership_day_type_matches_timetable_v1,
     trip_ridership_input_fingerprint_v1,
 )
 
@@ -437,8 +438,14 @@ def _analysis_eligibility(
             imported,
             b_fingerprint,
         )
-        or analysis.operating_day_type != scenario_b.operating_day_type.value
-        or metadata.operating_day_type != scenario_b.operating_day_type.value
+        or not trip_ridership_day_type_matches_timetable_v1(
+            analysis.operating_day_type,
+            scenario_b.operating_day_type,
+        )
+        or not trip_ridership_day_type_matches_timetable_v1(
+            metadata.operating_day_type,
+            scenario_b.operating_day_type,
+        )
         or analysis.match_policy.observed_schedule_scenario != "B"
         or metadata.observed_schedule_scenario != "B"
         or not _analysis_trip_facts_match_active_workbook(

@@ -26,6 +26,14 @@ Schema validation is necessary but not sufficient. Cross-record and temporal con
 
 Normalized contract directions are `outbound`, `inbound`, and demand-only `combined`. A legacy adapter must map terminal-specific labels deterministically and retain the original value in source metadata or diagnostics. `combined` is invalid on a timetable trip.
 
+## Operating-day type
+
+Scenario A and B accept `weekday`, `saturday`, `sunday`, `holiday`, `special`, and `all_days`.
+`all_days` is the exact assertion that one authoritative timetable applies unchanged to every
+listed calendar-day classification. It conveys no calendar-date inference and no demand coverage.
+Trip-ridership evidence remains labeled with one concrete day type; a concrete evidence day may
+bind to an `all_days` timetable without being relabeled, combined with other days, or extrapolated.
+
 ## Fleet fields
 
 `available_fleet_limit` is the required hard upper bound. `approved_active_fleet` is optional governance metadata. `minimum_required_fleet` is calculated independently from the timetable and continuous terminal-stock model; `fleet_margin` is the available limit minus that minimum. These fields must never be collapsed into a single vehicle count.

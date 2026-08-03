@@ -53,14 +53,14 @@ and
 and
 [Milestone 6A2D protected service-floor OR-Tools constraints](docs/engine/MILESTONE_6A2D_PROTECTED_SERVICE_FLOOR_ORTOOLS_CONSTRAINTS.md).
 
-### Active milestone: layered data-authority workflow
+### Active milestone: all-days operating timetables
 
 Milestone 6A2E is merged. It adds a one-workbook offline CLI that consumes the unchanged unified Contract V1
 pipeline and existing Page 05 artifact boundary. It writes deterministic JSON and Markdown
 expert-review evidence plus the three aligned Contract V1 artifacts when available. Every review
 is `EXPERT_REVIEW_REQUIRED`; it is not an operational timetable approval.
 
-Milestone 6A2F is active. Its no-solver `data_authority_review` command evaluates exact timetable
+Milestone 6A2F is merged. Its no-solver `data_authority_review` command evaluates exact timetable
 facts first and reports readiness separately for timetable, turnaround, demand, fleet,
 optimization, and terminal-capacity capabilities. Optimization-only gaps no longer suppress
 lower-level timetable review. The intended workflow is to run the authority review, supply the
@@ -68,6 +68,11 @@ identified missing authority, and then run the strict 6A2E optimization review. 
 [Milestone 6A2E real-route operational review](docs/engine/MILESTONE_6A2E_REAL_ROUTE_OPERATIONAL_REVIEW.md)
 and
 [Milestone 6A2F layered data-authority workflow](docs/engine/MILESTONE_6A2F_LAYERED_DATA_AUTHORITY_WORKFLOW.md).
+
+Milestone 6A2G is active. It adds the exact Contract V1 value `all_days` for one authoritative
+timetable that applies unchanged to every controlled calendar-day classification, while keeping
+demand-day coverage explicit and separate. See
+[Milestone 6A2G all-days operating timetables](docs/engine/MILESTONE_6A2G_ALL_DAYS_OPERATING_TIMETABLES.md).
 
 ### Offline legacy regression oracle
 
@@ -248,8 +253,9 @@ unified Page 05 artifacts are implemented and merged. Milestone 5C1 is merged an
 is merged. Milestone 6A1 supplemental trip-level ridership analysis, Milestone 6A2A
 protected service-floor authority, Milestone 6A2B acceptance enforcement, and Milestone 6A2C
 heuristic search awareness, and Milestone 6A2D OR-Tools hard constraints are implemented**, but
-Milestone 5C3 and Milestone 6A2E are merged. **Milestone 6A2F layered data-authority workflow is
-the active milestone.** `LEGACY_RUNTIME_RETIRED` still requires formal production approval.
+Milestone 5C3, Milestone 6A2E, and Milestone 6A2F are merged. **Milestone 6A2G all-days operating
+timetables is the active milestone.** `LEGACY_RUNTIME_RETIRED` still requires formal production
+approval.
 
 1. Milestone 5A1: compare deterministic legacy and unified result snapshots.
 2. Milestone 5A2A: stabilize authoritative workbook input and readiness.
@@ -281,7 +287,9 @@ the active milestone.** `LEGACY_RUNTIME_RETIRED` still requires formal productio
 16. Milestone 6A2E: generate deterministic, bounded real-route operational review packs through
     the existing unified pipeline and Page 05 artifact boundary (merged).
 17. Milestone 6A2F: review exact timetable facts before optimization, expose capability-specific
-    authority gaps, then hand optimization-ready workbooks to the strict 6A2E workflow (active).
+    authority gaps, then hand optimization-ready workbooks to the strict 6A2E workflow (merged).
+18. Milestone 6A2G: represent one authoritative timetable shared by every controlled day type
+    without broadening, combining, or fabricating demand evidence (active).
 
 See
 [Milestone 5A1 side-by-side validation](docs/engine/MILESTONE_5A1_SIDE_BY_SIDE_VALIDATION.md)
@@ -411,6 +419,11 @@ positive integer. Times use `HH:mm`; dates use `dd/mm/yyyy`.
 Blank `available_fleet_limit` or `operating_day_type` permits import but blocks authoritative
 fixed-resource optimization. Demand source type, confidence, and response mode become required
 for optimization only when `SAN_LUONG` has observations.
+`operating_day_type` accepts `weekday`, `saturday`, `sunday`, `holiday`, `special`, or `all_days`.
+`all_days` means one authoritative timetable applies unchanged to every listed calendar-day
+classification. It does not infer calendar dates or make passenger demand identical. Supplemental
+trip-ridership metadata must still name one concrete day type; those observations are not combined,
+fabricated, or expanded to other day types.
 `THONG_TIN_DU_LIEU` may declare `timetable_authority_status`,
 `timetable_authority_reference`, and `timetable_effective_date`. Only explicit
 `approved_operational` status is reported as source-approved; the engine does not grant or revoke

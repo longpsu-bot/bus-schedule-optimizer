@@ -90,6 +90,29 @@ def test_generated_template_classifies_authority_and_optional_fields(tmp_path) -
     workbook.close()
 
 
+def test_all_days_is_offered_only_for_timetable_authority(tmp_path) -> None:
+    path = create_input_template(tmp_path / "input.xlsx")
+    workbook = load_workbook(path)
+
+    expected_timetable_values = '"weekday,saturday,sunday,holiday,special,all_days"'
+    for sheet_name in ("THONG_SO_A", "THONG_SO_B"):
+        sheet = workbook[sheet_name]
+        validation = _validation_for_cell(
+            sheet,
+            _value_cell(sheet, "operating_day_type").coordinate,
+        )
+        assert validation.formula1 == expected_timetable_values
+
+    ridership_sheet = workbook["THONG_TIN_SAN_LUONG_CHUYEN"]
+    ridership_validation = _validation_for_cell(
+        ridership_sheet,
+        _value_cell(ridership_sheet, "operating_day_type").coordinate,
+    )
+    assert ridership_validation.formula1 == '"weekday,saturday,sunday,holiday,special"'
+    assert "all_days" not in ridership_validation.formula1
+    workbook.close()
+
+
 def test_requirement_levels_are_text_and_visually_distinct(tmp_path) -> None:
     path = create_input_template(tmp_path / "input.xlsx")
     workbook = load_workbook(path)

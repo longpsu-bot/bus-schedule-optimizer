@@ -70,7 +70,8 @@ Evidence is eligible only when the stored Milestone 6A1 analysis:
 - verifies its own analysis fingerprint;
 - matches the exact normalized Scenario B fingerprint;
 - declares observed scenario B;
-- matches Scenario B operating-day type; and
+- identifies one concrete day type compatible with Scenario B (exact match normally, or any one
+  concrete type when Scenario B is `all_days`); and
 - meets the declared minimum confidence under
   `unknown < low < medium < high`.
 

@@ -18,7 +18,7 @@ This document organizes the model defined normatively in [Engine Contract V1](EN
 
 ### `ScenarioAInput` and `ScenarioBInput`
 
-Each is an immutable normalized aggregate composed of route identity, `OperatingPlan`, exact `Timetable`, `FleetDeclaration`, operating-day type, and `SourceMetadata`. A and B are distinct even when their values happen to match.
+Each is an immutable normalized aggregate composed of route identity, `OperatingPlan`, exact `Timetable`, `FleetDeclaration`, operating-day type, and `SourceMetadata`. A and B are distinct even when their values happen to match. `OperatingDayType.ALL_DAYS` states that the same timetable applies to every controlled day classification; it does not broaden demand evidence or infer calendar dates.
 
 ### `ObservedDemandInput`
 

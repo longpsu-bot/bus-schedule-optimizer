@@ -295,7 +295,8 @@ def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) ->
             "operating_day_type",
             parameters.operating_day_type,
             REQUIRED_FOR_OPTIMIZATION_LABEL,
-            "weekday, saturday, sunday, holiday hoặc special",
+            "weekday, saturday, sunday, holiday, special hoặc all_days; "
+            "all_days nghĩa là cùng một biểu đồ được phê duyệt áp dụng cho mọi loại ngày",
         ),
         (
             "approved_active_fleet",
@@ -361,7 +362,7 @@ def _write_parameter_sheet(ws, parameters: ScenarioParameters, scenario: str) ->
     )
     block_validation = DataValidation(type="list", formula1='"30,60"')
     operating_day_validation = DataValidation(
-        type="list", formula1='"weekday,saturday,sunday,holiday,special"'
+        type="list", formula1='"weekday,saturday,sunday,holiday,special,all_days"'
     )
     required_positive_integer = DataValidation(
         type="whole", operator="greaterThan", formula1="0", allow_blank=False
@@ -542,7 +543,8 @@ def _write_trip_ridership_metadata_sheet(ws) -> None:
             "operating_day_type",
             "weekday",
             CONDITIONAL_TRIP_RIDERSHIP_LABEL,
-            "Phải trùng THONG_SO_B; không suy từ service_date",
+            "Phải là một loại ngày cụ thể; tương thích với THONG_SO_B=all_days "
+            "nhưng không mở rộng phạm vi dữ liệu nhu cầu; không suy từ service_date",
         ),
         (
             "match_tolerance_minutes",
