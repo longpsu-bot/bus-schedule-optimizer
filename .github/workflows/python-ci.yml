@@ -17,11 +17,28 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
       - name: Package current PR source
         run: git archive --format=tar.gz --output=current-engine-source.tar.gz HEAD
+
+      - name: Build self-contained pilot runtime
+        run: |
+          python -m pip install . -t pilot_runtime
+          tar -czf pilot-runtime.tar.gz pilot_runtime
 
       - name: Upload source artifact
         uses: actions/upload-artifact@v4
         with:
           name: current-engine-source
           path: current-engine-source.tar.gz
+
+      - name: Upload pilot runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pilot-runtime
+          path: pilot-runtime.tar.gz
