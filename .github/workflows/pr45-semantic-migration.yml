@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
   migrate-and-validate:
@@ -30,21 +32,24 @@ jobs:
         run: python -m pip install -e '.[dev]'
 
       - name: Apply V2 test migration
-        run: python tools/pr45_migrate_v2.py
+        run: |
+          set -o pipefail
+          python tools/pr45_migrate_v2.py 2>&1 | tee pr45-migration-edit.log
 
       - name: Ruff fix and format
         run: |
+          set -o pipefail
           python -m ruff check . --fix \
             --exclude .artifact \
             --exclude outputs \
-            --exclude .venv
+            --exclude .venv 2>&1 | tee pr45-migration-ruff.log
           python -m ruff format \
             src/bus_schedule_engine/contracts_v1 \
             tests/test_contract*.py \
             tests/test_optimization_service.py \
             tests/test_protected_service_floor_heuristic_search.py \
             tests/test_protected_service_floor_ortools_constraints.py \
-            tools/pr45_migrate_v2.py
+            tools/pr45_migrate_v2.py 2>&1 | tee -a pr45-migration-ruff.log
 
       - name: Full pytest
         run: |
@@ -66,10 +71,32 @@ jobs:
           git commit -m 'Migrate balanced-regime regressions to V2 semantics'
           git push origin HEAD:fix/scenario-c-balanced-regime-policy-v2
 
-      - name: Upload migration log
+      - name: Report failure on PR
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo '### PR45 semantic migration failure'
+            echo
+            echo '```text'
+            for file in pr45-migration-edit.log pr45-migration-ruff.log pr45-migration-pytest.log; do
+              if [ -f "$file" ]; then
+                echo "--- $file ---"
+                tail -n 120 "$file"
+              fi
+            done
+            echo '```'
+          } > pr45-comment.md
+          gh pr comment 45 --body-file pr45-comment.md
+
+      - name: Upload migration logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pr45-semantic-migration-logs
-          path: pr45-migration-pytest.log
+          path: |
+            pr45-migration-edit.log
+            pr45-migration-ruff.log
+            pr45-migration-pytest.log
           if-no-files-found: ignore
