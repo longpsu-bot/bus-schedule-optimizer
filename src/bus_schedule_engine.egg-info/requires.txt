@@ -1,0 +1,9 @@
+openpyxl<4,>=3.1
+pandas<3,>=2.2
+plotly<7,>=6.0
+streamlit<2,>=1.57
+
+[dev]
+kaleido==0.2.1
+pytest<10,>=8.0
+ruff<1,>=0.9
