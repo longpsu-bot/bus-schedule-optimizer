@@ -500,7 +500,7 @@ def _build_quality_cp_sat_model(
             regime_headway_by_id[regime.regime_id] = model.new_int_var(
                 1,
                 max(1, span),
-                f"quality_regime_headway_{regime.regime_id}",
+                f"quality_regime_floor_headway_{regime.regime_id}",
             )
         for index, (earlier, later) in enumerate(
             zip(trips, trips[1:], strict=False),
@@ -518,7 +518,11 @@ def _build_quality_cp_sat_model(
                 )
                 model.add(
                     headway_by_direction[direction][index - 1]
-                    == regime_headway_by_id[regime.regime_id]
+                    >= regime_headway_by_id[regime.regime_id]
+                ).only_enforce_if(same_regime_pair)
+                model.add(
+                    headway_by_direction[direction][index - 1]
+                    <= regime_headway_by_id[regime.regime_id] + 1
                 ).only_enforce_if(same_regime_pair)
                 same_regime_values.append(same_regime_pair)
             model.add(sum(same_regime_values) <= 1)
@@ -730,10 +734,7 @@ def _canonical_regime_groups_match_native(
     regime_policy,
 ) -> bool:
     native = tuple(
-        sorted(
-            (regime.direction.value, regime.block_ids)
-            for regime in bundle.regimes
-        )
+        sorted((regime.direction.value, regime.block_ids) for regime in bundle.regimes)
     )
     canonical = tuple(
         sorted(
