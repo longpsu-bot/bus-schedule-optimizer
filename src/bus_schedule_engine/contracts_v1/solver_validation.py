@@ -39,6 +39,7 @@ from .models import (
 from .problem_validation import validate_schedule_generation_context_v1
 from .regime_headway_policy import (
     HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1,
+    SCENARIO_C_REPRESENTABLE_REGIME_STATUSES,
     _analyze_regime_headways,
     _headway_regime_representability_error_codes,
     _RegimeHeadwayAnalysis,
@@ -283,7 +284,11 @@ def _reconcile_regimes(
         return (), [exc.code]
     errors.extend(policy.error_codes)
     errors.extend(_headway_regime_representability_error_codes(policy))
-    expected_ids = {regime.regime_id for regime in policy.regimes}
+    expected_ids = {
+        analysis.regime.regime_id
+        for analysis in policy.analyses
+        if analysis.status in SCENARIO_C_REPRESENTABLE_REGIME_STATUSES
+    }
     reported_ids = set(regime_id_counts)
     if reported_ids != expected_ids:
         if expected_ids - reported_ids:
@@ -321,8 +326,12 @@ def _reconcile_regimes(
             actual,
         ):
             errors.append("HEADWAY_REGIME_SEQUENCE_MISMATCH")
-        expected_target = float(analysis.exact_headway or 0)
-        if not _numeric_matches(regime.target_headway, expected_target):
+        expected_target = analysis.target_headway
+        if (
+            expected_target is None
+            or expected_target <= 0
+            or not _numeric_matches(regime.target_headway, expected_target)
+        ):
             errors.append("INVALID_HEADWAY_REGIME_TARGET")
         if regime.boundary_reason != "MATERIAL_FREQUENCY_CHANGE":
             errors.append("HEADWAY_REGIME_BOUNDARY_AUTHORITY_MISMATCH")
@@ -531,9 +540,9 @@ def _solution_regimes(
             continue
         if (
             not analysis.headway_measurable
-            or analysis.status != "UNIFORM"
-            or analysis.exact_headway is None
-            or analysis.exact_headway <= 0
+            or analysis.status not in SCENARIO_C_REPRESENTABLE_REGIME_STATUSES
+            or analysis.target_headway is None
+            or analysis.target_headway <= 0
         ):
             raise AssertionError(
                 "Unrepresentable authoritative regime reached accepted solution construction"
@@ -546,7 +555,7 @@ def _solution_regimes(
             )
             if value is not None
         )
-        target = float(analysis.exact_headway)
+        target = float(analysis.target_headway)
         output.append(
             SolutionHeadwayRegimeV1(
                 regime_id=regime.regime_id,
@@ -559,12 +568,12 @@ def _solution_regimes(
                 target_headway=target,
                 actual_headway_sequence=actual,
                 transition_headways=transition_headways,
-                exceptional_headways=(
-                    actual if reconciled.regularity_status == "INVALID_NON_UNIFORM" else ()
-                ),
+                exceptional_headways=(),
                 boundary_reason=regime.boundary_reason,
                 regularity_status=(
-                    "REGULAR" if reconciled.regularity_status == "UNIFORM" else "TRANSITION"
+                    "REGULAR"
+                    if reconciled.regularity_status == "UNIFORM"
+                    else "BALANCED_ROUNDING"
                 ),
             )
         )
@@ -619,12 +628,12 @@ def _candidate_rejection_summary(rejection_codes: tuple[str, ...]) -> str:
     if HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1 in rejection_codes:
         if "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in rejection_codes:
             return (
-                "Candidate violates exact within-regime uniformity and contains an "
-                "authoritative regime that cannot be represented faithfully in Contract V1."
+                "Candidate contains an internally irregular Scenario C service regime that is "
+                "neither uniform nor valid balanced rounding under the canonical policy."
             )
         return (
-            "Candidate contains a zero-trip or one-trip authoritative regime whose "
-            "headway is not measurable and cannot be represented faithfully in Contract V1."
+            "Candidate contains a remaining zero-trip or singleton Scenario C service regime "
+            "whose internal headway is not measurable after canonical singleton repair."
         )
     if any(code.startswith("SOLUTION_HEADWAY_REGIME_") for code in rejection_codes):
         return "Candidate failed accepted-solution headway-regime referential integrity."
