@@ -57,3 +57,9 @@ feasibility failure.
 
 The V2 profile is included in relevant Scenario C candidate, solution, and outcome fingerprints so
 results produced under earlier regime semantics cannot silently reuse the same identities.
+
+## Acceptance validation
+
+The focused implementation is accepted only when the complete repository suite, Ruff lint, Ruff
+format check, and diff hygiene all pass with no private route data committed. Real-route pilot
+quality remains a separate expert acceptance step after repository correctness.
