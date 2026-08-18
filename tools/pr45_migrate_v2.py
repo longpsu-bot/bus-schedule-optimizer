@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# Temporary migration helper entrypoint; removed before PR #45 is ready.
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
