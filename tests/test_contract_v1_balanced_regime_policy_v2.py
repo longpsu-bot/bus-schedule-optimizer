@@ -18,9 +18,9 @@ from test_contract_v1_ortools_quality_optimizer import _quality_request  # noqa:
 from bus_schedule_engine.contracts_v1 import (  # noqa: E402
     ContractDirection,
     GenerationResultStatus,
-    NativeSolverStatus,
     RawCandidateTripV1,
     run_schedule_solver_v1,
+    solver_fingerprints,  # noqa: E402
 )
 from bus_schedule_engine.contracts_v1.regime_headway_policy import (  # noqa: E402
     SCENARIO_C_BALANCED_REGIME_POLICY_PROFILE,
@@ -31,7 +31,6 @@ from bus_schedule_engine.contracts_v1.regime_headway_policy import (  # noqa: E4
     _repair_singletons,
     _SustainedServiceRegime,
 )
-from bus_schedule_engine.contracts_v1 import solver_fingerprints  # noqa: E402
 from bus_schedule_engine.contracts_v1.solver_fingerprints import (  # noqa: E402
     candidate_fingerprint,
     solution_fingerprint_payload,
@@ -194,7 +193,7 @@ def test_singleton_remains_unrepresentable_when_neither_merge_is_balanced() -> N
     ("minutes", "expected_status", "expected_target", "expected_valid"),
     (
         ((360, 370, 380), "UNIFORM", 10.0, True),
-        ((360, 365, 372), "BALANCED_ROUNDING", 10.5, True),
+        ((360, 370, 381), "BALANCED_ROUNDING", 10.5, True),
         ((360, 370, 383), "INVALID_NON_UNIFORM", 11.5, False),
     ),
 )
@@ -299,13 +298,16 @@ def test_canonical_maximal_merge_crosses_demand_phase_boundary() -> None:
     assert len(outbound) == 1
     assert outbound[0].internal_headways == (10, 10, 10)
     assert outbound[0].status == "UNIFORM"
-    assert len(
-        [
-            regime
-            for regime in candidate.headway_regimes
-            if regime.direction == ContractDirection.OUTBOUND
-        ]
-    ) == 1
+    assert (
+        len(
+            [
+                regime
+                for regime in candidate.headway_regimes
+                if regime.direction == ContractDirection.OUTBOUND
+            ]
+        )
+        == 1
+    )
 
 
 def test_irregular_scenario_b_remains_reviewable_and_ortools_can_balance_scenario_c() -> None:

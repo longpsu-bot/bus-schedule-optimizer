@@ -571,9 +571,7 @@ def _solution_regimes(
                 exceptional_headways=(),
                 boundary_reason=regime.boundary_reason,
                 regularity_status=(
-                    "REGULAR"
-                    if reconciled.regularity_status == "UNIFORM"
-                    else "BALANCED_ROUNDING"
+                    "REGULAR" if reconciled.regularity_status == "UNIFORM" else "BALANCED_ROUNDING"
                 ),
             )
         )

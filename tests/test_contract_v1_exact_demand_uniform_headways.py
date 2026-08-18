@@ -501,7 +501,10 @@ def test_two_regimes_use_independent_headways_and_transition_is_excluded() -> No
     ]
     assert len(outbound) == 2
     assert {regime.target_headway for regime in outbound} == {2.0, 4.0}
-    assert all(max(regime.actual_headway_sequence) - min(regime.actual_headway_sequence) <= 1 for regime in outbound)
+    assert all(
+        max(regime.actual_headway_sequence) - min(regime.actual_headway_sequence) <= 1
+        for regime in outbound
+    )
     assert outbound[0].transition_headways == outbound[1].transition_headways
     transition = outbound[0].transition_headways[0]
     assert transition not in outbound[1].actual_headway_sequence

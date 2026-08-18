@@ -1344,7 +1344,7 @@ def test_heuristic_candidate_matches_legacy_times_and_balanced_regime_is_accepte
     assert outcome.solution is not None
     assert outcome.diagnostic_candidate is None
     assert all(
-        regime.regularity_status in {"UNIFORM", "BALANCED_ROUNDING"}
+        regime.regularity_status in {"REGULAR", "BALANCED_ROUNDING"}
         for regime in outcome.solution.c_headway_regimes
     )
     assert tuple(trips) == baseline
@@ -1358,6 +1358,7 @@ def test_heuristic_candidate_matches_legacy_times_and_balanced_regime_is_accepte
         trip.source_b_trip_id: trip.c_departure_time for trip in run.candidate.exact_timetable
     }
     assert adapter_times == direct_times
+
 
 def test_heuristic_exhaustion_is_unknown_not_infeasible() -> None:
     config = ScenarioCConfig(
@@ -1939,6 +1940,7 @@ def test_zero_headway_is_rejected_by_uniform_regime_policy() -> None:
         == []
     )
 
+
 def test_zero_previous_headway_claimed_as_one_is_rejected() -> None:
     problem, *_ = _problem(fleet_limit_override=20)
     candidate, _, later_id = _zero_headway_candidate(problem)
@@ -2003,6 +2005,7 @@ def test_zero_headway_with_insufficient_fleet_fails_existing_fleet_rules() -> No
     assert "NON_POSITIVE_ADJACENT_HEADWAY" in validation.rejection_codes
     assert "NON_POSITIVE_ADJACENT_HEADWAY" in validation.rejection_codes
     assert "PREVIOUS_C_HEADWAY_MISMATCH" not in validation.rejection_codes
+
 
 def test_invalid_execution_state_is_completed_model_invalid_not_not_run() -> None:
     problem, *_ = _problem()

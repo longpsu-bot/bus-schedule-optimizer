@@ -303,8 +303,7 @@ def _balanced_headway_shape(
     ceil_headway = math.ceil(span_minutes / divisor)
     allowed = {floor_headway, ceil_headway}
     variations = tuple(
-        abs(later - earlier)
-        for earlier, later in zip(headways, headways[1:], strict=False)
+        abs(later - earlier) for earlier, later in zip(headways, headways[1:], strict=False)
     )
     valid = (
         floor_headway > 0
@@ -343,8 +342,7 @@ def _merge_groups(
     if left.direction != right.direction:
         raise _RegimeHeadwayPolicyError("HEADWAY_REGIME_DIRECTION_INVALID")
     trip_ids = tuple(
-        trip.c_trip_id
-        for trip in _ordered_members((*left.trip_ids, *right.trip_ids), trip_by_id)
+        trip.c_trip_id for trip in _ordered_members((*left.trip_ids, *right.trip_ids), trip_by_id)
     )
     return _CandidateRegimeGroup(
         direction=left.direction,

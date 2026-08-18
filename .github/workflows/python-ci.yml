@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -17,52 +17,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-          fetch-depth: 0
-
-      - name: One-shot PR45 finalizer
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/scenario-c-balanced-regime-policy-v2'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          balanced = Path('tests/test_contract_v1_balanced_regime_policy_v2.py')
-          text = balanced.read_text(encoding='utf-8')
-          old = '        ((360, 365, 372), "BALANCED_ROUNDING", 10.5, True),'
-          new = '        ((360, 370, 381), "BALANCED_ROUNDING", 10.5, True),'
-          if old not in text:
-              raise SystemExit('balanced-shape regression case not found')
-          balanced.write_text(text.replace(old, new, 1), encoding='utf-8')
-
-          solver = Path('tests/test_contract_v1_solver.py')
-          text = solver.read_text(encoding='utf-8')
-          old = 'regime.regularity_status in {"UNIFORM", "BALANCED_ROUNDING"}'
-          new = 'regime.regularity_status in {"REGULAR", "BALANCED_ROUNDING"}'
-          if old not in text:
-              raise SystemExit('solution regularity assertion not found')
-          solver.write_text(text.replace(old, new, 1), encoding='utf-8')
-          PY
-
-          python -m pip install -e '.[dev]'
-          python -m ruff check . --fix \
-            --exclude .artifact \
-            --exclude outputs \
-            --exclude .venv
-          python -m ruff format \
-            src/bus_schedule_engine/contracts_v1 \
-            tests/test_contract*.py \
-            tests/test_optimization_service.py \
-            tests/test_protected_service_floor_heuristic_search.py \
-            tests/test_protected_service_floor_ortools_constraints.py
-
-          git show origin/main:.github/workflows/python-ci.yml > .github/workflows/python-ci.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --check
-          git commit -m "Finalize balanced-regime V2 regressions"
-          git push origin HEAD:fix/scenario-c-balanced-regime-policy-v2
 
       - name: Set up Python
         uses: actions/setup-python@v5

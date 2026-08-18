@@ -310,8 +310,7 @@ def _independent_vector_for_minutes(problem, solved: dict[str, int]) -> tuple[in
             if earlier_regime == later_regime:
                 internal_sequences.setdefault(earlier_regime, []).append(later[1] - earlier[1])
     if any(
-        sequence and max(sequence) - min(sequence) > 1
-        for sequence in internal_sequences.values()
+        sequence and max(sequence) - min(sequence) > 1 for sequence in internal_sequences.values()
     ):
         raise ValueError("non-balanced within-regime headway")
 
@@ -730,6 +729,7 @@ def test_proportional_directional_demand_alignment_is_exact() -> None:
     assert enumerated is not None
     assert vector[:8] == enumerated[:8]
 
+
 def test_zero_demand_direction_contributes_zero_alignment_error() -> None:
     context, solver, *_ = _zero_demand_fixture()
     run = solver.solve(context.problem)
@@ -846,6 +846,7 @@ def test_balanced_rounding_is_feasible_under_v2_adjacent_minute_constraint() -> 
         or max(regime.actual_headway_sequence) - min(regime.actual_headway_sequence) <= 1
         for regime in outbound
     )
+
 
 def test_within_maximum_precedes_total_and_transitions_follow() -> None:
     context, *_ = _regularity_fixture()
@@ -1145,6 +1146,7 @@ def test_four_tiny_exhaustive_oracles_agree_on_demand_priority_prefix(fixture) -
     # The first eight objectives are independent of final Scenario C regime regrouping.
     # V2 regime regularity and transition semantics are covered by dedicated canonical-policy tests.
     assert cp_vector[:8] == independent_vector[:8] == enumerated[:8]
+
 
 def test_repeated_default_solves_are_deterministic() -> None:
     context, solver, *_ = _two_regime_fixture()

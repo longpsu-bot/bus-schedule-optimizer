@@ -652,6 +652,7 @@ def test_balanced_heuristic_candidate_is_accepted_by_independent_validation(
     assert result.heuristic_outcome.solution is not None
     assert result.heuristic_outcome.diagnostic_candidate is None
 
+
 def test_heuristic_unknown_remains_unknown_without_an_accepted_solution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -733,9 +733,7 @@ def _canonical_regime_groups_match_native(
     bundle: _QualityCpSatModelBundle,
     regime_policy,
 ) -> bool:
-    native = tuple(
-        sorted((regime.direction.value, regime.block_ids) for regime in bundle.regimes)
-    )
+    native = tuple(sorted((regime.direction.value, regime.block_ids) for regime in bundle.regimes))
     canonical = tuple(
         sorted(
             (analysis.regime.direction.value, analysis.regime.block_ids)
@@ -882,9 +880,7 @@ def _build_quality_candidate(
         for name, value in zip(_QUALITY_OBJECTIVE_NAMES, vector, strict=True)
     )
     native_proven_text = (
-        ", ".join(f"{name}={value} (proven)" for name, value in proven)
-        if proven
-        else "none"
+        ", ".join(f"{name}={value} (proven)" for name, value in proven) if proven else "none"
     )
     native_unproven = tuple(name for name in _QUALITY_OBJECTIVE_NAMES if name not in dict(proven))
     canonical_unproven = tuple(

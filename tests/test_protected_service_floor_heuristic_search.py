@@ -237,8 +237,11 @@ def test_no_authority_preserves_v2_deterministic_identity() -> None:
     assert first_run.candidate is not None and second_run.candidate is not None
     assert first_run.candidate.candidate_fingerprint == second_run.candidate.candidate_fingerprint
     assert first_outcome.solution is not None and second_outcome.solution is not None
-    assert first_outcome.solution.solution_fingerprint == second_outcome.solution.solution_fingerprint
+    assert (
+        first_outcome.solution.solution_fingerprint == second_outcome.solution.solution_fingerprint
+    )
     assert first_outcome.outcome_fingerprint == second_outcome.outcome_fingerprint
+
 
 def test_valid_empty_authority_preserves_v2_identity_and_behavior() -> None:
     baseline_context, baseline_adapter, *_ = _request()
@@ -267,14 +270,24 @@ def test_valid_empty_authority_preserves_v2_identity_and_behavior() -> None:
     assert empty_run.candidate is not None
     assert attached_empty_run.candidate is not None
     assert empty_run.candidate.candidate_fingerprint == baseline_run.candidate.candidate_fingerprint
-    assert attached_empty_run.candidate.candidate_fingerprint == baseline_run.candidate.candidate_fingerprint
+    assert (
+        attached_empty_run.candidate.candidate_fingerprint
+        == baseline_run.candidate.candidate_fingerprint
+    )
     assert baseline_outcome.solution is not None
     assert empty_outcome.solution is not None
     assert attached_empty_outcome.solution is not None
-    assert empty_outcome.solution.solution_fingerprint == baseline_outcome.solution.solution_fingerprint
-    assert attached_empty_outcome.solution.solution_fingerprint == baseline_outcome.solution.solution_fingerprint
+    assert (
+        empty_outcome.solution.solution_fingerprint
+        == baseline_outcome.solution.solution_fingerprint
+    )
+    assert (
+        attached_empty_outcome.solution.solution_fingerprint
+        == baseline_outcome.solution.solution_fingerprint
+    )
     assert empty_outcome.outcome_fingerprint == baseline_outcome.outcome_fingerprint
     assert attached_empty_outcome.outcome_fingerprint == baseline_outcome.outcome_fingerprint
+
 
 def test_enforceable_authority_changes_context_deterministically_and_is_exactly_attached() -> None:
     first_context, first_adapter, *_ = _request("enforceable")

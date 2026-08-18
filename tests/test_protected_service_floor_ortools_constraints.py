@@ -232,7 +232,9 @@ def test_no_authority_preserves_v2_quality_identity_and_objectives() -> None:
     assert first_solver.exact_demand_authority.authority_fingerprint == (
         _BASELINE_EXACT_DEMAND_FINGERPRINT
     )
-    assert first_context.problem.adapter_context_fingerprint == _BASELINE_ADAPTER_CONTEXT_FINGERPRINT
+    assert (
+        first_context.problem.adapter_context_fingerprint == _BASELINE_ADAPTER_CONTEXT_FINGERPRINT
+    )
     assert first_context.problem.problem_fingerprint == _BASELINE_PROBLEM_FINGERPRINT
     assert first_run.solver_status == NativeSolverStatus.OPTIMAL
     assert first_run.candidate is not None and second_run.candidate is not None
@@ -253,8 +255,11 @@ def test_no_authority_preserves_v2_quality_identity_and_objectives() -> None:
         == _BASELINE_VECTOR
     )
     assert first_outcome.solution is not None and second_outcome.solution is not None
-    assert first_outcome.solution.solution_fingerprint == second_outcome.solution.solution_fingerprint
+    assert (
+        first_outcome.solution.solution_fingerprint == second_outcome.solution.solution_fingerprint
+    )
     assert first_outcome.outcome_fingerprint == second_outcome.outcome_fingerprint
+
 
 def test_valid_empty_authority_preserves_v2_identity_and_model_behavior() -> None:
     baseline_context, baseline_solver, normalized, _ = _request()
@@ -274,6 +279,7 @@ def test_valid_empty_authority_preserves_v2_identity_and_model_behavior() -> Non
     assert outcome.solution.solution_fingerprint == baseline.solution.solution_fingerprint
     assert outcome.outcome_fingerprint == baseline.outcome_fingerprint
     assert outcome.solution.c_exact_timetable == baseline.solution.c_exact_timetable
+
 
 def test_enforceable_authority_composes_context_deterministically_and_is_shared() -> None:
     first_context, first_solver, authority = _protected_request()

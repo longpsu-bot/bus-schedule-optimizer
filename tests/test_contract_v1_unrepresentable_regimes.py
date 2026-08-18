@@ -124,12 +124,12 @@ def test_zero_trip_demand_phase_is_not_promoted_to_service_regime() -> None:
 
     assert all(analysis.status != "NO_TRIPS" for analysis in policy.analyses)
     assert all(
-        analysis.status in SCENARIO_C_REPRESENTABLE_REGIME_STATUSES
-        for analysis in policy.analyses
+        analysis.status in SCENARIO_C_REPRESENTABLE_REGIME_STATUSES for analysis in policy.analyses
     )
     assert all(analysis.headway_measurable for analysis in policy.analyses)
     assert all(regime.target_headway > 0 for regime in candidate.headway_regimes)
     assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" not in policy.error_codes
+
 
 def test_invalid_non_uniform_retains_both_distinct_rejection_codes() -> None:
     context, _ = _single_regime_fixture(
@@ -152,6 +152,7 @@ def test_invalid_non_uniform_retains_both_distinct_rejection_codes() -> None:
     assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in validation.rejection_codes
     assert HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1 in validation.rejection_codes
     assert "balanced rounding" in validation.summary
+
 
 def test_measurable_uniform_regimes_remain_accepted() -> None:
     context, solver = _single_regime_fixture(
