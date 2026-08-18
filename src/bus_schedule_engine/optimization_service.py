@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from .c_config import ScenarioCConfig
@@ -34,6 +34,8 @@ from .optimization_comparison import (
     compare_solver_outcomes_v1,
     comparison_proof_limitations_v1,
 )
+
+DEFAULT_OR_TOOLS_TOTAL_TIME_LIMIT_SECONDS = 120.0
 
 
 class OptimizationAction(StrEnum):
@@ -122,11 +124,6 @@ _DIRECTIONAL_SOLVING_UNAVAILABLE = (
     "Authoritative directional solving is unavailable because H3 demand coverage "
     "does not fully support both directional streams."
 )
-_BOTH_SOLVER_BUDGET_LIMITATION = (
-    "BOTH applies SolverPolicyV1.time_limit_seconds unchanged as a per-solver "
-    "invocation budget; total wall-clock execution may be up to approximately "
-    "two solver budgets plus application overhead."
-)
 _PROTECTED_AUTHORITY_FAILURE_LIMITATION = (
     "Protected-service-floor enforcement authority is invalid. Scenario B evaluation remains "
     "available, but Scenario C generation was blocked to prevent an unprotected fallback."
@@ -143,6 +140,31 @@ def select_optimization_action(
 def _validate_solver_choice(solver_choice: SolverChoice) -> None:
     if not isinstance(solver_choice, SolverChoice):
         raise TypeError("solver_choice must be a SolverChoice")
+
+
+def _effective_ortools_solver_policy(
+    solver_policy: SolverPolicyV1 | None,
+) -> SolverPolicyV1:
+    """Apply the ordinary-runtime OR budget without changing low-level Contract defaults."""
+    if solver_policy is None:
+        return SolverPolicyV1(
+            time_limit_seconds=DEFAULT_OR_TOOLS_TOTAL_TIME_LIMIT_SECONDS,
+        )
+    if solver_policy.time_limit_seconds is not None:
+        return solver_policy
+    return replace(
+        solver_policy,
+        time_limit_seconds=DEFAULT_OR_TOOLS_TOTAL_TIME_LIMIT_SECONDS,
+    )
+
+
+def _both_solver_budget_limitation(ortools_policy: SolverPolicyV1) -> str:
+    return (
+        "BOTH may consume approximately two solver budgets when an explicit policy also bounds "
+        "the heuristic; with the ordinary default, the heuristic keeps its existing bounded "
+        f"search and OR-Tools receives one total staged budget of {ortools_policy.time_limit_seconds:g} "
+        "seconds, plus application overhead."
+    )
 
 
 def _default_decision_policy(
@@ -436,6 +458,8 @@ def _analyze_normalized_and_optimize_schedule_v1(
             recommended_outcome=_accepted_outcome(heuristic_outcome),
         )
 
+    effective_ortools_policy = _effective_ortools_solver_policy(solver_policy)
+
     if solver_choice == SolverChoice.OR_TOOLS:
 
         def run_ortools():
@@ -443,7 +467,7 @@ def _analyze_normalized_and_optimize_schedule_v1(
                 normalized_inputs,
                 b_evaluation,
                 evaluation_policy=effective_evaluation_policy,
-                solver_policy=solver_policy,
+                solver_policy=effective_ortools_policy,
                 **enforcement_request_arguments,
             )
             return run_schedule_solver_v1(
@@ -484,7 +508,7 @@ def _analyze_normalized_and_optimize_schedule_v1(
             normalized_inputs,
             b_evaluation,
             evaluation_policy=effective_evaluation_policy,
-            solver_policy=solver_policy,
+            solver_policy=effective_ortools_policy,
             **enforcement_request_arguments,
         ),
     )
@@ -541,13 +565,14 @@ def _analyze_normalized_and_optimize_schedule_v1(
         comparison=comparison,
         recommended_outcome=recommended_outcome,
         extra_limitations=(
-            _BOTH_SOLVER_BUDGET_LIMITATION,
+            _both_solver_budget_limitation(effective_ortools_policy),
             *comparison_proof_limitations_v1(comparison, ortools_outcome),
         ),
     )
 
 
 __all__ = [
+    "DEFAULT_OR_TOOLS_TOTAL_TIME_LIMIT_SECONDS",
     "BusScheduleOptimizationResult",
     "OptimizationAction",
     "OptimizationExecutionErrorV1",
