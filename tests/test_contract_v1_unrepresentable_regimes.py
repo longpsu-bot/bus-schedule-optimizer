@@ -33,6 +33,7 @@ from bus_schedule_engine.contracts_v1 import (  # noqa: E402
 )
 from bus_schedule_engine.contracts_v1.regime_headway_policy import (  # noqa: E402
     HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1,
+    SCENARIO_C_REPRESENTABLE_REGIME_STATUSES,
     _analyze_regime_headways,
 )
 from bus_schedule_engine.contracts_v1.serialization import canonical_sha256  # noqa: E402
@@ -68,7 +69,7 @@ def _one_trip_case():
     return context, candidate, policy
 
 
-def _zero_trip_case():
+def _zero_trip_phase_case():
     context, *_ = _quality_request(
         outbound_minutes=(360, 390),
         inbound_minutes=(365, 395),
@@ -83,7 +84,7 @@ def _zero_trip_case():
             _record(Direction.TERMINAL_2_TO_1, 375, 385, 100),
             _record(Direction.TERMINAL_2_TO_1, 385, 396, 200),
         ),
-        route_id="UNREPRESENTABLE-ZERO-TRIP-REGIME",
+        route_id="ZERO-TRIP-DEMAND-PHASE-NOT-SERVICE-REGIME",
     )
     candidate, policy = _raw_candidate_for_seconds(
         context.problem,
@@ -101,20 +102,15 @@ def accepted_case():
     return context, solver, outcome
 
 
-def test_one_trip_regime_is_retained_without_fabricated_headway_and_rejected() -> None:
+def test_one_trip_regime_is_not_fabricated_and_is_rejected() -> None:
     context, candidate, policy = _one_trip_case()
     analyses = policy.analyses
-    raw_by_id = {regime.regime_id: regime for regime in candidate.headway_regimes}
 
     assert analyses
     assert {analysis.status for analysis in analyses} == {"SINGLE_TRIP_HEADWAY_NOT_MEASURABLE"}
     assert all(not analysis.headway_measurable for analysis in analyses)
-    assert all(raw_by_id[analysis.regime.regime_id].target_headway == 0 for analysis in analyses)
-    assert all(
-        raw_by_id[analysis.regime.regime_id].legacy_regularity_status
-        == "SINGLE_TRIP_HEADWAY_NOT_MEASURABLE"
-        for analysis in analyses
-    )
+    assert candidate.headway_regimes == ()
+    assert all(analysis.target_headway is None for analysis in analyses)
     assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" not in policy.error_codes
 
     validation = validate_and_build_solution_v1(context, candidate)
@@ -123,22 +119,21 @@ def test_one_trip_regime_is_retained_without_fabricated_headway_and_rejected() -
     assert validation.solution is None
 
 
-def test_zero_trip_regime_is_retained_without_fabricated_headway_and_rejected() -> None:
-    context, candidate, policy = _zero_trip_case()
-    zero_analyses = [analysis for analysis in policy.analyses if analysis.status == "NO_TRIPS"]
-    raw_by_id = {regime.regime_id: regime for regime in candidate.headway_regimes}
+def test_zero_trip_demand_phase_is_not_promoted_to_service_regime() -> None:
+    context, candidate, policy = _zero_trip_phase_case()
 
-    assert zero_analyses
-    assert all(not analysis.headway_measurable for analysis in zero_analyses)
-    assert all(raw_by_id[analysis.regime.regime_id].trip_count == 0 for analysis in zero_analyses)
+    assert all(analysis.status != "NO_TRIPS" for analysis in policy.analyses)
     assert all(
-        raw_by_id[analysis.regime.regime_id].target_headway == 0 for analysis in zero_analyses
+        analysis.status in SCENARIO_C_REPRESENTABLE_REGIME_STATUSES
+        for analysis in policy.analyses
     )
+    assert all(analysis.headway_measurable for analysis in policy.analyses)
+    assert all(regime.target_headway > 0 for regime in candidate.headway_regimes)
     assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" not in policy.error_codes
 
     validation = validate_and_build_solution_v1(context, candidate)
-    assert HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1 in (validation.rejection_codes)
-    assert validation.solution is None
+    assert validation.status == CandidateValidationStatus.ACCEPTED
+    assert validation.solution is not None
 
 
 def test_invalid_non_uniform_retains_both_distinct_rejection_codes() -> None:
@@ -160,8 +155,8 @@ def test_invalid_non_uniform_retains_both_distinct_rejection_codes() -> None:
 
     assert outbound.status == "INVALID_NON_UNIFORM"
     assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in validation.rejection_codes
-    assert HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1 in (validation.rejection_codes)
-    assert "uniformity" in validation.summary
+    assert HEADWAY_REGIME_NOT_REPRESENTABLE_IN_CONTRACT_V1 in validation.rejection_codes
+    assert "balanced rounding" in validation.summary
 
 
 def test_measurable_uniform_regimes_remain_accepted() -> None:
@@ -202,7 +197,8 @@ def test_accepted_solution_has_complete_authoritative_referential_integrity(
     authority_ids = frozenset(
         analysis.regime.regime_id
         for analysis in policy.analyses
-        if analysis.headway_measurable and analysis.status == "UNIFORM"
+        if analysis.headway_measurable
+        and analysis.status in SCENARIO_C_REPRESENTABLE_REGIME_STATUSES
     )
     emitted_counts = Counter(regime.regime_id for regime in solution.c_headway_regimes)
     trip_counts = Counter(trip.headway_regime_id for trip in solution.c_exact_timetable)
@@ -356,7 +352,7 @@ def test_native_candidate_is_validator_rejected_without_solution_or_vector(
     )
     outcome = run_schedule_solver_v1(context, _StaticSolver(run))
 
-    assert outcome.result_status == (GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR)
+    assert outcome.result_status == GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR
     assert outcome.solver_status == native_status
     assert outcome.solution is None
     assert outcome.diagnostic_candidate is not None
