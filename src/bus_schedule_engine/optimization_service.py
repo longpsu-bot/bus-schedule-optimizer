@@ -160,9 +160,10 @@ def _effective_ortools_solver_policy(
 
 def _both_solver_budget_limitation(ortools_policy: SolverPolicyV1) -> str:
     return (
-        "BOTH keeps the heuristic on its existing bounded search and applies a total staged "
-        f"OR-Tools solve budget of {ortools_policy.time_limit_seconds:g} seconds; total "
-        "wall-clock execution also includes heuristic and application overhead."
+        "BOTH may consume approximately two solver budgets when an explicit policy also bounds "
+        "the heuristic; with the ordinary default, the heuristic keeps its existing bounded "
+        f"search and OR-Tools receives one total staged budget of {ortools_policy.time_limit_seconds:g} "
+        "seconds, plus application overhead."
     )
 
 
