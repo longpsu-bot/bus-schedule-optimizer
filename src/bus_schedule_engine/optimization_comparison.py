@@ -74,7 +74,7 @@ def _eligible_vector(
     if solution is None:
         return None
     try:
-        vector = (
+        return (
             recompute_service_quality_objective_vector_v1(problem, solution)
             if exact_demand_authority is None
             else _recompute_service_quality_objective_vector_with_authority_v1(
@@ -85,9 +85,6 @@ def _eligible_vector(
         )
     except (TypeError, ValueError):
         return None
-    if vector[8] != 0 or vector[9] != 0:
-        return None
-    return vector
 
 
 def _first_difference(
