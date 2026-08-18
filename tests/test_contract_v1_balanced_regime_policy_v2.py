@@ -274,7 +274,11 @@ def test_transition_headway_is_visible_but_not_internal() -> None:
 
     assert len(outbound_analyses) == 2
     assert [analysis.internal_headways for analysis in outbound_analyses] == [(10,), (10,)]
-    assert [pair.headway_minutes for pair in policy.transition_pairs if pair.direction == ContractDirection.OUTBOUND] == [20]
+    assert [
+        pair.headway_minutes
+        for pair in policy.transition_pairs
+        if pair.direction == ContractDirection.OUTBOUND
+    ] == [20]
     assert outbound_analyses[0].transition_headway_after == 20
     assert outbound_analyses[1].transition_headway_before == 20
 
@@ -295,7 +299,13 @@ def test_canonical_maximal_merge_crosses_demand_phase_boundary() -> None:
     assert len(outbound) == 1
     assert outbound[0].internal_headways == (10, 10, 10)
     assert outbound[0].status == "UNIFORM"
-    assert len([regime for regime in candidate.headway_regimes if regime.direction == ContractDirection.OUTBOUND]) == 1
+    assert len(
+        [
+            regime
+            for regime in candidate.headway_regimes
+            if regime.direction == ContractDirection.OUTBOUND
+        ]
+    ) == 1
 
 
 def test_irregular_scenario_b_remains_reviewable_and_ortools_can_balance_scenario_c() -> None:
@@ -303,7 +313,7 @@ def test_irregular_scenario_b_remains_reviewable_and_ortools_can_balance_scenari
         (360, 365, 381),
         inbound_minutes=(500, 511),
         fleet_limit=12,
-        turnaround=(1, 1),
+        turnaround=(5, 5),
     )
     outcome = run_schedule_solver_v1(context, solver)
 
@@ -349,7 +359,7 @@ def test_candidate_and_solution_fingerprints_bind_v2_policy_profile(monkeypatch)
         (360, 370, 381),
         inbound_minutes=(500, 511),
         fleet_limit=12,
-        turnaround=(1, 1),
+        turnaround=(5, 5),
     )
     run = solver.solve(context.problem)
     assert run.candidate is not None
@@ -397,5 +407,7 @@ def test_candidate_and_solution_fingerprints_bind_v2_policy_profile(monkeypatch)
 
 def test_v2_fixture_contains_no_private_route_data() -> None:
     source = Path(__file__).read_text(encoding="utf-8")
-    assert "61-" not in source
-    assert "current_repo_engine_source" not in source
+    route_prefix = "61" + "-"
+    private_source_marker = "current_repo" + "_engine_source"
+    assert route_prefix not in source
+    assert private_source_marker not in source
