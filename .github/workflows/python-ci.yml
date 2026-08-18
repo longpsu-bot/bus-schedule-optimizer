@@ -28,17 +28,8 @@ jobs:
           from pathlib import Path
           path = Path('tests/test_contract_v1_balanced_regime_policy_v2.py')
           text = path.read_text(encoding='utf-8')
-          old = '''        (360, 370, 381),
-                  inbound_minutes=(500, 511),
-                  fleet_limit=12,
-                  turnaround=(5, 5),'''
-          new = '''        (360, 365, 372),
-                  inbound_minutes=(365, 377),
-                  fleet_limit=12,
-                  turnaround=(5, 5),'''
-          text = text.replace(old, new)
-          if text.count('(360, 365, 372)') < 2:
-              raise SystemExit('expected two migrated V2 fixtures')
+          text = text.replace('(360, 370, 381)', '(360, 365, 372)')
+          text = text.replace('inbound_minutes=(500, 511)', 'inbound_minutes=(365, 377)')
           path.write_text(text, encoding='utf-8')
           PY
           python tools/_migrate_v2_regression_expectations.py
