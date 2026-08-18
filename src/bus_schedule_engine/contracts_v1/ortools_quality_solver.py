@@ -813,11 +813,6 @@ def _build_quality_candidate(
         bundle,
         regime_policy,
     )
-    effective_status = (
-        NativeSolverStatus.FEASIBLE
-        if status == NativeSolverStatus.OPTIMAL and not canonical_groups_match_native
-        else status
-    )
     extra_limitations = tuple(
         (
             f"{analysis.regime.regime_id} has {len(analysis.trip_ids)} solved "
@@ -829,12 +824,12 @@ def _build_quality_candidate(
     if not canonical_groups_match_native:
         extra_limitations += (
             f"{SCENARIO_C_BALANCED_REGIME_POLICY_PROFILE} changed the final Scenario C "
-            "service-regime grouping relative to the native demand-phase model. The candidate "
-            "is retained as FEASIBLE under canonical validation; native OPTIMAL does not prove "
-            "the canonical regime-dependent objective suffix.",
+            "service-regime grouping relative to the native demand-phase model. Native solver "
+            "status is preserved, but native optimality does not prove the canonical "
+            "regime-dependent objective suffix.",
         )
     provisional = RawScheduleCandidateV1(
-        solver_status=effective_status,
+        solver_status=status,
         solver_adapter=adapter_id,
         solve_duration_seconds=duration,
         candidate_fingerprint=candidate_fingerprint(
@@ -876,27 +871,40 @@ def _build_quality_candidate(
                 f"Independently recomputed {name}={recomputed} does not match "
                 f"the solver-proven value {proven_value}"
             )
-    proven_by_name = dict(canonical_proven)
+    canonical_proven_by_name = dict(canonical_proven)
     stage_values = ", ".join(
-        f"{name}={value}" + (" (proven)" if name in proven_by_name else " (candidate; unproven)")
+        f"{name}={value}"
+        + (
+            " (canonical proof retained)"
+            if name in canonical_proven_by_name
+            else " (candidate; canonical proof not carried)"
+        )
         for name, value in zip(_QUALITY_OBJECTIVE_NAMES, vector, strict=True)
     )
-    unproven = tuple(name for name in _QUALITY_OBJECTIVE_NAMES if name not in proven_by_name)
+    native_proven_text = (
+        ", ".join(f"{name}={value} (proven)" for name, value in proven)
+        if proven
+        else "none"
+    )
+    native_unproven = tuple(name for name in _QUALITY_OBJECTIVE_NAMES if name not in dict(proven))
+    canonical_unproven = tuple(
+        name for name in _QUALITY_OBJECTIVE_NAMES if name not in canonical_proven_by_name
+    )
     native_only_text = (
         ", ".join(f"{name}={value}" for name, value in native_only_proven)
         if native_only_proven
         else "none"
     )
     explanation = (
-        f"Native CP-SAT service-quality staged solve returned {status.value}; canonical "
-        f"Scenario C candidate status is {effective_status.value}. "
+        f"CP-SAT service-quality staged solve returned {status.value}. "
         f"Objective stages attempted: {', '.join(attempted) if attempted else 'none'}. "
-        "Canonical objective stages proven without regime reinterpretation: "
-        f"{', '.join(f'{name}={value}' for name, value in canonical_proven) if canonical_proven else 'none'}. "
-        f"Native-only downstream proofs not carried into canonical V2: {native_only_text}. "
+        f"Objective stages proven optimal: {native_proven_text}. "
         f"Independently recomputed candidate vector: ({', '.join(map(str, vector))}). "
         f"Stage values: {stage_values}. "
-        f"Unproven canonical stages: {', '.join(unproven) if unproven else 'none'}. "
+        f"Unproven current/later stages: {', '.join(native_unproven) if native_unproven else 'none'}. "
+        f"Canonical V2 objective stages not proven by the native demand-phase model: "
+        f"{', '.join(canonical_unproven) if canonical_unproven else 'none'}. "
+        f"Native-only downstream proof values not carried into canonical V2: {native_only_text}. "
         "Variable trip counts and fleet minimization were not optimized."
     )
     return replace(provisional, explanation=explanation)
