@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -17,29 +17,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
-          fetch-depth: 0
-
-      - name: One-shot V2 regression migration
-        if: github.event_name == 'pull_request' && github.head_ref == 'fix/scenario-c-balanced-regime-policy-v2'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path = Path('tests/test_contract_v1_balanced_regime_policy_v2.py')
-          text = path.read_text(encoding='utf-8')
-          text = text.replace('(360, 370, 381)', '(360, 365, 372)')
-          text = text.replace('inbound_minutes=(500, 511)', 'inbound_minutes=(365, 377)')
-          path.write_text(text, encoding='utf-8')
-          PY
-          python tools/_migrate_v2_regression_expectations.py
-          git show origin/main:.github/workflows/python-ci.yml > .github/workflows/python-ci.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --check
-          git commit -m "Migrate regression expectations to balanced regime V2"
-          git push origin HEAD:fix/scenario-c-balanced-regime-policy-v2
 
       - name: Set up Python
         uses: actions/setup-python@v5

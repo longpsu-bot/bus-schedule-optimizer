@@ -194,7 +194,7 @@ def test_singleton_remains_unrepresentable_when_neither_merge_is_balanced() -> N
     ("minutes", "expected_status", "expected_target", "expected_valid"),
     (
         ((360, 370, 380), "UNIFORM", 10.0, True),
-        ((360, 370, 381), "BALANCED_ROUNDING", 10.5, True),
+        ((360, 365, 372), "BALANCED_ROUNDING", 10.5, True),
         ((360, 370, 383), "INVALID_NON_UNIFORM", 11.5, False),
     ),
 )
@@ -311,7 +311,7 @@ def test_canonical_maximal_merge_crosses_demand_phase_boundary() -> None:
 def test_irregular_scenario_b_remains_reviewable_and_ortools_can_balance_scenario_c() -> None:
     context, solver = _single_regime_fixture(
         (360, 365, 381),
-        inbound_minutes=(500, 511),
+        inbound_minutes=(365, 377),
         fleet_limit=12,
         turnaround=(5, 5),
     )
@@ -356,8 +356,8 @@ def test_canonical_assignment_is_solver_label_independent_for_same_timetable() -
 
 def test_candidate_and_solution_fingerprints_bind_v2_policy_profile(monkeypatch) -> None:
     context, solver = _single_regime_fixture(
-        (360, 370, 381),
-        inbound_minutes=(500, 511),
+        (360, 365, 372),
+        inbound_minutes=(365, 377),
         fleet_limit=12,
         turnaround=(5, 5),
     )

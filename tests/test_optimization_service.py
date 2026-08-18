@@ -619,7 +619,7 @@ def test_canonical_redistribute_trips_path_invokes_the_real_solver() -> None:
     assert result.heuristic_outcome.solution is None
 
 
-def test_non_uniform_heuristic_candidate_is_rejected_by_independent_validation(
+def test_balanced_heuristic_candidate_is_accepted_by_independent_validation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     imported, options = _fixture()
@@ -646,18 +646,11 @@ def test_non_uniform_heuristic_candidate_is_rejected_by_independent_validation(
 
     assert validation_calls == 1
     assert result.solver_attempted is True
-    assert result.recommended_outcome is None
     assert result.heuristic_outcome is not None
-    assert (
-        result.heuristic_outcome.result_status
-        == GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR
-    )
-    assert result.heuristic_outcome.solution is None
-    assert result.heuristic_outcome.diagnostic_candidate is not None
-    assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in (
-        result.heuristic_outcome.diagnostic_candidate.rejection_codes
-    )
-
+    assert result.recommended_outcome is result.heuristic_outcome
+    assert result.heuristic_outcome.result_status == GenerationResultStatus.SOLUTION_ACCEPTED
+    assert result.heuristic_outcome.solution is not None
+    assert result.heuristic_outcome.diagnostic_candidate is None
 
 def test_heuristic_unknown_remains_unknown_without_an_accepted_solution(
     monkeypatch: pytest.MonkeyPatch,
