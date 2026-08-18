@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -15,6 +16,12 @@ from .contracts_v1 import (
     recompute_service_quality_objective_vector_v1,
 )
 from .contracts_v1.exact_demand_authority import _ExactDemandAuthority
+from .contracts_v1.regime_headway_policy import (
+    SCENARIO_C_REPRESENTABLE_REGIME_STATUSES,
+    _analyze_regime_headways,
+    _headway_regime_representability_error_codes,
+    _RegimeHeadwayPolicyError,
+)
 from .contracts_v1.service_quality_metrics import (
     _recompute_service_quality_objective_vector_with_authority_v1,
 )
@@ -66,12 +73,71 @@ def _eligible_solution(
     return outcome.solution
 
 
+def _numeric_equal(left: float, right: float) -> bool:
+    return math.isclose(float(left), float(right), rel_tol=0.0, abs_tol=1e-9)
+
+
+def _canonical_solution_regimes_are_current(
+    problem: ScheduleProblemV1,
+    solution: ScheduleSolutionV1,
+) -> bool:
+    if problem.solver_adapter not in {
+        "legacy_heuristic_v1",
+        "ortools_cp_sat_quality_v1",
+    }:
+        return True
+    try:
+        policy = _analyze_regime_headways(
+            problem,
+            solution.c_exact_timetable,
+            enforce_candidate_labels=True,
+        )
+    except _RegimeHeadwayPolicyError:
+        return False
+    if policy.error_codes or _headway_regime_representability_error_codes(policy):
+        return False
+
+    canonical = {
+        analysis.regime.regime_id: analysis
+        for analysis in policy.analyses
+        if analysis.status in SCENARIO_C_REPRESENTABLE_REGIME_STATUSES
+    }
+    emitted = {regime.regime_id: regime for regime in solution.c_headway_regimes}
+    if len(emitted) != len(solution.c_headway_regimes) or set(emitted) != set(canonical):
+        return False
+    trip_by_id = {trip.c_trip_id: trip for trip in solution.c_exact_timetable}
+    for regime_id, analysis in canonical.items():
+        regime = emitted[regime_id]
+        if not analysis.trip_ids or analysis.target_headway is None:
+            return False
+        members = tuple(trip_by_id[trip_id] for trip_id in analysis.trip_ids)
+        expected_transitions = tuple(
+            value
+            for value in (
+                analysis.transition_headway_before,
+                analysis.transition_headway_after,
+            )
+            if value is not None
+        )
+        if (
+            regime.direction != analysis.regime.direction
+            or regime.start_time != members[0].c_departure_time
+            or regime.end_time != members[-1].c_departure_time
+            or regime.trip_count != len(members)
+            or regime.actual_headway_sequence != analysis.internal_headways
+            or regime.transition_headways != expected_transitions
+            or not _numeric_equal(regime.target_headway, analysis.target_headway)
+        ):
+            return False
+    return True
+
+
 def _eligible_vector(
     problem: ScheduleProblemV1,
     solution: ScheduleSolutionV1 | None,
     exact_demand_authority: _ExactDemandAuthority | None,
 ) -> tuple[int, ...] | None:
-    if solution is None:
+    if solution is None or not _canonical_solution_regimes_are_current(problem, solution):
         return None
     try:
         return (
