@@ -1,10 +1,27 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
+from streamlit.testing.v1 import AppTest
 
 from bus_schedule_engine.models import Direction, RouteType, ScenarioParameters, Trip
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_ORIGINAL_APPTEST_FROM_FILE = AppTest.from_file
+
+
+def _repo_relative_app_test(script_path, *args, **kwargs):
+    path = Path(script_path)
+    if not path.is_absolute():
+        path = _REPO_ROOT / path
+    return _ORIGINAL_APPTEST_FROM_FILE(path, *args, **kwargs)
+
+
+# Streamlit now resolves AppTest relative paths against the calling test file.
+# Keep the repository's historical test semantics explicit and version-independent.
+AppTest.from_file = _repo_relative_app_test
 
 
 @pytest.fixture
