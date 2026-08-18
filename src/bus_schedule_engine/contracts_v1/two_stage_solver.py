@@ -60,12 +60,15 @@ from .two_stage_authority import (
 from .two_stage_models import (
     FinalServiceTailMetricsV1,
     ProposedServiceRegimeV1,
+    Stage2ConstraintFamilyV1,
+    Stage2InfeasibilityDiagnosticV1,
     Stage2TimetableResultV1,
     TripAllocationPlanV1,
     TripAllocationSolveStatusV1,
     TwoStageNativeRunV1,
     TwoStageSolveDiagnosticsV1,
     UniformIntegerRegimePolicyV3,
+    finalize_stage_2_infeasibility_diagnostic,
 )
 
 ORTOOLS_TWO_STAGE_UNIFORM_ADAPTER_ID = "ortools_cp_sat_two_stage_uniform_v1"
@@ -158,6 +161,7 @@ def _departure_domains(
 ) -> dict[str, tuple[int, int]]:
     regime_by_source, source_ids_by_regime = _source_regime_membership(problem, plan)
     blocks = {block.block_id: block for block in problem.analysis_blocks}
+    sentinel_by_source_id = {item.source_b_trip_id: item for item in plan.final_service_sentinels}
     directional = _ordered_directional_trips(problem)
     output: dict[str, tuple[int, int]] = {}
     for trips in directional.values():
@@ -168,6 +172,9 @@ def _departure_domains(
             covered = tuple(blocks[block_id] for block_id in regime.covered_demand_block_ids)
             regime_start = min(block.start_time // 60 for block in covered)
             regime_end = max(block.end_time // 60 - 1 for block in covered)
+            sentinel = sentinel_by_source_id.get(trip.trip_id)
+            if sentinel is not None:
+                regime_end = max(regime_end, sentinel.departure_minute)
             source_minute = trip.departure_time // 60
             lower = max(
                 service_start,
@@ -230,29 +237,14 @@ def _add_exact_block_membership_constraints(
     return by_direction_and_block
 
 
-def _conjunction(
-    model: cp_model.CpModel,
-    literals: tuple[cp_model.IntVar, ...],
-    *,
-    name: str,
-) -> cp_model.IntVar:
-    output = model.new_bool_var(name)
-    model.add_bool_and(literals).only_enforce_if(output)
-    model.add_bool_or(tuple(literal.negated() for literal in literals)).only_enforce_if(
-        output.negated()
-    )
-    return output
-
-
 def _positive_demand_service_gap_objective(
     model: cp_model.CpModel,
     problem: ScheduleProblemV1,
     plan: TripAllocationPlanV1,
     departure_by_source_id: dict[str, cp_model.IntVar],
-    memberships: dict[tuple[ContractDirection, str], tuple[cp_model.IntVar, ...]],
+    domains: dict[str, tuple[int, int]],
 ) -> cp_model.IntVar:
-    """Lexicographically encode max then total positive-demand block service gap."""
-    directional = _ordered_directional_trips(problem)
+    """Encode gaps on one authority-native stream per positive-demand block."""
     block_gap_values: list[cp_model.IntVar] = []
     maximum_duration = max(
         block.end_minute - block.start_minute for block in plan.allocation_blocks
@@ -261,80 +253,63 @@ def _positive_demand_service_gap_objective(
     for block in plan.allocation_blocks:
         if block.observed_passengers <= 0:
             continue
-        for direction, target in block.directional_trip_counts:
-            duration = block.end_minute - block.start_minute
-            total_bound += duration
-            block_max = model.new_int_var(
+        duration = block.end_minute - block.start_minute
+        total_bound += duration
+        block_max = model.new_int_var(
+            0,
+            duration,
+            f"v3_block_max_gap_{block.block_id}",
+        )
+        compatible_directions = (
+            {ContractDirection.OUTBOUND, ContractDirection.INBOUND}
+            if block.direction == ContractDirection.COMBINED
+            else {block.direction}
+        )
+        source_ids = tuple(
+            source.trip_id
+            for source in problem.scenario_b.exact_timetable
+            if source.direction in compatible_directions
+            and domains[source.trip_id][0] < block.end_minute
+            and domains[source.trip_id][1] >= block.start_minute
+        )
+        distance = model.new_constant(0)
+        event_gaps: list[cp_model.IntVar] = []
+        for minute in range(block.start_minute, block.end_minute):
+            equality_literals: list[cp_model.IntVar] = []
+            for source_id in source_ids:
+                at_minute = model.new_bool_var(
+                    f"v3_at_minute_{block.block_id}_{source_id}_{minute:04d}"
+                )
+                departure = departure_by_source_id[source_id]
+                model.add(departure == minute).only_enforce_if(at_minute)
+                model.add(departure != minute).only_enforce_if(at_minute.negated())
+                equality_literals.append(at_minute)
+            event = model.new_bool_var(f"v3_service_event_{block.block_id}_{minute:04d}")
+            if equality_literals:
+                model.add_bool_or(equality_literals).only_enforce_if(event)
+                model.add_bool_and(
+                    tuple(item.negated() for item in equality_literals)
+                ).only_enforce_if(event.negated())
+            else:
+                model.add(event == 0)
+            gap = model.new_int_var(
                 0,
                 duration,
-                f"v3_block_max_gap_{direction.value}_{block.block_id}",
+                f"v3_event_gap_{block.block_id}_{minute:04d}",
             )
-            if target == 0:
-                model.add(block_max == duration)
-                block_gap_values.append(block_max)
-                continue
-            member_values = memberships[(direction, block.block_id)]
-            source_trips = directional[direction]
-            gap_values: list[cp_model.IntVar] = []
-            for index, (source, member) in enumerate(zip(source_trips, member_values, strict=True)):
-                departure = departure_by_source_id[source.trip_id]
-                first_literals = (
-                    (member,) if index == 0 else (member, member_values[index - 1].negated())
-                )
-                first = _conjunction(
-                    model,
-                    first_literals,
-                    name=f"v3_block_first_{direction.value}_{block.block_id}_{index:04d}",
-                )
-                start_gap = model.new_int_var(
-                    0,
-                    duration,
-                    f"v3_block_start_gap_{direction.value}_{block.block_id}_{index:04d}",
-                )
-                model.add(start_gap == departure - block.start_minute).only_enforce_if(first)
-                model.add(start_gap == 0).only_enforce_if(first.negated())
-                gap_values.append(start_gap)
-
-                last_literals = (
-                    (member,)
-                    if index == len(member_values) - 1
-                    else (member, member_values[index + 1].negated())
-                )
-                last = _conjunction(
-                    model,
-                    last_literals,
-                    name=f"v3_block_last_{direction.value}_{block.block_id}_{index:04d}",
-                )
-                end_gap = model.new_int_var(
-                    0,
-                    duration,
-                    f"v3_block_end_gap_{direction.value}_{block.block_id}_{index:04d}",
-                )
-                model.add(end_gap == block.end_minute - departure).only_enforce_if(last)
-                model.add(end_gap == 0).only_enforce_if(last.negated())
-                gap_values.append(end_gap)
-
-                if index + 1 < len(source_trips):
-                    consecutive = _conjunction(
-                        model,
-                        (member, member_values[index + 1]),
-                        name=(
-                            f"v3_block_consecutive_{direction.value}_{block.block_id}_{index:04d}"
-                        ),
-                    )
-                    internal_gap = model.new_int_var(
-                        0,
-                        duration,
-                        f"v3_block_internal_gap_{direction.value}_{block.block_id}_{index:04d}",
-                    )
-                    model.add(
-                        internal_gap
-                        == departure_by_source_id[source_trips[index + 1].trip_id] - departure
-                    ).only_enforce_if(consecutive)
-                    model.add(internal_gap == 0).only_enforce_if(consecutive.negated())
-                    gap_values.append(internal_gap)
-            model.add_max_equality(block_max, gap_values)
-            block_gap_values.append(block_max)
+            model.add(gap == distance).only_enforce_if(event)
+            model.add(gap == 0).only_enforce_if(event.negated())
+            event_gaps.append(gap)
+            next_distance = model.new_int_var(
+                0,
+                duration,
+                f"v3_distance_after_{block.block_id}_{minute:04d}",
+            )
+            model.add(next_distance == 1).only_enforce_if(event)
+            model.add(next_distance == distance + 1).only_enforce_if(event.negated())
+            distance = next_distance
+        model.add_max_equality(block_max, [*event_gaps, distance])
+        block_gap_values.append(block_max)
     maximum = model.new_int_var(0, maximum_duration, "v3_maximum_positive_demand_gap")
     if block_gap_values:
         model.add_max_equality(maximum, block_gap_values)
@@ -429,7 +404,7 @@ def _build_stage_2_model(
             locked_last = direction_trips[-1].departure_time // 60
             model.add(last == locked_last)
 
-    memberships = _add_exact_block_membership_constraints(
+    _add_exact_block_membership_constraints(
         model,
         problem,
         plan,
@@ -442,7 +417,7 @@ def _build_stage_2_model(
         problem,
         plan,
         hard.departure_by_source_id,
-        memberships,
+        domains,
     )
     directional_regimes = _directional_regimes(plan)
     transition_values: list[cp_model.IntVar] = []
@@ -747,6 +722,55 @@ def _build_candidate(
     )
 
 
+def _stage_2_infeasibility_diagnostic(
+    problem: ScheduleProblemV1,
+    plan: TripAllocationPlanV1,
+    *,
+    protected_projection: OrToolsProtectedFloorProjectionV1 | None,
+    domain_failure: bool,
+    detail: str,
+) -> Stage2InfeasibilityDiagnosticV1:
+    if domain_failure:
+        families = {
+            Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP,
+            Stage2ConstraintFamilyV1.REGIME_BOUNDARIES,
+            Stage2ConstraintFamilyV1.B_SHIFT_BOUND,
+            Stage2ConstraintFamilyV1.FIRST_LAST_LOCK,
+            Stage2ConstraintFamilyV1.FINAL_SERVICE_TAIL,
+        }
+    else:
+        families = {
+            Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP,
+            Stage2ConstraintFamilyV1.UNIFORM_HEADWAY,
+            Stage2ConstraintFamilyV1.REGIME_BOUNDARIES,
+            Stage2ConstraintFamilyV1.MINIMUM_OPERATIONAL_HEADWAY,
+            Stage2ConstraintFamilyV1.B_SHIFT_BOUND,
+            Stage2ConstraintFamilyV1.FIRST_LAST_LOCK,
+            Stage2ConstraintFamilyV1.FINAL_SERVICE_TAIL,
+            Stage2ConstraintFamilyV1.REGIME_TRANSITION_JUMP,
+            Stage2ConstraintFamilyV1.SOURCE_RUNTIME,
+            Stage2ConstraintFamilyV1.TURNAROUND,
+            Stage2ConstraintFamilyV1.FLEET,
+        }
+        if problem.scenario_b.terminal_occupancy_limits is not None:
+            families.add(Stage2ConstraintFamilyV1.TERMINAL_OCCUPANCY)
+        if protected_projection is not None:
+            families.add(Stage2ConstraintFamilyV1.PROTECTED_SERVICE_FLOOR)
+    explanation = (
+        "Stage 2 proved this allocation plan infeasible under the encoded constraints. "
+        f"{detail} The listed deterministic family classification is diagnostic and is not "
+        "claimed to be a mathematically minimal unsat core."
+    )
+    return finalize_stage_2_infeasibility_diagnostic(
+        Stage2InfeasibilityDiagnosticV1(
+            allocation_plan_fingerprint=plan.allocation_fingerprint,
+            native_solver_status=NativeSolverStatus.INFEASIBLE,
+            constraint_families=tuple(sorted(families, key=lambda item: item.value)),
+            explanation=explanation,
+        )
+    )
+
+
 def solve_exact_timetable_stage_2_v1(
     problem: ScheduleProblemV1,
     plan: TripAllocationPlanV1,
@@ -778,6 +802,13 @@ def solve_exact_timetable_stage_2_v1(
     try:
         bundle = _build_stage_2_model(problem, plan, policy, projection)
     except ValueError as exc:
+        diagnostic = _stage_2_infeasibility_diagnostic(
+            problem,
+            plan,
+            protected_projection=projection,
+            domain_failure=True,
+            detail=f"A deterministic domain probe failed: {exc}",
+        )
         return Stage2TimetableResultV1(
             solver_status=NativeSolverStatus.INFEASIBLE,
             candidate=None,
@@ -787,7 +818,8 @@ def solve_exact_timetable_stage_2_v1(
             constraint_count=0,
             maximum_departure_domain_width_minutes=0,
             full_service_window_domain_count=0,
-            explanations=(f"Stage 2 allocation domain is infeasible: {exc}",),
+            infeasibility_diagnostic=diagnostic,
+            explanations=(diagnostic.explanation,),
             limitations=(),
         )
     latest_solver: cp_model.CpSolver | None = None
@@ -814,6 +846,21 @@ def solve_exact_timetable_stage_2_v1(
         break
     duration = max(0.0, time.perf_counter() - started)
     if latest_solver is None:
+        diagnostic = (
+            _stage_2_infeasibility_diagnostic(
+                problem,
+                plan,
+                protected_projection=projection,
+                domain_failure=False,
+                detail=(
+                    "The cheap arithmetic-progression, domain, and fleet lower-bound probes "
+                    "passed, so infeasibility arises from one or more interactions among the "
+                    "remaining encoded families."
+                ),
+            )
+            if last_status == NativeSolverStatus.INFEASIBLE
+            else None
+        )
         return Stage2TimetableResultV1(
             solver_status=last_status,
             candidate=None,
@@ -823,7 +870,12 @@ def solve_exact_timetable_stage_2_v1(
             constraint_count=bundle.constraint_count,
             maximum_departure_domain_width_minutes=(bundle.maximum_departure_domain_width_minutes),
             full_service_window_domain_count=bundle.full_service_window_domain_count,
-            explanations=(f"Stage 2 returned {last_status.value} without a timetable.",),
+            infeasibility_diagnostic=diagnostic,
+            explanations=(
+                diagnostic.explanation
+                if diagnostic is not None
+                else f"Stage 2 returned {last_status.value} without a timetable.",
+            ),
             limitations=(),
         )
     final_status = (
@@ -849,6 +901,7 @@ def solve_exact_timetable_stage_2_v1(
         constraint_count=bundle.constraint_count,
         maximum_departure_domain_width_minutes=(bundle.maximum_departure_domain_width_minutes),
         full_service_window_domain_count=bundle.full_service_window_domain_count,
+        infeasibility_diagnostic=None,
         explanations=(candidate.explanation,),
         limitations=candidate.limitations,
     )
@@ -1049,6 +1102,8 @@ def allocate_empty_stage_1_result():
         plans=(),
         candidate_count=0,
         admissible_allocation_count=0,
+        necessary_feasibility_pruned_count=0,
+        pruned_necessary_feasibility=(),
         solve_duration_seconds=0.0,
         budget_exhausted=False,
         explanations=(),
@@ -1079,6 +1134,7 @@ def _diagnostics(
     return TwoStageSolveDiagnosticsV1(
         stage_1_candidate_count=stage_1.candidate_count,
         stage_1_admissible_allocation_count=stage_1.admissible_allocation_count,
+        stage_1_necessary_feasibility_pruned_count=(stage_1.necessary_feasibility_pruned_count),
         stage_2_allocation_attempt_count=len(attempts),
         stage_2_variable_count=sum(item.variable_count for item in attempts),
         stage_2_constraint_count=sum(item.constraint_count for item in attempts),
@@ -1095,6 +1151,11 @@ def _diagnostics(
         total_solve_duration=total_duration,
         total_budget_seconds=total_budget,
         budget_exhausted=total_duration >= total_budget if total_budget > 0 else True,
+        stage_2_infeasibility_diagnostics=tuple(
+            item.infeasibility_diagnostic
+            for item in attempts
+            if item.infeasibility_diagnostic is not None
+        ),
     )
 
 

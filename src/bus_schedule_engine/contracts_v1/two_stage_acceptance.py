@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from .demand_resolution import DemandAnalysisBlockV1
 from .models import ContractDirection
 from .solver_models import GenerationResultStatus, ScheduleGenerationContextV1
 from .solver_orchestration import run_schedule_solver_v1
@@ -67,35 +68,33 @@ def _block_count_for_c(solution, block) -> int:
     )
 
 
-def _service_gap_metrics(
-    context: ScheduleGenerationContextV1,
+def calculate_positive_demand_service_gap_minutes_v1(
+    analysis_blocks: tuple[DemandAnalysisBlockV1, ...],
     departures: tuple[tuple[ContractDirection, int], ...],
 ) -> int:
+    """Measure passenger service gaps using the demand authority's native direction grain."""
     maximum = 0
-    for block in context.problem.analysis_blocks:
+    for block in analysis_blocks:
         if block.observed_passengers <= 0:
             continue
-        directions = (
-            (ContractDirection.OUTBOUND, ContractDirection.INBOUND)
-            if block.direction == ContractDirection.COMBINED
-            else (block.direction,)
+        members = sorted(
+            minute
+            for candidate_direction, minute in departures
+            if (
+                block.direction == ContractDirection.COMBINED
+                or candidate_direction == block.direction
+            )
+            and block.start_time // 60 <= minute < block.end_time // 60
         )
-        for direction in directions:
-            members = sorted(
-                minute
-                for candidate_direction, minute in departures
-                if candidate_direction == direction
-                and block.start_time // 60 <= minute < block.end_time // 60
-            )
-            if not members:
-                maximum = max(maximum, block.duration_minutes)
-                continue
-            gaps = (
-                members[0] - block.start_time // 60,
-                *(later - earlier for earlier, later in zip(members, members[1:], strict=False)),
-                block.end_time // 60 - members[-1],
-            )
-            maximum = max(maximum, *gaps)
+        if not members:
+            maximum = max(maximum, block.duration_minutes)
+            continue
+        gaps = (
+            members[0] - block.start_time // 60,
+            *(later - earlier for earlier, later in zip(members, members[1:], strict=False)),
+            block.end_time // 60 - members[-1],
+        )
+        maximum = max(maximum, *gaps)
     return maximum
 
 
@@ -131,7 +130,7 @@ def _headway_variation(
     return total_internal, maximum_transition
 
 
-def _quality_vector(
+def calculate_two_stage_quality_vector_v1(
     context: ScheduleGenerationContextV1,
     *,
     solution=None,
@@ -168,7 +167,10 @@ def _quality_vector(
         shifted_count = solution.shifted_trip_count
         total_shift = round(solution.total_shift_minutes)
         maximum_shift = round(solution.maximum_shift_minutes)
-    max_gap = _service_gap_metrics(context, departure_rows)
+    max_gap = calculate_positive_demand_service_gap_minutes_v1(
+        context.problem.analysis_blocks,
+        departure_rows,
+    )
     internal_variation, transition_jump = _headway_variation(departure_rows, regimes)
     return (
         no_service,
@@ -193,7 +195,7 @@ def run_two_stage_scenario_c_v1(
     detailed = solver.last_detailed_run
     if detailed is None:  # pragma: no cover - adapter guarantees a detailed result
         raise AssertionError("two-stage adapter did not preserve its detailed run")
-    b_vector = _quality_vector(context)
+    b_vector = calculate_two_stage_quality_vector_v1(context)
     if (
         outcome.result_status != GenerationResultStatus.SOLUTION_ACCEPTED
         or outcome.solution is None
@@ -206,7 +208,7 @@ def run_two_stage_scenario_c_v1(
             "No independently accepted V3 candidate reached final comparison.",
         )
     else:
-        c_vector = _quality_vector(context, solution=outcome.solution)
+        c_vector = calculate_two_stage_quality_vector_v1(context, solution=outcome.solution)
         state = classify_two_stage_final_acceptance_v1(b_vector, c_vector)
         if state == FinalAcceptanceStateV1.VALID_CANDIDATE_NOT_FINAL:
             explanations = (
@@ -244,6 +246,8 @@ def run_two_stage_scenario_c_v1(
 
 __all__ = [
     "TWO_STAGE_QUALITY_VECTOR_NAMES_V1",
+    "calculate_positive_demand_service_gap_minutes_v1",
+    "calculate_two_stage_quality_vector_v1",
     "classify_two_stage_final_acceptance_v1",
     "run_two_stage_scenario_c_v1",
 ]

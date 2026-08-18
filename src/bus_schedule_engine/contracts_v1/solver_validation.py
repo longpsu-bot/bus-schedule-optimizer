@@ -457,6 +457,21 @@ def _two_stage_candidate_errors(
             if actual != expected:
                 errors.append("V3_STAGE_1_BLOCK_ALLOCATION_NOT_REPRODUCED")
 
+    for sentinel in allocation_plan.final_service_sentinels:
+        trip = candidate_by_source.get(sentinel.source_b_trip_id)
+        if trip is None or trip.c_departure_time != sentinel.departure_minute * 60:
+            errors.append("V3_FINAL_SERVICE_SENTINEL_LOCK_VIOLATION")
+            continue
+        if any(
+            block.start_minute <= sentinel.departure_minute < block.end_minute
+            and (
+                block.direction == ContractDirection.COMBINED
+                or block.direction == sentinel.direction
+            )
+            for block in allocation_plan.allocation_blocks
+        ):
+            errors.append("V3_FINAL_SERVICE_SENTINEL_COUNTED_AS_DEMAND_MEMBER")
+
     raw_by_id = {regime.regime_id: regime for regime in candidate.headway_regimes}
     planned_ids = {regime.regime_id for regime in allocation_plan.proposed_regimes}
     if set(raw_by_id) != planned_ids:

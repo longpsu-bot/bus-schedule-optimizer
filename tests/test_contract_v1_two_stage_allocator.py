@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, date, datetime
+from types import SimpleNamespace
 
 import pytest
 
@@ -15,13 +16,17 @@ from bus_schedule_engine.contracts_v1 import (
     OperatingDayType,
     ScenarioBEvaluationPolicyV1,
     ScenarioCOptimizationModeV1,
+    ServiceBoundarySemanticsV1,
     SolverPolicyV1,
+    Stage2ConstraintFamilyV1,
     UniformIntegerRegimePolicyV3,
     allocate_trips_stage_1_v1,
     build_schedule_generation_context_v1,
     build_schedule_problem_v1,
     build_two_stage_demand_authority_v1,
     build_two_stage_uniform_request_v1,
+    calculate_positive_demand_service_gap_minutes_v1,
+    calculate_two_stage_quality_vector_v1,
     evaluate_scenario_b_v1,
     find_representable_uniform_regime_v1,
     normalize_imported_workbook_v1,
@@ -237,6 +242,10 @@ def test_stage_1_fixes_daily_and_directional_totals_and_emits_only_exact_regimes
                 (regime.trip_count - 1) * regime.uniform_headway_minutes
             )
     assert any(len(regime.covered_demand_block_ids) > 1 for regime in plan.proposed_regimes)
+    assert plan.necessary_feasibility.passed
+    assert plan.necessary_feasibility.diagnostic_fingerprint
+    assert plan.necessary_feasibility.fleet_lower_bound is not None
+    assert plan.necessary_feasibility.fleet_lower_bound <= problem.scenario_b.available_fleet_limit
     b_no_service = c_no_service = 0
     b_critical = c_critical = 0
     b_planning = c_planning = 0
@@ -284,12 +293,165 @@ def test_combined_demand_allocates_total_service_without_changing_direction_coun
     assert any(
         "does not claim directional passenger inference" in item for item in result.limitations
     )
+    stage_2 = solve_exact_timetable_stage_2_v1(
+        problem,
+        plan,
+        policy=UniformIntegerRegimePolicyV3(),
+        time_limit_seconds=2.0,
+    )
+    assert stage_2.candidate is not None
+    combined_gap = calculate_positive_demand_service_gap_minutes_v1(
+        problem.analysis_blocks,
+        tuple(
+            (trip.direction, trip.c_departure_time // 60)
+            for trip in stage_2.candidate.exact_timetable
+        ),
+    )
+    assert combined_gap < max(block.duration_minutes for block in problem.analysis_blocks)
+
+
+def test_combined_passenger_gap_uses_one_alternating_service_stream() -> None:
+    combined_problem, *_ = _stage1_request(
+        outbound=(425, 460),
+        inbound=(440, 475),
+        demand=(_record(Direction.COMBINED, 420, 480, 130),),
+    )
+    directional_problem, *_ = _stage1_request(
+        outbound=(425, 460),
+        inbound=(440, 475),
+        demand=(
+            _record(Direction.TERMINAL_1_TO_2, 420, 480, 65),
+            _record(Direction.TERMINAL_2_TO_1, 420, 480, 65),
+        ),
+    )
+    alternating = (
+        (ContractDirection.OUTBOUND, 425),
+        (ContractDirection.INBOUND, 440),
+        (ContractDirection.OUTBOUND, 460),
+        (ContractDirection.INBOUND, 475),
+    )
+
+    assert (
+        calculate_positive_demand_service_gap_minutes_v1(
+            combined_problem.analysis_blocks,
+            alternating,
+        )
+        == 20
+    )
+    assert (
+        calculate_positive_demand_service_gap_minutes_v1(
+            directional_problem.analysis_blocks,
+            alternating,
+        )
+        == 35
+    )
+
+
+def test_combined_passenger_metrics_ignore_direction_split_with_same_service_sequence() -> None:
+    problem, _, normalized, evaluation, evaluation_policy = _stage1_request(
+        outbound=(425, 460),
+        inbound=(440, 475),
+        demand=(_record(Direction.COMBINED, 420, 480, 130),),
+    )
+    minutes = (425, 440, 460, 475)
+    first_split = tuple(
+        (direction, minute)
+        for direction, minute in zip(
+            (
+                ContractDirection.OUTBOUND,
+                ContractDirection.INBOUND,
+                ContractDirection.OUTBOUND,
+                ContractDirection.INBOUND,
+            ),
+            minutes,
+            strict=True,
+        )
+    )
+    second_split = tuple(
+        (direction, minute)
+        for direction, minute in zip(
+            (
+                ContractDirection.OUTBOUND,
+                ContractDirection.OUTBOUND,
+                ContractDirection.OUTBOUND,
+                ContractDirection.OUTBOUND,
+            ),
+            minutes,
+            strict=True,
+        )
+    )
+
+    assert calculate_positive_demand_service_gap_minutes_v1(
+        problem.analysis_blocks,
+        first_split,
+    ) == calculate_positive_demand_service_gap_minutes_v1(
+        problem.analysis_blocks,
+        second_split,
+    )
+
+    context = build_schedule_generation_context_v1(
+        problem,
+        normalized,
+        evaluation,
+        evaluation_policy,
+    )
+    combined_only_solution = SimpleNamespace(
+        c_exact_timetable=tuple(
+            SimpleNamespace(
+                direction=direction,
+                c_departure_time=minute * 60,
+                headway_regime_id="SYNTHETIC-COMBINED",
+            )
+            for direction, minute in second_split
+        ),
+        shifted_trip_count=0,
+        total_shift_minutes=0,
+        maximum_shift_minutes=0,
+    )
+    vector = calculate_two_stage_quality_vector_v1(
+        context,
+        solution=combined_only_solution,
+    )
+    assert vector[0] == 0
+    assert vector[4] == 20
 
 
 def test_stage_1_rejects_non_positive_budget() -> None:
     problem, authority, *_ = _stage1_request()
     with pytest.raises(ValueError, match="finite and positive"):
         allocate_trips_stage_1_v1(problem, authority, time_limit_seconds=0)
+
+
+def test_stage_1_prunes_plan_when_safe_fleet_lower_bound_exceeds_limit() -> None:
+    problem, authority, *_ = _stage1_request()
+    long_runtime_scenario = replace(
+        problem.scenario_b,
+        available_fleet_limit=1,
+        exact_timetable=tuple(
+            replace(
+                trip,
+                runtime_minutes=100,
+                arrival_time=trip.departure_time + 100 * 60,
+            )
+            for trip in problem.scenario_b.exact_timetable
+        ),
+    )
+    constrained_problem = replace(problem, scenario_b=long_runtime_scenario)
+
+    result = allocate_trips_stage_1_v1(
+        constrained_problem,
+        authority,
+        policy=UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=1),
+        time_limit_seconds=2.0,
+    )
+
+    assert not result.plans
+    assert result.necessary_feasibility_pruned_count >= 1
+    diagnostic = result.pruned_necessary_feasibility[0]
+    assert not diagnostic.passed
+    assert Stage2ConstraintFamilyV1.FLEET in diagnostic.constraint_families
+    assert diagnostic.fleet_lower_bound is not None
+    assert diagnostic.fleet_lower_bound > constrained_problem.scenario_b.available_fleet_limit
 
 
 def test_stage_2_uses_fixed_allocation_exact_uniformity_and_b_anchored_minutes() -> None:
@@ -329,6 +491,39 @@ def test_stage_2_uses_fixed_allocation_exact_uniformity_and_b_anchored_minutes()
         not regime.actual_headway_sequence or len(set(regime.actual_headway_sequence)) == 1
         for regime in candidate.headway_regimes
     )
+
+
+def test_stage_2_infeasible_result_has_versioned_family_diagnostic() -> None:
+    problem, authority, *_ = _stage1_request()
+    policy = UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=1)
+    stage_1 = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+    assert stage_1.plans
+    constrained_problem = replace(
+        problem,
+        scenario_b=replace(problem.scenario_b, available_fleet_limit=1),
+    )
+
+    stage_2 = solve_exact_timetable_stage_2_v1(
+        constrained_problem,
+        stage_1.plans[0],
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+
+    assert stage_2.solver_status == NativeSolverStatus.INFEASIBLE
+    assert stage_2.candidate is None
+    diagnostic = stage_2.infeasibility_diagnostic
+    assert diagnostic is not None
+    assert diagnostic.diagnostic_profile == ("scenario_c_stage_2_infeasibility_diagnostic_v1")
+    assert diagnostic.diagnostic_fingerprint
+    assert Stage2ConstraintFamilyV1.FLEET in diagnostic.constraint_families
+    assert Stage2ConstraintFamilyV1.REGIME_TRANSITION_JUMP in diagnostic.constraint_families
+    assert "not claimed to be a mathematically minimal unsat core" in diagnostic.explanation
 
 
 def test_stage_2_candidate_passes_existing_runtime_fleet_turnaround_and_occupancy_validator() -> (
@@ -405,6 +600,8 @@ def test_two_stage_adapter_shares_one_finite_budget_and_bounds_allocation_retrie
     assert isinstance(allocation, dict)
     assert isinstance(accepted, dict)
     assert allocation["allocation_by_demand_interval"]
+    assert allocation["necessary_feasibility"]["passed"] is True
+    assert allocation["necessary_feasibility"]["fleet_lower_bound"] is not None
     assert accepted["final_service_regimes"]
     assert all(
         trip["c_departure_time"].endswith(":00")
@@ -413,6 +610,7 @@ def test_two_stage_adapter_shares_one_finite_budget_and_bounds_allocation_retrie
     assert artifact["final_service_tail_metrics"]
     assert artifact["solve_diagnostics"]["total_budget_seconds"] == 2.0
     assert artifact["solve_diagnostics"]["full_service_window_domain_count"] == 0
+    assert artifact["solve_diagnostics"]["stage_2_infeasibility_diagnostics"] == []
 
 
 def test_budget_timeout_is_truthfully_unknown_not_infeasible() -> None:
@@ -499,6 +697,124 @@ def test_final_tail_is_uniform_spread_and_locked_to_last_departure() -> None:
         assert actual.end_time == locked_last
         assert (actual.end_time - actual.start_time) // 60 >= 55
         assert len(set(actual.actual_headway_sequence)) <= 1
+
+
+def test_final_service_sentinel_allows_locked_last_at_half_open_boundary() -> None:
+    boundary = 18 * 60
+    problem, authority, *_ = _stage1_request(
+        outbound=(17 * 60, 17 * 60 + 30, boundary),
+        inbound=(17 * 60, 17 * 60 + 30, boundary),
+        demand=(
+            _record(Direction.TERMINAL_1_TO_2, 17 * 60, boundary, 80),
+            _record(Direction.TERMINAL_2_TO_1, 17 * 60, boundary, 80),
+        ),
+    )
+    policy = UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=1)
+
+    stage_1 = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+
+    assert stage_1.plans
+    plan = stage_1.plans[0]
+    assert {
+        (item.direction, item.departure_minute, item.boundary_semantics)
+        for item in plan.final_service_sentinels
+    } == {
+        (
+            ContractDirection.OUTBOUND,
+            boundary,
+            ServiceBoundarySemanticsV1.FINAL_SERVICE_SENTINEL,
+        ),
+        (
+            ContractDirection.INBOUND,
+            boundary,
+            ServiceBoundarySemanticsV1.FINAL_SERVICE_SENTINEL,
+        ),
+    }
+    assert all(block.trip_count == 2 for block in plan.allocation_blocks)
+
+    stage_2 = solve_exact_timetable_stage_2_v1(
+        problem,
+        plan,
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+
+    assert stage_2.candidate is not None
+    candidate = stage_2.candidate
+    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
+        departures = sorted(
+            trip.c_departure_time // 60
+            for trip in candidate.exact_timetable
+            if trip.direction == direction
+        )
+        assert departures == [17 * 60, 17 * 60 + 30, boundary]
+        assert boundary not in range(17 * 60, boundary)
+    for block in plan.allocation_blocks:
+        actual_members = tuple(
+            trip
+            for trip in candidate.exact_timetable
+            if block.start_minute * 60 <= trip.c_departure_time < block.end_minute * 60
+            and (block.direction == ContractDirection.COMBINED or trip.direction == block.direction)
+        )
+        assert len(actual_members) == block.trip_count
+        assert all(trip.c_departure_time != boundary * 60 for trip in actual_members)
+    for regime in candidate.headway_regimes:
+        assert regime.actual_headway_sequence == (30.0, 30.0)
+
+
+def test_non_final_demand_boundaries_remain_half_open_with_final_sentinel() -> None:
+    boundary = 18 * 60
+    middle = 17 * 60 + 30
+    problem, authority, *_ = _stage1_request(
+        outbound=(17 * 60, middle, boundary),
+        inbound=(17 * 60, middle, boundary),
+        demand=(
+            _record(Direction.TERMINAL_1_TO_2, 17 * 60, middle, 40),
+            _record(Direction.TERMINAL_1_TO_2, middle, boundary, 40),
+            _record(Direction.TERMINAL_2_TO_1, 17 * 60, middle, 40),
+            _record(Direction.TERMINAL_2_TO_1, middle, boundary, 40),
+        ),
+    )
+    policy = UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=2)
+    stage_1 = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+    assert stage_1.plans
+    stage_2 = solve_exact_timetable_stage_2_v1(
+        problem,
+        stage_1.plans[0],
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+    assert stage_2.candidate is not None
+
+    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
+        blocks = sorted(
+            (block for block in stage_1.plans[0].allocation_blocks if block.direction == direction),
+            key=lambda item: item.start_minute,
+        )
+        departures = tuple(
+            trip.c_departure_time // 60
+            for trip in stage_2.candidate.exact_timetable
+            if trip.direction == direction
+        )
+        assert (
+            sum(blocks[0].start_minute <= item < blocks[0].end_minute for item in departures) == 1
+        )
+        assert (
+            sum(blocks[1].start_minute <= item < blocks[1].end_minute for item in departures) == 1
+        )
+        assert middle not in range(blocks[0].start_minute, blocks[0].end_minute)
+        assert middle in range(blocks[1].start_minute, blocks[1].end_minute)
+        assert boundary not in range(blocks[1].start_minute, blocks[1].end_minute)
 
 
 def test_non_minute_or_bunched_v3_tail_candidate_is_rejected() -> None:

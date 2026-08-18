@@ -14,6 +14,7 @@ from bus_schedule_engine.contracts_v1 import (
     FinalServiceTailPolicyV1,
     ProposedServiceRegimeV1,
     ScenarioCOptimizationModeV1,
+    Stage1NecessaryFeasibilityResultV1,
     TripAllocationBlockV1,
     TripAllocationPlanV1,
     TripAllocationSolveStatusV1,
@@ -21,6 +22,7 @@ from bus_schedule_engine.contracts_v1 import (
     calculate_allocation_fingerprint,
     classify_two_stage_final_acceptance_v1,
     finalize_allocation_plan,
+    finalize_stage_1_necessary_feasibility,
     is_strict_uniform_integer_headway_sequence_v3,
 )
 
@@ -107,6 +109,16 @@ def _plan() -> TripAllocationPlanV1:
                 headway=10,
                 trip_count=3,
             ),
+        ),
+        final_service_sentinels=(),
+        necessary_feasibility=finalize_stage_1_necessary_feasibility(
+            Stage1NecessaryFeasibilityResultV1(
+                allocation_candidate_fingerprint="c" * 64,
+                passed=True,
+                constraint_families=(),
+                fleet_lower_bound=1,
+                explanation="Synthetic plan passed deterministic necessary checks.",
+            )
         ),
         objective_vector=(0, 0, 0, 0, 0),
         solve_status=TripAllocationSolveStatusV1.OPTIMAL,

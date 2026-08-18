@@ -42,6 +42,28 @@ def trip_allocation_plan_to_contract_dict_v1(
             direction.value: count for direction, count in plan.trips_by_direction
         },
         "objective_vector": list(plan.objective_vector),
+        "necessary_feasibility": {
+            "diagnostic_profile": plan.necessary_feasibility.diagnostic_profile,
+            "diagnostic_fingerprint": plan.necessary_feasibility.diagnostic_fingerprint,
+            "allocation_candidate_fingerprint": (
+                plan.necessary_feasibility.allocation_candidate_fingerprint
+            ),
+            "passed": plan.necessary_feasibility.passed,
+            "constraint_families": [
+                item.value for item in plan.necessary_feasibility.constraint_families
+            ],
+            "fleet_lower_bound": plan.necessary_feasibility.fleet_lower_bound,
+            "explanation": plan.necessary_feasibility.explanation,
+        },
+        "final_service_sentinels": [
+            {
+                "direction": item.direction.value,
+                "source_b_trip_id": item.source_b_trip_id,
+                "departure_time": _minute_hhmmss(item.departure_minute),
+                "boundary_semantics": item.boundary_semantics.value,
+            }
+            for item in plan.final_service_sentinels
+        ],
         "allocation_by_demand_interval": [
             {
                 "block_id": block.block_id,
@@ -81,6 +103,7 @@ def trip_allocation_plan_to_contract_dict_v1(
                 "maximum_headway_minutes": regime.maximum_headway_minutes,
                 "boundary_reason": regime.boundary_reason,
                 "is_final_service_tail": regime.is_final_service_tail,
+                "boundary_semantics": regime.boundary_semantics.value,
                 "headway_measurement_status": (
                     "EXACT_UNIFORM_INTEGER_MINUTE"
                     if regime.measurable
@@ -213,6 +236,9 @@ def two_stage_result_to_contract_dict_v1(
             "stage_1_admissible_allocation_count": (
                 result.diagnostics.stage_1_admissible_allocation_count
             ),
+            "stage_1_necessary_feasibility_pruned_count": (
+                result.diagnostics.stage_1_necessary_feasibility_pruned_count
+            ),
             "stage_2_allocation_attempt_count": (
                 result.diagnostics.stage_2_allocation_attempt_count
             ),
@@ -233,6 +259,17 @@ def two_stage_result_to_contract_dict_v1(
             "total_solve_duration": result.diagnostics.total_solve_duration,
             "total_budget_seconds": result.diagnostics.total_budget_seconds,
             "budget_exhausted": result.diagnostics.budget_exhausted,
+            "stage_2_infeasibility_diagnostics": [
+                {
+                    "allocation_plan_fingerprint": item.allocation_plan_fingerprint,
+                    "native_solver_status": item.native_solver_status.value,
+                    "constraint_families": [family.value for family in item.constraint_families],
+                    "explanation": item.explanation,
+                    "diagnostic_profile": item.diagnostic_profile,
+                    "diagnostic_fingerprint": item.diagnostic_fingerprint,
+                }
+                for item in result.diagnostics.stage_2_infeasibility_diagnostics
+            ],
         },
         "explanations": list(result.explanations),
         "limitations": list(result.limitations),

@@ -17,18 +17,24 @@ from .ortools_protected_floor import (
     build_ortools_protected_floor_projection_v1,
 )
 from .ortools_solver import _map_cp_sat_status, _ordered_directional_trips
+from .serialization import canonical_sha256
 from .solver_models import NativeSolverStatus, ScheduleProblemV1
 from .two_stage_authority import TwoStageDemandAuthorityV1
 from .two_stage_models import (
     SCENARIO_C_UNIFORM_INTEGER_REGIME_POLICY_PROFILE,
     TRIP_ALLOCATION_PLAN_PROFILE_V1,
+    FinalServiceSentinelV1,
     ProposedServiceRegimeV1,
+    ServiceBoundarySemanticsV1,
     Stage1AllocationResultV1,
+    Stage1NecessaryFeasibilityResultV1,
+    Stage2ConstraintFamilyV1,
     TripAllocationBlockV1,
     TripAllocationPlanV1,
     TripAllocationSolveStatusV1,
     UniformIntegerRegimePolicyV3,
     finalize_allocation_plan,
+    finalize_stage_1_necessary_feasibility,
 )
 
 STAGE_1_ALLOCATION_MODEL_PROFILE_V1 = "scenario_c_stage_1_integer_allocation_v1"
@@ -58,6 +64,7 @@ class _AllocationModel:
     objective_term_bounds: tuple[int, ...]
     blocks: tuple[DemandAnalysisBlockV1, ...]
     protected_minimum_by_direction_and_block: dict[tuple[ContractDirection, str], int]
+    final_service_sentinels: tuple[FinalServiceSentinelV1, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +75,7 @@ class _RegimeGroup:
     source_start_index: int
     source_end_index: int
     is_final_service_tail: bool
+    has_final_service_sentinel: bool
 
 
 def _bounded_sum(
@@ -91,7 +99,7 @@ def _lexicographic_weights(bounds: tuple[int, ...]) -> tuple[int, ...]:
     return tuple(weights)
 
 
-def find_representable_uniform_regime_v1(
+def _representable_uniform_regime_candidates_v1(
     source_b_minutes: tuple[int, ...],
     *,
     permitted_start_window: tuple[int, int],
@@ -101,10 +109,9 @@ def find_representable_uniform_regime_v1(
     absolute_max_shift_per_trip_minutes: int,
     preferred_start_minute: int,
     preferred_end_minute: int,
-) -> UniformRegimeRepresentationV1 | None:
-    """Find one exact arithmetic progression inside boundary and B-anchor domains."""
+) -> tuple[UniformRegimeRepresentationV1, ...]:
     if not source_b_minutes:
-        return None
+        return ()
     if len(source_b_minutes) == 1:
         lower = max(
             permitted_start_window[0],
@@ -117,13 +124,18 @@ def find_representable_uniform_regime_v1(
             source_b_minutes[0] + absolute_max_shift_per_trip_minutes,
         )
         if lower > upper:
-            return None
-        minute = min(range(lower, upper + 1), key=lambda item: abs(item - preferred_start_minute))
-        return UniformRegimeRepresentationV1(
-            start_minute=minute,
-            end_minute=minute,
-            uniform_headway_minutes=None,
-            departure_minutes=(minute,),
+            return ()
+        return tuple(
+            UniformRegimeRepresentationV1(
+                start_minute=minute,
+                end_minute=minute,
+                uniform_headway_minutes=None,
+                departure_minutes=(minute,),
+            )
+            for minute in sorted(
+                range(lower, upper + 1),
+                key=lambda item: (abs(item - preferred_start_minute), item),
+            )
         )
 
     candidates: list[tuple[tuple[int, int, int, int], UniformRegimeRepresentationV1]] = []
@@ -171,7 +183,32 @@ def find_representable_uniform_regime_v1(
                     ),
                 )
             )
-    return min(candidates, key=lambda item: item[0])[1] if candidates else None
+    return tuple(item[1] for item in sorted(candidates, key=lambda item: item[0]))
+
+
+def find_representable_uniform_regime_v1(
+    source_b_minutes: tuple[int, ...],
+    *,
+    permitted_start_window: tuple[int, int],
+    permitted_end_window: tuple[int, int],
+    minimum_headway_minutes: int,
+    maximum_headway_minutes: int,
+    absolute_max_shift_per_trip_minutes: int,
+    preferred_start_minute: int,
+    preferred_end_minute: int,
+) -> UniformRegimeRepresentationV1 | None:
+    """Find one exact arithmetic progression inside boundary and B-anchor domains."""
+    candidates = _representable_uniform_regime_candidates_v1(
+        source_b_minutes,
+        permitted_start_window=permitted_start_window,
+        permitted_end_window=permitted_end_window,
+        minimum_headway_minutes=minimum_headway_minutes,
+        maximum_headway_minutes=maximum_headway_minutes,
+        absolute_max_shift_per_trip_minutes=absolute_max_shift_per_trip_minutes,
+        preferred_start_minute=preferred_start_minute,
+        preferred_end_minute=preferred_end_minute,
+    )
+    return candidates[0] if candidates else None
 
 
 def _block_for_minute(
@@ -208,6 +245,18 @@ def _protected_minimums(
             source = source_by_id[source_id]
             block = _block_for_minute(blocks, regime.direction, source.departure_time // 60)
             if block is None:
+                directional_sources = _ordered_directional_trips(problem)[regime.direction]
+                compatible_ends = tuple(
+                    item.end_time // 60
+                    for item in blocks
+                    if item.direction in {regime.direction, ContractDirection.COMBINED}
+                )
+                if (
+                    source.trip_id == directional_sources[-1].trip_id
+                    and compatible_ends
+                    and source.departure_time // 60 == max(compatible_ends)
+                ):
+                    continue
                 raise Stage1AllocationError(
                     STAGE_1_PROBLEM_AUTHORITY_MISMATCH,
                     "a protected B source does not map to one authoritative allocation block",
@@ -234,6 +283,32 @@ def _direction_total(problem: ScheduleProblemV1, direction: ContractDirection) -
         if direction == ContractDirection.OUTBOUND
         else problem.scenario_b.trips_by_direction.inbound
     )
+
+
+def _final_service_sentinels(
+    problem: ScheduleProblemV1,
+    blocks: tuple[DemandAnalysisBlockV1, ...],
+) -> tuple[FinalServiceSentinelV1, ...]:
+    """Identify locked last departures that equal an analytical exclusive end boundary."""
+    directional = _ordered_directional_trips(problem)
+    output: list[FinalServiceSentinelV1] = []
+    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
+        compatible = tuple(
+            block for block in blocks if block.direction in {direction, ContractDirection.COMBINED}
+        )
+        if not compatible:
+            continue
+        final_boundary = max(block.end_time // 60 for block in compatible)
+        source = directional[direction][-1]
+        if source.departure_time // 60 == final_boundary:
+            output.append(
+                FinalServiceSentinelV1(
+                    direction=direction,
+                    source_b_trip_id=source.trip_id,
+                    departure_minute=final_boundary,
+                )
+            )
+    return tuple(output)
 
 
 def _build_allocation_model(
@@ -269,6 +344,8 @@ def _build_allocation_model(
         )
 
     protected_minimums, _ = _protected_minimums(problem, blocks, protected_authority)
+    final_service_sentinels = _final_service_sentinels(problem, blocks)
+    sentinel_directions = {item.direction for item in final_service_sentinels}
     model = cp_model.CpModel()
     counts: dict[tuple[ContractDirection, str], cp_model.IntVar] = {}
     for block in blocks:
@@ -287,7 +364,10 @@ def _build_allocation_model(
             for (candidate_direction, _), value in counts.items()
             if candidate_direction == direction
         ]
-        model.add(sum(directional_values) == _direction_total(problem, direction))
+        analytical_total = _direction_total(problem, direction) - int(
+            direction in sentinel_directions
+        )
+        model.add(sum(directional_values) == analytical_total)
 
         compatible_blocks = tuple(
             block for block in blocks if block.direction in {direction, ContractDirection.COMBINED}
@@ -297,7 +377,11 @@ def _build_allocation_model(
         if total >= policy.final_service_tail.final_service_tail_minimum_trip_count:
             model.add(
                 counts[(direction, last_block.block_id)]
-                >= policy.final_service_tail.final_service_tail_minimum_trip_count
+                >= max(
+                    0,
+                    policy.final_service_tail.final_service_tail_minimum_trip_count
+                    - int(direction in sentinel_directions),
+                )
             )
 
     no_service_values: list[cp_model.IntVar] = []
@@ -416,6 +500,7 @@ def _build_allocation_model(
         objective_term_bounds=bounds,
         blocks=blocks,
         protected_minimum_by_direction_and_block=protected_minimums,
+        final_service_sentinels=final_service_sentinels,
     )
 
 
@@ -469,8 +554,10 @@ def _initial_groups(
     problem: ScheduleProblemV1,
     allocation: dict[tuple[ContractDirection, str], int],
     blocks: tuple[DemandAnalysisBlockV1, ...],
+    final_service_sentinels: tuple[FinalServiceSentinelV1, ...],
 ) -> dict[ContractDirection, list[_RegimeGroup]]:
     output: dict[ContractDirection, list[_RegimeGroup]] = {}
+    sentinel_by_direction = {item.direction: item for item in final_service_sentinels}
     for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
         compatible = tuple(
             block for block in blocks if block.direction in {direction, ContractDirection.COMBINED}
@@ -491,9 +578,40 @@ def _initial_groups(
                     source_start_index=cursor,
                     source_end_index=cursor + count - 1,
                     is_final_service_tail=index == len(nonzero) - 1,
+                    has_final_service_sentinel=False,
                 )
             )
             cursor += count
+        sentinel = sentinel_by_direction.get(direction)
+        if sentinel is not None:
+            if groups:
+                last = groups[-1]
+                groups[-1] = _RegimeGroup(
+                    direction=last.direction,
+                    blocks=last.blocks,
+                    trip_count=last.trip_count + 1,
+                    source_start_index=last.source_start_index,
+                    source_end_index=last.source_end_index + 1,
+                    is_final_service_tail=True,
+                    has_final_service_sentinel=True,
+                )
+            else:
+                compatible_final = max(
+                    compatible,
+                    key=lambda item: (item.end_time, item.block_id),
+                )
+                groups.append(
+                    _RegimeGroup(
+                        direction=direction,
+                        blocks=(compatible_final,),
+                        trip_count=1,
+                        source_start_index=0,
+                        source_end_index=0,
+                        is_final_service_tail=True,
+                        has_final_service_sentinel=True,
+                    )
+                )
+            cursor += 1
         if cursor != _direction_total(problem, direction):
             raise Stage1AllocationError(
                 STAGE_1_PROBLEM_AUTHORITY_MISMATCH,
@@ -511,6 +629,7 @@ def _merge_groups(left: _RegimeGroup, right: _RegimeGroup) -> _RegimeGroup:
         source_start_index=left.source_start_index,
         source_end_index=right.source_end_index,
         is_final_service_tail=right.is_final_service_tail,
+        has_final_service_sentinel=right.has_final_service_sentinel,
     )
 
 
@@ -529,7 +648,10 @@ def _representation_for_group(
     block_start = min(block.start_time // 60 for block in group.blocks)
     block_end = max(block.end_time // 60 for block in group.blocks)
     lower = max(first_service, block_start)
-    upper = min(last_service, block_end - 1)
+    upper = min(
+        last_service,
+        block_end if group.has_final_service_sentinel else block_end - 1,
+    )
     tolerance = policy.maximum_regime_boundary_adjustment_minutes
     if group.is_final_service_tail:
         preferred_end = last_service
@@ -599,8 +721,14 @@ def _representable_regimes(
     blocks: tuple[DemandAnalysisBlockV1, ...],
     policy: UniformIntegerRegimePolicyV3,
     projection: OrToolsProtectedFloorProjectionV1 | None,
+    final_service_sentinels: tuple[FinalServiceSentinelV1, ...],
 ) -> tuple[ProposedServiceRegimeV1, ...] | None:
-    groups_by_direction = _initial_groups(problem, allocation, blocks)
+    groups_by_direction = _initial_groups(
+        problem,
+        allocation,
+        blocks,
+        final_service_sentinels,
+    )
     output: list[ProposedServiceRegimeV1] = []
     for direction, original_groups in groups_by_direction.items():
         groups = list(original_groups)
@@ -718,6 +846,11 @@ def _representable_regimes(
                         )
                     ),
                     is_final_service_tail=group.is_final_service_tail,
+                    boundary_semantics=(
+                        ServiceBoundarySemanticsV1.FINAL_SERVICE_SENTINEL
+                        if group.has_final_service_sentinel
+                        else ServiceBoundarySemanticsV1.HALF_OPEN_DEMAND_MEMBERSHIP
+                    ),
                 )
             )
             index += 1
@@ -765,6 +898,241 @@ def _allocation_blocks(
             )
         )
     return tuple(output)
+
+
+def _allocation_candidate_fingerprint(
+    problem: ScheduleProblemV1,
+    allocation: dict[tuple[ContractDirection, str], int],
+    policy: UniformIntegerRegimePolicyV3,
+) -> str:
+    return canonical_sha256(
+        {
+            "profile": STAGE_1_ALLOCATION_MODEL_PROFILE_V1,
+            "source_b_fingerprint": problem.source_b_fingerprint,
+            "policy_fingerprint": policy.policy_fingerprint,
+            "allocation": [
+                {
+                    "direction": direction.value,
+                    "block_id": block_id,
+                    "trip_count": count,
+                }
+                for (direction, block_id), count in sorted(
+                    allocation.items(),
+                    key=lambda item: (item[0][0].value, item[0][1]),
+                )
+            ],
+        }
+    )
+
+
+def _source_ids_by_regime(
+    problem: ScheduleProblemV1,
+    regimes: tuple[ProposedServiceRegimeV1, ...],
+) -> dict[str, tuple[str, ...]]:
+    directional = _ordered_directional_trips(problem)
+    output: dict[str, tuple[str, ...]] = {}
+    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
+        cursor = 0
+        ordered_regimes = sorted(
+            (item for item in regimes if item.direction == direction),
+            key=lambda item: (
+                item.planned_start_minute,
+                item.planned_end_minute,
+                item.regime_id,
+            ),
+        )
+        for regime in ordered_regimes:
+            members = directional[direction][cursor : cursor + regime.trip_count]
+            if len(members) != regime.trip_count:
+                return {}
+            output[regime.regime_id] = tuple(item.trip_id for item in members)
+            cursor += regime.trip_count
+        if cursor != len(directional[direction]):
+            return {}
+    return output
+
+
+def _necessary_departure_domains(
+    problem: ScheduleProblemV1,
+    regimes: tuple[ProposedServiceRegimeV1, ...],
+    final_service_sentinels: tuple[FinalServiceSentinelV1, ...],
+    policy: UniformIntegerRegimePolicyV3,
+) -> tuple[dict[str, tuple[int, int]], tuple[Stage2ConstraintFamilyV1, ...]]:
+    source_ids_by_regime = _source_ids_by_regime(problem, regimes)
+    if not source_ids_by_regime:
+        return {}, (Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP,)
+    regime_by_source = {
+        source_id: regime
+        for regime in regimes
+        for source_id in source_ids_by_regime[regime.regime_id]
+    }
+    sentinel_by_source = {item.source_b_trip_id: item for item in final_service_sentinels}
+    blocks = {item.block_id: item for item in problem.analysis_blocks}
+    directional = _ordered_directional_trips(problem)
+    output: dict[str, tuple[int, int]] = {}
+    failures: set[Stage2ConstraintFamilyV1] = set()
+    for trips in directional.values():
+        service_start = trips[0].departure_time // 60
+        service_end = trips[-1].departure_time // 60
+        for source in trips:
+            regime = regime_by_source[source.trip_id]
+            covered = tuple(blocks[item] for item in regime.covered_demand_block_ids)
+            regime_start = min(item.start_time // 60 for item in covered)
+            regime_end = max(item.end_time // 60 - 1 for item in covered)
+            sentinel = sentinel_by_source.get(source.trip_id)
+            if sentinel is not None:
+                regime_end = max(regime_end, sentinel.departure_minute)
+            source_minute = source.departure_time // 60
+            lower = max(
+                service_start,
+                regime_start,
+                source_minute - policy.absolute_max_shift_per_trip_minutes,
+            )
+            upper = min(
+                service_end,
+                regime_end,
+                source_minute + policy.absolute_max_shift_per_trip_minutes,
+            )
+            members = source_ids_by_regime[regime.regime_id]
+            if source.trip_id == members[0]:
+                lower = max(lower, regime.permitted_start_window[0])
+                upper = min(upper, regime.permitted_start_window[1])
+            if source.trip_id == members[-1]:
+                lower = max(lower, regime.permitted_end_window[0])
+                upper = min(upper, regime.permitted_end_window[1])
+            if lower > upper:
+                failures.update(
+                    {
+                        Stage2ConstraintFamilyV1.REGIME_BOUNDARIES,
+                        Stage2ConstraintFamilyV1.B_SHIFT_BOUND,
+                    }
+                )
+                if source is trips[0] or source is trips[-1]:
+                    failures.add(Stage2ConstraintFamilyV1.FIRST_LAST_LOCK)
+                if regime.is_final_service_tail:
+                    failures.add(Stage2ConstraintFamilyV1.FINAL_SERVICE_TAIL)
+                continue
+            output[source.trip_id] = (lower, upper)
+    return output, tuple(sorted(failures, key=lambda item: item.value))
+
+
+def _fleet_lower_bound(
+    problem: ScheduleProblemV1,
+    domains: dict[str, tuple[int, int]],
+) -> int:
+    """Return a safe lower bound from intervals every feasible departure must occupy."""
+    mandatory_intervals: list[tuple[int, int]] = []
+    for source in problem.scenario_b.exact_timetable:
+        lower, upper = domains[source.trip_id]
+        turnaround = (
+            problem.scenario_b.turnaround_minutes.terminal_2
+            if source.direction == ContractDirection.OUTBOUND
+            else problem.scenario_b.turnaround_minutes.terminal_1
+        )
+        earliest_ready = lower + source.runtime_minutes + turnaround
+        if upper < earliest_ready:
+            mandatory_intervals.append((upper, earliest_ready))
+    if not mandatory_intervals:
+        return 1
+    points = sorted({value for interval in mandatory_intervals for value in interval})
+    return max(
+        1,
+        max(sum(start <= minute < end for start, end in mandatory_intervals) for minute in points),
+    )
+
+
+def evaluate_stage_1_necessary_feasibility_v1(
+    problem: ScheduleProblemV1,
+    allocation: dict[tuple[ContractDirection, str], int],
+    allocation_blocks: tuple[TripAllocationBlockV1, ...],
+    regimes: tuple[ProposedServiceRegimeV1, ...],
+    final_service_sentinels: tuple[FinalServiceSentinelV1, ...],
+    policy: UniformIntegerRegimePolicyV3,
+) -> Stage1NecessaryFeasibilityResultV1:
+    """Apply cheap necessary Stage 2 checks without recreating the exact CP-SAT model."""
+    candidate_fingerprint = _allocation_candidate_fingerprint(problem, allocation, policy)
+    source_by_id = {item.trip_id: item for item in problem.scenario_b.exact_timetable}
+    source_ids_by_regime = _source_ids_by_regime(problem, regimes)
+    failures: set[Stage2ConstraintFamilyV1] = set()
+    represented_by_regime: dict[str, tuple[int, ...]] = {}
+    if not source_ids_by_regime:
+        failures.add(Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP)
+    for regime in regimes:
+        source_ids = source_ids_by_regime.get(regime.regime_id, ())
+        source_minutes = tuple(source_by_id[item].departure_time // 60 for item in source_ids)
+        represented = find_representable_uniform_regime_v1(
+            source_minutes,
+            permitted_start_window=regime.permitted_start_window,
+            permitted_end_window=regime.permitted_end_window,
+            minimum_headway_minutes=regime.minimum_headway_minutes,
+            maximum_headway_minutes=regime.maximum_headway_minutes,
+            absolute_max_shift_per_trip_minutes=policy.absolute_max_shift_per_trip_minutes,
+            preferred_start_minute=regime.planned_start_minute,
+            preferred_end_minute=regime.planned_end_minute,
+        )
+        if represented is None:
+            failures.update(
+                {
+                    Stage2ConstraintFamilyV1.UNIFORM_HEADWAY,
+                    Stage2ConstraintFamilyV1.REGIME_BOUNDARIES,
+                    Stage2ConstraintFamilyV1.B_SHIFT_BOUND,
+                }
+            )
+            if regime.is_final_service_tail:
+                failures.update(
+                    {
+                        Stage2ConstraintFamilyV1.FINAL_SERVICE_TAIL,
+                        Stage2ConstraintFamilyV1.FIRST_LAST_LOCK,
+                    }
+                )
+            continue
+        represented_by_regime[regime.regime_id] = represented.departure_minutes
+
+    for block in allocation_blocks:
+        for direction, expected in block.directional_trip_counts:
+            actual = sum(
+                block.start_minute <= minute < block.end_minute
+                for regime in regimes
+                if regime.direction == direction
+                for minute in represented_by_regime.get(regime.regime_id, ())
+            )
+            if actual != expected:
+                failures.add(Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP)
+
+    domains, domain_failures = _necessary_departure_domains(
+        problem,
+        regimes,
+        final_service_sentinels,
+        policy,
+    )
+    failures.update(domain_failures)
+    fleet_lower_bound = None
+    if len(domains) == problem.scenario_b.total_daily_trips:
+        fleet_lower_bound = _fleet_lower_bound(problem, domains)
+        if fleet_lower_bound > problem.scenario_b.available_fleet_limit:
+            failures.add(Stage2ConstraintFamilyV1.FLEET)
+    passed = not failures
+    if passed:
+        explanation = (
+            "Stage 1 plan passed exact arithmetic-progression, B-anchor, half-open allocation, "
+            f"final-tail, and safe fleet lower-bound checks (fleet lower bound "
+            f"{fleet_lower_bound})."
+        )
+    else:
+        explanation = (
+            "Stage 1 plan failed cheap necessary Stage 2 checks for: "
+            + ", ".join(item.value for item in sorted(failures, key=lambda item: item.value))
+            + "."
+        )
+    return finalize_stage_1_necessary_feasibility(
+        Stage1NecessaryFeasibilityResultV1(
+            allocation_candidate_fingerprint=candidate_fingerprint,
+            passed=passed,
+            constraint_families=tuple(sorted(failures, key=lambda item: item.value)),
+            fleet_lower_bound=fleet_lower_bound,
+            explanation=explanation,
+        )
+    )
 
 
 def _stage1_status(status: NativeSolverStatus) -> TripAllocationSolveStatusV1:
@@ -819,6 +1187,7 @@ def allocate_trips_stage_1_v1(
         protected_service_floor_enforcement_authority,
     )
     plans: list[TripAllocationPlanV1] = []
+    pruned_necessary_feasibility: list[Stage1NecessaryFeasibilityResultV1] = []
     candidate_count = 0
     last_status = NativeSolverStatus.UNKNOWN
     while len(plans) < effective_policy.maximum_stage_1_alternative_plans:
@@ -845,31 +1214,77 @@ def allocate_trips_stage_1_v1(
             bundle.blocks,
             effective_policy,
             projection,
+            bundle.final_service_sentinels,
         )
         if regimes is not None:
-            duration = max(0.0, time.perf_counter() - started)
-            plan = TripAllocationPlanV1(
-                source_b_fingerprint=problem.source_b_fingerprint,
-                demand_authority_fingerprint=demand_authority.authority_fingerprint,
-                optimization_mode=problem.optimization_mode,
-                demand_authority_mode=demand_authority.authority_mode,
-                allocation_plan_profile=TRIP_ALLOCATION_PLAN_PROFILE_V1,
-                uniform_regime_profile=SCENARIO_C_UNIFORM_INTEGER_REGIME_POLICY_PROFILE,
-                final_tail_policy_fingerprint=effective_policy.policy_fingerprint,
-                total_trips=problem.scenario_b.total_daily_trips,
-                trips_by_direction=(
-                    (ContractDirection.OUTBOUND, problem.scenario_b.trips_by_direction.outbound),
-                    (ContractDirection.INBOUND, problem.scenario_b.trips_by_direction.inbound),
-                ),
-                allocation_blocks=_allocation_blocks(problem, bundle, allocation),
-                proposed_regimes=regimes,
-                objective_vector=objective_vector,
-                solve_status=_stage1_status(last_status),
-                solve_duration_seconds=duration,
-                allocation_fingerprint="",
-                rank=len(plans) + 1,
+            allocation_blocks = _allocation_blocks(problem, bundle, allocation)
+            necessary_feasibility = evaluate_stage_1_necessary_feasibility_v1(
+                problem,
+                allocation,
+                allocation_blocks,
+                regimes,
+                bundle.final_service_sentinels,
+                effective_policy,
             )
-            plans.append(finalize_allocation_plan(plan))
+            if not necessary_feasibility.passed:
+                pruned_necessary_feasibility.append(necessary_feasibility)
+            else:
+                duration = max(0.0, time.perf_counter() - started)
+                plan = TripAllocationPlanV1(
+                    source_b_fingerprint=problem.source_b_fingerprint,
+                    demand_authority_fingerprint=demand_authority.authority_fingerprint,
+                    optimization_mode=problem.optimization_mode,
+                    demand_authority_mode=demand_authority.authority_mode,
+                    allocation_plan_profile=TRIP_ALLOCATION_PLAN_PROFILE_V1,
+                    uniform_regime_profile=SCENARIO_C_UNIFORM_INTEGER_REGIME_POLICY_PROFILE,
+                    final_tail_policy_fingerprint=effective_policy.policy_fingerprint,
+                    total_trips=problem.scenario_b.total_daily_trips,
+                    trips_by_direction=(
+                        (
+                            ContractDirection.OUTBOUND,
+                            problem.scenario_b.trips_by_direction.outbound,
+                        ),
+                        (
+                            ContractDirection.INBOUND,
+                            problem.scenario_b.trips_by_direction.inbound,
+                        ),
+                    ),
+                    allocation_blocks=allocation_blocks,
+                    proposed_regimes=regimes,
+                    final_service_sentinels=bundle.final_service_sentinels,
+                    necessary_feasibility=necessary_feasibility,
+                    objective_vector=objective_vector,
+                    solve_status=_stage1_status(last_status),
+                    solve_duration_seconds=duration,
+                    allocation_fingerprint="",
+                    rank=len(plans) + 1,
+                )
+                plans.append(finalize_allocation_plan(plan))
+        else:
+            pruned_necessary_feasibility.append(
+                finalize_stage_1_necessary_feasibility(
+                    Stage1NecessaryFeasibilityResultV1(
+                        allocation_candidate_fingerprint=_allocation_candidate_fingerprint(
+                            problem,
+                            allocation,
+                            effective_policy,
+                        ),
+                        passed=False,
+                        constraint_families=(
+                            Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP,
+                            Stage2ConstraintFamilyV1.UNIFORM_HEADWAY,
+                            Stage2ConstraintFamilyV1.REGIME_BOUNDARIES,
+                            Stage2ConstraintFamilyV1.B_SHIFT_BOUND,
+                            Stage2ConstraintFamilyV1.FINAL_SERVICE_TAIL,
+                        ),
+                        fleet_lower_bound=None,
+                        explanation=(
+                            "Stage 1 could not construct a representable strict-uniform regime "
+                            "partition for this bounded allocation candidate."
+                        ),
+                    )
+                )
+            )
         literals = []
         for index, (key, variable) in enumerate(
             sorted(
@@ -904,11 +1319,15 @@ def allocate_trips_stage_1_v1(
         plans=tuple(plans),
         candidate_count=candidate_count,
         admissible_allocation_count=len(plans),
+        necessary_feasibility_pruned_count=len(pruned_necessary_feasibility),
+        pruned_necessary_feasibility=tuple(pruned_necessary_feasibility),
         solve_duration_seconds=duration,
         budget_exhausted=budget_exhausted,
         explanations=(
             f"Stage 1 evaluated {candidate_count} bounded integer allocation candidate(s) and "
-            f"produced {len(plans)} V3-representable plan(s).",
+            f"produced {len(plans)} V3-representable, necessary-feasible plan(s); "
+            f"{len(pruned_necessary_feasibility)} candidate(s) were pruned by deterministic "
+            "representability/domain/fleet checks.",
         ),
         limitations=(
             *demand_authority.limitations,
@@ -925,5 +1344,6 @@ __all__ = [
     "Stage1AllocationError",
     "UniformRegimeRepresentationV1",
     "allocate_trips_stage_1_v1",
+    "evaluate_stage_1_necessary_feasibility_v1",
     "find_representable_uniform_regime_v1",
 ]

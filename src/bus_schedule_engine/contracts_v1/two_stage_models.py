@@ -27,6 +27,9 @@ SCENARIO_C_UNIFORM_INTEGER_REGIME_POLICY_PROFILE = "scenario_c_uniform_integer_r
 TRIP_ALLOCATION_PLAN_PROFILE_V1 = "scenario_c_trip_allocation_plan_v1"
 TWO_STAGE_ACCEPTANCE_PROFILE_V1 = "scenario_c_two_stage_final_acceptance_v1"
 TWO_STAGE_RESULT_FINGERPRINT_PROFILE_V1 = "scenario_c_two_stage_result_v1"
+FINAL_SERVICE_SENTINEL = "FINAL_SERVICE_SENTINEL"
+STAGE_1_NECESSARY_FEASIBILITY_PROFILE_V1 = "scenario_c_stage_1_necessary_feasibility_v1"
+STAGE_2_INFEASIBILITY_DIAGNOSTIC_PROFILE_V1 = "scenario_c_stage_2_infeasibility_diagnostic_v1"
 
 
 class TripAllocationSolveStatusV1(StrEnum):
@@ -42,6 +45,27 @@ class FinalAcceptanceStateV1(StrEnum):
     VALID_CANDIDATE_NOT_FINAL = "VALID_CANDIDATE_NOT_FINAL"
     KEEP_SCENARIO_B = "KEEP_SCENARIO_B"
     NO_FINAL_C_WITHIN_SOLVE_BUDGET = "NO_FINAL_C_WITHIN_SOLVE_BUDGET"
+
+
+class ServiceBoundarySemanticsV1(StrEnum):
+    HALF_OPEN_DEMAND_MEMBERSHIP = "HALF_OPEN_DEMAND_MEMBERSHIP"
+    FINAL_SERVICE_SENTINEL = FINAL_SERVICE_SENTINEL
+
+
+class Stage2ConstraintFamilyV1(StrEnum):
+    ALLOCATION_MEMBERSHIP = "ALLOCATION_MEMBERSHIP"
+    UNIFORM_HEADWAY = "UNIFORM_HEADWAY"
+    REGIME_BOUNDARIES = "REGIME_BOUNDARIES"
+    MINIMUM_OPERATIONAL_HEADWAY = "MINIMUM_OPERATIONAL_HEADWAY"
+    B_SHIFT_BOUND = "B_SHIFT_BOUND"
+    FIRST_LAST_LOCK = "FIRST_LAST_LOCK"
+    FINAL_SERVICE_TAIL = "FINAL_SERVICE_TAIL"
+    REGIME_TRANSITION_JUMP = "REGIME_TRANSITION_JUMP"
+    SOURCE_RUNTIME = "SOURCE_RUNTIME"
+    TURNAROUND = "TURNAROUND"
+    FLEET = "FLEET"
+    TERMINAL_OCCUPANCY = "TERMINAL_OCCUPANCY"
+    PROTECTED_SERVICE_FLOOR = "PROTECTED_SERVICE_FLOOR"
 
 
 def is_strict_uniform_integer_headway_sequence_v3(
@@ -236,6 +260,25 @@ class TripAllocationBlockV1:
 
 
 @dataclass(frozen=True, slots=True)
+class FinalServiceSentinelV1:
+    direction: ContractDirection
+    source_b_trip_id: str
+    departure_minute: int
+    boundary_semantics: ServiceBoundarySemanticsV1 = (
+        ServiceBoundarySemanticsV1.FINAL_SERVICE_SENTINEL
+    )
+
+    def __post_init__(self) -> None:
+        if self.direction not in {ContractDirection.OUTBOUND, ContractDirection.INBOUND}:
+            raise ValueError("final-service sentinel must have a timetable direction")
+        if not self.source_b_trip_id.strip():
+            raise ValueError("final-service sentinel source identity must be non-empty")
+        _non_negative_integer("departure_minute", self.departure_minute)
+        if self.boundary_semantics != ServiceBoundarySemanticsV1.FINAL_SERVICE_SENTINEL:
+            raise ValueError("final-service sentinel must use explicit sentinel semantics")
+
+
+@dataclass(frozen=True, slots=True)
 class ProposedServiceRegimeV1:
     regime_id: str
     direction: ContractDirection
@@ -250,12 +293,20 @@ class ProposedServiceRegimeV1:
     uniform_headway_minutes: int | None
     boundary_reason: str
     is_final_service_tail: bool = False
+    boundary_semantics: ServiceBoundarySemanticsV1 = (
+        ServiceBoundarySemanticsV1.HALF_OPEN_DEMAND_MEMBERSHIP
+    )
 
     def __post_init__(self) -> None:
         if not self.regime_id.strip() or not self.boundary_reason.strip():
             raise ValueError("regime identity and boundary reason must be non-empty")
         if self.direction not in {ContractDirection.OUTBOUND, ContractDirection.INBOUND}:
             raise ValueError("service regime must have a timetable direction")
+        if (
+            self.boundary_semantics == ServiceBoundarySemanticsV1.FINAL_SERVICE_SENTINEL
+            and not self.is_final_service_tail
+        ):
+            raise ValueError("only a final-service-tail regime may contain a sentinel boundary")
         if not self.covered_demand_block_ids:
             raise ValueError("service regime must cover at least one demand block")
         _positive_integer("trip_count", self.trip_count)
@@ -308,6 +359,50 @@ class ProposedServiceRegimeV1:
 
 
 @dataclass(frozen=True, slots=True)
+class Stage1NecessaryFeasibilityResultV1:
+    allocation_candidate_fingerprint: str
+    passed: bool
+    constraint_families: tuple[Stage2ConstraintFamilyV1, ...]
+    fleet_lower_bound: int | None
+    explanation: str
+    diagnostic_profile: str = STAGE_1_NECESSARY_FEASIBILITY_PROFILE_V1
+    diagnostic_fingerprint: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.allocation_candidate_fingerprint.strip() or not self.explanation.strip():
+            raise ValueError("Stage 1 necessary-feasibility identity and explanation are required")
+        if self.diagnostic_profile != STAGE_1_NECESSARY_FEASIBILITY_PROFILE_V1:
+            raise ValueError("Stage 1 necessary-feasibility profile is invalid")
+        if self.fleet_lower_bound is not None:
+            _positive_integer("fleet_lower_bound", self.fleet_lower_bound)
+        if len(set(self.constraint_families)) != len(self.constraint_families):
+            raise ValueError("necessary-feasibility constraint families must be unique")
+        if self.passed and self.constraint_families:
+            raise ValueError("a passed necessary-feasibility result cannot list failed families")
+        if self.diagnostic_fingerprint and self.diagnostic_fingerprint != (
+            calculate_stage_1_necessary_feasibility_fingerprint(self)
+        ):
+            raise ValueError("Stage 1 necessary-feasibility fingerprint is invalid")
+
+
+def calculate_stage_1_necessary_feasibility_fingerprint(
+    result: Stage1NecessaryFeasibilityResultV1,
+) -> str:
+    payload = jsonable(asdict(result))
+    payload.pop("diagnostic_fingerprint", None)
+    return canonical_sha256(payload)
+
+
+def finalize_stage_1_necessary_feasibility(
+    result: Stage1NecessaryFeasibilityResultV1,
+) -> Stage1NecessaryFeasibilityResultV1:
+    return replace(
+        result,
+        diagnostic_fingerprint=calculate_stage_1_necessary_feasibility_fingerprint(result),
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class TripAllocationPlanV1:
     source_b_fingerprint: str
     demand_authority_fingerprint: str
@@ -320,6 +415,8 @@ class TripAllocationPlanV1:
     trips_by_direction: tuple[tuple[ContractDirection, int], ...]
     allocation_blocks: tuple[TripAllocationBlockV1, ...]
     proposed_regimes: tuple[ProposedServiceRegimeV1, ...]
+    final_service_sentinels: tuple[FinalServiceSentinelV1, ...]
+    necessary_feasibility: Stage1NecessaryFeasibilityResultV1
     objective_vector: tuple[int, ...]
     solve_status: TripAllocationSolveStatusV1
     solve_duration_seconds: float
@@ -363,11 +460,23 @@ class TripAllocationPlanV1:
             raise ValueError("directional trip totals must be positive integers")
         if sum(direction_counts.values()) != self.total_trips:
             raise ValueError("allocation directional totals do not equal the daily total")
+        sentinel_counts = {
+            direction: sum(item.direction == direction for item in self.final_service_sentinels)
+            for direction in direction_counts
+        }
+        if len({item.direction for item in self.final_service_sentinels}) != len(
+            self.final_service_sentinels
+        ) or any(
+            item.boundary_semantics != ServiceBoundarySemanticsV1.FINAL_SERVICE_SENTINEL
+            for item in self.final_service_sentinels
+        ):
+            raise ValueError("final-service sentinels must be unique by direction")
         allocated = {
             direction: sum(
                 dict(block.directional_trip_counts).get(direction, 0)
                 for block in self.allocation_blocks
             )
+            + sentinel_counts[direction]
             for direction in direction_counts
         }
         if allocated != direction_counts:
@@ -386,6 +495,12 @@ class TripAllocationPlanV1:
             self.allocation_fingerprint != calculate_allocation_fingerprint(self)
         ):
             raise ValueError("allocation fingerprint does not match immutable plan facts")
+        if (
+            not self.necessary_feasibility.passed
+            or self.necessary_feasibility.diagnostic_fingerprint
+            != calculate_stage_1_necessary_feasibility_fingerprint(self.necessary_feasibility)
+        ):
+            raise ValueError("an admitted allocation plan requires a passed feasibility probe")
 
 
 def allocation_fingerprint_payload(plan: TripAllocationPlanV1) -> dict[str, object]:
@@ -412,10 +527,57 @@ class Stage1AllocationResultV1:
     plans: tuple[TripAllocationPlanV1, ...]
     candidate_count: int
     admissible_allocation_count: int
+    necessary_feasibility_pruned_count: int
+    pruned_necessary_feasibility: tuple[Stage1NecessaryFeasibilityResultV1, ...]
     solve_duration_seconds: float
     budget_exhausted: bool
     explanations: tuple[str, ...]
     limitations: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Stage2InfeasibilityDiagnosticV1:
+    allocation_plan_fingerprint: str
+    native_solver_status: NativeSolverStatus
+    constraint_families: tuple[Stage2ConstraintFamilyV1, ...]
+    explanation: str
+    diagnostic_profile: str = STAGE_2_INFEASIBILITY_DIAGNOSTIC_PROFILE_V1
+    diagnostic_fingerprint: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.allocation_plan_fingerprint.strip() or not self.explanation.strip():
+            raise ValueError(
+                "Stage 2 infeasibility diagnostic identity and explanation are required"
+            )
+        if self.native_solver_status != NativeSolverStatus.INFEASIBLE:
+            raise ValueError("Stage 2 infeasibility diagnostic requires native INFEASIBLE status")
+        if not self.constraint_families or len(set(self.constraint_families)) != len(
+            self.constraint_families
+        ):
+            raise ValueError("Stage 2 diagnostic families must be non-empty and unique")
+        if self.diagnostic_profile != STAGE_2_INFEASIBILITY_DIAGNOSTIC_PROFILE_V1:
+            raise ValueError("Stage 2 infeasibility diagnostic profile is invalid")
+        if self.diagnostic_fingerprint and self.diagnostic_fingerprint != (
+            calculate_stage_2_infeasibility_diagnostic_fingerprint(self)
+        ):
+            raise ValueError("Stage 2 infeasibility diagnostic fingerprint is invalid")
+
+
+def calculate_stage_2_infeasibility_diagnostic_fingerprint(
+    diagnostic: Stage2InfeasibilityDiagnosticV1,
+) -> str:
+    payload = jsonable(asdict(diagnostic))
+    payload.pop("diagnostic_fingerprint", None)
+    return canonical_sha256(payload)
+
+
+def finalize_stage_2_infeasibility_diagnostic(
+    diagnostic: Stage2InfeasibilityDiagnosticV1,
+) -> Stage2InfeasibilityDiagnosticV1:
+    return replace(
+        diagnostic,
+        diagnostic_fingerprint=(calculate_stage_2_infeasibility_diagnostic_fingerprint(diagnostic)),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -428,6 +590,7 @@ class Stage2TimetableResultV1:
     constraint_count: int
     maximum_departure_domain_width_minutes: int
     full_service_window_domain_count: int
+    infeasibility_diagnostic: Stage2InfeasibilityDiagnosticV1 | None
     explanations: tuple[str, ...]
     limitations: tuple[str, ...]
 
@@ -456,6 +619,7 @@ class FinalServiceTailMetricsV1:
 class TwoStageSolveDiagnosticsV1:
     stage_1_candidate_count: int
     stage_1_admissible_allocation_count: int
+    stage_1_necessary_feasibility_pruned_count: int
     stage_2_allocation_attempt_count: int
     stage_2_variable_count: int
     stage_2_constraint_count: int
@@ -467,6 +631,7 @@ class TwoStageSolveDiagnosticsV1:
     total_solve_duration: float
     total_budget_seconds: float
     budget_exhausted: bool
+    stage_2_infeasibility_diagnostics: tuple[Stage2InfeasibilityDiagnosticV1, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -519,15 +684,23 @@ __all__ = [
     "B_ANCHORED_TWO_STAGE_REBALANCE_V1",
     "COMBINED_DEMAND_FIXED_DIRECTION_COUNTS",
     "DIRECTIONAL_DEMAND_FIXED_DIRECTION_COUNTS",
+    "FINAL_SERVICE_SENTINEL",
     "SCENARIO_C_UNIFORM_INTEGER_REGIME_POLICY_PROFILE",
+    "STAGE_1_NECESSARY_FEASIBILITY_PROFILE_V1",
+    "STAGE_2_INFEASIBILITY_DIAGNOSTIC_PROFILE_V1",
     "TRIP_ALLOCATION_PLAN_PROFILE_V1",
     "DemandAllocationAuthorityModeV1",
     "FinalAcceptanceStateV1",
+    "FinalServiceSentinelV1",
     "FinalServiceTailMetricsV1",
     "FinalServiceTailPolicyV1",
     "ProposedServiceRegimeV1",
     "ScenarioCOptimizationModeV1",
+    "ServiceBoundarySemanticsV1",
     "Stage1AllocationResultV1",
+    "Stage1NecessaryFeasibilityResultV1",
+    "Stage2ConstraintFamilyV1",
+    "Stage2InfeasibilityDiagnosticV1",
     "Stage2TimetableResultV1",
     "TripAllocationBlockV1",
     "TripAllocationPlanV1",
@@ -538,7 +711,11 @@ __all__ = [
     "UniformIntegerRegimePolicyV3",
     "allocation_fingerprint_payload",
     "calculate_allocation_fingerprint",
+    "calculate_stage_1_necessary_feasibility_fingerprint",
+    "calculate_stage_2_infeasibility_diagnostic_fingerprint",
     "finalize_allocation_plan",
+    "finalize_stage_1_necessary_feasibility",
+    "finalize_stage_2_infeasibility_diagnostic",
     "finalize_two_stage_result",
     "is_strict_uniform_integer_headway_sequence_v3",
     "two_stage_result_fingerprint_payload",

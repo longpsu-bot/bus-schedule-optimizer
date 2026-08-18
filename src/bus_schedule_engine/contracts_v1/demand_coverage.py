@@ -11,6 +11,7 @@ from .models import (
     DemandObservation,
     DemandResolutionType,
     NormalizedInputBundleV1,
+    ScenarioCOptimizationModeV1,
     ScenarioId,
 )
 
@@ -496,6 +497,39 @@ def _departure_is_covered(
     )
 
 
+def _is_final_service_sentinel(
+    bundle: NormalizedInputBundleV1,
+    departure: _Departure,
+    mode: DemandCoverageModeV1,
+    observations: tuple[DemandObservation, ...],
+) -> bool:
+    """Allow only the V3 locked B last departure at an exclusive analytical end."""
+    if (
+        bundle.optimization_mode != ScenarioCOptimizationModeV1.B_ANCHORED_TWO_STAGE_REBALANCE
+        or departure.scenario != ScenarioId.B
+    ):
+        return False
+    directional_times = tuple(
+        trip.departure_time
+        for trip in bundle.scenario_b.exact_timetable
+        if trip.direction == departure.direction
+    )
+    if not directional_times or departure.departure_time != max(directional_times):
+        return False
+    required_stream = (
+        ContractDirection.COMBINED
+        if mode == DemandCoverageModeV1.COMBINED_ONLY
+        else departure.direction
+    )
+    stream_ends = tuple(
+        item.interval_end
+        for item in observations
+        if item.source_resolution_type != DemandResolutionType.DAILY_TOTAL
+        and item.direction == required_stream
+    )
+    return bool(stream_ends) and departure.departure_time == max(stream_ends)
+
+
 def _deduplicate_uncovered_segments(
     values: list[DemandUncoveredSegmentV1],
 ) -> tuple[DemandUncoveredSegmentV1, ...]:
@@ -639,7 +673,12 @@ def assess_demand_coverage_v1(
             mode,
             observations,
         )
-        if not covered:
+        if not covered and not _is_final_service_sentinel(
+            bundle,
+            departure,
+            mode,
+            observations,
+        ):
             uncovered_departures.append(
                 DemandUncoveredDepartureV1(
                     scenario=departure.scenario,
@@ -691,10 +730,18 @@ def assess_demand_coverage_v1(
         for stream in directional_streams
     )
     directional_departures_supported = all(
-        _observation_covers(
-            observations,
-            departure.direction,
-            departure.departure_time,
+        (
+            _observation_covers(
+                observations,
+                departure.direction,
+                departure.departure_time,
+            )
+            or _is_final_service_sentinel(
+                bundle,
+                departure,
+                mode,
+                observations,
+            )
         )
         for departure in departures
     )
@@ -724,10 +771,18 @@ def assess_demand_coverage_v1(
             ),
         )
         and all(
-            _observation_covers(
-                observations,
-                ContractDirection.COMBINED,
-                departure.departure_time,
+            (
+                _observation_covers(
+                    observations,
+                    ContractDirection.COMBINED,
+                    departure.departure_time,
+                )
+                or _is_final_service_sentinel(
+                    bundle,
+                    departure,
+                    mode,
+                    observations,
+                )
             )
             for departure in departures
         )
