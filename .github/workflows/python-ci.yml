@@ -88,7 +88,11 @@ jobs:
           rm tools/_apply_bounded_ortools_runtime_rebase.py
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add src/bus_schedule_engine/optimization_service.py
+          git add docs/engine/ORDINARY_ORTOOLS_RUNTIME_POLICY_V1.md
+          git add tests/test_optimization_service_ortools_runtime_budget.py
+          git add .github/workflows/python-ci.yml
+          git add -u tools/_apply_bounded_ortools_runtime_rebase.py
           git diff --cached --check
           git commit -m "Rebase bounded OR-Tools runtime policy onto balanced-regime main"
           git push origin HEAD:fix/bounded-ortools-runtime-policy-v1-rebased
