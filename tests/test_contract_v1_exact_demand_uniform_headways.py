@@ -457,13 +457,13 @@ def test_unsafe_lcm_and_cross_products_fail_closed() -> None:
     ("minutes", "expected_status", "expected_sequence"),
     (
         ((360, 372, 384, 396), "UNIFORM", (12, 12, 12)),
-        ((360, 372, 385, 397), "INVALID_NON_UNIFORM", (12, 13, 12)),
-        ((360, 382, 405, 427, 450), "INVALID_NON_UNIFORM", (22, 23, 22, 23)),
+        ((360, 372, 385, 397), "BALANCED_ROUNDING", (12, 13, 12)),
+        ((360, 382, 405, 427, 450), "BALANCED_ROUNDING", (22, 23, 22, 23)),
         ((360,), "SINGLE_TRIP_HEADWAY_NOT_MEASURABLE", ()),
         ((360, 372), "UNIFORM", (12,)),
     ),
 )
-def test_regime_uniformity_edge_cases(
+def test_regime_balance_edge_cases(
     minutes,
     expected_status,
     expected_sequence,
@@ -484,7 +484,10 @@ def test_regime_uniformity_edge_cases(
         assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in policy.error_codes
     else:
         assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" not in policy.error_codes
-    assert candidate.headway_regimes
+    if expected_status == "SINGLE_TRIP_HEADWAY_NOT_MEASURABLE":
+        assert candidate.headway_regimes == ()
+    else:
+        assert candidate.headway_regimes
 
 
 def test_two_regimes_use_independent_headways_and_transition_is_excluded() -> None:
@@ -498,7 +501,7 @@ def test_two_regimes_use_independent_headways_and_transition_is_excluded() -> No
     ]
     assert len(outbound) == 2
     assert {regime.target_headway for regime in outbound} == {2.0, 4.0}
-    assert all(len(set(regime.actual_headway_sequence)) <= 1 for regime in outbound)
+    assert all(max(regime.actual_headway_sequence) - min(regime.actual_headway_sequence) <= 1 for regime in outbound)
     assert outbound[0].transition_headways == outbound[1].transition_headways
     transition = outbound[0].transition_headways[0]
     assert transition not in outbound[1].actual_headway_sequence
@@ -557,7 +560,7 @@ def test_accepted_solution_has_zero_within_stages_and_active_transition_stages()
     assert vector[11] > 0
 
 
-def test_divisible_span_solves_and_non_divisible_span_is_infeasible() -> None:
+def test_divisible_and_non_divisible_spans_are_solved_with_valid_balance() -> None:
     divisible_context, divisible_solver = _single_regime_fixture((360, 370, 380, 390, 448))
     divisible = divisible_solver.solve(divisible_context.problem)
     assert divisible.solver_status == NativeSolverStatus.OPTIMAL
@@ -569,13 +572,21 @@ def test_divisible_span_solves_and_non_divisible_span_is_infeasible() -> None:
     )
     assert outbound.actual_headway_sequence == (22.0, 22.0, 22.0, 22.0)
 
-    impossible_context, impossible_solver, *_ = _regularity_fixture()
-    impossible = impossible_solver.solve(impossible_context.problem)
-    assert impossible.solver_status == NativeSolverStatus.INFEASIBLE
-    assert impossible.candidate is None
+    balanced_context, balanced_solver, *_ = _regularity_fixture()
+    balanced = balanced_solver.solve(balanced_context.problem)
+    assert balanced.solver_status == NativeSolverStatus.OPTIMAL
+    assert balanced.candidate is not None
+    balanced_outbound = next(
+        regime
+        for regime in balanced.candidate.headway_regimes
+        if regime.direction == ContractDirection.OUTBOUND
+    )
+    assert set(balanced_outbound.actual_headway_sequence) == {3.0, 4.0}
+    assert sum(balanced_outbound.actual_headway_sequence) == 11.0
+    assert balanced_outbound.legacy_regularity_status == "BALANCED_ROUNDING"
 
 
-def test_unknown_remains_unknown_without_uniformity_relaxation(
+def test_unknown_remains_unknown_without_balance_relaxation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     context, solver = _single_regime_fixture((360, 372, 384))
@@ -606,7 +617,7 @@ def test_valid_multiple_regime_allocation_can_restore_feasibility() -> None:
     )
 
 
-def test_cp_sat_candidate_passes_independent_uniformity_validation() -> None:
+def test_cp_sat_candidate_passes_independent_balance_validation() -> None:
     context, solver, *_ = _two_regime_fixture()
     run = solver.solve(context.problem)
     assert run.candidate is not None
@@ -615,7 +626,7 @@ def test_cp_sat_candidate_passes_independent_uniformity_validation() -> None:
     assert validation.solution is not None
 
 
-def test_corrupted_non_uniform_quality_candidate_is_rejected() -> None:
+def test_corrupted_irregular_quality_candidate_is_rejected() -> None:
     context, solver, *_ = _two_regime_fixture()
     run = solver.solve(context.problem)
     assert run.candidate is not None
@@ -687,7 +698,7 @@ def test_raw_candidate_solution_and_solver_proof_use_same_exact_vector() -> None
     )
 
 
-def test_comparison_excludes_non_uniform_accepted_looking_outcome() -> None:
+def test_comparison_excludes_irregular_accepted_looking_outcome() -> None:
     context, solver, *_ = _two_regime_fixture()
     accepted = run_schedule_solver_v1(context, solver)
     assert accepted.solution is not None
@@ -725,9 +736,10 @@ def test_comparison_excludes_non_uniform_accepted_looking_outcome() -> None:
 def test_source_inspection_proves_solver_decision_variables_and_no_fixed_grid() -> None:
     source = inspect.getsource(_build_quality_cp_sat_model)
     assert "new_int_var" in source
-    assert "quality_regime_headway_" in source
+    assert "quality_regime_floor_headway_" in source
     assert "only_enforce_if(same_regime_pair)" in source
     assert "later_departure - earlier_departure" in source
+    assert "regime_headway_by_id[regime.regime_id] + 1" in source
     assert " % " not in source
     assert "modulo" not in source.lower()
     assert "target_headway" not in source
