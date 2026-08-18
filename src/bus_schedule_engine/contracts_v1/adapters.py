@@ -23,6 +23,7 @@ from .models import (
     OperatingDayType,
     ScenarioAInput,
     ScenarioBInput,
+    ScenarioCOptimizationModeV1,
     ScenarioInputV1,
     SourceMetadata,
     TerminalDepartureTimes,
@@ -61,6 +62,7 @@ class NormalizationOptions:
     demand_source_type: DemandSourceType = DemandSourceType.AGGREGATE_REPORT
     demand_confidence: DemandConfidence = DemandConfidence.UNKNOWN
     demand_response_mode: DemandResponseMode = DemandResponseMode.STATIC
+    optimization_mode: ScenarioCOptimizationModeV1 = ScenarioCOptimizationModeV1.LEGACY_A_BOUND
 
 
 def _contract_direction(direction: Direction) -> ContractDirection:
@@ -385,6 +387,7 @@ def normalize_imported_workbook_v1(
         observed_demand_fingerprint=(
             observed_demand_fingerprint(observed_demand) if observed_demand else None
         ),
+        optimization_mode=options.optimization_mode,
     )
     try:
         ensure_valid_bundle(bundle)

@@ -11,7 +11,7 @@ from .evaluation_serialization import (
     demand_resolution_to_contract_dict,
     schedule_evaluation_to_contract_dict,
 )
-from .models import NormalizedInputBundleV1
+from .models import NormalizedInputBundleV1, ScenarioCOptimizationModeV1
 from .serialization import canonical_sha256
 
 EVALUATION_FINGERPRINT_PROFILE = "contract_v1_h1_evaluation"
@@ -55,7 +55,7 @@ def evaluation_fingerprint_payload(
             "warnings": list(resolution.warnings),
             "limitations": list(resolution.limitations),
         }
-    return {
+    payload = {
         "fingerprint_profile": EVALUATION_FINGERPRINT_PROFILE,
         "contract_version": normalized_inputs.scenario_b.contract_version,
         "scenario_a_fingerprint": normalized_inputs.scenario_a_fingerprint,
@@ -72,6 +72,9 @@ def evaluation_fingerprint_payload(
         "fleet_assessment": _fleet_assessment_payload(evaluation),
         "evaluation": schedule_evaluation_to_contract_dict(evaluation.evaluation),
     }
+    if normalized_inputs.optimization_mode != ScenarioCOptimizationModeV1.LEGACY_A_BOUND:
+        payload["scenario_c_optimization_mode"] = normalized_inputs.optimization_mode.value
+    return payload
 
 
 def evaluation_fingerprint(

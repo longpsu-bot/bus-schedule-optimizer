@@ -1,0 +1,727 @@
+from __future__ import annotations
+
+from dataclasses import replace
+from datetime import UTC, date, datetime
+
+import pytest
+
+from bus_schedule_engine.contracts_v1 import (
+    ContractDirection,
+    DemandAllocationAuthorityModeV1,
+    DemandConfidence,
+    FinalAcceptanceStateV1,
+    NativeSolverStatus,
+    NormalizationOptions,
+    OperatingDayType,
+    ScenarioBEvaluationPolicyV1,
+    ScenarioCOptimizationModeV1,
+    SolverPolicyV1,
+    UniformIntegerRegimePolicyV3,
+    allocate_trips_stage_1_v1,
+    build_schedule_generation_context_v1,
+    build_schedule_problem_v1,
+    build_two_stage_demand_authority_v1,
+    build_two_stage_uniform_request_v1,
+    evaluate_scenario_b_v1,
+    find_representable_uniform_regime_v1,
+    normalize_imported_workbook_v1,
+    run_two_stage_scenario_c_v1,
+    schedule_problem_to_contract_dict,
+    schedule_solution_to_contract_dict,
+    solve_exact_timetable_stage_2_v1,
+    two_stage_result_to_contract_dict_v1,
+    validate_and_build_solution_v1,
+)
+from bus_schedule_engine.importer import ImportedWorkbook
+from bus_schedule_engine.models import (
+    DemandRecord,
+    Direction,
+    RouteType,
+    ScenarioParameters,
+    Trip,
+    VolumeType,
+)
+
+_ADAPTER_ID = "ortools_cp_sat_two_stage_uniform_v1"
+
+
+def _record(direction: Direction, start: int, end: int, passengers: float) -> DemandRecord:
+    return DemandRecord(
+        period_start=date(2026, 8, 1),
+        period_end=date(2026, 8, 7),
+        observation_days=7,
+        block_start_seconds=start * 60,
+        block_end_seconds=end * 60,
+        direction=direction,
+        passenger_volume=passengers,
+        volume_type=VolumeType.AVERAGE_DAY,
+    )
+
+
+def _stage1_request(
+    *,
+    outbound: tuple[int, ...] = (360, 380, 400, 420),
+    inbound: tuple[int, ...] = (365, 385, 405, 425),
+    demand: tuple[DemandRecord, ...] | None = None,
+):
+    parameters = ScenarioParameters(
+        route_id="SYNTHETIC-STAGE-1",
+        route_name="Synthetic Stage 1",
+        route_type=RouteType.INTRA_PROVINCIAL,
+        trip_runtime_minutes=1,
+        total_daily_trips=len(outbound) + len(inbound),
+        terminal_1_name="T1",
+        terminal_1_first_departure=outbound[0] * 60,
+        terminal_1_last_departure=outbound[-1] * 60,
+        terminal_2_name="T2",
+        terminal_2_first_departure=inbound[0] * 60,
+        terminal_2_last_departure=inbound[-1] * 60,
+        vehicle_capacity_passengers=60,
+        target_load_factor=0.85,
+        maximum_load_factor=0.9,
+        time_block_minutes=30,
+        minimum_layover_minutes=5,
+        available_fleet_limit=len(outbound) + len(inbound),
+    )
+    trips = [
+        Trip(
+            scenario="B",
+            trip_id=f"B-OUT-{index:03d}",
+            departure_terminal="T1",
+            direction=Direction.TERMINAL_1_TO_2,
+            departure_seconds=minute * 60,
+            arrival_seconds=(minute + 1) * 60,
+        )
+        for index, minute in enumerate(outbound, start=1)
+    ] + [
+        Trip(
+            scenario="B",
+            trip_id=f"B-IN-{index:03d}",
+            departure_terminal="T2",
+            direction=Direction.TERMINAL_2_TO_1,
+            departure_seconds=minute * 60,
+            arrival_seconds=(minute + 1) * 60,
+        )
+        for index, minute in enumerate(inbound, start=1)
+    ]
+    effective_demand = demand or (
+        _record(Direction.TERMINAL_1_TO_2, 360, 391, 80),
+        _record(Direction.TERMINAL_1_TO_2, 391, 421, 70),
+        _record(Direction.TERMINAL_2_TO_1, 365, 396, 75),
+        _record(Direction.TERMINAL_2_TO_1, 396, 426, 65),
+    )
+    normalized = normalize_imported_workbook_v1(
+        ImportedWorkbook(
+            parameters_a=None,
+            trips_a=[],
+            parameters_b=parameters,
+            trips_b=trips,
+            demand=list(effective_demand),
+            configuration={},
+        ),
+        NormalizationOptions(
+            source_id="synthetic-stage-1",
+            imported_at=datetime(2026, 8, 18, 8, 0, tzinfo=UTC),
+            operating_day_type_b=OperatingDayType.WEEKDAY,
+            available_fleet_limit_b=len(outbound) + len(inbound),
+            terminal_1_max_occupancy_vehicles_b=len(outbound) + len(inbound),
+            terminal_2_max_occupancy_vehicles_b=len(outbound) + len(inbound),
+            demand_confidence=DemandConfidence.HIGH,
+            optimization_mode=ScenarioCOptimizationModeV1.B_ANCHORED_TWO_STAGE_REBALANCE,
+        ),
+    )
+    evaluation_policy = ScenarioBEvaluationPolicyV1()
+    evaluation = evaluate_scenario_b_v1(normalized, evaluation_policy)
+    authority = build_two_stage_demand_authority_v1(normalized, evaluation)
+    problem = build_schedule_problem_v1(
+        normalized,
+        evaluation,
+        solver_adapter=_ADAPTER_ID,
+        adapter_context_fingerprint=authority.authority_fingerprint,
+        evaluation_policy=evaluation_policy,
+        solver_policy=SolverPolicyV1(time_limit_seconds=2.0),
+        demand_allocation_authority_mode=authority.authority_mode,
+    )
+    return problem, authority, normalized, evaluation, evaluation_policy
+
+
+def test_exact_uniform_representability_and_bounded_boundary_repair() -> None:
+    exact = find_representable_uniform_regime_v1(
+        (360, 370, 380),
+        permitted_start_window=(360, 360),
+        permitted_end_window=(380, 380),
+        minimum_headway_minutes=2,
+        maximum_headway_minutes=30,
+        absolute_max_shift_per_trip_minutes=30,
+        preferred_start_minute=360,
+        preferred_end_minute=380,
+    )
+    repaired = find_representable_uniform_regime_v1(
+        (360, 367, 374, 380),
+        permitted_start_window=(360, 360),
+        permitted_end_window=(378, 382),
+        minimum_headway_minutes=2,
+        maximum_headway_minutes=30,
+        absolute_max_shift_per_trip_minutes=30,
+        preferred_start_minute=360,
+        preferred_end_minute=380,
+    )
+
+    assert exact is not None and exact.departure_minutes == (360, 370, 380)
+    assert repaired is not None and repaired.departure_minutes == (360, 367, 374, 381)
+
+
+def test_alternate_trip_count_can_repair_a_non_divisible_span_without_balanced_rounding() -> None:
+    four_trips = find_representable_uniform_regime_v1(
+        (360, 367, 374, 380),
+        permitted_start_window=(360, 360),
+        permitted_end_window=(380, 380),
+        minimum_headway_minutes=2,
+        maximum_headway_minutes=30,
+        absolute_max_shift_per_trip_minutes=30,
+        preferred_start_minute=360,
+        preferred_end_minute=380,
+    )
+    three_trips = find_representable_uniform_regime_v1(
+        (360, 370, 380),
+        permitted_start_window=(360, 360),
+        permitted_end_window=(380, 380),
+        minimum_headway_minutes=2,
+        maximum_headway_minutes=30,
+        absolute_max_shift_per_trip_minutes=30,
+        preferred_start_minute=360,
+        preferred_end_minute=380,
+    )
+
+    assert four_trips is None
+    assert three_trips is not None
+    assert three_trips.uniform_headway_minutes == 10
+
+
+def test_no_representable_progression_returns_explicit_none() -> None:
+    assert (
+        find_representable_uniform_regime_v1(
+            (360, 370, 380),
+            permitted_start_window=(360, 360),
+            permitted_end_window=(381, 381),
+            minimum_headway_minutes=2,
+            maximum_headway_minutes=30,
+            absolute_max_shift_per_trip_minutes=30,
+            preferred_start_minute=360,
+            preferred_end_minute=381,
+        )
+        is None
+    )
+
+
+def test_stage_1_fixes_daily_and_directional_totals_and_emits_only_exact_regimes() -> None:
+    problem, authority, *_ = _stage1_request()
+    result = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=2),
+        time_limit_seconds=2.0,
+    )
+
+    assert result.plans
+    plan = result.plans[0]
+    assert plan.total_trips == 8
+    assert dict(plan.trips_by_direction) == {
+        ContractDirection.OUTBOUND: 4,
+        ContractDirection.INBOUND: 4,
+    }
+    for regime in plan.proposed_regimes:
+        if regime.measurable:
+            assert regime.uniform_headway_minutes is not None
+            assert regime.planned_end_minute - regime.planned_start_minute == (
+                (regime.trip_count - 1) * regime.uniform_headway_minutes
+            )
+    assert any(len(regime.covered_demand_block_ids) > 1 for regime in plan.proposed_regimes)
+    b_no_service = c_no_service = 0
+    b_critical = c_critical = 0
+    b_planning = c_planning = 0
+    for block in plan.allocation_blocks:
+        b_no_service += int(block.observed_passengers > 0 and block.source_b_trip_count == 0)
+        c_no_service += int(block.observed_passengers > 0 and block.trip_count == 0)
+        b_critical += max(0, block.required_trips_90 - block.source_b_trip_count)
+        c_critical += max(0, block.required_trips_90 - block.trip_count)
+        b_planning += max(0, block.required_trips_85 - block.source_b_trip_count)
+        c_planning += max(0, block.required_trips_85 - block.trip_count)
+    assert all(
+        c_value <= b_value
+        for c_value, b_value in zip(
+            (c_no_service, c_critical, c_planning),
+            (b_no_service, b_critical, b_planning),
+            strict=True,
+        )
+    )
+
+
+def test_combined_demand_allocates_total_service_without_changing_direction_counts() -> None:
+    problem, authority, *_ = _stage1_request(
+        demand=(
+            _record(Direction.COMBINED, 360, 396, 170),
+            _record(Direction.COMBINED, 396, 426, 130),
+        )
+    )
+    assert authority.authority_mode == (
+        DemandAllocationAuthorityModeV1.COMBINED_FIXED_DIRECTION_COUNTS
+    )
+    result = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        time_limit_seconds=2.0,
+    )
+
+    assert result.plans
+    plan = result.plans[0]
+    assert dict(plan.trips_by_direction) == {
+        ContractDirection.OUTBOUND: 4,
+        ContractDirection.INBOUND: 4,
+    }
+    assert all(block.direction == ContractDirection.COMBINED for block in plan.allocation_blocks)
+    assert all(len(block.directional_trip_counts) == 2 for block in plan.allocation_blocks)
+    assert any(
+        "does not claim directional passenger inference" in item for item in result.limitations
+    )
+
+
+def test_stage_1_rejects_non_positive_budget() -> None:
+    problem, authority, *_ = _stage1_request()
+    with pytest.raises(ValueError, match="finite and positive"):
+        allocate_trips_stage_1_v1(problem, authority, time_limit_seconds=0)
+
+
+def test_stage_2_uses_fixed_allocation_exact_uniformity_and_b_anchored_minutes() -> None:
+    problem, authority, *_ = _stage1_request()
+    policy = UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=1)
+    stage_1 = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+    assert stage_1.plans
+    stage_2 = solve_exact_timetable_stage_2_v1(
+        problem,
+        stage_1.plans[0],
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+
+    assert stage_2.candidate is not None
+    candidate = stage_2.candidate
+    assert len(candidate.exact_timetable) == problem.scenario_b.total_daily_trips
+    source = {trip.trip_id: trip for trip in problem.scenario_b.exact_timetable}
+    assert {trip.source_b_trip_id for trip in candidate.exact_timetable} == set(source)
+    assert all(trip.c_departure_time % 60 == 0 for trip in candidate.exact_timetable)
+    assert all(
+        abs(trip.c_departure_time - source[trip.source_b_trip_id].departure_time)
+        <= policy.absolute_max_shift_per_trip_minutes * 60
+        for trip in candidate.exact_timetable
+    )
+    assert all(
+        trip.arrival_time
+        == trip.c_departure_time + source[trip.source_b_trip_id].runtime_minutes * 60
+        for trip in candidate.exact_timetable
+    )
+    assert all(
+        not regime.actual_headway_sequence or len(set(regime.actual_headway_sequence)) == 1
+        for regime in candidate.headway_regimes
+    )
+
+
+def test_stage_2_candidate_passes_existing_runtime_fleet_turnaround_and_occupancy_validator() -> (
+    None
+):
+    problem, authority, normalized, evaluation, evaluation_policy = _stage1_request()
+    policy = UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=1)
+    stage_1 = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+    stage_2 = solve_exact_timetable_stage_2_v1(
+        problem,
+        stage_1.plans[0],
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+    assert stage_2.candidate is not None
+
+    context = build_schedule_generation_context_v1(
+        problem,
+        normalized,
+        evaluation,
+        evaluation_policy,
+    )
+    validation = validate_and_build_solution_v1(
+        context,
+        stage_2.candidate,
+        allocation_plan=stage_1.plans[0],
+        uniform_regime_policy=policy,
+    )
+
+    assert validation.passed, validation.rejection_codes
+    assert validation.solution is not None
+    assert validation.solution.minimum_required_fleet <= problem.scenario_b.available_fleet_limit
+    assert problem.scenario_b.terminal_occupancy_limits is not None
+    assert any("Physical terminal occupancy" in item for item in validation.solution.explanations)
+
+
+def test_two_stage_adapter_shares_one_finite_budget_and_bounds_allocation_retries() -> None:
+    _, _, normalized, evaluation, evaluation_policy = _stage1_request()
+    policy = UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=2)
+    context, solver = build_two_stage_uniform_request_v1(
+        normalized,
+        evaluation,
+        evaluation_policy=evaluation_policy,
+        solver_policy=SolverPolicyV1(time_limit_seconds=2.0),
+        uniform_regime_policy=policy,
+    )
+
+    result = run_two_stage_scenario_c_v1(context, solver)
+
+    assert result.final_acceptance_state in set(FinalAcceptanceStateV1)
+    assert result.diagnostics.total_budget_seconds == 2.0
+    assert result.diagnostics.solve_duration_stage_1 <= 0.7 + 0.1
+    assert result.diagnostics.stage_2_allocation_attempt_count <= 2
+    assert result.diagnostics.maximum_stage_2_departure_domain_width_minutes <= (
+        policy.absolute_max_shift_per_trip_minutes * 2
+    )
+    assert result.diagnostics.full_service_window_domain_count == 0
+    assert (
+        result.diagnostics.solve_duration_stage_1 + result.diagnostics.solve_duration_stage_2 <= 2.1
+    )
+    assert result.result_fingerprint
+    assert result.allocation_plan is not None
+    assert result.candidate_outcome is not None
+    assert result.candidate_outcome.solution is not None
+
+    artifact = two_stage_result_to_contract_dict_v1(result)
+    allocation = artifact["stage_1_allocation"]
+    accepted = artifact["accepted_candidate"]
+    assert isinstance(allocation, dict)
+    assert isinstance(accepted, dict)
+    assert allocation["allocation_by_demand_interval"]
+    assert accepted["final_service_regimes"]
+    assert all(
+        trip["c_departure_time"].endswith(":00")
+        for trip in accepted["exact_timetable_and_b_to_c_shifts"]
+    )
+    assert artifact["final_service_tail_metrics"]
+    assert artifact["solve_diagnostics"]["total_budget_seconds"] == 2.0
+    assert artifact["solve_diagnostics"]["full_service_window_domain_count"] == 0
+
+
+def test_budget_timeout_is_truthfully_unknown_not_infeasible() -> None:
+    _, _, normalized, evaluation, evaluation_policy = _stage1_request()
+    context, solver = build_two_stage_uniform_request_v1(
+        normalized,
+        evaluation,
+        evaluation_policy=evaluation_policy,
+        solver_policy=SolverPolicyV1(time_limit_seconds=0.000001),
+    )
+
+    detailed = solver.solve_detailed(context.problem)
+
+    assert detailed.solver_run.solver_status == NativeSolverStatus.UNKNOWN
+    assert not detailed.stage_1_result.plans
+    assert detailed.diagnostics.stage_2_allocation_attempt_count == 0
+
+
+def test_v3_thresholds_bind_problem_solution_and_artifact_identities() -> None:
+    _, _, normalized, evaluation, evaluation_policy = _stage1_request()
+    first_context, first_solver = build_two_stage_uniform_request_v1(
+        normalized,
+        evaluation,
+        evaluation_policy=evaluation_policy,
+        solver_policy=SolverPolicyV1(time_limit_seconds=2.0),
+        uniform_regime_policy=UniformIntegerRegimePolicyV3(
+            absolute_max_shift_per_trip_minutes=30,
+        ),
+    )
+    second_context, _ = build_two_stage_uniform_request_v1(
+        normalized,
+        evaluation,
+        evaluation_policy=evaluation_policy,
+        solver_policy=SolverPolicyV1(time_limit_seconds=2.0),
+        uniform_regime_policy=UniformIntegerRegimePolicyV3(
+            absolute_max_shift_per_trip_minutes=29,
+        ),
+    )
+    assert first_context.problem.problem_fingerprint != second_context.problem.problem_fingerprint
+    problem_payload = schedule_problem_to_contract_dict(first_context.problem)
+    assert problem_payload["scenario_c_optimization_mode"] == ("B_ANCHORED_TWO_STAGE_REBALANCE_V1")
+    assert problem_payload["demand_allocation_authority_mode"] == (
+        "DIRECTIONAL_DEMAND_FIXED_DIRECTION_COUNTS"
+    )
+
+    result = run_two_stage_scenario_c_v1(first_context, first_solver)
+    assert result.candidate_outcome is not None
+    assert result.candidate_outcome.solution is not None
+    solution_payload = schedule_solution_to_contract_dict(result.candidate_outcome.solution)
+    assert solution_payload["allocation_plan_fingerprint"] == (
+        result.allocation_plan.allocation_fingerprint
+    )
+    assert solution_payload["uniform_regime_policy_profile"] == (
+        "scenario_c_uniform_integer_regime_policy_v3"
+    )
+
+
+def test_final_tail_is_uniform_spread_and_locked_to_last_departure() -> None:
+    problem, authority, *_ = _stage1_request()
+    policy = UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=1)
+    stage_1 = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+    stage_2 = solve_exact_timetable_stage_2_v1(
+        problem,
+        stage_1.plans[0],
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+    assert stage_2.candidate is not None
+    by_regime = {item.regime_id: item for item in stage_2.candidate.headway_regimes}
+    for regime in stage_1.plans[0].proposed_regimes:
+        if not regime.is_final_service_tail:
+            continue
+        actual = by_regime[regime.regime_id]
+        locked_last = max(
+            trip.departure_time
+            for trip in problem.scenario_b.exact_timetable
+            if trip.direction == regime.direction
+        )
+        assert actual.end_time == locked_last
+        assert (actual.end_time - actual.start_time) // 60 >= 55
+        assert len(set(actual.actual_headway_sequence)) <= 1
+
+
+def test_non_minute_or_bunched_v3_tail_candidate_is_rejected() -> None:
+    problem, authority, normalized, evaluation, evaluation_policy = _stage1_request()
+    policy = UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=1)
+    stage_1 = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+    stage_2 = solve_exact_timetable_stage_2_v1(
+        problem,
+        stage_1.plans[0],
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+    assert stage_2.candidate is not None
+    tail_ids = {
+        regime.regime_id
+        for regime in stage_1.plans[0].proposed_regimes
+        if regime.is_final_service_tail
+    }
+    members = [
+        trip for trip in stage_2.candidate.exact_timetable if trip.headway_regime_id in tail_ids
+    ]
+    target = sorted(members, key=lambda item: item.c_departure_time)[0]
+    changed_trip = replace(
+        target,
+        c_departure_time=target.c_departure_time + 30,
+        arrival_time=target.arrival_time + 30,
+    )
+    changed = replace(
+        stage_2.candidate,
+        exact_timetable=tuple(
+            changed_trip if trip.c_trip_id == target.c_trip_id else trip
+            for trip in stage_2.candidate.exact_timetable
+        ),
+    )
+    context = build_schedule_generation_context_v1(
+        problem,
+        normalized,
+        evaluation,
+        evaluation_policy,
+    )
+
+    validation = validate_and_build_solution_v1(
+        context,
+        changed,
+        allocation_plan=stage_1.plans[0],
+        uniform_regime_policy=policy,
+    )
+
+    assert not validation.passed
+    assert "V3_DEPARTURE_NOT_WHOLE_MINUTE" in validation.rejection_codes
+
+    bunched_trip = replace(
+        target,
+        c_departure_time=target.c_departure_time + 10 * 60,
+        arrival_time=target.arrival_time + 10 * 60,
+    )
+    bunched = replace(
+        stage_2.candidate,
+        exact_timetable=tuple(
+            bunched_trip if trip.c_trip_id == target.c_trip_id else trip
+            for trip in stage_2.candidate.exact_timetable
+        ),
+    )
+    bunched_validation = validate_and_build_solution_v1(
+        context,
+        bunched,
+        allocation_plan=stage_1.plans[0],
+        uniform_regime_policy=policy,
+    )
+    assert "V3_WITHIN_REGIME_HEADWAY_NOT_EXACTLY_UNIFORM" in (bunched_validation.rejection_codes)
+    assert "V3_FINAL_TAIL_AVOIDABLE_COMPRESSION" in bunched_validation.rejection_codes
+
+
+def _solved_plan_with_tail_count(problem, authority, policy, tail_count):
+    stage_1 = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=policy,
+        time_limit_seconds=3.0,
+    )
+    for plan in stage_1.plans:
+        if any(
+            regime.is_final_service_tail and regime.trip_count != tail_count
+            for regime in plan.proposed_regimes
+        ):
+            continue
+        stage_2 = solve_exact_timetable_stage_2_v1(
+            problem,
+            plan,
+            policy=policy,
+            time_limit_seconds=2.0,
+        )
+        if stage_2.candidate is not None:
+            return plan, stage_2.candidate
+    pytest.fail("expected one bounded Stage 1 alternative to be Stage 2 feasible")
+
+
+def test_tail_headway_can_be_longer_for_low_demand_and_shorter_for_strong_late_demand() -> None:
+    outbound = (300, 315, 330, 345, 360, 390, 420)
+    inbound = (305, 320, 335, 350, 365, 395, 425)
+    (
+        low_problem,
+        low_authority,
+        low_normalized,
+        low_evaluation,
+        low_evaluation_policy,
+    ) = _stage1_request(
+        outbound=outbound,
+        inbound=inbound,
+        demand=(
+            _record(Direction.TERMINAL_1_TO_2, 300, 361, 204),
+            _record(Direction.TERMINAL_1_TO_2, 361, 421, 20),
+            _record(Direction.TERMINAL_2_TO_1, 305, 366, 204),
+            _record(Direction.TERMINAL_2_TO_1, 366, 426, 20),
+        ),
+    )
+    strong_problem, strong_authority, *_ = _stage1_request(
+        outbound=outbound,
+        inbound=inbound,
+        demand=(
+            _record(Direction.TERMINAL_1_TO_2, 300, 361, 153),
+            _record(Direction.TERMINAL_1_TO_2, 361, 421, 204),
+            _record(Direction.TERMINAL_2_TO_1, 305, 366, 153),
+            _record(Direction.TERMINAL_2_TO_1, 366, 426, 204),
+        ),
+    )
+    policy = UniformIntegerRegimePolicyV3(
+        maximum_stage_1_alternative_plans=12,
+        maximum_transition_jump_minutes=30,
+    )
+    low_plan, low_candidate = _solved_plan_with_tail_count(
+        low_problem,
+        low_authority,
+        policy,
+        3,
+    )
+    strong_plan, strong_candidate = _solved_plan_with_tail_count(
+        strong_problem,
+        strong_authority,
+        policy,
+        4,
+    )
+
+    def headways(plan, candidate, direction):
+        raw = {item.regime_id: item for item in candidate.headway_regimes}
+        regimes = sorted(
+            (item for item in plan.proposed_regimes if item.direction == direction),
+            key=lambda item: item.planned_start_minute,
+        )
+        return tuple(
+            raw[item.regime_id].actual_headway_sequence[0]
+            for item in regimes
+            if raw[item.regime_id].actual_headway_sequence
+        )
+
+    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
+        low = headways(low_plan, low_candidate, direction)
+        strong = headways(strong_plan, strong_candidate, direction)
+        assert len(low) >= 2
+        assert low[-1] > low[-2]
+        assert strong[-1] < low[-1]
+    low_context = build_schedule_generation_context_v1(
+        low_problem,
+        low_normalized,
+        low_evaluation,
+        low_evaluation_policy,
+    )
+    low_validation = validate_and_build_solution_v1(
+        low_context,
+        low_candidate,
+        allocation_plan=low_plan,
+        uniform_regime_policy=policy,
+    )
+    assert low_validation.passed, low_validation.rejection_codes
+
+
+def test_protected_floors_are_not_stage_1_donors_or_stage_2_tail_overrides() -> None:
+    from test_protected_service_floor_ortools_constraints import _authority as _protected_authority
+
+    problem, demand_authority, *_ = _stage1_request()
+    protected = _protected_authority(
+        problem.scenario_b,
+        outbound_indices=(0, 1),
+        inbound_indices=(0, 1),
+    )
+    policy = UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=2)
+    stage_1 = allocate_trips_stage_1_v1(
+        problem,
+        demand_authority,
+        policy=policy,
+        protected_service_floor_enforcement_authority=protected,
+        time_limit_seconds=2.0,
+    )
+
+    assert stage_1.plans
+    assert all(
+        block.trip_count >= block.protected_minimum_trip_count
+        for block in stage_1.plans[0].allocation_blocks
+    )
+    stage_2 = solve_exact_timetable_stage_2_v1(
+        problem,
+        stage_1.plans[0],
+        policy=policy,
+        protected_service_floor_enforcement_authority=protected,
+        time_limit_seconds=2.0,
+    )
+    assert stage_2.candidate is not None
+    candidate_by_source = {
+        trip.source_b_trip_id: trip for trip in stage_2.candidate.exact_timetable
+    }
+    for regime in protected.protected_regimes:
+        departures = tuple(
+            candidate_by_source[source_id].c_departure_time
+            for source_id in regime.ordered_b_trip_ids
+        )
+        assert departures[0] == regime.protected_window_start
+        assert departures[-1] == regime.protected_window_end
+        assert all(
+            later - earlier <= regime.maximum_future_c_headway_minutes * 60
+            for earlier, later in zip(departures, departures[1:], strict=False)
+        )

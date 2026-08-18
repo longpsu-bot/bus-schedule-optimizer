@@ -79,8 +79,10 @@ RETIRED_RESULT_KEYS = (
 TEMPLATE_SEMANTIC_FINGERPRINT = "96f9f240613f4ec511855e085a8a1a791bb9c50993b7e4338620d7a8ead809c7"
 BASELINE_MANIFEST_FINGERPRINTS = {
     "heuristic_core": "c96009627d669e4ec2387ea28a5af0ba14d8bea4761066cfb21bc284c234be1f",
-    "protected_solver_core": "34317e53575bcba6f7913d53f22c7affaf2de6cfc487052773e24c249cca25ff",
-    "contract_schemas": "27c42bc441aa035bc1db47865f925257f5c3ce9e5f3308ec40e4dc8d5aeb9584",
+    # Intentionally advanced by the explicit V3 two-stage solver and optional V3 schema fields.
+    # V2 semantic/fingerprint stability remains covered by its dedicated regression suite.
+    "protected_solver_core": "4a355974983e99a958d982b0ef98a3ec9f470612afc7b406327ee79ec1040d07",
+    "contract_schemas": "a3e08e4a55900842038ee8929471a2db93a005eec013cbf8b1ea7c09b717c587",
     "route_corpus": "4e50c1c1dad4c805ce7d1fc89323782eac02161c79d777659ab1fff890472294",
 }
 _TEXT_MANIFEST_SUFFIXES = {

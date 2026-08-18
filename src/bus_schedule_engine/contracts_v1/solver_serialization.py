@@ -140,6 +140,24 @@ def schedule_solution_to_contract_dict(
         payload["protected_service_floor_validation_fingerprint"] = (
             solution.protected_service_floor_validation_fingerprint
         )
+    if solution.allocation_plan_fingerprint is not None:
+        payload.update(
+            {
+                "allocation_plan_fingerprint": solution.allocation_plan_fingerprint,
+                "scenario_c_optimization_mode": (
+                    solution.optimization_mode.value
+                    if solution.optimization_mode is not None
+                    else None
+                ),
+                "demand_allocation_authority_mode": (
+                    solution.demand_allocation_authority_mode.value
+                    if solution.demand_allocation_authority_mode is not None
+                    else None
+                ),
+                "uniform_regime_policy_profile": solution.uniform_regime_policy_profile,
+                "final_tail_policy_fingerprint": solution.final_tail_policy_fingerprint,
+            }
+        )
     return payload
 
 

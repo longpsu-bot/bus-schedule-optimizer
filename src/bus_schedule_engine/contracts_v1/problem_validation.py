@@ -9,7 +9,7 @@ from .evaluation_serialization import (
     block_supply_plan_to_contract_dict,
     demand_analysis_block_to_contract_dict,
 )
-from .models import DemandResolutionType
+from .models import DemandResolutionType, ScenarioCOptimizationModeV1
 from .public_api import evaluate_scenario_b_v1
 from .serialization import observed_demand_fingerprint, scenario_fingerprint
 from .solver_models import (
@@ -318,6 +318,19 @@ def _validate_modes_and_policy(
             "available-fleet upper bounds, solver-determined positioning, and "
             "half-open analytical boundaries.",
         )
+    if problem.optimization_mode == ScenarioCOptimizationModeV1.LEGACY_A_BOUND:
+        if problem.demand_allocation_authority_mode is not None:
+            _issue(
+                issues,
+                "UNSUPPORTED_PROBLEM_MODE",
+                "Legacy A-bound problems cannot claim a V3 allocation authority mode.",
+            )
+    elif problem.demand_allocation_authority_mode is None:
+        _issue(
+            issues,
+            "PROBLEM_DEMAND_ALLOCATION_AUTHORITY_MISSING",
+            "B-anchored two-stage problems require explicit directional or combined authority.",
+        )
     policy = problem.solver_policy
     policy_invalid = not policy.require_independent_validation
     if policy.time_limit_seconds is not None:
@@ -405,6 +418,12 @@ def validate_schedule_generation_context_v1(
             issues,
             "PROBLEM_SCENARIO_A_FINGERPRINT_MISMATCH",
             "Generation context Scenario A does not match the problem.",
+        )
+    if problem.optimization_mode != normalized.optimization_mode:
+        _issue(
+            issues,
+            "PROBLEM_OPTIMIZATION_MODE_MISMATCH",
+            "Generation context optimization mode does not match the problem.",
         )
     if (
         problem.scenario_b != normalized.scenario_b

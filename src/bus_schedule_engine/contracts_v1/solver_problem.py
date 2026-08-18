@@ -17,7 +17,12 @@ from .evaluation_serialization import (
 from .heuristic_context import (
     HEURISTIC_TURNAROUND_BRIDGE_MODE as HEURISTIC_TURNAROUND_BRIDGE_MODE,
 )
-from .models import NormalizedInputBundleV1, ScenarioBInput
+from .models import (
+    DemandAllocationAuthorityModeV1,
+    NormalizedInputBundleV1,
+    ScenarioBInput,
+    ScenarioCOptimizationModeV1,
+)
 from .public_api import evaluate_scenario_b_v1
 from .serialization import canonical_sha256
 from .solver_models import (
@@ -187,7 +192,7 @@ def problem_fingerprint_payload(
     authorization = problem.direction_redistribution_authorization
     fixed = problem.fixed_initial_fleet
     bounded = problem.bounded_initial_fleet
-    return {
+    payload = {
         "fingerprint_profile": PROBLEM_FINGERPRINT_PROFILE,
         "contract_version": problem.contract_version,
         "source_a_fingerprint": problem.source_a_fingerprint,
@@ -254,6 +259,14 @@ def problem_fingerprint_payload(
         "adapter_context_fingerprint": (problem.adapter_context_fingerprint),
         "solver_policy": jsonable(asdict(problem.solver_policy)),
     }
+    if problem.optimization_mode != ScenarioCOptimizationModeV1.LEGACY_A_BOUND:
+        payload["scenario_c_optimization_mode"] = problem.optimization_mode.value
+        payload["demand_allocation_authority_mode"] = (
+            problem.demand_allocation_authority_mode.value
+            if problem.demand_allocation_authority_mode is not None
+            else None
+        )
+    return payload
 
 
 def calculate_problem_fingerprint(problem: ScheduleProblemV1) -> str:
@@ -290,6 +303,7 @@ def build_schedule_problem_v1(
     bounded_initial_fleet: BoundedInitialFleetV1 | None = None,
     boundary_convention: BoundaryConvention = BoundaryConvention.HALF_OPEN,
     adapter_operating_lock_values: Mapping[str, object] | None = None,
+    demand_allocation_authority_mode: DemandAllocationAuthorityModeV1 | None = None,
 ) -> ScheduleProblemV1:
     effective_policy = evaluation_policy or ScenarioBEvaluationPolicyV1()
     authoritative_evaluation = evaluate_scenario_b_v1(
@@ -352,6 +366,8 @@ def build_schedule_problem_v1(
         block_requirements=tuple(authoritative_evaluation.b_block_supply),
         boundary_convention=boundary_convention,
         solver_policy=solver_policy or SolverPolicyV1(),
+        optimization_mode=normalized_inputs.optimization_mode,
+        demand_allocation_authority_mode=demand_allocation_authority_mode,
     )
     fingerprint = calculate_problem_fingerprint(problem)
     problem = replace(

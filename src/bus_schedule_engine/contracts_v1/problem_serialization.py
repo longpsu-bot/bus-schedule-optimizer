@@ -5,6 +5,7 @@ from .evaluation_serialization import (
     demand_analysis_block_to_contract_dict,
     demand_resolution_to_contract_dict,
 )
+from .models import ScenarioCOptimizationModeV1
 from .serialization import scenario_to_contract_dict
 from .solver_models import (
     BoundedInitialFleetV1,
@@ -91,7 +92,7 @@ def schedule_problem_to_contract_dict(
             item.block_id,
         ),
     )
-    return {
+    payload = {
         "contract_version": problem.contract_version,
         "problem_id": problem.problem_id,
         "problem_fingerprint": problem.problem_fingerprint,
@@ -141,3 +142,11 @@ def schedule_problem_to_contract_dict(
         "boundary_convention": problem.boundary_convention.value,
         "solver_policy": solver_policy_to_contract_dict(problem.solver_policy),
     }
+    if problem.optimization_mode != ScenarioCOptimizationModeV1.LEGACY_A_BOUND:
+        payload["scenario_c_optimization_mode"] = problem.optimization_mode.value
+        payload["demand_allocation_authority_mode"] = (
+            problem.demand_allocation_authority_mode.value
+            if problem.demand_allocation_authority_mode is not None
+            else None
+        )
+    return payload
