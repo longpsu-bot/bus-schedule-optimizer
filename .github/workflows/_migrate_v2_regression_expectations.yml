@@ -32,3 +32,5 @@ jobs:
           git diff --cached --check
           git commit -m "Migrate regression expectations to balanced regime V2"
           git push origin HEAD:fix/scenario-c-balanced-regime-policy-v2
+
+# Touch after initial workflow creation so the branch-level push trigger is active.
