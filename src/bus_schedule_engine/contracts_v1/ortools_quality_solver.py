@@ -40,6 +40,7 @@ from .ortools_solver import (
     _solver_controls,
 )
 from .regime_headway_policy import (
+    SCENARIO_C_BALANCED_REGIME_POLICY_PROFILE,
     _authoritative_candidate_payload,
     _derive_sustained_service_regimes,
     _RegimeHeadwayPolicyError,
@@ -84,6 +85,7 @@ ORTOOLS_SERVICE_QUALITY_REQUIRES_DIRECTIONAL_AUTHORITY = (
 ORTOOLS_QUALITY_EXACT_DEMAND_CONTEXT_MISMATCH = "ORTOOLS_QUALITY_EXACT_DEMAND_CONTEXT_MISMATCH"
 ORTOOLS_PROTECTED_FLOOR_AUTHORITY_MISMATCH = "ORTOOLS_PROTECTED_FLOOR_AUTHORITY_MISMATCH"
 ORTOOLS_QUALITY_ADAPTER_CONTEXT_PROFILE = "ortools_quality_exact_demand_and_protected_floor_v1"
+_CANONICAL_REGIME_DEPENDENT_OBJECTIVES = frozenset(_QUALITY_OBJECTIVE_NAMES[8:])
 
 
 @dataclass(frozen=True, slots=True)
@@ -679,13 +681,16 @@ def _quality_solver_limitations(
         f"OR-Tools version {ortools.__version__}; total staged-solve time limit: "
         f"{configured_time_limit}; worker count: {worker_count}; random seed: {random_seed}.",
         "Milestone 4A2 optimizes fixed-resource demand protection, positive-demand "
-        "service gaps, proportional directional-demand alignment, and sustained-regime "
+        "service gaps, proportional directional-demand alignment, and demand-phase "
         "headway regularity before B-preservation shift tie-breaks.",
         "Variable trip counts, directional trip-count redistribution, fleet minimization, "
         "heuristic comparison, application solver selection, UI, charts, and XLSX are "
         "not optimized or integrated by this adapter.",
-        "Sustained service regimes are derived from authoritative directional demand blocks "
-        "and exact planning service-rate equality; they are not directly passenger-supplied.",
+        "Native CP-SAT regularity stages use demand phases derived from directional demand "
+        "blocks and exact planning service-rate equality. Final Scenario C service regimes "
+        f"are reconciled independently by {SCENARIO_C_BALANCED_REGIME_POLICY_PROFILE}; when "
+        "that policy repairs or merges demand phases, native optimality does not prove the "
+        "canonical regime-dependent objective suffix.",
     )
     if protected_enforcement_fingerprint is None:
         return limitations
@@ -718,6 +723,25 @@ def _model_invalid_result(
             "or integration defect; it is not timetable or fleet infeasibility.",
         ),
     )
+
+
+def _canonical_regime_groups_match_native(
+    bundle: _QualityCpSatModelBundle,
+    regime_policy,
+) -> bool:
+    native = tuple(
+        sorted(
+            (regime.direction.value, regime.block_ids)
+            for regime in bundle.regimes
+        )
+    )
+    canonical = tuple(
+        sorted(
+            (analysis.regime.direction.value, analysis.regime.block_ids)
+            for analysis in regime_policy.analyses
+        )
+    )
+    return canonical == native
 
 
 def _build_quality_candidate(
@@ -784,6 +808,15 @@ def _build_quality_candidate(
     )
     if regime_policy.error_codes:
         raise ValueError(", ".join(regime_policy.error_codes))
+    canonical_groups_match_native = _canonical_regime_groups_match_native(
+        bundle,
+        regime_policy,
+    )
+    effective_status = (
+        NativeSolverStatus.FEASIBLE
+        if status == NativeSolverStatus.OPTIMAL and not canonical_groups_match_native
+        else status
+    )
     extra_limitations = tuple(
         (
             f"{analysis.regime.regime_id} has {len(analysis.trip_ids)} solved "
@@ -792,8 +825,15 @@ def _build_quality_candidate(
         for analysis in regime_policy.analyses
         if not analysis.headway_measurable
     )
+    if not canonical_groups_match_native:
+        extra_limitations += (
+            f"{SCENARIO_C_BALANCED_REGIME_POLICY_PROFILE} changed the final Scenario C "
+            "service-regime grouping relative to the native demand-phase model. The candidate "
+            "is retained as FEASIBLE under canonical validation; native OPTIMAL does not prove "
+            "the canonical regime-dependent objective suffix.",
+        )
     provisional = RawScheduleCandidateV1(
-        solver_status=status,
+        solver_status=effective_status,
         solver_adapter=adapter_id,
         solve_duration_seconds=duration,
         candidate_fingerprint=candidate_fingerprint(
@@ -818,29 +858,44 @@ def _build_quality_candidate(
         provisional,
         bundle.exact_demand_authority,
     )
-    if vector[8] != 0 or vector[9] != 0:
-        raise ValueError("WITHIN_REGIME_HEADWAY_NOT_UNIFORM")
-    for name, proven_value in proven:
+    canonical_proven = tuple(
+        (name, value)
+        for name, value in proven
+        if canonical_groups_match_native or name not in _CANONICAL_REGIME_DEPENDENT_OBJECTIVES
+    )
+    native_only_proven = tuple(
+        (name, value)
+        for name, value in proven
+        if not canonical_groups_match_native and name in _CANONICAL_REGIME_DEPENDENT_OBJECTIVES
+    )
+    for name, proven_value in canonical_proven:
         recomputed = vector[_QUALITY_OBJECTIVE_NAMES.index(name)]
         if recomputed != proven_value:
             raise ValueError(
                 f"Independently recomputed {name}={recomputed} does not match "
-                f"solver-proven value {proven_value}"
+                f"the solver-proven value {proven_value}"
             )
-    proven_by_name = dict(proven)
+    proven_by_name = dict(canonical_proven)
     stage_values = ", ".join(
         f"{name}={value}" + (" (proven)" if name in proven_by_name else " (candidate; unproven)")
         for name, value in zip(_QUALITY_OBJECTIVE_NAMES, vector, strict=True)
     )
     unproven = tuple(name for name in _QUALITY_OBJECTIVE_NAMES if name not in proven_by_name)
+    native_only_text = (
+        ", ".join(f"{name}={value}" for name, value in native_only_proven)
+        if native_only_proven
+        else "none"
+    )
     explanation = (
-        f"CP-SAT service-quality staged solve returned {status.value}. "
+        f"Native CP-SAT service-quality staged solve returned {status.value}; canonical "
+        f"Scenario C candidate status is {effective_status.value}. "
         f"Objective stages attempted: {', '.join(attempted) if attempted else 'none'}. "
-        "Objective stages proven optimal: "
-        f"{', '.join(f'{name}={value}' for name, value in proven) if proven else 'none'}. "
+        "Canonical objective stages proven without regime reinterpretation: "
+        f"{', '.join(f'{name}={value}' for name, value in canonical_proven) if canonical_proven else 'none'}. "
+        f"Native-only downstream proofs not carried into canonical V2: {native_only_text}. "
         f"Independently recomputed candidate vector: ({', '.join(map(str, vector))}). "
         f"Stage values: {stage_values}. "
-        f"Unproven current/later stages: {', '.join(unproven) if unproven else 'none'}. "
+        f"Unproven canonical stages: {', '.join(unproven) if unproven else 'none'}. "
         "Variable trip counts and fleet minimization were not optimized."
     )
     return replace(provisional, explanation=explanation)
@@ -1114,7 +1169,7 @@ class OrToolsCpSatServiceQualitySolver:
             )
             return SolverRunResultV1(
                 execution_status=SolverExecutionStatus.COMPLETED,
-                solver_status=NativeSolverStatus.OPTIMAL,
+                solver_status=candidate.solver_status,
                 solver_adapter=self.adapter_id,
                 solve_duration_seconds=duration,
                 candidate=candidate,
