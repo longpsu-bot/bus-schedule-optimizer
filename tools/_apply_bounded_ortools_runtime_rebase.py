@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 path = Path("src/bus_schedule_engine/optimization_service.py")
 text = path.read_text(encoding="utf-8")
@@ -92,21 +93,16 @@ replace_once(
     "    if solver_choice == SolverChoice.OR_TOOLS:",
 )
 
-# The first two OR-Tools quality builder calls after the heuristic branch are the OR_TOOLS and BOTH paths.
-needle = (
-    "evaluation_policy=effective_evaluation_policy,\n"
-    "                solver_policy=solver_policy,\n"
-    "                **enforcement_request_arguments,"
+pattern = re.compile(
+    r"(build_ortools_service_quality_request_v1\(\n(?:.|\n)*?evaluation_policy=effective_evaluation_policy,\n\s*)"
+    r"solver_policy=solver_policy,",
+    re.MULTILINE,
 )
-if text.count(needle) != 2:
-    raise SystemExit(f"Expected two OR-Tools solver_policy call sites, found {text.count(needle)}")
-text = text.replace(
-    needle,
-    "evaluation_policy=effective_evaluation_policy,\n"
-    "                solver_policy=effective_ortools_policy,\n"
-    "                **enforcement_request_arguments,",
-    2,
-)
+text, count = pattern.subn(r"\1solver_policy=effective_ortools_policy,", text)
+if count != 2:
+    raise SystemExit(f"Expected exactly two OR-Tools builder call sites, found {count}")
+if "build_heuristic_schedule_request_v1" not in text or text.count("solver_policy=effective_ortools_policy") != 2:
+    raise SystemExit("Unexpected runtime-policy patch shape")
 
 replace_once(
     "            _BOTH_SOLVER_BUDGET_LIMITATION,\n"
