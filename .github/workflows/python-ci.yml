@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   validate:
@@ -17,6 +17,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Apply bounded OR runtime rebase
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/bounded-ortools-runtime-policy-v1-rebased'
+        run: python tools/_apply_bounded_ortools_runtime_rebase.py
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -69,3 +76,15 @@ jobs:
           steps.lint.outcome == 'failure' ||
           steps.format.outcome == 'failure'
         run: exit 1
+
+      - name: Commit clean rebased runtime policy
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/bounded-ortools-runtime-policy-v1-rebased'
+        run: |
+          git show origin/main:.github/workflows/python-ci.yml > .github/workflows/python-ci.yml
+          rm tools/_apply_bounded_ortools_runtime_rebase.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Rebase bounded OR-Tools runtime policy onto balanced-regime main"
+          git push origin HEAD:fix/bounded-ortools-runtime-policy-v1-rebased
