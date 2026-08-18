@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -104,7 +105,7 @@ def test_ordinary_ortools_execution_injects_default_budget(
 
     def quality_builder(*args, **kwargs):
         captured.append(kwargs["solver_policy"])
-        return object(), object()
+        return SimpleNamespace(problem=object()), object()
 
     monkeypatch.setattr(
         optimization_service,
@@ -133,14 +134,15 @@ def test_both_bounds_only_ortools_when_no_policy_is_supplied(
     imported, options = _forced_fixed_resource(monkeypatch)
     captured = {"heuristic": object(), "ortools": object()}
     outcome = _unknown_outcome()
+    quality_problem = object()
 
     def heuristic_builder(*args, **kwargs):
         captured["heuristic"] = kwargs["solver_policy"]
-        return object(), object()
+        return SimpleNamespace(problem=object()), object()
 
     def quality_builder(*args, **kwargs):
         captured["ortools"] = kwargs["solver_policy"]
-        return object(), object()
+        return SimpleNamespace(problem=quality_problem), object()
 
     monkeypatch.setattr(
         optimization_service,
@@ -202,7 +204,7 @@ def test_explicit_finite_budget_reaches_ortools_unchanged(
 
     def quality_builder(*args, **kwargs):
         captured.append(kwargs["solver_policy"])
-        return object(), object()
+        return SimpleNamespace(problem=object()), object()
 
     monkeypatch.setattr(
         optimization_service,
