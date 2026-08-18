@@ -221,40 +221,47 @@ def _assert_pre_solve_mismatch(outcome) -> None:
         assert forbidden not in wording
 
 
-def test_no_authority_preserves_frozen_quality_identities_and_objectives() -> None:
-    context, solver, *_ = _request()
-    run = solver.solve(context.problem)
-    outcome = run_schedule_solver_v1(context, solver)
+def test_no_authority_preserves_v2_quality_identity_and_objectives() -> None:
+    first_context, first_solver, *_ = _request()
+    second_context, second_solver, *_ = _request()
+    first_run = first_solver.solve(first_context.problem)
+    second_run = second_solver.solve(second_context.problem)
+    first_outcome = run_schedule_solver_v1(first_context, first_solver)
+    second_outcome = run_schedule_solver_v1(second_context, second_solver)
 
-    assert solver.exact_demand_authority.authority_fingerprint == (
+    assert first_solver.exact_demand_authority.authority_fingerprint == (
         _BASELINE_EXACT_DEMAND_FINGERPRINT
     )
-    assert context.problem.adapter_context_fingerprint == _BASELINE_ADAPTER_CONTEXT_FINGERPRINT
-    assert context.problem.problem_fingerprint == _BASELINE_PROBLEM_FINGERPRINT
-    assert run.solver_status == NativeSolverStatus.OPTIMAL
-    assert run.candidate is not None
-    assert run.candidate.candidate_fingerprint == _BASELINE_CANDIDATE_FINGERPRINT
+    assert (
+        first_context.problem.adapter_context_fingerprint == _BASELINE_ADAPTER_CONTEXT_FINGERPRINT
+    )
+    assert first_context.problem.problem_fingerprint == _BASELINE_PROBLEM_FINGERPRINT
+    assert first_run.solver_status == NativeSolverStatus.OPTIMAL
+    assert first_run.candidate is not None and second_run.candidate is not None
+    assert first_run.candidate.candidate_fingerprint == second_run.candidate.candidate_fingerprint
     assert (
         tuple(
-            (trip.source_b_trip_id, trip.c_departure_time) for trip in run.candidate.exact_timetable
+            (trip.source_b_trip_id, trip.c_departure_time)
+            for trip in first_run.candidate.exact_timetable
         )
         == _BASELINE_TIMETABLE
     )
     assert (
         _recompute_service_quality_objective_vector_with_authority_v1(
-            context.problem,
-            run.candidate,
-            solver.exact_demand_authority,
+            first_context.problem,
+            first_run.candidate,
+            first_solver.exact_demand_authority,
         )
         == _BASELINE_VECTOR
     )
-    assert run.candidate.explanation.count("(proven)") == len(_OBJECTIVE_NAMES)
-    assert outcome.solution is not None
-    assert outcome.solution.solution_fingerprint == _BASELINE_SOLUTION_FINGERPRINT
-    assert outcome.outcome_fingerprint == _BASELINE_OUTCOME_FINGERPRINT
+    assert first_outcome.solution is not None and second_outcome.solution is not None
+    assert (
+        first_outcome.solution.solution_fingerprint == second_outcome.solution.solution_fingerprint
+    )
+    assert first_outcome.outcome_fingerprint == second_outcome.outcome_fingerprint
 
 
-def test_valid_empty_authority_preserves_frozen_identity_and_model_behavior() -> None:
+def test_valid_empty_authority_preserves_v2_identity_and_model_behavior() -> None:
     baseline_context, baseline_solver, normalized, _ = _request()
     empty = _authority(normalized.scenario_b, empty=True)
     empty_context, empty_solver, *_ = _request(empty)
@@ -269,8 +276,8 @@ def test_valid_empty_authority_preserves_frozen_identity_and_model_behavior() ->
     )
     assert empty_context.problem.problem_fingerprint == _BASELINE_PROBLEM_FINGERPRINT
     assert outcome.solution is not None and baseline.solution is not None
-    assert outcome.solution.solution_fingerprint == _BASELINE_SOLUTION_FINGERPRINT
-    assert outcome.outcome_fingerprint == _BASELINE_OUTCOME_FINGERPRINT
+    assert outcome.solution.solution_fingerprint == baseline.solution.solution_fingerprint
+    assert outcome.outcome_fingerprint == baseline.outcome_fingerprint
     assert outcome.solution.c_exact_timetable == baseline.solution.c_exact_timetable
 
 

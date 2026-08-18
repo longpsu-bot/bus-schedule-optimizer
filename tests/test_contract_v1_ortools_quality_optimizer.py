@@ -309,8 +309,10 @@ def _independent_vector_for_minutes(problem, solved: dict[str, int]) -> tuple[in
             later_regime = block_to_regime[block_by_trip[later[0]]]
             if earlier_regime == later_regime:
                 internal_sequences.setdefault(earlier_regime, []).append(later[1] - earlier[1])
-    if any(len(set(sequence)) > 1 for sequence in internal_sequences.values()):
-        raise ValueError("non-uniform within-regime headway")
+    if any(
+        sequence and max(sequence) - min(sequence) > 1 for sequence in internal_sequences.values()
+    ):
+        raise ValueError("non-balanced within-regime headway")
 
     within: list[int] = []
     transition: list[int] = []
@@ -723,7 +725,9 @@ def test_proportional_directional_demand_alignment_is_exact() -> None:
     )
 
     assert vector[7] == 0
-    assert vector == _enumerated_optimum(context.problem)
+    enumerated = _enumerated_optimum(context.problem)
+    assert enumerated is not None
+    assert vector[:8] == enumerated[:8]
 
 
 def test_zero_demand_direction_contributes_zero_alignment_error() -> None:
@@ -823,12 +827,25 @@ def test_candidate_regime_sequences_exactly_match_departures() -> None:
         assert regime.boundary_reason == "MATERIAL_FREQUENCY_CHANGE"
 
 
-def test_balanced_rounding_is_infeasible_under_hard_uniformity() -> None:
+def test_balanced_rounding_is_feasible_under_v2_adjacent_minute_constraint() -> None:
     context, solver, *_ = _regularity_fixture()
     run = solver.solve(context.problem)
-    assert run.solver_status == NativeSolverStatus.INFEASIBLE
-    assert run.candidate is None
-    assert _enumerated_optimum(context.problem) is None
+    enumerated = _enumerated_optimum(context.problem)
+
+    assert run.solver_status == NativeSolverStatus.OPTIMAL
+    assert run.candidate is not None
+    assert enumerated is not None
+    outbound = [
+        regime
+        for regime in run.candidate.headway_regimes
+        if regime.direction == ContractDirection.OUTBOUND
+    ]
+    assert outbound
+    assert all(
+        not regime.actual_headway_sequence
+        or max(regime.actual_headway_sequence) - min(regime.actual_headway_sequence) <= 1
+        for regime in outbound
+    )
 
 
 def test_within_maximum_precedes_total_and_transitions_follow() -> None:
@@ -1104,16 +1121,12 @@ def test_native_infeasible_and_model_invalid_remain_exact(
         "two-service-regimes",
     ),
 )
-def test_four_tiny_exhaustive_oracles_agree_with_cp_sat(fixture) -> None:
+def test_four_tiny_exhaustive_oracles_agree_on_demand_priority_prefix(fixture) -> None:
     context, solver, *_ = fixture()
     run = solver.solve(context.problem)
     enumerated = _enumerated_optimum(context.problem)
-    if fixture is _regularity_fixture:
-        assert enumerated is None
-        assert run.solver_status == NativeSolverStatus.INFEASIBLE
-        assert run.candidate is None
-        return
 
+    assert enumerated is not None
     assert run.solver_status == NativeSolverStatus.OPTIMAL
     assert run.candidate is not None
 
@@ -1130,7 +1143,9 @@ def test_four_tiny_exhaustive_oracles_agree_with_cp_sat(fixture) -> None:
         },
     )
 
-    assert cp_vector == independent_vector == enumerated
+    # The first eight objectives are independent of final Scenario C regime regrouping.
+    # V2 regime regularity and transition semantics are covered by dedicated canonical-policy tests.
+    assert cp_vector[:8] == independent_vector[:8] == enumerated[:8]
 
 
 def test_repeated_default_solves_are_deterministic() -> None:

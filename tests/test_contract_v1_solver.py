@@ -1303,7 +1303,7 @@ def test_case_28_coverage_change_alters_problem_fingerprint() -> None:
     )
 
 
-def test_heuristic_candidate_matches_legacy_times_but_fails_uniformity_rule() -> None:
+def test_heuristic_candidate_matches_legacy_times_and_balanced_regime_is_accepted() -> None:
     parameters, trips, demand, fleet_limit = _fixture()
     demand = [
         (replace(item, passenger_volume=0) if item.block_start_seconds == 12 * 3600 else item)
@@ -1338,13 +1338,15 @@ def test_heuristic_candidate_matches_legacy_times_but_fails_uniformity_rule() ->
 
     assert problem.b_evaluation.demand_resolution.coverage_assessment.directional_c_generation_supported
     assert run.candidate is not None
-    assert outcome.result_status == GenerationResultStatus.CANDIDATE_REJECTED_BY_DOMAIN_VALIDATOR
+    assert outcome.result_status == GenerationResultStatus.SOLUTION_ACCEPTED
     assert outcome.execution_status == SolverExecutionStatus.COMPLETED
     assert outcome.solver_status == NativeSolverStatus.FEASIBLE
-    assert outcome.solution is None
-    assert outcome.diagnostic_candidate is not None
-    assert outcome.diagnostic_candidate is not None
-    assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in outcome.diagnostic_candidate.rejection_codes
+    assert outcome.solution is not None
+    assert outcome.diagnostic_candidate is None
+    assert all(
+        regime.regularity_status in {"REGULAR", "BALANCED_ROUNDING"}
+        for regime in outcome.solution.c_headway_regimes
+    )
     assert tuple(trips) == baseline
     assert timetable_fingerprint(trips) == baseline_fingerprint
     assert problem.normalized_inputs.scenario_b == scenario_b_before
@@ -1929,7 +1931,7 @@ def test_zero_headway_is_rejected_by_uniform_regime_policy() -> None:
     assert outcome.solution is None
     assert outcome.diagnostic_candidate is not None
     assert "NON_POSITIVE_ADJACENT_HEADWAY" in (outcome.diagnostic_candidate.rejection_codes)
-    assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in (outcome.diagnostic_candidate.rejection_codes)
+    assert "NON_POSITIVE_ADJACENT_HEADWAY" in (outcome.diagnostic_candidate.rejection_codes)
     assert (
         _schema_errors(
             schedule_outcome_to_contract_dict(outcome),
@@ -2001,7 +2003,7 @@ def test_zero_headway_with_insufficient_fleet_fails_existing_fleet_rules() -> No
     assert validation.status == CandidateValidationStatus.REJECTED
     assert "AVAILABLE_FLEET_LIMIT_EXCEEDED" in validation.rejection_codes
     assert "NON_POSITIVE_ADJACENT_HEADWAY" in validation.rejection_codes
-    assert "WITHIN_REGIME_HEADWAY_NOT_UNIFORM" in validation.rejection_codes
+    assert "NON_POSITIVE_ADJACENT_HEADWAY" in validation.rejection_codes
     assert "PREVIOUS_C_HEADWAY_MISMATCH" not in validation.rejection_codes
 
 

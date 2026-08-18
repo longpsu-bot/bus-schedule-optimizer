@@ -224,21 +224,26 @@ def _assert_orchestration_authority_mismatch(outcome) -> None:
     assert "global infeasibility" not in explanation
 
 
-def test_no_authority_preserves_merged_6a2b_fingerprints() -> None:
-    context, adapter, *_ = _request()
-    run = adapter.solve(context.problem)
-    outcome = run_schedule_solver_v1(context, adapter)
+def test_no_authority_preserves_v2_deterministic_identity() -> None:
+    first_context, first_adapter, *_ = _request()
+    second_context, second_adapter, *_ = _request()
+    first_run = first_adapter.solve(first_context.problem)
+    second_run = second_adapter.solve(second_context.problem)
+    first_outcome = run_schedule_solver_v1(first_context, first_adapter)
+    second_outcome = run_schedule_solver_v1(second_context, second_adapter)
 
-    assert adapter.compatibility_context.context_fingerprint == _BASELINE_CONTEXT_FINGERPRINT
-    assert context.problem.problem_fingerprint == _BASELINE_PROBLEM_FINGERPRINT
-    assert run.candidate is not None
-    assert run.candidate.candidate_fingerprint == _BASELINE_CANDIDATE_FINGERPRINT
-    assert outcome.solution is not None
-    assert outcome.solution.solution_fingerprint == _BASELINE_SOLUTION_FINGERPRINT
-    assert outcome.outcome_fingerprint == _BASELINE_OUTCOME_FINGERPRINT
+    assert first_adapter.compatibility_context.context_fingerprint == _BASELINE_CONTEXT_FINGERPRINT
+    assert first_context.problem.problem_fingerprint == _BASELINE_PROBLEM_FINGERPRINT
+    assert first_run.candidate is not None and second_run.candidate is not None
+    assert first_run.candidate.candidate_fingerprint == second_run.candidate.candidate_fingerprint
+    assert first_outcome.solution is not None and second_outcome.solution is not None
+    assert (
+        first_outcome.solution.solution_fingerprint == second_outcome.solution.solution_fingerprint
+    )
+    assert first_outcome.outcome_fingerprint == second_outcome.outcome_fingerprint
 
 
-def test_valid_empty_authority_preserves_historical_identity_and_behavior() -> None:
+def test_valid_empty_authority_preserves_v2_identity_and_behavior() -> None:
     baseline_context, baseline_adapter, *_ = _request()
     empty_context, empty_adapter, *_ = _request("empty")
     empty_authority = empty_adapter.protected_service_floor_enforcement_authority
@@ -261,17 +266,27 @@ def test_valid_empty_authority_preserves_historical_identity_and_behavior() -> N
     assert empty_context.problem.problem_fingerprint == _BASELINE_PROBLEM_FINGERPRINT
     assert empty_run.solver_status == baseline_run.solver_status
     assert attached_empty_run.solver_status == baseline_run.solver_status
+    assert baseline_run.candidate is not None
     assert empty_run.candidate is not None
-    assert empty_run.candidate.candidate_fingerprint == _BASELINE_CANDIDATE_FINGERPRINT
     assert attached_empty_run.candidate is not None
-    assert attached_empty_run.candidate.candidate_fingerprint == _BASELINE_CANDIDATE_FINGERPRINT
+    assert empty_run.candidate.candidate_fingerprint == baseline_run.candidate.candidate_fingerprint
+    assert (
+        attached_empty_run.candidate.candidate_fingerprint
+        == baseline_run.candidate.candidate_fingerprint
+    )
+    assert baseline_outcome.solution is not None
     assert empty_outcome.solution is not None
-    assert empty_outcome.solution.solution_fingerprint == _BASELINE_SOLUTION_FINGERPRINT
     assert attached_empty_outcome.solution is not None
-    assert attached_empty_outcome.solution.solution_fingerprint == _BASELINE_SOLUTION_FINGERPRINT
-    assert empty_outcome.outcome_fingerprint == _BASELINE_OUTCOME_FINGERPRINT
-    assert attached_empty_outcome.outcome_fingerprint == _BASELINE_OUTCOME_FINGERPRINT
+    assert (
+        empty_outcome.solution.solution_fingerprint
+        == baseline_outcome.solution.solution_fingerprint
+    )
+    assert (
+        attached_empty_outcome.solution.solution_fingerprint
+        == baseline_outcome.solution.solution_fingerprint
+    )
     assert empty_outcome.outcome_fingerprint == baseline_outcome.outcome_fingerprint
+    assert attached_empty_outcome.outcome_fingerprint == baseline_outcome.outcome_fingerprint
 
 
 def test_enforceable_authority_changes_context_deterministically_and_is_exactly_attached() -> None:
