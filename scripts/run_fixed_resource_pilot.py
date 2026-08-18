@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import asdict, is_dataclass
+from dataclasses import fields, is_dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -25,7 +25,7 @@ def _jsonable(value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
     if is_dataclass(value):
-        return {key: _jsonable(item) for key, item in asdict(value).items()}
+        return {field.name: _jsonable(getattr(value, field.name)) for field in fields(value)}
     if isinstance(value, dict):
         return {str(key): _jsonable(item) for key, item in value.items()}
     if isinstance(value, (tuple, list, set)):
