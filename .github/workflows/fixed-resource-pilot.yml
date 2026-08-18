@@ -1,38 +1,56 @@
 name: Fixed-resource pilot
 
 on:
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       route6_url:
         description: Temporary URL for Engine_Input_MST_6.xlsx
-        required: true
+        required: false
         type: string
       route10_url:
         description: Temporary URL for Engine_Input_MST_10.xlsx
-        required: true
+        required: false
         type: string
 
 permissions:
   contents: read
 
 jobs:
+  validate-runner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: python -m pip install -e '.[dev]'
+      - name: Compile pilot runner
+        run: python -m py_compile scripts/run_fixed_resource_pilot.py
+      - name: Ruff pilot runner
+        run: python -m ruff check scripts/run_fixed_resource_pilot.py
+
   pilot:
+    if: github.event_name == 'workflow_dispatch' && inputs.route6_url != '' && inputs.route10_url != ''
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: pilot/mst6-mst10-fixed-resource
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
-
       - name: Install
         run: python -m pip install -e '.[dev]'
-
       - name: Download private pilot inputs
         env:
           ROUTE6_URL: ${{ inputs.route6_url }}
@@ -40,21 +58,14 @@ jobs:
         run: |
           curl --fail --location --silent --show-error "$ROUTE6_URL" --output /tmp/Engine_Input_MST_6.xlsx
           curl --fail --location --silent --show-error "$ROUTE10_URL" --output /tmp/Engine_Input_MST_10.xlsx
-
       - name: Run route 6 BOTH
         run: |
-          python scripts/run_fixed_resource_pilot.py \
-            /tmp/Engine_Input_MST_6.xlsx \
-            --source-id MST6-PILOT-202607 \
-            --output /tmp/pilot-results/mst6.json
-
+          python scripts/run_fixed_resource_pilot.py /tmp/Engine_Input_MST_6.xlsx \
+            --source-id MST6-PILOT-202607 --output /tmp/pilot-results/mst6.json
       - name: Run route 10 BOTH
         run: |
-          python scripts/run_fixed_resource_pilot.py \
-            /tmp/Engine_Input_MST_10.xlsx \
-            --source-id MST10-PILOT-202607 \
-            --output /tmp/pilot-results/mst10.json
-
+          python scripts/run_fixed_resource_pilot.py /tmp/Engine_Input_MST_10.xlsx \
+            --source-id MST10-PILOT-202607 --output /tmp/pilot-results/mst10.json
       - name: Upload pilot results
         if: always()
         uses: actions/upload-artifact@v4
