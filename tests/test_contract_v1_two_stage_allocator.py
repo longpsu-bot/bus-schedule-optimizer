@@ -11,6 +11,7 @@ from bus_schedule_engine.contracts_v1 import (
     DemandAllocationAuthorityModeV1,
     DemandConfidence,
     FinalAcceptanceStateV1,
+    GenerationResultStatus,
     NativeSolverStatus,
     NormalizationOptions,
     OperatingDayType,
@@ -18,7 +19,11 @@ from bus_schedule_engine.contracts_v1 import (
     ScenarioCOptimizationModeV1,
     ServiceBoundarySemanticsV1,
     SolverPolicyV1,
+    Stage1AllocationResultV1,
     Stage2ConstraintFamilyV1,
+    Stage2InfeasibilityDiagnosticV1,
+    Stage2TimetableResultV1,
+    TripAllocationSolveStatusV1,
     UniformIntegerRegimePolicyV3,
     allocate_trips_stage_1_v1,
     build_schedule_generation_context_v1,
@@ -28,6 +33,8 @@ from bus_schedule_engine.contracts_v1 import (
     calculate_positive_demand_service_gap_minutes_v1,
     calculate_two_stage_quality_vector_v1,
     evaluate_scenario_b_v1,
+    finalize_allocation_plan,
+    finalize_stage_2_infeasibility_diagnostic,
     find_representable_uniform_regime_v1,
     normalize_imported_workbook_v1,
     run_two_stage_scenario_c_v1,
@@ -37,6 +44,7 @@ from bus_schedule_engine.contracts_v1 import (
     two_stage_result_to_contract_dict_v1,
     validate_and_build_solution_v1,
 )
+from bus_schedule_engine.contracts_v1 import two_stage_solver as two_stage_solver_module
 from bus_schedule_engine.importer import ImportedWorkbook
 from bus_schedule_engine.models import (
     DemandRecord,
@@ -578,7 +586,11 @@ def test_two_stage_adapter_shares_one_finite_budget_and_bounds_allocation_retrie
 
     result = run_two_stage_scenario_c_v1(context, solver)
 
-    assert result.final_acceptance_state in set(FinalAcceptanceStateV1)
+    assert result.native_solver_status in {
+        NativeSolverStatus.OPTIMAL,
+        NativeSolverStatus.FEASIBLE,
+    }
+    assert result.final_acceptance_state != FinalAcceptanceStateV1.NO_FINAL_C_WITHIN_SOLVE_BUDGET
     assert result.diagnostics.total_budget_seconds == 2.0
     assert result.diagnostics.solve_duration_stage_1 <= 0.7 + 0.1
     assert result.diagnostics.stage_2_allocation_attempt_count <= 2
@@ -613,6 +625,165 @@ def test_two_stage_adapter_shares_one_finite_budget_and_bounds_allocation_retrie
     assert artifact["solve_diagnostics"]["stage_2_infeasibility_diagnostics"] == []
 
 
+def test_bounded_stage_2_infeasibility_is_unknown_without_losing_plan_diagnostics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, _, normalized, evaluation, evaluation_policy = _stage1_request()
+    policy = UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=2)
+    context, solver = build_two_stage_uniform_request_v1(
+        normalized,
+        evaluation,
+        evaluation_policy=evaluation_policy,
+        solver_policy=SolverPolicyV1(time_limit_seconds=5.0),
+        uniform_regime_policy=policy,
+    )
+    seed_stage_1 = allocate_trips_stage_1_v1(
+        context.problem,
+        solver.demand_authority,
+        policy=policy,
+        time_limit_seconds=2.0,
+    )
+    assert seed_stage_1.plans
+    first_plan = seed_stage_1.plans[0]
+    second_plan = finalize_allocation_plan(replace(first_plan, rank=2, allocation_fingerprint=""))
+    bounded_stage_1 = Stage1AllocationResultV1(
+        solve_status=TripAllocationSolveStatusV1.FEASIBLE,
+        plans=(first_plan, second_plan),
+        candidate_count=12,
+        admissible_allocation_count=2,
+        necessary_feasibility_pruned_count=8,
+        pruned_necessary_feasibility=(),
+        solve_duration_seconds=0.01,
+        budget_exhausted=False,
+        explanations=("Stage 1 returned the configured bounded top-N plan set.",),
+        limitations=("Additional authorized Stage 1 allocations may exist.",),
+    )
+    attempts: list[Stage2TimetableResultV1] = []
+
+    def prove_fixed_plan_infeasible(
+        problem,
+        plan,
+        **_kwargs,
+    ) -> Stage2TimetableResultV1:
+        diagnostic = finalize_stage_2_infeasibility_diagnostic(
+            Stage2InfeasibilityDiagnosticV1(
+                allocation_plan_fingerprint=plan.allocation_fingerprint,
+                native_solver_status=NativeSolverStatus.INFEASIBLE,
+                constraint_families=(Stage2ConstraintFamilyV1.FLEET,),
+                explanation=(
+                    "Stage 2 proved this allocation plan infeasible under the encoded constraints."
+                ),
+            )
+        )
+        attempt = Stage2TimetableResultV1(
+            solver_status=NativeSolverStatus.INFEASIBLE,
+            candidate=None,
+            allocation_plan=plan,
+            solve_duration_seconds=0.01,
+            variable_count=1,
+            constraint_count=1,
+            maximum_departure_domain_width_minutes=1,
+            full_service_window_domain_count=0,
+            infeasibility_diagnostic=diagnostic,
+            explanations=(diagnostic.explanation,),
+            limitations=(),
+        )
+        attempts.append(attempt)
+        return attempt
+
+    monkeypatch.setattr(
+        two_stage_solver_module,
+        "solve_exact_timetable_stage_2_v1",
+        prove_fixed_plan_infeasible,
+    )
+    monkeypatch.setattr(
+        two_stage_solver_module,
+        "allocate_trips_stage_1_v1",
+        lambda *_args, **_kwargs: bounded_stage_1,
+    )
+
+    result = run_two_stage_scenario_c_v1(context, solver)
+
+    assert len(attempts) == policy.maximum_stage_1_alternative_plans
+    assert all(item.solver_status == NativeSolverStatus.INFEASIBLE for item in attempts)
+    assert result.native_solver_status == NativeSolverStatus.UNKNOWN
+    assert result.final_acceptance_state == FinalAcceptanceStateV1.NO_FINAL_C_WITHIN_SOLVE_BUDGET
+    assert result.candidate_outcome is not None
+    assert result.candidate_outcome.result_status == (
+        GenerationResultStatus.C_NOT_FOUND_WITHIN_SOLVE_LIMIT
+    )
+    assert result.candidate_outcome.result_status != (
+        GenerationResultStatus.NO_FEASIBLE_C_WITH_B_PARAMETERS
+    )
+    assert not result.diagnostics.budget_exhausted
+    assert len(result.diagnostics.stage_2_infeasibility_diagnostics) == len(attempts)
+    assert all(
+        item.native_solver_status == NativeSolverStatus.INFEASIBLE
+        for item in result.diagnostics.stage_2_infeasibility_diagnostics
+    )
+    assert any(
+        "All bounded Stage 2 allocation plans attempted in this run were proven infeasible." in item
+        for item in result.explanations
+    )
+    assert any("bounded-plan exhaustion is not a timeout" in item for item in result.explanations)
+    assert any(
+        "This does not prove that no feasible Scenario C exists under the locked Scenario B "
+        "parameters." in item
+        for item in (*result.explanations, *result.limitations)
+    )
+
+    artifact = two_stage_result_to_contract_dict_v1(result)
+    assert artifact["native_solver_status"] == "UNKNOWN"
+    assert artifact["final_acceptance_state"] == "NO_FINAL_C_WITHIN_SOLVE_BUDGET"
+    serialized_diagnostics = artifact["solve_diagnostics"]["stage_2_infeasibility_diagnostics"]
+    assert len(serialized_diagnostics) == len(attempts)
+    assert all(item["native_solver_status"] == "INFEASIBLE" for item in serialized_diagnostics)
+
+
+def test_exhaustive_stage_1_infeasibility_remains_aggregate_infeasible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, _, normalized, evaluation, evaluation_policy = _stage1_request()
+    context, solver = build_two_stage_uniform_request_v1(
+        normalized,
+        evaluation,
+        evaluation_policy=evaluation_policy,
+        solver_policy=SolverPolicyV1(time_limit_seconds=2.0),
+    )
+
+    def prove_complete_stage_1_model_infeasible(*_args, **_kwargs) -> Stage1AllocationResultV1:
+        return Stage1AllocationResultV1(
+            solve_status=TripAllocationSolveStatusV1.INFEASIBLE,
+            plans=(),
+            candidate_count=0,
+            admissible_allocation_count=0,
+            necessary_feasibility_pruned_count=0,
+            pruned_necessary_feasibility=(),
+            solve_duration_seconds=0.01,
+            budget_exhausted=False,
+            explanations=(
+                "Stage 1 CP-SAT proved the complete encoded allocation model infeasible.",
+            ),
+            limitations=(),
+        )
+
+    monkeypatch.setattr(
+        two_stage_solver_module,
+        "allocate_trips_stage_1_v1",
+        prove_complete_stage_1_model_infeasible,
+    )
+
+    result = run_two_stage_scenario_c_v1(context, solver)
+
+    assert result.native_solver_status == NativeSolverStatus.INFEASIBLE
+    assert result.final_acceptance_state == FinalAcceptanceStateV1.NO_FINAL_C_WITHIN_SOLVE_BUDGET
+    assert result.candidate_outcome is not None
+    assert result.candidate_outcome.result_status == (
+        GenerationResultStatus.NO_FEASIBLE_C_WITH_B_PARAMETERS
+    )
+    assert result.diagnostics.stage_2_allocation_attempt_count == 0
+
+
 def test_budget_timeout_is_truthfully_unknown_not_infeasible() -> None:
     _, _, normalized, evaluation, evaluation_policy = _stage1_request()
     context, solver = build_two_stage_uniform_request_v1(
@@ -622,11 +793,16 @@ def test_budget_timeout_is_truthfully_unknown_not_infeasible() -> None:
         solver_policy=SolverPolicyV1(time_limit_seconds=0.000001),
     )
 
-    detailed = solver.solve_detailed(context.problem)
+    result = run_two_stage_scenario_c_v1(context, solver)
+    detailed = solver.last_detailed_run
 
+    assert detailed is not None
     assert detailed.solver_run.solver_status == NativeSolverStatus.UNKNOWN
     assert not detailed.stage_1_result.plans
     assert detailed.diagnostics.stage_2_allocation_attempt_count == 0
+    assert result.native_solver_status == NativeSolverStatus.UNKNOWN
+    assert result.final_acceptance_state == FinalAcceptanceStateV1.NO_FINAL_C_WITHIN_SOLVE_BUDGET
+    assert not any("bounded-plan exhaustion" in item for item in result.explanations)
 
 
 def test_v3_thresholds_bind_problem_solution_and_artifact_identities() -> None:

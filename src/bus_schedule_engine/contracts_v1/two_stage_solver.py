@@ -77,6 +77,9 @@ TWO_STAGE_ADAPTER_CONTEXT_MISMATCH = "TWO_STAGE_ADAPTER_CONTEXT_MISMATCH"
 TWO_STAGE_TOTAL_BUDGET_REQUIRED = "TWO_STAGE_TOTAL_BUDGET_REQUIRED"
 _DEFAULT_TOTAL_BUDGET_SECONDS = 120.0
 _STAGE_1_BUDGET_SHARE = 0.35
+_BOUNDED_STAGE_1_PLANS_EXHAUSTED_WITHOUT_FEASIBLE_C = (
+    "BOUNDED_STAGE_1_PLANS_EXHAUSTED_WITHOUT_FEASIBLE_C"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1042,6 +1045,9 @@ class OrToolsCpSatTwoStageUniformSolver:
             selected_plan = stage_1.plans[0] if stage_1.plans else None
             candidate = None
             tails = ()
+            bounded_stage_2_plans_proven_infeasible = bool(attempts) and all(
+                attempt.solver_status == NativeSolverStatus.INFEASIBLE for attempt in attempts
+            )
             if not stage_1.plans:
                 solver_status = (
                     NativeSolverStatus.INFEASIBLE
@@ -1052,24 +1058,35 @@ class OrToolsCpSatTwoStageUniformSolver:
                     }
                     else NativeSolverStatus.UNKNOWN
                 )
-            elif attempts and all(
-                attempt.solver_status == NativeSolverStatus.INFEASIBLE for attempt in attempts
-            ):
-                solver_status = NativeSolverStatus.INFEASIBLE
             else:
+                # Stage 1 exposes a bounded top-N plan set, not an exhaustive proof that no
+                # other authorized allocation exists.  Preserve each fixed-plan INFEASIBLE
+                # result below, but do not promote those local proofs to aggregate infeasibility.
                 solver_status = NativeSolverStatus.UNKNOWN
             explanations = (
                 *stage_1.explanations,
                 *(item for attempt in attempts for item in attempt.explanations),
             )
             limitations = stage_1.limitations
-            if attempts and all(
-                attempt.solver_status == NativeSolverStatus.INFEASIBLE for attempt in attempts
-            ):
+            if bounded_stage_2_plans_proven_infeasible:
+                explanations = (
+                    *explanations,
+                    f"{_BOUNDED_STAGE_1_PLANS_EXHAUSTED_WITHOUT_FEASIBLE_C}: All bounded "
+                    "Stage 2 allocation plans attempted in this run were proven infeasible.",
+                    "This does not prove that no feasible Scenario C exists under the locked "
+                    "Scenario B parameters.",
+                )
+                if total_duration < total_budget:
+                    explanations = (
+                        *explanations,
+                        "The finite total solve budget was not exhausted; bounded-plan "
+                        "exhaustion is not a timeout.",
+                    )
                 limitations = (
                     *limitations,
-                    "Only the bounded Stage 1 allocation plans passed to Stage 2 were proven "
-                    "infeasible; this is not a claim of global route or timetable infeasibility.",
+                    "All bounded Stage 2 allocation plans attempted in this run were proven "
+                    "infeasible. This does not prove that no feasible Scenario C exists under "
+                    "the locked Scenario B parameters.",
                 )
         run = SolverRunResultV1(
             execution_status=SolverExecutionStatus.COMPLETED,
