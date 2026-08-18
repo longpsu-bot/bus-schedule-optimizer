@@ -13,6 +13,10 @@ headway must be either `floor(H)` or `ceil(H)`, their sum must equal the regime 
 maximum and minimum internal headways may differ by at most one minute. Accepted statuses are
 `UNIFORM` and `BALANCED_ROUNDING`.
 
+Regression tests must therefore treat adjacent-minute sequences such as 10/11 minutes as valid
+balanced rounding; genuinely irregular sequences require internal variation greater than one
+minute or another explicit representability violation.
+
 ## Boundary repair and maximality
 
 Canonical construction begins from demand-phase membership. A singleton phase is tested against
