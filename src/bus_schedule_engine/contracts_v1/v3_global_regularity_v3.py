@@ -9,9 +9,10 @@ the analytical horizon.
 V3 carries that same bounded phase into source-slice construction. It chooses deterministic
 per-block realized counts near Scenario B while preserving +/-1 block deviation, +/-1
 cumulative deviation, positive-demand service, and zero final drift. Regime-local membership
-no longer requires an artificial zero drift at every regime boundary; the existing independent
-necessary-feasibility check still enforces cumulative +/-1 and zero drift across the full
-direction.
+no longer requires an artificial zero drift at every regime boundary. The cheap necessary
+feasibility check uses Stage 2 departure domains, rather than one fixed Stage 1 planned witness,
+so it rejects bounded-phase membership only when the permitted domains themselves cannot reach
+an admissible prefix-count path. Exact membership remains Stage 2 CP-SAT authority.
 """
 
 from __future__ import annotations
@@ -29,10 +30,12 @@ from .serialization import canonical_sha256
 GLOBAL_REGULARITY_POLICY_PROFILE_V3 = "scenario_c_global_regularity_policy_v3"
 PHASE_AWARE_SOURCE_SLICING_V3 = True
 REGIME_LOCAL_ZERO_DRIFT_REQUIRED_V3 = False
+NECESSARY_MEMBERSHIP_USES_DEPARTURE_DOMAINS_V3 = True
 
 _INSTALLED = False
 _V2_INITIAL_GROUPS = None
 _V2_EXACT_MEMBERSHIP = None
+_V2_NECESSARY_FEASIBILITY = None
 _V2_POLICY_FINGERPRINT_PROPERTY = None
 _V2_ADAPTER_CONTEXT_FINGERPRINT = None
 
@@ -45,6 +48,9 @@ def _policy_fingerprint_payload() -> dict[str, object]:
         "cumulative_phase_max_deviation_trips": v1.CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1,
         "regime_local_zero_drift_required": REGIME_LOCAL_ZERO_DRIFT_REQUIRED_V3,
         "full_direction_zero_drift_required": True,
+        "necessary_membership_uses_departure_domains": (
+            NECESSARY_MEMBERSHIP_USES_DEPARTURE_DOMAINS_V3
+        ),
         "source_slice_selection": "MINIMIZE_B_BLOCK_COUNT_DEVIATION_THEN_PHASE_MOVEMENT",
     }
 
@@ -206,23 +212,146 @@ def _phase_aware_membership_representation(candidates, group, allocation):
     )
 
 
+def _domain_phase_membership_possible(
+    problem,
+    allocation_blocks,
+    regimes,
+    final_service_sentinels,
+    policy,
+) -> bool:
+    """Return a cheap necessary bounded-phase check over Stage 2 departure domains.
+
+    For every analytical boundary, the reachable number of departures before that boundary
+    must overlap the authoritative cumulative target +/-1. This deliberately does not choose
+    exact minutes; CP-SAT remains responsible for proving simultaneous block membership.
+    """
+    domains, domain_failures = allocator._necessary_departure_domains(
+        problem,
+        regimes,
+        final_service_sentinels,
+        policy,
+    )
+    if domain_failures or len(domains) != problem.scenario_b.total_daily_trips:
+        return False
+
+    directional = allocator._ordered_directional_trips(problem)
+    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
+        rows = []
+        for block in allocation_blocks:
+            counts = dict(block.directional_trip_counts)
+            if direction in counts:
+                rows.append((block, counts[direction]))
+        ordered = sorted(
+            rows,
+            key=lambda item: (item[0].start_minute, item[0].end_minute, item[0].block_id),
+        )
+        if not ordered:
+            continue
+
+        source_domains = tuple(domains[trip.trip_id] for trip in directional[direction])
+        cumulative_target = 0
+        for index, (block, expected) in enumerate(ordered):
+            cumulative_target += expected
+            boundary = block.end_minute
+            mandatory_before = sum(upper < boundary for _, upper in source_domains)
+            possible_before = sum(lower < boundary for lower, _ in source_domains)
+            authority_lower = max(
+                0,
+                cumulative_target - v1.CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1,
+            )
+            authority_upper = min(
+                len(source_domains),
+                cumulative_target + v1.CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1,
+            )
+            if index == len(ordered) - 1:
+                authority_lower = cumulative_target
+                authority_upper = cumulative_target
+            if max(mandatory_before, authority_lower) > min(possible_before, authority_upper):
+                return False
+
+            if block.observed_passengers > 0 and expected > 0:
+                can_serve_block = any(
+                    lower < block.end_minute and upper >= block.start_minute
+                    for lower, upper in source_domains
+                )
+                if not can_serve_block:
+                    return False
+    return True
+
+
+def _phase_aware_necessary_feasibility(
+    problem,
+    allocation,
+    allocation_blocks,
+    regimes,
+    final_service_sentinels,
+    policy,
+):
+    """Keep every V2 necessary failure except a false fixed-witness membership rejection."""
+    assert _V2_NECESSARY_FEASIBILITY is not None
+    result = _V2_NECESSARY_FEASIBILITY(
+        problem,
+        allocation,
+        allocation_blocks,
+        regimes,
+        final_service_sentinels,
+        policy,
+    )
+    membership = models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP
+    if result.passed or membership not in result.constraint_families:
+        return result
+    if not _domain_phase_membership_possible(
+        problem,
+        allocation_blocks,
+        regimes,
+        final_service_sentinels,
+        policy,
+    ):
+        return result
+
+    remaining = tuple(item for item in result.constraint_families if item != membership)
+    passed = not remaining
+    explanation = (
+        "Stage 1 plan passed domain-reachable bounded-phase membership; exact block membership "
+        "is deferred to Stage 2 CP-SAT."
+        if passed
+        else "Stage 1 planned witness was phase-inexact but the departure domains can satisfy "
+        "bounded-phase membership; remaining necessary failures: "
+        + ", ".join(item.value for item in remaining)
+        + "."
+    )
+    return allocator.finalize_stage_1_necessary_feasibility(
+        models.Stage1NecessaryFeasibilityResultV1(
+            allocation_candidate_fingerprint=result.allocation_candidate_fingerprint,
+            passed=passed,
+            constraint_families=remaining,
+            fleet_lower_bound=result.fleet_lower_bound,
+            explanation=explanation,
+            diagnostic_fingerprint="",
+        )
+    )
+
+
 def install_global_regularity_v3() -> None:
-    """Install V2 plus bounded-phase-aware source-slice construction."""
+    """Install V2 plus bounded-phase-aware source slicing and necessary feasibility."""
     global _INSTALLED
     global _V2_ADAPTER_CONTEXT_FINGERPRINT
     global _V2_EXACT_MEMBERSHIP
     global _V2_INITIAL_GROUPS
+    global _V2_NECESSARY_FEASIBILITY
     global _V2_POLICY_FINGERPRINT_PROPERTY
     if _INSTALLED:
         return
     v2.install_global_regularity_v2()
     _V2_INITIAL_GROUPS = allocator._initial_groups
     _V2_EXACT_MEMBERSHIP = allocator._exact_membership_representation
+    _V2_NECESSARY_FEASIBILITY = allocator.evaluate_stage_1_necessary_feasibility_v1
     _V2_POLICY_FINGERPRINT_PROPERTY = models.UniformIntegerRegimePolicyV3.policy_fingerprint
     _V2_ADAPTER_CONTEXT_FINGERPRINT = stage2._adapter_context_fingerprint
 
     allocator._initial_groups = _phase_aware_initial_groups
     allocator._exact_membership_representation = _phase_aware_membership_representation
+    allocator.evaluate_stage_1_necessary_feasibility_v1 = _phase_aware_necessary_feasibility
     models.UniformIntegerRegimePolicyV3.policy_fingerprint = property(_v3_policy_fingerprint)
     stage2._adapter_context_fingerprint = _v3_adapter_context_fingerprint
     _INSTALLED = True
@@ -234,27 +363,32 @@ def uninstall_global_regularity_v3() -> None:
     global _V2_ADAPTER_CONTEXT_FINGERPRINT
     global _V2_EXACT_MEMBERSHIP
     global _V2_INITIAL_GROUPS
+    global _V2_NECESSARY_FEASIBILITY
     global _V2_POLICY_FINGERPRINT_PROPERTY
     if not _INSTALLED:
         return
     assert _V2_INITIAL_GROUPS is not None
     assert _V2_EXACT_MEMBERSHIP is not None
+    assert _V2_NECESSARY_FEASIBILITY is not None
     assert _V2_POLICY_FINGERPRINT_PROPERTY is not None
     assert _V2_ADAPTER_CONTEXT_FINGERPRINT is not None
     allocator._initial_groups = _V2_INITIAL_GROUPS
     allocator._exact_membership_representation = _V2_EXACT_MEMBERSHIP
+    allocator.evaluate_stage_1_necessary_feasibility_v1 = _V2_NECESSARY_FEASIBILITY
     models.UniformIntegerRegimePolicyV3.policy_fingerprint = _V2_POLICY_FINGERPRINT_PROPERTY
     stage2._adapter_context_fingerprint = _V2_ADAPTER_CONTEXT_FINGERPRINT
     _INSTALLED = False
     v2.uninstall_global_regularity_v2()
     _V2_INITIAL_GROUPS = None
     _V2_EXACT_MEMBERSHIP = None
+    _V2_NECESSARY_FEASIBILITY = None
     _V2_POLICY_FINGERPRINT_PROPERTY = None
     _V2_ADAPTER_CONTEXT_FINGERPRINT = None
 
 
 __all__ = [
     "GLOBAL_REGULARITY_POLICY_PROFILE_V3",
+    "NECESSARY_MEMBERSHIP_USES_DEPARTURE_DOMAINS_V3",
     "PHASE_AWARE_SOURCE_SLICING_V3",
     "REGIME_LOCAL_ZERO_DRIFT_REQUIRED_V3",
     "install_global_regularity_v3",
