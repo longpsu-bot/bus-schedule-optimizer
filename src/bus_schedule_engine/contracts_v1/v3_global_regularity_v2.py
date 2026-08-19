@@ -94,7 +94,21 @@ def _protected_floor_for_stream(bundle, direction, block_id: str) -> int:
     return bundle.protected_minimum_by_direction_and_block.get((direction, block_id), 0)
 
 
-def _add_passenger_target_envelopes(problem, bundle) -> None:
+def _final_tail_floor_for_stream(bundle, policy, direction, row, rows) -> int:
+    last_block = max(rows, key=lambda item: (item.end_time, item.block_id))
+    if row.block_id != last_block.block_id:
+        return 0
+    sentinel_directions = {item.direction for item in bundle.final_service_sentinels}
+    minimum = policy.final_service_tail.final_service_tail_minimum_trip_count
+    if direction == ContractDirection.COMBINED:
+        return sum(
+            max(0, minimum - int(candidate in sentinel_directions))
+            for candidate in (ContractDirection.OUTBOUND, ContractDirection.INBOUND)
+        )
+    return max(0, minimum - int(direction in sentinel_directions))
+
+
+def _add_passenger_target_envelopes(problem, bundle, policy) -> None:
     requirements = {item.block_id: item for item in problem.block_requirements}
     total_trips = problem.scenario_b.total_daily_trips
     for direction, rows, analytical_total in v1._demand_target_streams(problem, bundle):
@@ -115,11 +129,19 @@ def _add_passenger_target_envelopes(problem, bundle) -> None:
             target = targets[row.block_id]
             planning_floor = requirements[row.block_id].required_trips_85
             protected_floor = _protected_floor_for_stream(bundle, direction, row.block_id)
+            final_tail_floor = _final_tail_floor_for_stream(
+                bundle,
+                policy,
+                direction,
+                row,
+                rows,
+            )
             lower = max(0, target - PASSENGER_TARGET_ENVELOPE_TRIPS_V2)
             upper = max(
                 target + PASSENGER_TARGET_ENVELOPE_TRIPS_V2,
                 planning_floor,
                 protected_floor,
+                final_tail_floor,
             )
             bundle.model.add(aggregate >= lower)
             bundle.model.add(aggregate <= upper)
@@ -160,6 +182,7 @@ def _add_b_shift_cumulative_envelopes(problem, bundle, policy) -> None:
 
 def _service_change_terms(problem, bundle, policy):
     """Return per-direction service-rate change booleans and impose the regime-count proxy cap."""
+    del problem
     changes = []
     for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
         blocks = sorted(
@@ -208,7 +231,7 @@ def _add_b_hints(problem, bundle) -> None:
 def _representability_aware_build_model(problem, authority, policy, protected_authority):
     assert _V1_BUILD_ALLOCATION_MODEL is not None
     bundle = _V1_BUILD_ALLOCATION_MODEL(problem, authority, policy, protected_authority)
-    _add_passenger_target_envelopes(problem, bundle)
+    _add_passenger_target_envelopes(problem, bundle, policy)
     _add_b_shift_cumulative_envelopes(problem, bundle, policy)
     _add_b_hints(problem, bundle)
     change_term, change_bound = _service_change_terms(problem, bundle, policy)
