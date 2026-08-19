@@ -17,10 +17,8 @@ from bus_schedule_engine.contracts_v1.v3_global_regularity import (  # noqa: E40
     CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1,
     GLOBAL_REGULARITY_POLICY_PROFILE_V1,
     install_global_regularity_v1,
+    uninstall_global_regularity_v1,
 )
-
-install_global_regularity_v1()
-
 from bus_schedule_engine.v3_result_exporter import (  # noqa: E402
     build_profile_comparison_v1,
     export_profile_comparison_xlsx_v1,
@@ -93,50 +91,55 @@ def _with_global_regularity_metadata(run):
     return replace(run, payload=payload)
 
 
+def _run(args: argparse.Namespace) -> None:
+    input_path = args.input.expanduser().resolve()
+    output_root = args.output_dir.expanduser().resolve()
+    selected_profiles, batch_mode = _selected_profiles(args)
+    runs = []
+    for profile_id in selected_profiles:
+        run = run_v3_profile_v1(
+            input_path,
+            profile_id,
+            total_budget_seconds=args.solve_budget_seconds,
+            shape_distance_threshold=args.shape_distance_threshold,
+        )
+        run = _with_global_regularity_metadata(run)
+        profile_output = output_root / profile_id if batch_mode else output_root
+        write_deterministic_json(profile_output / "result.json", run.payload)
+        export_v3_result_xlsx_v1(run, profile_output / "result.xlsx")
+        runs.append(run)
+        print(
+            f"{profile_id}: {run.payload['aggregate_native_status']} / "
+            f"{run.payload['final_acceptance_state']} / "
+            f"global_regularity={GLOBAL_REGULARITY_POLICY_PROFILE_V1} -> {profile_output}"
+        )
+    if batch_mode:
+        comparison = build_profile_comparison_v1(runs)
+        write_deterministic_json(output_root / "profile_comparison.json", comparison)
+        export_profile_comparison_xlsx_v1(
+            comparison,
+            output_root / "profile_comparison.xlsx",
+        )
+        comparison_state = (
+            comparison["stability_classification"]
+            or comparison["review_code"]
+            or comparison["comparison_eligibility"]
+        )
+        print(f"profile comparison: {comparison['comparison_eligibility']} / {comparison_state}")
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = _parser()
-    args = parser.parse_args(argv)
+    args = _parser().parse_args(argv)
+    install_global_regularity_v1()
     try:
-        input_path = args.input.expanduser().resolve()
-        output_root = args.output_dir.expanduser().resolve()
-        selected_profiles, batch_mode = _selected_profiles(args)
-        runs = []
-        for profile_id in selected_profiles:
-            run = run_v3_profile_v1(
-                input_path,
-                profile_id,
-                total_budget_seconds=args.solve_budget_seconds,
-                shape_distance_threshold=args.shape_distance_threshold,
-            )
-            run = _with_global_regularity_metadata(run)
-            profile_output = output_root / profile_id if batch_mode else output_root
-            write_deterministic_json(profile_output / "result.json", run.payload)
-            export_v3_result_xlsx_v1(run, profile_output / "result.xlsx")
-            runs.append(run)
-            print(
-                f"{profile_id}: {run.payload['aggregate_native_status']} / "
-                f"{run.payload['final_acceptance_state']} / "
-                f"global_regularity={GLOBAL_REGULARITY_POLICY_PROFILE_V1} -> {profile_output}"
-            )
-        if batch_mode:
-            comparison = build_profile_comparison_v1(runs)
-            write_deterministic_json(output_root / "profile_comparison.json", comparison)
-            export_profile_comparison_xlsx_v1(
-                comparison,
-                output_root / "profile_comparison.xlsx",
-            )
-            comparison_state = (
-                comparison["stability_classification"]
-                or comparison["review_code"]
-                or comparison["comparison_eligibility"]
-            )
-            print(
-                f"profile comparison: {comparison['comparison_eligibility']} / {comparison_state}"
-            )
-    except (FileNotFoundError, OSError, ValueError) as exc:
-        print(f"V3 runner failed: {exc}", file=sys.stderr)
-        return 2
-    return 0
+        try:
+            _run(args)
+        except (FileNotFoundError, OSError, ValueError) as exc:
+            print(f"V3 runner failed: {exc}", file=sys.stderr)
+            return 2
+        return 0
+    finally:
+        uninstall_global_regularity_v1()
 
 
 if __name__ == "__main__":
