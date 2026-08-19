@@ -282,7 +282,10 @@ def _source_segments(
 
 def _departures(bundle: NormalizedInputBundleV1) -> tuple[_Departure, ...]:
     output: list[_Departure] = []
-    if bundle.scenario_a is not None:
+    if (
+        bundle.scenario_a is not None
+        and bundle.optimization_mode == ScenarioCOptimizationModeV1.LEGACY_A_BOUND
+    ):
         output.extend(
             _Departure(
                 scenario=ScenarioId.A,

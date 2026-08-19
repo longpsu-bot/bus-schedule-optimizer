@@ -385,6 +385,21 @@ The repository-only 5C2R approval package was generated at the exact pre-deletio
 `docs/engine/evidence/M5C2R_LEGACY_RUNTIME_RETIREMENT_EVIDENCE_45B49791.json`. The original 5C2R
 CLI describes that historical candidate-bearing checkout; it is not a post-deletion status CLI.
 
+## Run V3 with native multi-period demand
+
+The opt-in local runner reads `PERIOD_CATALOG`, `SAN_LUONG_MULTI_PERIOD`, and
+`DEMAND_PROFILE_CONFIG` without widening the legacy single-period `SAN_LUONG` adapter:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_v3_two_stage.py `
+  --input "private/Engine_Input_MST_6_V3_MultiPeriod_Mar-Jul_2026.xlsx" `
+  --profiles STABLE_MAR_JUL_2026,BASELINE_MAR_JUN_2026,CURRENT_JUL_2026 `
+  --output-dir "local_outputs/mst6"
+```
+
+See `docs/engine/V3_MULTI_PERIOD_LOCAL_RUNNER_V1.md` for validation, weighting, diagnostics,
+budget semantics, outputs, and the profile-sensitivity classification.
+
 ## Validate the repository
 
 ```powershell

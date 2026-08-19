@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import BinaryIO
@@ -32,6 +32,7 @@ from .models import (
     TurnaroundMinutes,
     VolumeClassification,
 )
+from .multi_period_demand import DemandProfileV1, MultiPeriodDemandInputV1
 from .serialization import observed_demand_fingerprint, scenario_fingerprint
 from .validation import ContractValidationError, ensure_valid_bundle
 
@@ -401,3 +402,46 @@ def import_and_normalize_workbook_v1(
     options: NormalizationOptions,
 ) -> NormalizedInputBundleV1:
     return normalize_imported_workbook_v1(import_workbook(source), options)
+
+
+def normalize_multi_period_profile_v1(
+    imported: ImportedWorkbook,
+    demand_input: MultiPeriodDemandInputV1,
+    profile: DemandProfileV1,
+    options: NormalizationOptions,
+) -> NormalizedInputBundleV1:
+    """Adapt one explicit derived profile without widening the legacy SAN_LUONG path."""
+    period_lookup = {item.period_id: item for item in demand_input.periods}
+    selected_periods = tuple(period_lookup[item] for item in profile.included_period_ids)
+    period_start = min(item.period_start for item in selected_periods)
+    period_end = max(item.period_end for item in selected_periods)
+    records = [
+        DemandRecord(
+            period_start=period_start,
+            period_end=period_end,
+            observation_days=profile.total_observation_days,
+            block_start_seconds=item.interval_start,
+            block_end_seconds=item.interval_end,
+            direction={
+                ContractDirection.OUTBOUND: Direction.TERMINAL_1_TO_2,
+                ContractDirection.INBOUND: Direction.TERMINAL_2_TO_1,
+                ContractDirection.COMBINED: Direction.COMBINED,
+            }[item.direction],
+            passenger_volume=item.average_daily_passengers,
+            volume_type=VolumeType.AVERAGE_DAY,
+        )
+        for item in profile.derived_observations
+    ]
+    profile_imported = replace(imported, demand=records)
+    profile_options = replace(
+        options,
+        demand_dataset_id=(
+            f"{demand_input.demand_dataset_id}:{profile.profile_id}:{profile.profile_fingerprint}"
+        ),
+        source_notes=(
+            f"{options.source_notes + '; ' if options.source_notes else ''}"
+            f"selected_demand_profile={profile.profile_id}; "
+            f"profile_fingerprint={profile.profile_fingerprint}"
+        ),
+    )
+    return normalize_imported_workbook_v1(profile_imported, profile_options)

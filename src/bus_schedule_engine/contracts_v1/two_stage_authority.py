@@ -33,12 +33,15 @@ class TwoStageDemandAuthorityV1:
     source_b_fingerprint: str
     supports_directional_passenger_inference: bool
     limitations: tuple[str, ...]
+    demand_profile_fingerprint: str | None
     authority_fingerprint: str
 
 
 def _authority_payload(authority: TwoStageDemandAuthorityV1) -> dict[str, object]:
     payload = jsonable(asdict(authority))
     payload.pop("authority_fingerprint", None)
+    if payload.get("demand_profile_fingerprint") is None:
+        payload.pop("demand_profile_fingerprint", None)
     return {
         "fingerprint_profile": TWO_STAGE_DEMAND_AUTHORITY_PROFILE_V1,
         "optimization_mode": ScenarioCOptimizationModeV1.B_ANCHORED_TWO_STAGE_REBALANCE.value,
@@ -55,7 +58,14 @@ def calculate_two_stage_demand_authority_fingerprint_v1(
 def build_two_stage_demand_authority_v1(
     normalized_inputs: NormalizedInputBundleV1,
     b_evaluation: ScenarioBEvaluationBundleV1,
+    *,
+    demand_profile_fingerprint: str | None = None,
 ) -> TwoStageDemandAuthorityV1:
+    if demand_profile_fingerprint is not None and not demand_profile_fingerprint.strip():
+        raise TwoStageDemandAuthorityError(
+            TWO_STAGE_DEMAND_AUTHORITY_MISSING,
+            "selected demand-profile fingerprint must be non-empty when supplied",
+        )
     if normalized_inputs.optimization_mode != (
         ScenarioCOptimizationModeV1.B_ANCHORED_TWO_STAGE_REBALANCE
     ):
@@ -102,6 +112,7 @@ def build_two_stage_demand_authority_v1(
         source_b_fingerprint=normalized_inputs.scenario_b_fingerprint,
         supports_directional_passenger_inference=supports_directional,
         limitations=limitations,
+        demand_profile_fingerprint=demand_profile_fingerprint,
         authority_fingerprint="",
     )
     return TwoStageDemandAuthorityV1(
@@ -112,6 +123,7 @@ def build_two_stage_demand_authority_v1(
             provisional.supports_directional_passenger_inference
         ),
         limitations=provisional.limitations,
+        demand_profile_fingerprint=provisional.demand_profile_fingerprint,
         authority_fingerprint=(calculate_two_stage_demand_authority_fingerprint_v1(provisional)),
     )
 
