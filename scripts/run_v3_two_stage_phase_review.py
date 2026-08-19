@@ -70,9 +70,14 @@ def _phase_membership_ok(
         cumulative_target += target
         if abs(cumulative_actual - cumulative_target) > _PHASE_DEVIATION_CUMULATIVE:
             return False
-    # A merged regime still owns exactly the same number of trips. The bounded deviation only
-    # changes which side of an internal statistical boundary one trip may fall on.
-    return cumulative_actual == cumulative_target == group.trip_count
+    # A merged regime still owns exactly the same number of trips. A final-service sentinel sits
+    # exactly on the exclusive analytical end boundary, so it belongs to the regime/day total but
+    # intentionally does not belong to the final half-open demand block.
+    sentinel_count = int(group.has_final_service_sentinel)
+    return (
+        cumulative_actual == cumulative_target
+        and group.trip_count == cumulative_target + sentinel_count
+    )
 
 
 def _bounded_phase_membership_representation(candidates, group, allocation):
@@ -145,7 +150,10 @@ def _singleton_aware_representation_candidates(
             uniform_headway_minutes=None,
             departure_minutes=(minute,),
         )
-        for minute in sorted(range(lower, upper + 1), key=lambda item: (abs(item - source_minute), item))
+        for minute in sorted(
+            range(lower, upper + 1),
+            key=lambda item: (abs(item - source_minute), item),
+        )
     )
     unified_window = (lower, upper)
     return candidates, unified_window, unified_window
