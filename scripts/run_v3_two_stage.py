@@ -18,11 +18,15 @@ from bus_schedule_engine.contracts_v1.v3_global_regularity import (  # noqa: E40
 )
 from bus_schedule_engine.contracts_v1.v3_global_regularity_v2 import (  # noqa: E402
     B_SHIFT_CUMULATIVE_ENVELOPE_V2,
-    GLOBAL_REGULARITY_POLICY_PROFILE_V2,
     PASSENGER_TARGET_ENVELOPE_TRIPS_V2,
     PER_DIRECTION_CHANGE_POINT_CAP_V2,
-    install_global_regularity_v2,
-    uninstall_global_regularity_v2,
+)
+from bus_schedule_engine.contracts_v1.v3_global_regularity_v3 import (  # noqa: E402
+    GLOBAL_REGULARITY_POLICY_PROFILE_V3,
+    PHASE_AWARE_SOURCE_SLICING_V3,
+    REGIME_LOCAL_ZERO_DRIFT_REQUIRED_V3,
+    install_global_regularity_v3,
+    uninstall_global_regularity_v3,
 )
 from bus_schedule_engine.v3_result_exporter import (  # noqa: E402
     build_profile_comparison_v1,
@@ -85,12 +89,14 @@ def _selected_profiles(args: argparse.Namespace) -> tuple[tuple[str, ...], bool]
 def _with_global_regularity_metadata(run):
     payload = dict(run.payload)
     payload["global_regularity_policy"] = {
-        "profile": GLOBAL_REGULARITY_POLICY_PROFILE_V2,
+        "profile": GLOBAL_REGULARITY_POLICY_PROFILE_V3,
         "block_phase_max_deviation_trips": BLOCK_PHASE_MAX_DEVIATION_TRIPS_V1,
         "cumulative_phase_max_deviation_trips": CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1,
         "passenger_target_envelope_trips": PASSENGER_TARGET_ENVELOPE_TRIPS_V2,
         "b_shift_cumulative_envelope": B_SHIFT_CUMULATIVE_ENVELOPE_V2,
         "per_direction_change_point_cap": PER_DIRECTION_CHANGE_POINT_CAP_V2,
+        "phase_aware_source_slicing": PHASE_AWARE_SOURCE_SLICING_V3,
+        "regime_local_zero_drift_required": REGIME_LOCAL_ZERO_DRIFT_REQUIRED_V3,
         "regime_count_semantics": "HARD_MAXIMUM_WITH_REPRESENTABLE_FIXED_POINT_COARSENING",
         "surplus_allocation": "PASSENGER_TARGET_ENVELOPE_WITH_GLOBAL_SMOOTHNESS",
         "objective_order": [
@@ -127,7 +133,7 @@ def _run(args: argparse.Namespace) -> None:
         print(
             f"{profile_id}: {run.payload['aggregate_native_status']} / "
             f"{run.payload['final_acceptance_state']} / "
-            f"global_regularity={GLOBAL_REGULARITY_POLICY_PROFILE_V2} -> {profile_output}"
+            f"global_regularity={GLOBAL_REGULARITY_POLICY_PROFILE_V3} -> {profile_output}"
         )
     if batch_mode:
         comparison = build_profile_comparison_v1(runs)
@@ -146,7 +152,7 @@ def _run(args: argparse.Namespace) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    install_global_regularity_v2()
+    install_global_regularity_v3()
     try:
         try:
             _run(args)
@@ -155,7 +161,7 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         return 0
     finally:
-        uninstall_global_regularity_v2()
+        uninstall_global_regularity_v3()
 
 
 if __name__ == "__main__":
