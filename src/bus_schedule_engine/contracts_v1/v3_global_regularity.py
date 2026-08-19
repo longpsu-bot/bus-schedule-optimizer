@@ -83,25 +83,19 @@ def _largest_remainder_targets(rows, total: int) -> dict[str, int]:
     """Allocate a fixed integer total proportionally to observed passenger volume."""
     if total < 0:
         raise ValueError("analytical trip total cannot be negative")
-    ordered = tuple(
-        sorted(rows, key=lambda item: (item.start_time, item.end_time, item.block_id))
-    )
+    ordered = tuple(sorted(rows, key=lambda item: (item.start_time, item.end_time, item.block_id)))
     if not ordered:
         return {}
     weights = {
-        row.block_id: Fraction(str(max(0.0, float(row.observed_passengers))))
-        for row in ordered
+        row.block_id: Fraction(str(max(0.0, float(row.observed_passengers)))) for row in ordered
     }
     weight_sum = sum(weights.values(), Fraction(0, 1))
     if weight_sum == 0:
         return {row.block_id: 0 for row in ordered}
     quotas = {
-        row.block_id: Fraction(total, 1) * weights[row.block_id] / weight_sum
-        for row in ordered
+        row.block_id: Fraction(total, 1) * weights[row.block_id] / weight_sum for row in ordered
     }
-    targets = {
-        block_id: quota.numerator // quota.denominator for block_id, quota in quotas.items()
-    }
+    targets = {block_id: quota.numerator // quota.denominator for block_id, quota in quotas.items()}
     remaining = total - sum(targets.values())
     ranking = sorted(
         ordered,
@@ -245,9 +239,7 @@ def _global_build_allocation_model(problem, authority, policy, protected_authori
         old_bounds[4],
     )
     weights = allocator._lexicographic_weights(bounds)
-    theoretical_maximum = sum(
-        bound * weight for bound, weight in zip(bounds, weights, strict=True)
-    )
+    theoretical_maximum = sum(bound * weight for bound, weight in zip(bounds, weights, strict=True))
     if theoretical_maximum > 2**63 - 1:
         raise allocator.Stage1AllocationError(
             allocator.STAGE_1_PROBLEM_AUTHORITY_MISMATCH,
@@ -275,10 +267,7 @@ def _phase_membership_ok(representation, group, allocation) -> bool:
             return False
         cumulative_actual += actual
         cumulative_target += target
-        if (
-            abs(cumulative_actual - cumulative_target)
-            > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1
-        ):
+        if abs(cumulative_actual - cumulative_target) > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1:
             return False
     sentinel_count = int(group.has_final_service_sentinel)
     return (
@@ -396,10 +385,7 @@ def _bounded_phase_plan_ok(allocation_blocks, regimes) -> bool:
             del block
             cumulative_actual += actual
             cumulative_target += expected
-            if (
-                abs(cumulative_actual - cumulative_target)
-                > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1
-            ):
+            if abs(cumulative_actual - cumulative_target) > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1:
                 return False
         if cumulative_actual != cumulative_target:
             return False
@@ -679,9 +665,7 @@ def _add_bounded_phase_block_membership_constraints(
                     block.end_minute - 1,
                     name=f"v3_phase_before_{source.trip_id}_{block.block_id}",
                 )
-                member = model.new_bool_var(
-                    f"v3_phase_member_{source.trip_id}_{block.block_id}"
-                )
+                member = model.new_bool_var(f"v3_phase_member_{source.trip_id}_{block.block_id}")
                 model.add(member <= at_or_after)
                 model.add(member <= before_end)
                 model.add(member >= at_or_after + before_end - 1)
@@ -719,12 +703,8 @@ def _add_bounded_phase_block_membership_constraints(
             cumulative_counts.append(counts_by_key[key])
             cumulative_target += targets_by_key[key]
             prefix = sum(cumulative_counts)
-            model.add(
-                prefix - cumulative_target <= CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1
-            )
-            model.add(
-                cumulative_target - prefix <= CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1
-            )
+            model.add(prefix - cumulative_target <= CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1)
+            model.add(cumulative_target - prefix <= CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1)
         if ordered:
             model.add(sum(cumulative_counts) == cumulative_target)
     return memberships_by_key
@@ -735,9 +715,7 @@ def _scenario_b_max_headway_change(problem) -> int:
     has_comparable = False
     for trips in stage2._ordered_directional_trips(problem).values():
         minutes = [trip.departure_time // 60 for trip in trips]
-        headways = [
-            later - earlier for earlier, later in zip(minutes, minutes[1:], strict=False)
-        ]
+        headways = [later - earlier for earlier, later in zip(minutes, minutes[1:], strict=False)]
         for earlier, later in zip(headways, headways[1:], strict=False):
             has_comparable = True
             maximum = max(maximum, abs(later - earlier))
@@ -754,10 +732,7 @@ def _regime_passenger_rate(problem, regime) -> float:
 
 
 def _tail_demand_not_rising(problem, earlier, tail) -> bool:
-    return (
-        _regime_passenger_rate(problem, tail)
-        <= _regime_passenger_rate(problem, earlier) + 1e-9
-    )
+    return _regime_passenger_rate(problem, tail) <= _regime_passenger_rate(problem, earlier) + 1e-9
 
 
 def _global_build_stage2_model(problem, plan, policy, protected_projection):
@@ -833,10 +808,7 @@ def _candidate_bounded_phase_ok(candidate, allocation_plan) -> bool:
             del block
             cumulative_actual += actual
             cumulative_target += expected
-            if (
-                abs(cumulative_actual - cumulative_target)
-                > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1
-            ):
+            if abs(cumulative_actual - cumulative_target) > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1:
                 return False
         if cumulative_actual != cumulative_target:
             return False
