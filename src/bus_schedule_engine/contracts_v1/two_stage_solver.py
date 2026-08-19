@@ -1173,6 +1173,23 @@ def _diagnostics(
             for item in attempts
             if item.infeasibility_diagnostic is not None
         ),
+        stage_1_regime_build_rejected_count=stage_1.regime_build_rejected_count,
+        stage_1_regime_build_failure_reason_counts=(stage_1.regime_build_failure_reason_counts),
+        stage_1_regime_build_example_diagnostics=(stage_1.regime_build_example_diagnostics),
+        stage_1_necessary_feasibility_constraint_family_counts=tuple(
+            (family, count)
+            for family in Stage2ConstraintFamilyV1
+            if (
+                count := sum(
+                    family in diagnostic.constraint_families
+                    for diagnostic in stage_1.pruned_necessary_feasibility
+                )
+            )
+        ),
+        stage_1_necessary_feasibility_example_candidate_fingerprints=tuple(
+            diagnostic.allocation_candidate_fingerprint
+            for diagnostic in stage_1.pruned_necessary_feasibility[:8]
+        ),
     )
 
 

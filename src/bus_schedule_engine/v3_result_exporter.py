@@ -145,7 +145,9 @@ def _write_summary(ws, run: V3ProfileRunV1) -> None:
         (
             "Stage 1 counts",
             f"candidates={stage_1['candidate_count']}; admitted={stage_1['admitted_count']}; "
-            f"pruned={stage_1['pruned_count']}",
+            f"regime-build rejected={stage_1['regime_build_rejected_count']}; "
+            "necessary-feasibility rejected="
+            f"{stage_1['necessary_feasibility_rejected_count']}",
         ),
         ("Stage 2 attempts", stage_2["allocation_attempt_count"]),
     ]
@@ -177,6 +179,7 @@ def _write_summary(ws, run: V3ProfileRunV1) -> None:
     )
     ws.freeze_panes = "A4"
     _autowidth(ws)
+    ws.column_dimensions["B"].width = 92
 
 
 def _write_demand_profile(ws, run: V3ProfileRunV1) -> None:
@@ -316,6 +319,7 @@ def _write_regimes(ws, run: V3ProfileRunV1) -> None:
         "end",
         "trip_count",
         "uniform_headway_minutes",
+        "covered_demand_blocks",
         "boundary_reason",
         "is_final_service_tail",
     ]
@@ -329,16 +333,18 @@ def _write_regimes(ws, run: V3ProfileRunV1) -> None:
             _excel_time(item["end"]),
             item["trip_count"],
             item["uniform_headway_minutes"],
+            ", ".join(item["covered_demand_blocks"]),
             item["boundary_reason"],
             item["is_final_service_tail"],
         ]
         for column, value in enumerate(values, start=1):
             ws.cell(row_number, column, value)
+        ws.cell(row_number, 7).alignment = Alignment(wrap_text=True, vertical="top")
     end_row = max(4, 3 + len(regimes))
     _set_time_columns(ws, (3, 4), 4, end_row)
     ws.freeze_panes = "A4"
     if regimes:
-        ws.auto_filter.ref = f"A3:H{end_row}"
+        ws.auto_filter.ref = f"A3:I{end_row}"
     _autowidth(ws)
 
 
@@ -379,7 +385,7 @@ def _write_timetable_b(ws, run: V3ProfileRunV1) -> None:
 
 
 def _write_timetable_c(ws, run: V3ProfileRunV1) -> None:
-    _title(ws, "SCENARIO C EXACT TIMETABLE AND B → C SHIFTS", 10)
+    _title(ws, "SCENARIO C EXACT TIMETABLE AND B → C SHIFTS", 12)
     headers = [
         "c_trip_id",
         "source_b_trip_id",
@@ -387,6 +393,8 @@ def _write_timetable_c(ws, run: V3ProfileRunV1) -> None:
         "departure_terminal",
         "b_departure_time",
         "c_departure_time",
+        "previous_c_departure_time",
+        "headway_minutes",
         "arrival_time",
         "shift_minutes",
         "headway_regime_id",
@@ -402,6 +410,8 @@ def _write_timetable_c(ws, run: V3ProfileRunV1) -> None:
             item["departure_terminal"],
             _excel_time(item["b_departure_time"]),
             _excel_time(item["c_departure_time"]),
+            _excel_time(item["previous_c_departure_time"]),
+            item["headway_minutes"],
             _excel_time(item["arrival_time"]),
             item["shift_minutes"],
             item["headway_regime_id"],
@@ -410,10 +420,10 @@ def _write_timetable_c(ws, run: V3ProfileRunV1) -> None:
         for column, value in enumerate(values, start=1):
             ws.cell(row_number, column, value)
     end_row = max(4, 3 + len(timetable))
-    _set_time_columns(ws, (5, 6, 7), 4, end_row)
+    _set_time_columns(ws, (5, 6, 7, 9), 4, end_row)
     ws.freeze_panes = "A4"
     if timetable:
-        ws.auto_filter.ref = f"A3:J{end_row}"
+        ws.auto_filter.ref = f"A3:L{end_row}"
     _autowidth(ws)
 
 
@@ -454,6 +464,59 @@ def _write_diagnostics(ws, run: V3ProfileRunV1) -> None:
     end_row = 3 + len(diagnostics)
     _set_time_columns(ws, (4, 5), 4, end_row)
     next_row = end_row + 2
+    stage_1 = run.payload["stage_1"]
+    _section(ws, next_row, "STAGE 1 REJECTION SUMMARY", 10)
+    next_row += 1
+    _header(ws, next_row, ["category", "reason_or_family", "count"])
+    next_row += 1
+    for category, counts in (
+        ("REGIME_BUILD", stage_1["regime_build_failure_reason_counts"]),
+        (
+            "NECESSARY_FEASIBILITY",
+            stage_1["necessary_feasibility_constraint_family_counts"],
+        ),
+    ):
+        for reason, count in counts.items():
+            ws.cell(next_row, 1, category)
+            ws.cell(next_row, 2, reason)
+            ws.cell(next_row, 3, count)
+            next_row += 1
+    next_row += 1
+    _section(ws, next_row, "STAGE 1 REGIME-BUILD EXAMPLES", 10)
+    next_row += 1
+    _header(
+        ws,
+        next_row,
+        [
+            "failure_code",
+            "direction",
+            "candidate_fingerprint",
+            "initial_groups",
+            "final_groups",
+            "cap",
+            "failing_blocks",
+            "diagnostic_fingerprint",
+        ],
+    )
+    next_row += 1
+    for item in stage_1["regime_build_example_diagnostics"]:
+        values = [
+            item["failure_code"],
+            item["direction"],
+            item["allocation_candidate_fingerprint"],
+            item["initial_group_count"],
+            item["final_group_count"],
+            item["maximum_group_count"],
+            ", ".join(item["failing_group_block_ids"]),
+            item["diagnostic_fingerprint"],
+        ]
+        for column, value in enumerate(values, start=1):
+            ws.cell(next_row, column, value)
+        for column in (1, 3, 7, 8):
+            ws.cell(next_row, column).alignment = Alignment(wrap_text=True, vertical="top")
+        ws.row_dimensions[next_row].height = 60
+        next_row += 1
+    next_row += 1
     for title, values in (
         ("DIAGNOSTIC CODES", run.payload["diagnostic_codes"]),
         ("EXPLANATIONS", run.payload["explanations"]),
@@ -476,7 +539,20 @@ def _write_diagnostics(ws, run: V3ProfileRunV1) -> None:
                 next_row += 1
         next_row += 1
     ws.freeze_panes = "A4"
-    _autowidth(ws, maximum=34)
+    _autowidth(ws, maximum=68)
+    for column, width in {
+        "A": 42,
+        "B": 42,
+        "C": 38,
+        "D": 16,
+        "E": 16,
+        "F": 12,
+        "G": 50,
+        "H": 38,
+        "I": 14,
+        "J": 20,
+    }.items():
+        ws.column_dimensions[column].width = width
 
 
 def export_v3_result_xlsx_v1(run: V3ProfileRunV1, path: str | Path) -> Path:

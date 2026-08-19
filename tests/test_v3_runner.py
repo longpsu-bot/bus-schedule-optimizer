@@ -370,6 +370,13 @@ def test_default_profile_cli_creates_deterministic_json_and_required_xlsx(
     assert payload["quality"]["C"] is None
     assert payload["fleet"]["scenario_b_required"] is not None
     assert payload["fleet"]["scenario_c_required"] is None
+    assert payload["stage_1"]["candidate_count"] == (
+        payload["stage_1"]["regime_build_rejected_count"]
+        + payload["stage_1"]["necessary_feasibility_rejected_count"]
+        + payload["stage_1"]["admitted_count"]
+    )
+    assert "regime_build_failure_reason_counts" in payload["stage_1"]
+    assert "necessary_feasibility_constraint_family_counts" in payload["stage_1"]
     assert payload["shift_metrics"] == {
         "maximum_shift_minutes": None,
         "shifted_trip_count": None,
@@ -389,6 +396,34 @@ def test_default_profile_cli_creates_deterministic_json_and_required_xlsx(
     demand_chart, service_chart = result_workbook["DEMAND_PROFILE"]._charts
     assert len(demand_chart.series) == 1
     assert len(service_chart.series) == 1
+    assert [cell.value for cell in result_workbook["REGIMES"][3]] == [
+        "direction",
+        "regime_id",
+        "start",
+        "end",
+        "trip_count",
+        "uniform_headway_minutes",
+        "covered_demand_blocks",
+        "boundary_reason",
+        "is_final_service_tail",
+    ]
+    assert [cell.value for cell in result_workbook["TIMETABLE_C"][3]] == [
+        "c_trip_id",
+        "source_b_trip_id",
+        "direction",
+        "departure_terminal",
+        "b_departure_time",
+        "c_departure_time",
+        "previous_c_departure_time",
+        "headway_minutes",
+        "arrival_time",
+        "shift_minutes",
+        "headway_regime_id",
+        "vehicle_assignment",
+    ]
+    assert "STAGE 1 REJECTION SUMMARY" in {
+        cell.value for cell in result_workbook["DIAGNOSTICS"]["A"]
+    }
     with zipfile.ZipFile(output / "result.xlsx") as archive:
         chart_xml = b"".join(
             archive.read(name) for name in archive.namelist() if name.startswith("xl/charts/chart")

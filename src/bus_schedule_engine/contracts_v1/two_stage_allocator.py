@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import math
 import time
+from collections import Counter
 from dataclasses import dataclass
+from fractions import Fraction
 
 from ortools.sat.python import cp_model
 
@@ -28,6 +30,8 @@ from .two_stage_models import (
     ServiceBoundarySemanticsV1,
     Stage1AllocationResultV1,
     Stage1NecessaryFeasibilityResultV1,
+    Stage1RegimeBuildDiagnosticV1,
+    Stage1RegimeBuildFailureCodeV1,
     Stage2ConstraintFamilyV1,
     TripAllocationBlockV1,
     TripAllocationPlanV1,
@@ -35,6 +39,7 @@ from .two_stage_models import (
     UniformIntegerRegimePolicyV3,
     finalize_allocation_plan,
     finalize_stage_1_necessary_feasibility,
+    finalize_stage_1_regime_build_diagnostic,
 )
 
 STAGE_1_ALLOCATION_MODEL_PROFILE_V1 = "scenario_c_stage_1_integer_allocation_v1"
@@ -76,6 +81,20 @@ class _RegimeGroup:
     source_end_index: int
     is_final_service_tail: bool
     has_final_service_sentinel: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _GroupRepresentationProbe:
+    representation: UniformRegimeRepresentationV1 | None
+    start_window: tuple[int, int]
+    end_window: tuple[int, int]
+    failure_code: Stage1RegimeBuildFailureCodeV1 | None
+
+
+@dataclass(frozen=True, slots=True)
+class _RegimeBuildOutcome:
+    regimes: tuple[ProposedServiceRegimeV1, ...] | None
+    diagnostic: Stage1RegimeBuildDiagnosticV1 | None
 
 
 def _bounded_sum(
@@ -535,21 +554,6 @@ def _protected_maximum_headway(
     return min((default, *bounds)) if bounds else default
 
 
-def _materially_mergeable(
-    left: _RegimeGroup,
-    right: _RegimeGroup,
-    policy: UniformIntegerRegimePolicyV3,
-) -> bool:
-    left_duration = sum(block.duration_minutes for block in left.blocks)
-    right_duration = sum(block.duration_minutes for block in right.blocks)
-    left_demand = sum(block.observed_passengers for block in left.blocks) / max(1, left_duration)
-    right_demand = sum(block.observed_passengers for block in right.blocks) / max(1, right_duration)
-    denominator = max(left_demand, right_demand, 1e-9)
-    return abs(left_demand - right_demand) / denominator < (
-        policy.minimum_material_service_rate_change_ratio
-    )
-
-
 def _initial_groups(
     problem: ScheduleProblemV1,
     allocation: dict[tuple[ContractDirection, str], int],
@@ -633,13 +637,28 @@ def _merge_groups(left: _RegimeGroup, right: _RegimeGroup) -> _RegimeGroup:
     )
 
 
-def _representation_for_group(
+def _groups_are_contiguous(left: _RegimeGroup, right: _RegimeGroup) -> bool:
+    return (
+        left.direction == right.direction
+        and left.source_end_index + 1 == right.source_start_index
+        and left.blocks[-1].end_time == right.blocks[0].start_time
+    )
+
+
+def _representation_candidates_for_group(
     problem: ScheduleProblemV1,
     group: _RegimeGroup,
     policy: UniformIntegerRegimePolicyV3,
     projection: OrToolsProtectedFloorProjectionV1 | None,
-    allocation: dict[tuple[ContractDirection, str], int],
-) -> tuple[UniformRegimeRepresentationV1, tuple[int, int], tuple[int, int]] | None:
+    *,
+    absolute_max_shift_per_trip_minutes: int | None = None,
+    enforce_final_tail: bool = True,
+    enforce_protected_floor: bool = True,
+) -> tuple[
+    tuple[UniformRegimeRepresentationV1, ...],
+    tuple[int, int],
+    tuple[int, int],
+]:
     directional = _ordered_directional_trips(problem)[group.direction]
     sources = directional[group.source_start_index : group.source_end_index + 1]
     source_minutes = tuple(trip.departure_time // 60 for trip in sources)
@@ -653,7 +672,7 @@ def _representation_for_group(
         block_end if group.has_final_service_sentinel else block_end - 1,
     )
     tolerance = policy.maximum_regime_boundary_adjustment_minutes
-    if group.is_final_service_tail:
+    if group.is_final_service_tail and enforce_final_tail:
         preferred_end = last_service
         preferred_start = max(
             lower,
@@ -681,38 +700,208 @@ def _representation_for_group(
         end_window = (last_service, last_service)
         preferred_end = last_service
     maximum = max(1, last_service - first_service)
-    if group.is_final_service_tail:
+    if group.is_final_service_tail and enforce_final_tail:
         maximum = min(
             maximum,
             policy.final_service_tail.final_service_tail_maximum_headway_minutes,
         )
-    maximum = _protected_maximum_headway(
-        projection,
-        group.direction,
-        group.source_start_index,
-        group.source_end_index,
-        maximum,
-    )
-    representation = find_representable_uniform_regime_v1(
+    if enforce_protected_floor:
+        maximum = _protected_maximum_headway(
+            projection,
+            group.direction,
+            group.source_start_index,
+            group.source_end_index,
+            maximum,
+        )
+    candidates = _representable_uniform_regime_candidates_v1(
         source_minutes,
         permitted_start_window=start_window,
         permitted_end_window=end_window,
         minimum_headway_minutes=policy.minimum_operational_headway_minutes,
         maximum_headway_minutes=maximum,
-        absolute_max_shift_per_trip_minutes=policy.absolute_max_shift_per_trip_minutes,
+        absolute_max_shift_per_trip_minutes=(
+            policy.absolute_max_shift_per_trip_minutes
+            if absolute_max_shift_per_trip_minutes is None
+            else absolute_max_shift_per_trip_minutes
+        ),
         preferred_start_minute=preferred_start,
         preferred_end_minute=preferred_end,
     )
-    if representation is None:
-        return None
-    for block in group.blocks:
-        represented_count = sum(
-            block.start_time // 60 <= minute < block.end_time // 60
-            for minute in representation.departure_minutes
+    return candidates, start_window, end_window
+
+
+def _exact_membership_representation(
+    candidates: tuple[UniformRegimeRepresentationV1, ...],
+    group: _RegimeGroup,
+    allocation: dict[tuple[ContractDirection, str], int],
+) -> UniformRegimeRepresentationV1 | None:
+    return next(
+        (
+            representation
+            for representation in candidates
+            if all(
+                sum(
+                    block.start_time // 60 <= minute < block.end_time // 60
+                    for minute in representation.departure_minutes
+                )
+                == allocation[(group.direction, block.block_id)]
+                for block in group.blocks
+            )
+        ),
+        None,
+    )
+
+
+def _representation_for_group(
+    problem: ScheduleProblemV1,
+    group: _RegimeGroup,
+    policy: UniformIntegerRegimePolicyV3,
+    projection: OrToolsProtectedFloorProjectionV1 | None,
+    allocation: dict[tuple[ContractDirection, str], int],
+) -> _GroupRepresentationProbe:
+    candidates, start_window, end_window = _representation_candidates_for_group(
+        problem,
+        group,
+        policy,
+        projection,
+    )
+    representation = _exact_membership_representation(candidates, group, allocation)
+    if representation is not None:
+        return _GroupRepresentationProbe(representation, start_window, end_window, None)
+
+    directional = _ordered_directional_trips(problem)[group.direction]
+    first_service = directional[0].departure_time // 60
+    last_service = directional[-1].departure_time // 60
+    relaxed_shift = max(
+        policy.absolute_max_shift_per_trip_minutes,
+        last_service - first_service + 1,
+    )
+    relaxed_candidates, _, _ = _representation_candidates_for_group(
+        problem,
+        group,
+        policy,
+        projection,
+        absolute_max_shift_per_trip_minutes=relaxed_shift,
+    )
+    if _exact_membership_representation(relaxed_candidates, group, allocation) is not None:
+        failure = Stage1RegimeBuildFailureCodeV1.B_SHIFT_BOUND_UNREPRESENTABLE
+    elif group.is_final_service_tail:
+        relaxed_tail, _, _ = _representation_candidates_for_group(
+            problem,
+            group,
+            policy,
+            projection,
+            enforce_final_tail=False,
         )
-        if represented_count != allocation[(group.direction, block.block_id)]:
-            return None
-    return representation, start_window, end_window
+        if _exact_membership_representation(relaxed_tail, group, allocation) is not None:
+            failure = Stage1RegimeBuildFailureCodeV1.FINAL_TAIL_UNREPRESENTABLE
+        else:
+            failure = None
+    else:
+        failure = None
+    if failure is None and projection is not None:
+        relaxed_protected, _, _ = _representation_candidates_for_group(
+            problem,
+            group,
+            policy,
+            projection,
+            enforce_protected_floor=False,
+        )
+        if _exact_membership_representation(relaxed_protected, group, allocation) is not None:
+            failure = Stage1RegimeBuildFailureCodeV1.PROTECTED_FLOOR_BLOCKED_MERGE
+    if failure is None:
+        failure = (
+            Stage1RegimeBuildFailureCodeV1.ALLOCATION_MEMBERSHIP_UNREPRESENTABLE
+            if candidates
+            else Stage1RegimeBuildFailureCodeV1.GROUP_UNIFORM_REPRESENTATION_UNAVAILABLE
+        )
+    return _GroupRepresentationProbe(None, start_window, end_window, failure)
+
+
+def _representation_shift_score(
+    problem: ScheduleProblemV1,
+    group: _RegimeGroup,
+    representation: UniformRegimeRepresentationV1,
+) -> tuple[int, int]:
+    directional = _ordered_directional_trips(problem)[group.direction]
+    source_minutes = tuple(
+        trip.departure_time // 60
+        for trip in directional[group.source_start_index : group.source_end_index + 1]
+    )
+    shifts = tuple(
+        abs(departure - source)
+        for departure, source in zip(
+            representation.departure_minutes,
+            source_minutes,
+            strict=True,
+        )
+    )
+    return max(shifts, default=0), sum(shifts)
+
+
+def _service_rate(
+    group: _RegimeGroup,
+    values_by_block: dict[str, int],
+) -> Fraction:
+    duration = sum(block.duration_minutes for block in group.blocks)
+    return Fraction(sum(values_by_block[block.block_id] for block in group.blocks) * 60, duration)
+
+
+def _passenger_rate(group: _RegimeGroup) -> float:
+    duration = sum(block.duration_minutes for block in group.blocks)
+    return sum(block.observed_passengers for block in group.blocks) * 60.0 / duration
+
+
+def _merge_score(
+    problem: ScheduleProblemV1,
+    left: _RegimeGroup,
+    right: _RegimeGroup,
+    merged: _RegimeGroup,
+    representation: UniformRegimeRepresentationV1,
+    required_by_block: dict[str, int],
+    allocated_by_block: dict[str, int],
+) -> tuple[object, ...]:
+    maximum_shift, total_shift = _representation_shift_score(problem, merged, representation)
+    return (
+        abs(_service_rate(left, required_by_block) - _service_rate(right, required_by_block)),
+        abs(_service_rate(left, allocated_by_block) - _service_rate(right, allocated_by_block)),
+        round(abs(_passenger_rate(left) - _passenger_rate(right)), 12),
+        maximum_shift,
+        total_shift,
+        left.source_start_index,
+        right.source_end_index,
+        tuple(block.block_id for block in merged.blocks),
+    )
+
+
+def _regime_build_diagnostic(
+    candidate_fingerprint: str,
+    direction: ContractDirection,
+    initial_group_count: int,
+    final_group_count: int,
+    maximum_group_count: int,
+    failure_code: Stage1RegimeBuildFailureCodeV1,
+    groups: list[_RegimeGroup],
+) -> Stage1RegimeBuildDiagnosticV1:
+    block_ids = tuple(block.block_id for group in groups for block in group.blocks)
+    if len(block_ids) > 6:
+        block_ids = (*block_ids[:3], *block_ids[-3:])
+    return finalize_stage_1_regime_build_diagnostic(
+        Stage1RegimeBuildDiagnosticV1(
+            allocation_candidate_fingerprint=candidate_fingerprint,
+            failure_code=failure_code,
+            direction=direction,
+            initial_group_count=initial_group_count,
+            final_group_count=final_group_count,
+            maximum_group_count=maximum_group_count,
+            failing_group_block_ids=block_ids,
+            explanation=(
+                f"Stage 1 regime construction stopped for {direction.value}: "
+                f"{failure_code.value}; {initial_group_count} initial group(s), "
+                f"{final_group_count} remaining group(s), cap={maximum_group_count}."
+            ),
+        )
+    )
 
 
 def _representable_regimes(
@@ -722,16 +911,24 @@ def _representable_regimes(
     policy: UniformIntegerRegimePolicyV3,
     projection: OrToolsProtectedFloorProjectionV1 | None,
     final_service_sentinels: tuple[FinalServiceSentinelV1, ...],
-) -> tuple[ProposedServiceRegimeV1, ...] | None:
+    candidate_fingerprint: str,
+) -> _RegimeBuildOutcome:
     groups_by_direction = _initial_groups(
         problem,
         allocation,
         blocks,
         final_service_sentinels,
     )
+    requirements = {item.block_id: item.required_trips_85 for item in problem.block_requirements}
     output: list[ProposedServiceRegimeV1] = []
     for direction, original_groups in groups_by_direction.items():
         groups = list(original_groups)
+        allocated = {
+            block.block_id: allocation[(direction, block.block_id)]
+            for block in blocks
+            if block.direction in {direction, ContractDirection.COMBINED}
+        }
+        initial_group_count = len(groups)
         tail_target = policy.final_service_tail.final_service_tail_window_minutes
         while len(groups) >= 2:
             tail_representation = _representation_for_group(
@@ -741,73 +938,151 @@ def _representable_regimes(
                 projection,
                 allocation,
             )
-            if tail_representation is not None:
-                tail_span = tail_representation[0].end_minute - tail_representation[0].start_minute
+            if tail_representation.representation is not None:
+                tail_span = (
+                    tail_representation.representation.end_minute
+                    - tail_representation.representation.start_minute
+                )
                 if tail_span >= max(
                     0,
                     tail_target - policy.maximum_regime_boundary_adjustment_minutes,
                 ):
                     break
-            expanded_tail = _merge_groups(groups[-2], groups[-1])
-            if (
-                _representation_for_group(
-                    problem,
-                    expanded_tail,
-                    policy,
-                    projection,
-                    allocation,
-                )
-                is None
-            ):
+            if not _groups_are_contiguous(groups[-2], groups[-1]):
                 break
-            groups[-2:] = [expanded_tail]
-        while len(groups) > policy.maximum_headway_regimes_per_direction:
-            options = [
-                (index, _merge_groups(groups[index], groups[index + 1]))
-                for index in range(len(groups) - 1)
-                if _materially_mergeable(groups[index], groups[index + 1], policy)
-            ]
-            if not options:
-                return None
-            index, merged = min(options, key=lambda item: item[1].trip_count)
-            groups[index : index + 2] = [merged]
-
-        index = 0
-        while index < len(groups):
-            group = groups[index]
-            represented = _representation_for_group(
+            expanded_tail = _merge_groups(groups[-2], groups[-1])
+            expanded_probe = _representation_for_group(
                 problem,
-                group,
+                expanded_tail,
                 policy,
                 projection,
                 allocation,
             )
-            if (
-                represented is None
-                and index + 1 < len(groups)
-                and _materially_mergeable(
-                    group,
-                    groups[index + 1],
+            if expanded_probe.representation is None:
+                break
+            groups[-2:] = [expanded_tail]
+        while len(groups) > policy.maximum_headway_regimes_per_direction:
+            options: list[tuple[tuple[object, ...], int, _RegimeGroup]] = []
+            for index in range(len(groups) - 1):
+                left, right = groups[index : index + 2]
+                if not _groups_are_contiguous(left, right):
+                    continue
+                merged = _merge_groups(left, right)
+                probe = _representation_for_group(
+                    problem,
+                    merged,
                     policy,
+                    projection,
+                    allocation,
                 )
-            ):
-                groups[index : index + 2] = [_merge_groups(group, groups[index + 1])]
-                continue
-            if (
-                represented is None
-                and index > 0
-                and _materially_mergeable(
-                    groups[index - 1],
-                    group,
+                if probe.representation is None:
+                    continue
+                options.append(
+                    (
+                        _merge_score(
+                            problem,
+                            left,
+                            right,
+                            merged,
+                            probe.representation,
+                            requirements,
+                            allocated,
+                        ),
+                        index,
+                        merged,
+                    )
+                )
+            if not options:
+                return _RegimeBuildOutcome(
+                    regimes=None,
+                    diagnostic=_regime_build_diagnostic(
+                        candidate_fingerprint,
+                        direction,
+                        initial_group_count,
+                        len(groups),
+                        policy.maximum_headway_regimes_per_direction,
+                        Stage1RegimeBuildFailureCodeV1.REGIME_COUNT_CAP_UNREPRESENTABLE,
+                        groups,
+                    ),
+                )
+            _, index, merged = min(options, key=lambda item: item[0])
+            groups[index : index + 2] = [merged]
+
+        while True:
+            probes = [
+                _representation_for_group(problem, group, policy, projection, allocation)
+                for group in groups
+            ]
+            failing_indices = [
+                index for index, probe in enumerate(probes) if probe.representation is None
+            ]
+            if not failing_indices:
+                break
+            repair_options: list[tuple[tuple[object, ...], int, _RegimeGroup]] = []
+            candidate_pair_indices = sorted(
+                {
+                    pair_index
+                    for failing_index in failing_indices
+                    for pair_index in (failing_index - 1, failing_index)
+                    if 0 <= pair_index < len(groups) - 1
+                }
+            )
+            for pair_index in candidate_pair_indices:
+                left, right = groups[pair_index : pair_index + 2]
+                if not _groups_are_contiguous(left, right):
+                    continue
+                merged = _merge_groups(left, right)
+                probe = _representation_for_group(
+                    problem,
+                    merged,
                     policy,
+                    projection,
+                    allocation,
                 )
-            ):
-                groups[index - 1 : index + 1] = [_merge_groups(groups[index - 1], group)]
-                index -= 1
-                continue
-            if represented is None:
-                return None
-            representation, start_window, end_window = represented
+                if probe.representation is None:
+                    continue
+                repair_options.append(
+                    (
+                        _merge_score(
+                            problem,
+                            left,
+                            right,
+                            merged,
+                            probe.representation,
+                            requirements,
+                            allocated,
+                        ),
+                        pair_index,
+                        merged,
+                    )
+                )
+            if not repair_options:
+                first_failure = failing_indices[0]
+                failure = probes[first_failure].failure_code
+                assert failure is not None
+                return _RegimeBuildOutcome(
+                    regimes=None,
+                    diagnostic=_regime_build_diagnostic(
+                        candidate_fingerprint,
+                        direction,
+                        initial_group_count,
+                        len(groups),
+                        policy.maximum_headway_regimes_per_direction,
+                        failure,
+                        [groups[first_failure]],
+                    ),
+                )
+            _, pair_index, merged = min(repair_options, key=lambda item: item[0])
+            groups[pair_index : pair_index + 2] = [merged]
+
+        for regime_index, (group, represented) in enumerate(
+            zip(groups, probes, strict=True),
+            start=1,
+        ):
+            representation = represented.representation
+            assert representation is not None
+            start_window = represented.start_window
+            end_window = represented.end_window
             maximum = (
                 policy.final_service_tail.final_service_tail_maximum_headway_minutes
                 if group.is_final_service_tail
@@ -822,7 +1097,7 @@ def _representable_regimes(
             )
             output.append(
                 ProposedServiceRegimeV1(
-                    regime_id=f"V3-{direction.value.upper()}-{index + 1:04d}",
+                    regime_id=f"V3-{direction.value.upper()}-{regime_index:04d}",
                     direction=direction,
                     covered_demand_block_ids=tuple(block.block_id for block in group.blocks),
                     trip_count=group.trip_count,
@@ -840,7 +1115,7 @@ def _representable_regimes(
                         "FINAL_SERVICE_TAIL_ANCHORED_TO_LOCKED_LAST_DEPARTURE"
                         if group.is_final_service_tail
                         else (
-                            "MERGED_NON_MATERIAL_DEMAND_BLOCKS_FOR_EXACT_REPRESENTABILITY"
+                            "MERGED_SERVICE_LEVEL_AWARE_FOR_EXACT_REPRESENTABILITY"
                             if len(group.blocks) > 1
                             else "AUTHORITATIVE_DEMAND_BLOCK"
                         )
@@ -853,8 +1128,7 @@ def _representable_regimes(
                     ),
                 )
             )
-            index += 1
-    return tuple(output)
+    return _RegimeBuildOutcome(regimes=tuple(output), diagnostic=None)
 
 
 def _allocation_blocks(
@@ -1188,6 +1462,9 @@ def allocate_trips_stage_1_v1(
     )
     plans: list[TripAllocationPlanV1] = []
     pruned_necessary_feasibility: list[Stage1NecessaryFeasibilityResultV1] = []
+    regime_build_rejected_count = 0
+    regime_build_failure_counts: Counter[Stage1RegimeBuildFailureCodeV1] = Counter()
+    regime_build_examples: list[Stage1RegimeBuildDiagnosticV1] = []
     candidate_count = 0
     last_status = NativeSolverStatus.UNKNOWN
     while len(plans) < effective_policy.maximum_stage_1_alternative_plans:
@@ -1208,15 +1485,22 @@ def allocate_trips_stage_1_v1(
             for key, value in bundle.count_by_direction_and_block.items()
         }
         objective_vector = tuple(int(solver.value(term)) for term in bundle.objective_terms)
-        regimes = _representable_regimes(
+        candidate_fingerprint = _allocation_candidate_fingerprint(
+            problem,
+            allocation,
+            effective_policy,
+        )
+        regime_build = _representable_regimes(
             problem,
             allocation,
             bundle.blocks,
             effective_policy,
             projection,
             bundle.final_service_sentinels,
+            candidate_fingerprint,
         )
-        if regimes is not None:
+        if regime_build.regimes is not None:
+            regimes = regime_build.regimes
             allocation_blocks = _allocation_blocks(problem, bundle, allocation)
             necessary_feasibility = evaluate_stage_1_necessary_feasibility_v1(
                 problem,
@@ -1261,30 +1545,12 @@ def allocate_trips_stage_1_v1(
                 )
                 plans.append(finalize_allocation_plan(plan))
         else:
-            pruned_necessary_feasibility.append(
-                finalize_stage_1_necessary_feasibility(
-                    Stage1NecessaryFeasibilityResultV1(
-                        allocation_candidate_fingerprint=_allocation_candidate_fingerprint(
-                            problem,
-                            allocation,
-                            effective_policy,
-                        ),
-                        passed=False,
-                        constraint_families=(
-                            Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP,
-                            Stage2ConstraintFamilyV1.UNIFORM_HEADWAY,
-                            Stage2ConstraintFamilyV1.REGIME_BOUNDARIES,
-                            Stage2ConstraintFamilyV1.B_SHIFT_BOUND,
-                            Stage2ConstraintFamilyV1.FINAL_SERVICE_TAIL,
-                        ),
-                        fleet_lower_bound=None,
-                        explanation=(
-                            "Stage 1 could not construct a representable strict-uniform regime "
-                            "partition for this bounded allocation candidate."
-                        ),
-                    )
-                )
-            )
+            diagnostic = regime_build.diagnostic
+            assert diagnostic is not None
+            regime_build_rejected_count += 1
+            regime_build_failure_counts[diagnostic.failure_code] += 1
+            if len(regime_build_examples) < 8:
+                regime_build_examples.append(diagnostic)
         literals = []
         for index, (key, variable) in enumerate(
             sorted(
@@ -1326,14 +1592,20 @@ def allocate_trips_stage_1_v1(
         explanations=(
             f"Stage 1 evaluated {candidate_count} bounded integer allocation candidate(s) and "
             f"produced {len(plans)} V3-representable, necessary-feasible plan(s); "
-            f"{len(pruned_necessary_feasibility)} candidate(s) were pruned by deterministic "
-            "representability/domain/fleet checks.",
+            f"{regime_build_rejected_count} candidate(s) were rejected during regime build and "
+            f"{len(pruned_necessary_feasibility)} candidate(s) were pruned by later deterministic "
+            "necessary-feasibility domain/fleet checks.",
         ),
         limitations=(
             *demand_authority.limitations,
             "Stage 1 assigns counts and representable regime boundaries only; exact source-trip "
             "minute positions remain Stage 2 authority.",
         ),
+        regime_build_rejected_count=regime_build_rejected_count,
+        regime_build_failure_reason_counts=tuple(
+            sorted(regime_build_failure_counts.items(), key=lambda item: item[0].value)
+        ),
+        regime_build_example_diagnostics=tuple(regime_build_examples),
     )
 
 
