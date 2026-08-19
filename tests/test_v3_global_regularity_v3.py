@@ -63,6 +63,67 @@ def test_stage1_v3_builds_with_full_direction_phase_authority() -> None:
     assert result.plans[0].necessary_feasibility.passed
 
 
+def _necessary_result(*families):
+    return global_policy_v3.allocator.finalize_stage_1_necessary_feasibility(
+        global_policy_v3.models.Stage1NecessaryFeasibilityResultV1(
+            allocation_candidate_fingerprint="candidate",
+            passed=False,
+            constraint_families=tuple(families),
+            fleet_lower_bound=None,
+            explanation="fixed Stage 1 witness failed a cheap necessary check",
+            diagnostic_fingerprint="",
+        )
+    )
+
+
+def test_domain_reachable_membership_is_deferred_to_stage2(monkeypatch) -> None:
+    membership = global_policy_v3.models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP
+    base = _necessary_result(membership)
+    monkeypatch.setattr(global_policy_v3, "_V2_NECESSARY_FEASIBILITY", lambda *args: base)
+    monkeypatch.setattr(
+        global_policy_v3,
+        "_domain_phase_membership_possible",
+        lambda *args: True,
+    )
+
+    result = global_policy_v3._phase_aware_necessary_feasibility(
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+
+    assert result.passed
+    assert result.constraint_families == ()
+    assert "Stage 2 CP-SAT" in result.explanation
+
+
+def test_domain_reachable_membership_does_not_clear_other_failures(monkeypatch) -> None:
+    membership = global_policy_v3.models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP
+    fleet = global_policy_v3.models.Stage2ConstraintFamilyV1.FLEET
+    base = _necessary_result(membership, fleet)
+    monkeypatch.setattr(global_policy_v3, "_V2_NECESSARY_FEASIBILITY", lambda *args: base)
+    monkeypatch.setattr(
+        global_policy_v3,
+        "_domain_phase_membership_possible",
+        lambda *args: True,
+    )
+
+    result = global_policy_v3._phase_aware_necessary_feasibility(
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+
+    assert not result.passed
+    assert result.constraint_families == (fleet,)
+
+
 def test_v3_policy_fingerprint_is_versioned_and_reversible() -> None:
     baseline = UniformIntegerRegimePolicyV3().policy_fingerprint
     global_policy_v3.install_global_regularity_v3()
