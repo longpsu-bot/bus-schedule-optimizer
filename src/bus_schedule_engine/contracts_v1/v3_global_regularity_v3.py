@@ -78,7 +78,9 @@ def _v3_adapter_context_fingerprint(demand_authority, policy, protected_fingerpr
 
 def _realized_block_counts(problem, direction, blocks, allocation) -> tuple[int, ...]:
     """Choose a deterministic full-direction bounded-phase realization close to Scenario B."""
-    ordered = tuple(sorted(blocks, key=lambda item: (item.start_time, item.end_time, item.block_id)))
+    ordered = tuple(
+        sorted(blocks, key=lambda item: (item.start_time, item.end_time, item.block_id))
+    )
     if not ordered:
         return ()
     targets = tuple(allocation[(direction, block.block_id)] for block in ordered)
@@ -178,7 +180,9 @@ def _phase_aware_initial_groups(problem, allocation, blocks, final_service_senti
 
 def _regime_local_phase_ok(representation, group, allocation) -> bool:
     """Check block phase locally; full cumulative authority is enforced after all regimes exist."""
-    for block in sorted(group.blocks, key=lambda item: (item.start_time, item.end_time, item.block_id)):
+    for block in sorted(
+        group.blocks, key=lambda item: (item.start_time, item.end_time, item.block_id)
+    ):
         target = allocation[(group.direction, block.block_id)]
         actual = sum(
             block.start_time // 60 <= minute < block.end_time // 60
