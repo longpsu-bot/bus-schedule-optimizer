@@ -1186,6 +1186,7 @@ def build_two_stage_uniform_request_v1(
     protected_service_floor_enforcement_authority: (
         ProtectedServiceFloorEnforcementAuthorityV1 | None
     ) = None,
+    demand_profile_fingerprint: str | None = None,
 ) -> tuple[ScheduleGenerationContextV1, OrToolsCpSatTwoStageUniformSolver]:
     if normalized_inputs.optimization_mode != (
         ScenarioCOptimizationModeV1.B_ANCHORED_TWO_STAGE_REBALANCE
@@ -1209,6 +1210,7 @@ def build_two_stage_uniform_request_v1(
     demand_authority = build_two_stage_demand_authority_v1(
         normalized_inputs,
         b_evaluation,
+        demand_profile_fingerprint=demand_profile_fingerprint,
     )
     protected_fingerprint = (
         protected_service_floor_enforcement_authority.enforcement_fingerprint
@@ -1240,6 +1242,8 @@ def build_two_stage_uniform_request_v1(
             effective_policy.maximum_regime_boundary_adjustment_minutes
         ),
     }
+    if demand_profile_fingerprint is not None:
+        adapter_locks["selected_demand_profile_fingerprint"] = demand_profile_fingerprint
     problem = build_schedule_problem_v1(
         normalized_inputs,
         b_evaluation,

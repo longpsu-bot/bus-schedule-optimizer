@@ -844,6 +844,28 @@ def test_v3_thresholds_bind_problem_solution_and_artifact_identities() -> None:
     )
 
 
+def test_selected_multi_period_profile_fingerprint_binds_v3_problem_identity() -> None:
+    _, _, normalized, evaluation, evaluation_policy = _stage1_request()
+    first_context, first_solver = build_two_stage_uniform_request_v1(
+        normalized,
+        evaluation,
+        evaluation_policy=evaluation_policy,
+        solver_policy=SolverPolicyV1(time_limit_seconds=2.0),
+        demand_profile_fingerprint="a" * 64,
+    )
+    second_context, second_solver = build_two_stage_uniform_request_v1(
+        normalized,
+        evaluation,
+        evaluation_policy=evaluation_policy,
+        solver_policy=SolverPolicyV1(time_limit_seconds=2.0),
+        demand_profile_fingerprint="b" * 64,
+    )
+
+    assert first_solver.demand_authority.demand_profile_fingerprint == "a" * 64
+    assert second_solver.demand_authority.demand_profile_fingerprint == "b" * 64
+    assert first_context.problem.problem_fingerprint != second_context.problem.problem_fingerprint
+
+
 def test_final_tail_is_uniform_spread_and_locked_to_last_departure() -> None:
     problem, authority, *_ = _stage1_request()
     policy = UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=1)

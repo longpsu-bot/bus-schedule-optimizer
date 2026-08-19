@@ -121,6 +121,56 @@ def test_combined_mode_preserves_direction_counts_without_directional_inference(
     )
 
 
+def test_unrelated_scenario_a_does_not_expand_b_anchored_v3_demand_coverage(
+    make_parameters,
+    make_valid_trips,
+) -> None:
+    parameters_b = make_parameters()
+    trips_b = make_valid_trips(parameters_b)
+    demand = [
+        _record(Direction.TERMINAL_1_TO_2, 360, 421, 80),
+        _record(Direction.TERMINAL_2_TO_1, 370, 431, 70),
+    ]
+    without_a = normalize_imported_workbook_v1(
+        _imported(parameters_b, trips_b, demand),
+        _options(ScenarioCOptimizationModeV1.B_ANCHORED_TWO_STAGE_REBALANCE),
+    )
+    parameters_a = replace(
+        parameters_b,
+        terminal_1_first_departure=5 * 3600,
+        terminal_1_last_departure=9 * 3600,
+        terminal_2_first_departure=5 * 3600 + 10 * 60,
+        terminal_2_last_departure=9 * 3600 + 10 * 60,
+    )
+    with_unrelated_a = normalize_imported_workbook_v1(
+        ImportedWorkbook(
+            parameters_a=parameters_a,
+            trips_a=[replace(item, scenario="A") for item in make_valid_trips(parameters_a)],
+            parameters_b=parameters_b,
+            trips_b=trips_b,
+            demand=demand,
+            configuration={},
+        ),
+        _options(ScenarioCOptimizationModeV1.B_ANCHORED_TWO_STAGE_REBALANCE),
+    )
+
+    evaluation_without_a = evaluate_scenario_b_v1(without_a)
+    evaluation_with_a = evaluate_scenario_b_v1(with_unrelated_a)
+    coverage_without_a = evaluation_without_a.demand_resolution.coverage_assessment
+    coverage_with_a = evaluation_with_a.demand_resolution.coverage_assessment
+    authority_without_a = build_two_stage_demand_authority_v1(
+        without_a,
+        evaluation_without_a,
+    )
+    authority_with_a = build_two_stage_demand_authority_v1(
+        with_unrelated_a,
+        evaluation_with_a,
+    )
+
+    assert coverage_without_a == coverage_with_a
+    assert authority_without_a == authority_with_a
+
+
 def test_new_optimization_mode_is_fingerprinted_without_changing_source_identities(
     make_parameters,
     make_valid_trips,
