@@ -16,9 +16,9 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
-import run_v3_two_stage_phase_review as base
+import run_v3_two_stage_phase_review as base  # noqa: E402
 
-from bus_schedule_engine.contracts_v1 import two_stage_allocator as allocator
+from bus_schedule_engine.contracts_v1 import two_stage_allocator as allocator  # noqa: E402
 
 
 def _planned_departures(regime) -> tuple[int, ...]:
