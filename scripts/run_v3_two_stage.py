@@ -4,12 +4,22 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _SRC = _REPO_ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
+
+from bus_schedule_engine.contracts_v1.v3_global_regularity import (  # noqa: E402
+    BLOCK_PHASE_MAX_DEVIATION_TRIPS_V1,
+    CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1,
+    GLOBAL_REGULARITY_POLICY_PROFILE_V1,
+    install_global_regularity_v1,
+)
+
+install_global_regularity_v1()
 
 from bus_schedule_engine.v3_result_exporter import (  # noqa: E402
     build_profile_comparison_v1,
@@ -69,6 +79,20 @@ def _selected_profiles(args: argparse.Namespace) -> tuple[tuple[str, ...], bool]
     return (default,), False
 
 
+def _with_global_regularity_metadata(run):
+    payload = dict(run.payload)
+    payload["global_regularity_policy"] = {
+        "profile": GLOBAL_REGULARITY_POLICY_PROFILE_V1,
+        "block_phase_max_deviation_trips": BLOCK_PHASE_MAX_DEVIATION_TRIPS_V1,
+        "cumulative_phase_max_deviation_trips": CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1,
+        "regime_count_semantics": "HARD_MAXIMUM_WITH_REPRESENTABLE_FIXED_POINT_COARSENING",
+        "surplus_allocation": "PASSENGER_PROPORTIONAL_LARGEST_REMAINDER",
+        "transition_authority": "NOT_WORSE_THAN_SCENARIO_B",
+        "declining_tail_authority": "FINAL_HEADWAY_NOT_SHORTER_THAN_PREVIOUS",
+    }
+    return replace(run, payload=payload)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
@@ -84,13 +108,15 @@ def main(argv: list[str] | None = None) -> int:
                 total_budget_seconds=args.solve_budget_seconds,
                 shape_distance_threshold=args.shape_distance_threshold,
             )
+            run = _with_global_regularity_metadata(run)
             profile_output = output_root / profile_id if batch_mode else output_root
             write_deterministic_json(profile_output / "result.json", run.payload)
             export_v3_result_xlsx_v1(run, profile_output / "result.xlsx")
             runs.append(run)
             print(
                 f"{profile_id}: {run.payload['aggregate_native_status']} / "
-                f"{run.payload['final_acceptance_state']} -> {profile_output}"
+                f"{run.payload['final_acceptance_state']} / "
+                f"global_regularity={GLOBAL_REGULARITY_POLICY_PROFILE_V1} -> {profile_output}"
             )
         if batch_mode:
             comparison = build_profile_comparison_v1(runs)
