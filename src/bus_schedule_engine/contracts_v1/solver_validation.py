@@ -69,6 +69,13 @@ from .terminal_occupancy import (
     TERMINAL_OCCUPANCY_EVENT_ORDER,
     assess_terminal_occupancy_v1,
 )
+from .two_stage_models import (
+    SCENARIO_C_UNIFORM_INTEGER_REGIME_POLICY_PROFILE,
+    TripAllocationPlanV1,
+    UniformIntegerRegimePolicyV3,
+    calculate_allocation_fingerprint,
+    is_strict_uniform_integer_headway_sequence_v3,
+)
 from .validation import validate_scenario_input
 
 _CONFIDENCE_RANK = {
@@ -77,6 +84,7 @@ _CONFIDENCE_RANK = {
     DemandConfidence.MEDIUM: 2,
     DemandConfidence.HIGH: 3,
 }
+_V3_ADAPTER_ID = "ortools_cp_sat_two_stage_uniform_v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,10 +269,38 @@ def _reconcile_legacy_regimes(
     return tuple(reconciled), errors
 
 
+def _reconcile_v3_regimes(
+    candidate: RawScheduleCandidateV1,
+) -> tuple[tuple[_ReconciledRegime, ...], list[str]]:
+    reconciled, errors = _reconcile_legacy_regimes(candidate)
+    if any(trip.c_departure_time % 60 for trip in candidate.exact_timetable):
+        errors.append("V3_DEPARTURE_NOT_WHOLE_MINUTE")
+    for item in reconciled:
+        sequence = item.actual_headway_sequence
+        if sequence and not is_strict_uniform_integer_headway_sequence_v3(sequence):
+            errors.append("V3_WITHIN_REGIME_HEADWAY_NOT_EXACTLY_UNIFORM")
+        expected_status = "UNIFORM" if sequence else "SINGLE_TRIP_HEADWAY_NOT_MEASURABLE"
+        if item.raw.legacy_regularity_status != expected_status:
+            errors.append("HEADWAY_REGIME_STATUS_MISMATCH")
+        if sequence and not _numeric_matches(item.raw.target_headway, sequence[0]):
+            errors.append("INVALID_HEADWAY_REGIME_TARGET")
+    return tuple(
+        replace(
+            item,
+            regularity_status=(
+                "UNIFORM" if item.actual_headway_sequence else "SINGLE_TRIP_HEADWAY_NOT_MEASURABLE"
+            ),
+        )
+        for item in reconciled
+    ), errors
+
+
 def _reconcile_regimes(
     problem: ScheduleProblemV1,
     candidate: RawScheduleCandidateV1,
 ) -> tuple[tuple[_ReconciledRegime, ...], list[str]]:
+    if problem.solver_adapter == _V3_ADAPTER_ID:
+        return _reconcile_v3_regimes(candidate)
     if problem.solver_adapter not in {
         "legacy_heuristic_v1",
         "ortools_cp_sat_quality_v1",
@@ -347,6 +383,194 @@ def _reconcile_regimes(
             )
         )
     return tuple(reconciled), errors
+
+
+def _two_stage_candidate_errors(
+    problem: ScheduleProblemV1,
+    candidate: RawScheduleCandidateV1,
+    allocation_plan: TripAllocationPlanV1 | None,
+    policy: UniformIntegerRegimePolicyV3 | None,
+) -> list[str]:
+    errors: list[str] = []
+    if allocation_plan is None or policy is None:
+        return ["V3_ALLOCATION_OR_POLICY_AUTHORITY_MISSING"]
+    if (
+        allocation_plan.allocation_fingerprint != calculate_allocation_fingerprint(allocation_plan)
+        or candidate.allocation_plan_fingerprint != allocation_plan.allocation_fingerprint
+        or allocation_plan.source_b_fingerprint != problem.source_b_fingerprint
+        or allocation_plan.demand_authority_mode != problem.demand_allocation_authority_mode
+    ):
+        errors.append("V3_ALLOCATION_PLAN_FINGERPRINT_MISMATCH")
+    if (
+        candidate.optimization_mode != problem.optimization_mode
+        or candidate.demand_allocation_authority_mode != problem.demand_allocation_authority_mode
+        or candidate.uniform_regime_policy_profile
+        != SCENARIO_C_UNIFORM_INTEGER_REGIME_POLICY_PROFILE
+        or allocation_plan.uniform_regime_profile
+        != SCENARIO_C_UNIFORM_INTEGER_REGIME_POLICY_PROFILE
+        or candidate.final_tail_policy_fingerprint != allocation_plan.final_tail_policy_fingerprint
+        or allocation_plan.final_tail_policy_fingerprint != policy.policy_fingerprint
+    ):
+        errors.append("V3_POLICY_AUTHORITY_MISMATCH")
+
+    source_by_id = {trip.trip_id: trip for trip in problem.scenario_b.exact_timetable}
+    candidate_by_source = {trip.source_b_trip_id: trip for trip in candidate.exact_timetable}
+    if any(trip.c_departure_time % 60 for trip in candidate.exact_timetable):
+        errors.append("V3_DEPARTURE_NOT_WHOLE_MINUTE")
+    if any(
+        source_id in candidate_by_source
+        and abs(candidate_by_source[source_id].c_departure_time - source.departure_time)
+        > policy.absolute_max_shift_per_trip_minutes * 60
+        for source_id, source in source_by_id.items()
+    ):
+        errors.append("V3_ABSOLUTE_SOURCE_SHIFT_BOUND_EXCEEDED")
+
+    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
+        source_order = tuple(
+            trip.trip_id
+            for trip in sorted(
+                (
+                    trip
+                    for trip in problem.scenario_b.exact_timetable
+                    if trip.direction == direction
+                ),
+                key=lambda item: (item.departure_time, item.trip_id),
+            )
+        )
+        candidate_order = tuple(
+            trip.source_b_trip_id
+            for trip in sorted(
+                (trip for trip in candidate.exact_timetable if trip.direction == direction),
+                key=lambda item: (item.c_departure_time, item.c_trip_id),
+            )
+        )
+        if candidate_order != source_order:
+            errors.append("V3_SOURCE_ORDER_LOCK_VIOLATION")
+
+    for block in allocation_plan.allocation_blocks:
+        for direction, expected in block.directional_trip_counts:
+            actual = sum(
+                trip.direction == direction
+                and block.start_minute * 60 <= trip.c_departure_time < block.end_minute * 60
+                for trip in candidate.exact_timetable
+            )
+            if actual != expected:
+                errors.append("V3_STAGE_1_BLOCK_ALLOCATION_NOT_REPRODUCED")
+
+    for sentinel in allocation_plan.final_service_sentinels:
+        trip = candidate_by_source.get(sentinel.source_b_trip_id)
+        if trip is None or trip.c_departure_time != sentinel.departure_minute * 60:
+            errors.append("V3_FINAL_SERVICE_SENTINEL_LOCK_VIOLATION")
+            continue
+        if any(
+            block.start_minute <= sentinel.departure_minute < block.end_minute
+            and (
+                block.direction == ContractDirection.COMBINED
+                or block.direction == sentinel.direction
+            )
+            for block in allocation_plan.allocation_blocks
+        ):
+            errors.append("V3_FINAL_SERVICE_SENTINEL_COUNTED_AS_DEMAND_MEMBER")
+
+    raw_by_id = {regime.regime_id: regime for regime in candidate.headway_regimes}
+    planned_ids = {regime.regime_id for regime in allocation_plan.proposed_regimes}
+    if set(raw_by_id) != planned_ids:
+        errors.append("V3_STAGE_1_REGIME_ALLOCATION_NOT_REPRODUCED")
+    members_by_id: dict[str, list[RawCandidateTripV1]] = {}
+    for trip in candidate.exact_timetable:
+        members_by_id.setdefault(trip.headway_regime_id, []).append(trip)
+    for regime in allocation_plan.proposed_regimes:
+        raw = raw_by_id.get(regime.regime_id)
+        members = sorted(
+            members_by_id.get(regime.regime_id, ()),
+            key=lambda item: (item.c_departure_time, item.c_trip_id),
+        )
+        if raw is None or len(members) != regime.trip_count:
+            errors.append("V3_STAGE_1_REGIME_ALLOCATION_NOT_REPRODUCED")
+            continue
+        sequence = tuple(
+            (later.c_departure_time - earlier.c_departure_time) // 60
+            for earlier, later in zip(members, members[1:], strict=False)
+        )
+        if sequence and not is_strict_uniform_integer_headway_sequence_v3(sequence):
+            errors.append("V3_WITHIN_REGIME_HEADWAY_NOT_EXACTLY_UNIFORM")
+        if sequence and sequence[0] > regime.maximum_headway_minutes:
+            errors.append("V3_REGIME_MAXIMUM_HEADWAY_EXCEEDED")
+        if regime.is_final_service_tail:
+            locked_last = max(
+                source.departure_time
+                for source in problem.scenario_b.exact_timetable
+                if source.direction == regime.direction
+            )
+            if not members or members[-1].c_departure_time != locked_last:
+                errors.append("V3_FINAL_TAIL_LAST_DEPARTURE_LOCK_VIOLATION")
+                continue
+            actual_span = (members[-1].c_departure_time - members[0].c_departure_time) // 60
+            planned_span = regime.planned_end_minute - regime.planned_start_minute
+            if actual_span < max(
+                0,
+                planned_span - policy.maximum_regime_boundary_adjustment_minutes,
+            ):
+                errors.append("V3_FINAL_TAIL_AVOIDABLE_COMPRESSION")
+            if sequence and sequence[0] > (
+                policy.final_service_tail.final_service_tail_maximum_headway_minutes
+            ):
+                errors.append("V3_FINAL_TAIL_MAXIMUM_HEADWAY_EXCEEDED")
+
+    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
+        directional_regimes = sorted(
+            (
+                regime
+                for regime in allocation_plan.proposed_regimes
+                if regime.direction == direction
+            ),
+            key=lambda item: (
+                item.planned_start_minute,
+                item.planned_end_minute,
+                item.regime_id,
+            ),
+        )
+        final_tails = [regime for regime in directional_regimes if regime.is_final_service_tail]
+        if len(final_tails) != 1 or final_tails[0] is not directional_regimes[-1]:
+            errors.append("V3_FINAL_TAIL_REGIME_AUTHORITY_INVALID")
+        elif (
+            sum(source.direction == direction for source in problem.scenario_b.exact_timetable)
+            >= policy.final_service_tail.final_service_tail_minimum_trip_count
+            and final_tails[0].trip_count
+            < policy.final_service_tail.final_service_tail_minimum_trip_count
+        ):
+            errors.append("V3_FINAL_TAIL_MINIMUM_TRIP_COUNT_VIOLATION")
+        for earlier, later in zip(
+            directional_regimes,
+            directional_regimes[1:],
+            strict=False,
+        ):
+            earlier_members = sorted(
+                members_by_id.get(earlier.regime_id, ()),
+                key=lambda item: (item.c_departure_time, item.c_trip_id),
+            )
+            later_members = sorted(
+                members_by_id.get(later.regime_id, ()),
+                key=lambda item: (item.c_departure_time, item.c_trip_id),
+            )
+            if not earlier_members or not later_members:
+                continue
+            transition = (
+                later_members[0].c_departure_time - earlier_members[-1].c_departure_time
+            ) // 60
+            adjacent_raw_regimes = tuple(
+                raw
+                for regime in (earlier, later)
+                if (raw := raw_by_id.get(regime.regime_id)) is not None
+                and raw.actual_headway_sequence
+            )
+            if any(
+                abs(transition - raw.actual_headway_sequence[0])
+                > policy.maximum_transition_jump_minutes
+                for raw in adjacent_raw_regimes
+            ):
+                errors.append("V3_MAXIMUM_REGIME_TRANSITION_JUMP_EXCEEDED")
+    return errors
 
 
 def _candidate_scenario(
@@ -724,6 +948,9 @@ def _ordered_candidate_rejection_codes(
 def validate_and_build_solution_v1(
     context: ScheduleGenerationContextV1,
     candidate: RawScheduleCandidateV1,
+    *,
+    allocation_plan: TripAllocationPlanV1 | None = None,
+    uniform_regime_policy: UniformIntegerRegimePolicyV3 | None = None,
 ) -> CandidateValidationResultV1:
     rejection_codes: list[str] = []
     problem = context.problem
@@ -733,7 +960,14 @@ def validate_and_build_solution_v1(
         context.normalized_inputs,
         minimum_confidence=(context.evaluation_policy.minimum_authoritative_demand_confidence),
     )
-    if not coverage.directional_c_generation_supported:
+    combined_v3_supported = (
+        problem.solver_adapter == _V3_ADAPTER_ID
+        and problem.demand_allocation_authority_mode is not None
+        and problem.demand_allocation_authority_mode.value
+        == "COMBINED_DEMAND_FIXED_DIRECTION_COUNTS"
+        and coverage.whole_b_suitability_supported
+    )
+    if not coverage.directional_c_generation_supported and not combined_v3_supported:
         rejection_codes.append(DEMAND_COVERAGE_INCOMPLETE_FOR_AUTHORITATIVE_C)
     b = problem.scenario_b
     if candidate.solver_adapter != problem.solver_adapter:
@@ -752,6 +986,10 @@ def validate_and_build_solution_v1(
         solver_adapter=candidate.solver_adapter,
         exact_timetable=candidate.exact_timetable,
         headway_regimes=candidate.headway_regimes,
+        allocation_plan_fingerprint=candidate.allocation_plan_fingerprint,
+        optimization_mode=candidate.optimization_mode,
+        demand_allocation_authority_mode=(candidate.demand_allocation_authority_mode),
+        final_tail_policy_fingerprint=candidate.final_tail_policy_fingerprint,
     )
     if candidate.candidate_fingerprint != expected_candidate_fingerprint:
         rejection_codes.append("CANDIDATE_FINGERPRINT_MISMATCH")
@@ -765,6 +1003,15 @@ def validate_and_build_solution_v1(
         )
         rejection_codes.extend(protected_validation.rejection_codes)
     rejection_codes.extend(_source_lock_errors(problem, candidate))
+    if problem.solver_adapter == _V3_ADAPTER_ID:
+        rejection_codes.extend(
+            _two_stage_candidate_errors(
+                problem,
+                candidate,
+                allocation_plan,
+                uniform_regime_policy,
+            )
+        )
     derived_trip_facts, trip_fact_errors = _derive_trip_facts(problem, candidate)
     rejection_codes.extend(trip_fact_errors)
     reconciled_regimes, regime_errors = _reconcile_regimes(problem, candidate)
@@ -952,6 +1199,11 @@ def validate_and_build_solution_v1(
             if protected_validation is not None
             else None
         ),
+        allocation_plan_fingerprint=candidate.allocation_plan_fingerprint,
+        optimization_mode=candidate.optimization_mode,
+        demand_allocation_authority_mode=(candidate.demand_allocation_authority_mode),
+        uniform_regime_policy_profile=candidate.uniform_regime_policy_profile,
+        final_tail_policy_fingerprint=candidate.final_tail_policy_fingerprint,
     )
     final_integrity_errors = _solution_headway_regime_integrity_errors(
         provisional.c_exact_timetable,

@@ -20,12 +20,14 @@ from .evaluation import (
 from .models import (
     CONTRACT_VERSION,
     ContractDirection,
+    DemandAllocationAuthorityModeV1,
     DemandConfidence,
     DemandResponseMode,
     DepartureTerminal,
     NormalizedInputBundleV1,
     ScenarioAInput,
     ScenarioBInput,
+    ScenarioCOptimizationModeV1,
 )
 
 
@@ -161,6 +163,11 @@ class RawScheduleCandidateV1:
     headway_regimes: tuple[RawHeadwayRegimeV1, ...]
     explanation: str
     limitations: tuple[str, ...]
+    allocation_plan_fingerprint: str | None = None
+    optimization_mode: ScenarioCOptimizationModeV1 | None = None
+    demand_allocation_authority_mode: DemandAllocationAuthorityModeV1 | None = None
+    uniform_regime_policy_profile: str | None = None
+    final_tail_policy_fingerprint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -261,6 +268,11 @@ class ScheduleSolutionV1:
     limitations: tuple[str, ...]
     protected_service_floor_enforcement_fingerprint: str | None = None
     protected_service_floor_validation_fingerprint: str | None = None
+    allocation_plan_fingerprint: str | None = None
+    optimization_mode: ScenarioCOptimizationModeV1 | None = None
+    demand_allocation_authority_mode: DemandAllocationAuthorityModeV1 | None = None
+    uniform_regime_policy_profile: str | None = None
+    final_tail_policy_fingerprint: str | None = None
 
     @property
     def contract_version(self) -> str:
@@ -342,6 +354,8 @@ class ScheduleProblemV1:
     block_requirements: tuple[BlockSupplyPlanV1, ...]
     boundary_convention: BoundaryConvention
     solver_policy: SolverPolicyV1
+    optimization_mode: ScenarioCOptimizationModeV1 = ScenarioCOptimizationModeV1.LEGACY_A_BOUND
+    demand_allocation_authority_mode: DemandAllocationAuthorityModeV1 | None = None
 
     @property
     def contract_version(self) -> str:

@@ -7,6 +7,21 @@ from enum import StrEnum
 from bus_schedule_engine.models import RouteType
 
 CONTRACT_VERSION = "1.0.0"
+B_ANCHORED_TWO_STAGE_REBALANCE_V1 = "B_ANCHORED_TWO_STAGE_REBALANCE_V1"
+COMBINED_DEMAND_FIXED_DIRECTION_COUNTS = "COMBINED_DEMAND_FIXED_DIRECTION_COUNTS"
+DIRECTIONAL_DEMAND_FIXED_DIRECTION_COUNTS = "DIRECTIONAL_DEMAND_FIXED_DIRECTION_COUNTS"
+
+
+class ScenarioCOptimizationModeV1(StrEnum):
+    """Demand provenance mode used before building a solver problem."""
+
+    LEGACY_A_BOUND = "LEGACY_A_BOUND"
+    B_ANCHORED_TWO_STAGE_REBALANCE = B_ANCHORED_TWO_STAGE_REBALANCE_V1
+
+
+class DemandAllocationAuthorityModeV1(StrEnum):
+    DIRECTIONAL_FIXED_DIRECTION_COUNTS = DIRECTIONAL_DEMAND_FIXED_DIRECTION_COUNTS
+    COMBINED_FIXED_DIRECTION_COUNTS = COMBINED_DEMAND_FIXED_DIRECTION_COUNTS
 
 
 class ScenarioId(StrEnum):
@@ -238,3 +253,4 @@ class NormalizedInputBundleV1:
     scenario_a_fingerprint: str | None
     scenario_b_fingerprint: str
     observed_demand_fingerprint: str | None
+    optimization_mode: ScenarioCOptimizationModeV1 = ScenarioCOptimizationModeV1.LEGACY_A_BOUND

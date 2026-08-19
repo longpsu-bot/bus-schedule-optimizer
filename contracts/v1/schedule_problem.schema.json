@@ -47,6 +47,15 @@
     },
     "solver_adapter": {"type": "string", "minLength": 1},
     "adapter_context_fingerprint": {"$ref": "#/$defs/fingerprint"},
+    "scenario_c_optimization_mode": {
+      "const": "B_ANCHORED_TWO_STAGE_REBALANCE_V1"
+    },
+    "demand_allocation_authority_mode": {
+      "enum": [
+        "DIRECTIONAL_DEMAND_FIXED_DIRECTION_COUNTS",
+        "COMBINED_DEMAND_FIXED_DIRECTION_COUNTS"
+      ]
+    },
     "scenario_a": {
       "anyOf": [{"$ref": "scenario_a_input.schema.json"}, {"type": "null"}]
     },

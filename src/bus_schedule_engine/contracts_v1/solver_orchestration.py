@@ -413,7 +413,20 @@ def run_schedule_solver_v1(
             limitations=run.limitations,
         )
 
-    validation = validate_and_build_solution_v1(validation_context, run.candidate)
+    validation_arguments = {}
+    if solver.adapter_id == "ortools_cp_sat_two_stage_uniform_v1":
+        detailed_run = getattr(solver, "last_detailed_run", None)
+        validation_arguments = {
+            "allocation_plan": (
+                detailed_run.selected_allocation_plan if detailed_run is not None else None
+            ),
+            "uniform_regime_policy": getattr(solver, "policy", None),
+        }
+    validation = validate_and_build_solution_v1(
+        validation_context,
+        run.candidate,
+        **validation_arguments,
+    )
     if not validation.passed or validation.solution is None:
         diagnostic = RejectedCandidateDiagnosticV1(
             candidate_fingerprint=run.candidate.candidate_fingerprint,

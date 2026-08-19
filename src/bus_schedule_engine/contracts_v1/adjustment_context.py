@@ -14,6 +14,7 @@ from .models import (
     CONTRACT_VERSION,
     DemandConfidence,
     NormalizedInputBundleV1,
+    ScenarioCOptimizationModeV1,
 )
 from .serialization import (
     canonical_sha256,
@@ -308,7 +309,7 @@ def normalized_bundle_fingerprint_payload_v1(
     source_b_fingerprint: str,
     observed_demand_fingerprint_value: str | None,
 ) -> dict[str, object]:
-    return {
+    payload = {
         "fingerprint_profile": NORMALIZED_BUNDLE_FINGERPRINT_PROFILE,
         "contract_version": bundle.scenario_b.contract_version,
         "source_a_fingerprint": source_a_fingerprint,
@@ -318,6 +319,9 @@ def normalized_bundle_fingerprint_payload_v1(
         "scenario_b_source_identity": _source_identity(bundle.scenario_b),
         "observed_demand_source_identity": _source_identity(bundle.observed_demand),
     }
+    if bundle.optimization_mode != ScenarioCOptimizationModeV1.LEGACY_A_BOUND:
+        payload["scenario_c_optimization_mode"] = bundle.optimization_mode.value
+    return payload
 
 
 def calculate_normalized_bundle_fingerprint_v1(

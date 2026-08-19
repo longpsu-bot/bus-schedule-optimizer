@@ -271,7 +271,12 @@ def _add_terminal_occupancy_capacity_constraints(
     return binary_variables, constraints, len(arrival_trips)
 
 
-def _build_cp_sat_model(problem: ScheduleProblemV1) -> _CpSatModelBundle:
+def _build_cp_sat_model(
+    problem: ScheduleProblemV1,
+    *,
+    departure_domain_by_source_id: dict[str, tuple[int, int]] | None = None,
+    minimum_headway_minutes: int = 1,
+) -> _CpSatModelBundle:
     model = cp_model.CpModel()
     directional = _ordered_directional_trips(problem)
     departure_by_source_id: dict[str, cp_model.IntVar] = {}
@@ -279,9 +284,14 @@ def _build_cp_sat_model(problem: ScheduleProblemV1) -> _CpSatModelBundle:
         first_minute, last_minute = _directional_window_minutes(problem, direction)
         variables: list[cp_model.IntVar] = []
         for index, trip in enumerate(trips, start=1):
+            domain = (
+                departure_domain_by_source_id[trip.trip_id]
+                if departure_domain_by_source_id is not None
+                else (first_minute, last_minute)
+            )
             variable = model.new_int_var(
-                first_minute,
-                last_minute,
+                domain[0],
+                domain[1],
                 f"departure_{direction.value}_{index:04d}_{trip.trip_id}",
             )
             variables.append(variable)
@@ -290,7 +300,7 @@ def _build_cp_sat_model(problem: ScheduleProblemV1) -> _CpSatModelBundle:
         model.add(variables[0] == first_minute)
         model.add(variables[-1] == last_minute)
         for earlier, later in zip(variables, variables[1:], strict=False):
-            model.add(later >= earlier + 1)
+            model.add(later >= earlier + minimum_headway_minutes)
 
     fleet_limit = problem.scenario_b.available_fleet_limit
     initial_terminal_1 = model.new_int_var(0, fleet_limit, "initial_terminal_1")

@@ -13,6 +13,7 @@ from .models import (
     NormalizedInputBundleV1,
     ObservedDemandInput,
     ScenarioBInput,
+    ScenarioCOptimizationModeV1,
     ScenarioInputV1,
 )
 
@@ -498,7 +499,11 @@ def validate_normalized_bundle(bundle: NormalizedInputBundleV1) -> ContractValid
     issues.extend(validate_scenario_input(bundle.scenario_b).issues)
     if bundle.observed_demand is not None:
         issues.extend(validate_observed_demand(bundle.observed_demand).issues)
-        if bundle.scenario_a is None:
+        if (
+            bundle.scenario_a is None
+            and bundle.optimization_mode
+            != ScenarioCOptimizationModeV1.B_ANCHORED_TWO_STAGE_REBALANCE
+        ):
             issues.append(
                 _issue(
                     "DEMAND_WITHOUT_SCENARIO_A",
@@ -506,6 +511,14 @@ def validate_normalized_bundle(bundle: NormalizedInputBundleV1) -> ContractValid
                     "observed demand is associated with Scenario A, but Scenario A is absent",
                 )
             )
+    if not isinstance(bundle.optimization_mode, ScenarioCOptimizationModeV1):
+        issues.append(
+            _issue(
+                "INVALID_SCENARIO_C_OPTIMIZATION_MODE",
+                "optimization_mode",
+                "optimization mode must be an explicit versioned Contract V1 value",
+            )
+        )
     if bundle.scenario_a is not None:
         if bundle.scenario_a.route_id != bundle.scenario_b.route_id:
             issues.append(
