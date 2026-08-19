@@ -29,6 +29,7 @@ TWO_STAGE_ACCEPTANCE_PROFILE_V1 = "scenario_c_two_stage_final_acceptance_v1"
 TWO_STAGE_RESULT_FINGERPRINT_PROFILE_V1 = "scenario_c_two_stage_result_v1"
 FINAL_SERVICE_SENTINEL = "FINAL_SERVICE_SENTINEL"
 STAGE_1_NECESSARY_FEASIBILITY_PROFILE_V1 = "scenario_c_stage_1_necessary_feasibility_v1"
+STAGE_1_REGIME_BUILD_DIAGNOSTIC_PROFILE_V1 = "scenario_c_stage_1_regime_build_diagnostic_v1"
 STAGE_2_INFEASIBILITY_DIAGNOSTIC_PROFILE_V1 = "scenario_c_stage_2_infeasibility_diagnostic_v1"
 
 
@@ -66,6 +67,15 @@ class Stage2ConstraintFamilyV1(StrEnum):
     FLEET = "FLEET"
     TERMINAL_OCCUPANCY = "TERMINAL_OCCUPANCY"
     PROTECTED_SERVICE_FLOOR = "PROTECTED_SERVICE_FLOOR"
+
+
+class Stage1RegimeBuildFailureCodeV1(StrEnum):
+    REGIME_COUNT_CAP_UNREPRESENTABLE = "REGIME_COUNT_CAP_UNREPRESENTABLE"
+    GROUP_UNIFORM_REPRESENTATION_UNAVAILABLE = "GROUP_UNIFORM_REPRESENTATION_UNAVAILABLE"
+    ALLOCATION_MEMBERSHIP_UNREPRESENTABLE = "ALLOCATION_MEMBERSHIP_UNREPRESENTABLE"
+    B_SHIFT_BOUND_UNREPRESENTABLE = "B_SHIFT_BOUND_UNREPRESENTABLE"
+    FINAL_TAIL_UNREPRESENTABLE = "FINAL_TAIL_UNREPRESENTABLE"
+    PROTECTED_FLOOR_BLOCKED_MERGE = "PROTECTED_FLOOR_BLOCKED_MERGE"
 
 
 def is_strict_uniform_integer_headway_sequence_v3(
@@ -359,6 +369,55 @@ class ProposedServiceRegimeV1:
 
 
 @dataclass(frozen=True, slots=True)
+class Stage1RegimeBuildDiagnosticV1:
+    allocation_candidate_fingerprint: str
+    failure_code: Stage1RegimeBuildFailureCodeV1
+    direction: ContractDirection
+    initial_group_count: int
+    final_group_count: int
+    maximum_group_count: int
+    failing_group_block_ids: tuple[str, ...]
+    explanation: str
+    diagnostic_profile: str = STAGE_1_REGIME_BUILD_DIAGNOSTIC_PROFILE_V1
+    diagnostic_fingerprint: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.allocation_candidate_fingerprint.strip() or not self.explanation.strip():
+            raise ValueError("Stage 1 regime-build identity and explanation are required")
+        if self.direction not in {ContractDirection.OUTBOUND, ContractDirection.INBOUND}:
+            raise ValueError("Stage 1 regime-build diagnostic requires a timetable direction")
+        for name in ("initial_group_count", "final_group_count", "maximum_group_count"):
+            _non_negative_integer(name, getattr(self, name))
+        if self.maximum_group_count < 1:
+            raise ValueError("maximum_group_count must be positive")
+        if len(set(self.failing_group_block_ids)) != len(self.failing_group_block_ids):
+            raise ValueError("failing demand-block identities must be unique")
+        if self.diagnostic_profile != STAGE_1_REGIME_BUILD_DIAGNOSTIC_PROFILE_V1:
+            raise ValueError("Stage 1 regime-build diagnostic profile is invalid")
+        if self.diagnostic_fingerprint and self.diagnostic_fingerprint != (
+            calculate_stage_1_regime_build_diagnostic_fingerprint(self)
+        ):
+            raise ValueError("Stage 1 regime-build diagnostic fingerprint is invalid")
+
+
+def calculate_stage_1_regime_build_diagnostic_fingerprint(
+    diagnostic: Stage1RegimeBuildDiagnosticV1,
+) -> str:
+    payload = jsonable(asdict(diagnostic))
+    payload.pop("diagnostic_fingerprint", None)
+    return canonical_sha256(payload)
+
+
+def finalize_stage_1_regime_build_diagnostic(
+    diagnostic: Stage1RegimeBuildDiagnosticV1,
+) -> Stage1RegimeBuildDiagnosticV1:
+    return replace(
+        diagnostic,
+        diagnostic_fingerprint=(calculate_stage_1_regime_build_diagnostic_fingerprint(diagnostic)),
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class Stage1NecessaryFeasibilityResultV1:
     allocation_candidate_fingerprint: str
     passed: bool
@@ -533,6 +592,9 @@ class Stage1AllocationResultV1:
     budget_exhausted: bool
     explanations: tuple[str, ...]
     limitations: tuple[str, ...]
+    regime_build_rejected_count: int = 0
+    regime_build_failure_reason_counts: tuple[tuple[Stage1RegimeBuildFailureCodeV1, int], ...] = ()
+    regime_build_example_diagnostics: tuple[Stage1RegimeBuildDiagnosticV1, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -632,6 +694,15 @@ class TwoStageSolveDiagnosticsV1:
     total_budget_seconds: float
     budget_exhausted: bool
     stage_2_infeasibility_diagnostics: tuple[Stage2InfeasibilityDiagnosticV1, ...]
+    stage_1_regime_build_rejected_count: int = 0
+    stage_1_regime_build_failure_reason_counts: tuple[
+        tuple[Stage1RegimeBuildFailureCodeV1, int], ...
+    ] = ()
+    stage_1_regime_build_example_diagnostics: tuple[Stage1RegimeBuildDiagnosticV1, ...] = ()
+    stage_1_necessary_feasibility_constraint_family_counts: tuple[
+        tuple[Stage2ConstraintFamilyV1, int], ...
+    ] = ()
+    stage_1_necessary_feasibility_example_candidate_fingerprints: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -687,6 +758,7 @@ __all__ = [
     "FINAL_SERVICE_SENTINEL",
     "SCENARIO_C_UNIFORM_INTEGER_REGIME_POLICY_PROFILE",
     "STAGE_1_NECESSARY_FEASIBILITY_PROFILE_V1",
+    "STAGE_1_REGIME_BUILD_DIAGNOSTIC_PROFILE_V1",
     "STAGE_2_INFEASIBILITY_DIAGNOSTIC_PROFILE_V1",
     "TRIP_ALLOCATION_PLAN_PROFILE_V1",
     "DemandAllocationAuthorityModeV1",
@@ -699,6 +771,8 @@ __all__ = [
     "ServiceBoundarySemanticsV1",
     "Stage1AllocationResultV1",
     "Stage1NecessaryFeasibilityResultV1",
+    "Stage1RegimeBuildDiagnosticV1",
+    "Stage1RegimeBuildFailureCodeV1",
     "Stage2ConstraintFamilyV1",
     "Stage2InfeasibilityDiagnosticV1",
     "Stage2TimetableResultV1",
@@ -712,9 +786,11 @@ __all__ = [
     "allocation_fingerprint_payload",
     "calculate_allocation_fingerprint",
     "calculate_stage_1_necessary_feasibility_fingerprint",
+    "calculate_stage_1_regime_build_diagnostic_fingerprint",
     "calculate_stage_2_infeasibility_diagnostic_fingerprint",
     "finalize_allocation_plan",
     "finalize_stage_1_necessary_feasibility",
+    "finalize_stage_1_regime_build_diagnostic",
     "finalize_stage_2_infeasibility_diagnostic",
     "finalize_two_stage_result",
     "is_strict_uniform_integer_headway_sequence_v3",

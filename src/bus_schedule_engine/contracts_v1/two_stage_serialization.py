@@ -239,6 +239,37 @@ def two_stage_result_to_contract_dict_v1(
             "stage_1_necessary_feasibility_pruned_count": (
                 result.diagnostics.stage_1_necessary_feasibility_pruned_count
             ),
+            "stage_1_regime_build_rejected_count": (
+                result.diagnostics.stage_1_regime_build_rejected_count
+            ),
+            "stage_1_regime_build_failure_reason_counts": {
+                reason.value: count
+                for reason, count in (result.diagnostics.stage_1_regime_build_failure_reason_counts)
+            },
+            "stage_1_regime_build_example_diagnostics": [
+                {
+                    "allocation_candidate_fingerprint": (item.allocation_candidate_fingerprint),
+                    "failure_code": item.failure_code.value,
+                    "direction": item.direction.value,
+                    "initial_group_count": item.initial_group_count,
+                    "final_group_count": item.final_group_count,
+                    "maximum_group_count": item.maximum_group_count,
+                    "failing_group_block_ids": list(item.failing_group_block_ids),
+                    "explanation": item.explanation,
+                    "diagnostic_profile": item.diagnostic_profile,
+                    "diagnostic_fingerprint": item.diagnostic_fingerprint,
+                }
+                for item in result.diagnostics.stage_1_regime_build_example_diagnostics
+            ],
+            "stage_1_necessary_feasibility_constraint_family_counts": {
+                family.value: count
+                for family, count in (
+                    result.diagnostics.stage_1_necessary_feasibility_constraint_family_counts
+                )
+            },
+            "stage_1_necessary_feasibility_example_candidate_fingerprints": list(
+                result.diagnostics.stage_1_necessary_feasibility_example_candidate_fingerprints
+            ),
             "stage_2_allocation_attempt_count": (
                 result.diagnostics.stage_2_allocation_attempt_count
             ),

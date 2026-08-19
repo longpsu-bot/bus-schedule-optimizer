@@ -44,6 +44,7 @@ from bus_schedule_engine.contracts_v1 import (
     two_stage_result_to_contract_dict_v1,
     validate_and_build_solution_v1,
 )
+from bus_schedule_engine.contracts_v1 import two_stage_allocator as two_stage_allocator_module
 from bus_schedule_engine.contracts_v1 import two_stage_solver as two_stage_solver_module
 from bus_schedule_engine.importer import ImportedWorkbook
 from bus_schedule_engine.models import (
@@ -156,6 +157,22 @@ def _stage1_request(
         demand_allocation_authority_mode=authority.authority_mode,
     )
     return problem, authority, normalized, evaluation, evaluation_policy
+
+
+def _dense_half_hour_stage1_request(
+    block_count: int = 18,
+    *,
+    passengers: tuple[float, ...] | None = None,
+):
+    start = 300
+    departures = tuple(start + index * 30 for index in range(block_count + 1))
+    values = passengers or tuple(10.0 if index % 2 == 0 else 16.0 for index in range(block_count))
+    demand = tuple(
+        _record(direction, start + index * 30, start + (index + 1) * 30, values[index])
+        for direction in (Direction.TERMINAL_1_TO_2, Direction.TERMINAL_2_TO_1)
+        for index in range(block_count)
+    )
+    return _stage1_request(outbound=departures, inbound=departures, demand=demand)
 
 
 def test_exact_uniform_representability_and_bounded_boundary_repair() -> None:
@@ -271,6 +288,223 @@ def test_stage_1_fixes_daily_and_directional_totals_and_emits_only_exact_regimes
             (b_no_service, b_critical, b_planning),
             strict=True,
         )
+    )
+
+
+def test_noisy_equal_service_blocks_coarsen_below_cap_with_exact_membership() -> None:
+    problem, authority, *_ = _dense_half_hour_stage1_request()
+    policy = UniformIntegerRegimePolicyV3(
+        maximum_headway_regimes_per_direction=16,
+        maximum_stage_1_alternative_plans=1,
+    )
+
+    result = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=policy,
+        time_limit_seconds=3.0,
+    )
+
+    assert result.plans
+    assert result.candidate_count == 1
+    assert result.regime_build_rejected_count == 0
+    assert result.necessary_feasibility_pruned_count == 0
+    plan = result.plans[0]
+    assert all(
+        sum(regime.direction == direction for regime in plan.proposed_regimes) <= 16
+        for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND)
+    )
+    assert any(len(regime.covered_demand_block_ids) > 1 for regime in plan.proposed_regimes)
+    allocation = {
+        (block.direction, block.block_id): block.trip_count for block in plan.allocation_blocks
+    }
+    source_blocks = {block.block_id: block for block in problem.analysis_blocks}
+    for regime in plan.proposed_regimes:
+        departures = (
+            (regime.planned_start_minute,)
+            if regime.uniform_headway_minutes is None
+            else tuple(
+                regime.planned_start_minute + index * regime.uniform_headway_minutes
+                for index in range(regime.trip_count)
+            )
+        )
+        for block_id in regime.covered_demand_block_ids:
+            block = source_blocks[block_id]
+            represented_count = sum(
+                block.start_time // 60 <= minute < block.end_time // 60 for minute in departures
+            )
+            assert represented_count == allocation[(regime.direction, block_id)]
+
+
+def test_service_discontinuity_precedes_passenger_noise_in_merge_score() -> None:
+    problem, *_ = _dense_half_hour_stage1_request(
+        block_count=3,
+        passengers=(10.0, 100.0, 101.0),
+    )
+    blocks = tuple(
+        block for block in problem.analysis_blocks if block.direction == ContractDirection.OUTBOUND
+    )
+    group_type = two_stage_allocator_module._RegimeGroup
+    groups = tuple(
+        group_type(
+            direction=ContractDirection.OUTBOUND,
+            blocks=(block,),
+            trip_count=1,
+            source_start_index=index,
+            source_end_index=index,
+            is_final_service_tail=False,
+            has_final_service_sentinel=False,
+        )
+        for index, block in enumerate(blocks)
+    )
+    required = {
+        blocks[0].block_id: 1,
+        blocks[1].block_id: 1,
+        blocks[2].block_id: 4,
+    }
+    allocated = {block.block_id: 1 for block in blocks}
+
+    left_merged = two_stage_allocator_module._merge_groups(groups[0], groups[1])
+    right_merged = two_stage_allocator_module._merge_groups(groups[1], groups[2])
+    left_representation = two_stage_allocator_module.UniformRegimeRepresentationV1(
+        start_minute=300,
+        end_minute=330,
+        uniform_headway_minutes=30,
+        departure_minutes=(300, 330),
+    )
+    right_representation = two_stage_allocator_module.UniformRegimeRepresentationV1(
+        start_minute=330,
+        end_minute=360,
+        uniform_headway_minutes=30,
+        departure_minutes=(330, 360),
+    )
+
+    left_score = two_stage_allocator_module._merge_score(
+        problem,
+        groups[0],
+        groups[1],
+        left_merged,
+        left_representation,
+        required,
+        allocated,
+    )
+    right_score = two_stage_allocator_module._merge_score(
+        problem,
+        groups[1],
+        groups[2],
+        right_merged,
+        right_representation,
+        required,
+        allocated,
+    )
+
+    assert left_score[0] == 0
+    assert left_score[2] > right_score[2]
+    assert left_score < right_score
+
+
+def test_true_cap_failure_returns_versioned_regime_build_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    problem, authority, *_ = _dense_half_hour_stage1_request()
+    policy = UniformIntegerRegimePolicyV3(
+        maximum_headway_regimes_per_direction=16,
+        maximum_stage_1_alternative_plans=1,
+    )
+    admitted = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=policy,
+        time_limit_seconds=3.0,
+    )
+    plan = admitted.plans[0]
+    allocation = {
+        (block.direction, block.block_id): block.trip_count for block in plan.allocation_blocks
+    }
+    original_probe = two_stage_allocator_module._representation_for_group
+
+    def reject_every_multi_block_group(*args, **kwargs):
+        group = args[1]
+        if len(group.blocks) > 1:
+            return two_stage_allocator_module._GroupRepresentationProbe(
+                representation=None,
+                start_window=(0, 0),
+                end_window=(0, 0),
+                failure_code=(
+                    two_stage_allocator_module.Stage1RegimeBuildFailureCodeV1.GROUP_UNIFORM_REPRESENTATION_UNAVAILABLE
+                ),
+            )
+        return original_probe(*args, **kwargs)
+
+    monkeypatch.setattr(
+        two_stage_allocator_module,
+        "_representation_for_group",
+        reject_every_multi_block_group,
+    )
+    outcome = two_stage_allocator_module._representable_regimes(
+        problem,
+        allocation,
+        problem.analysis_blocks,
+        policy,
+        None,
+        plan.final_service_sentinels,
+        "a" * 64,
+    )
+
+    assert outcome.regimes is None
+    assert outcome.diagnostic is not None
+    assert outcome.diagnostic.failure_code.value == "REGIME_COUNT_CAP_UNREPRESENTABLE"
+    assert outcome.diagnostic.diagnostic_profile == (
+        "scenario_c_stage_1_regime_build_diagnostic_v1"
+    )
+    assert outcome.diagnostic.diagnostic_fingerprint
+    assert len(outcome.diagnostic.failing_group_block_ids) <= 12
+
+
+def test_stage_1_summary_separates_regime_build_from_necessary_feasibility(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    problem, authority, *_ = _stage1_request()
+
+    def reject_regime_build(*args, **_kwargs):
+        candidate_fingerprint = args[-1]
+        diagnostic = two_stage_allocator_module.finalize_stage_1_regime_build_diagnostic(
+            two_stage_allocator_module.Stage1RegimeBuildDiagnosticV1(
+                allocation_candidate_fingerprint=candidate_fingerprint,
+                failure_code=(
+                    two_stage_allocator_module.Stage1RegimeBuildFailureCodeV1.ALLOCATION_MEMBERSHIP_UNREPRESENTABLE
+                ),
+                direction=ContractDirection.OUTBOUND,
+                initial_group_count=2,
+                final_group_count=2,
+                maximum_group_count=16,
+                failing_group_block_ids=(problem.analysis_blocks[0].block_id,),
+                explanation="Synthetic exact-membership rejection.",
+            )
+        )
+        return two_stage_allocator_module._RegimeBuildOutcome(None, diagnostic)
+
+    monkeypatch.setattr(
+        two_stage_allocator_module,
+        "_representable_regimes",
+        reject_regime_build,
+    )
+    result = allocate_trips_stage_1_v1(
+        problem,
+        authority,
+        policy=UniformIntegerRegimePolicyV3(maximum_stage_1_alternative_plans=1),
+        time_limit_seconds=2.0,
+    )
+
+    assert result.candidate_count > 0
+    assert result.regime_build_rejected_count == result.candidate_count
+    assert result.necessary_feasibility_pruned_count == 0
+    assert dict(result.regime_build_failure_reason_counts) == {
+        two_stage_allocator_module.Stage1RegimeBuildFailureCodeV1.ALLOCATION_MEMBERSHIP_UNREPRESENTABLE: result.candidate_count
+    }
+    assert len(result.regime_build_example_diagnostics) <= 8
+    assert all(
+        item.allocation_candidate_fingerprint for item in result.regime_build_example_diagnostics
     )
 
 

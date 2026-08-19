@@ -11,6 +11,7 @@ from typing import Any
 
 from .contracts_v1 import (
     TWO_STAGE_QUALITY_VECTOR_NAMES_V1,
+    ContractDirection,
     DemandConfidence,
     DemandProfileDerivationResultV1,
     DemandResponseMode,
@@ -162,6 +163,10 @@ def _regime_payload(
         for regime in (result.allocation_plan.proposed_regimes if result.allocation_plan else ())
         if regime.is_final_service_tail
     }
+    proposed_by_id = {
+        regime.regime_id: regime
+        for regime in (result.allocation_plan.proposed_regimes if result.allocation_plan else ())
+    }
     return [
         {
             "direction": item.direction.value,
@@ -172,6 +177,7 @@ def _regime_payload(
             "uniform_headway_minutes": (
                 item.actual_headway_sequence[0] if item.actual_headway_sequence else None
             ),
+            "covered_demand_blocks": list(proposed_by_id[item.regime_id].covered_demand_block_ids),
             "boundary_reason": item.boundary_reason,
             "is_final_service_tail": item.regime_id in final_tail_ids,
         }
@@ -186,23 +192,35 @@ def _timetable_c_payload(
     if solution is None:
         return []
     source = {item.trip_id: item for item in normalized.scenario_b.exact_timetable}
-    return [
-        {
-            "c_trip_id": item.c_trip_id,
-            "source_b_trip_id": item.source_b_trip_id,
-            "direction": item.direction.value,
-            "departure_terminal": item.departure_terminal.value,
-            "b_departure_time": _time(item.b_departure_time),
-            "c_departure_time": _time(item.c_departure_time),
-            "arrival_time": _time(
-                item.c_departure_time + source[item.source_b_trip_id].runtime_minutes * 60
-            ),
-            "shift_minutes": item.shift_minutes,
-            "headway_regime_id": item.headway_regime_id,
-            "vehicle_assignment": item.vehicle_assignment,
-        }
-        for item in solution.c_exact_timetable
-    ]
+    previous_by_direction: dict[ContractDirection, int] = {}
+    output: list[dict[str, object]] = []
+    for item in sorted(
+        solution.c_exact_timetable,
+        key=lambda trip: (trip.direction.value, trip.c_departure_time, trip.c_trip_id),
+    ):
+        previous = previous_by_direction.get(item.direction)
+        output.append(
+            {
+                "c_trip_id": item.c_trip_id,
+                "source_b_trip_id": item.source_b_trip_id,
+                "direction": item.direction.value,
+                "departure_terminal": item.departure_terminal.value,
+                "b_departure_time": _time(item.b_departure_time),
+                "c_departure_time": _time(item.c_departure_time),
+                "previous_c_departure_time": _time(previous) if previous is not None else None,
+                "headway_minutes": (
+                    (item.c_departure_time - previous) // 60 if previous is not None else None
+                ),
+                "arrival_time": _time(
+                    item.c_departure_time + source[item.source_b_trip_id].runtime_minutes * 60
+                ),
+                "shift_minutes": item.shift_minutes,
+                "headway_regime_id": item.headway_regime_id,
+                "vehicle_assignment": item.vehicle_assignment,
+            }
+        )
+        previous_by_direction[item.direction] = item.c_departure_time
+    return output
 
 
 def build_v3_result_payload_v1(
@@ -265,6 +283,27 @@ def build_v3_result_payload_v1(
             "candidate_count": diagnostics.stage_1_candidate_count,
             "admitted_count": diagnostics.stage_1_admissible_allocation_count,
             "pruned_count": diagnostics.stage_1_necessary_feasibility_pruned_count,
+            "regime_build_rejected_count": (diagnostics.stage_1_regime_build_rejected_count),
+            "necessary_feasibility_rejected_count": (
+                diagnostics.stage_1_necessary_feasibility_pruned_count
+            ),
+            "regime_build_failure_reason_counts": {
+                reason.value: count
+                for reason, count in diagnostics.stage_1_regime_build_failure_reason_counts
+            },
+            "necessary_feasibility_constraint_family_counts": {
+                family.value: count
+                for family, count in (
+                    diagnostics.stage_1_necessary_feasibility_constraint_family_counts
+                )
+            },
+            "regime_build_example_diagnostics": [
+                _jsonable(asdict(item))
+                for item in diagnostics.stage_1_regime_build_example_diagnostics
+            ],
+            "necessary_feasibility_example_candidate_fingerprints": list(
+                diagnostics.stage_1_necessary_feasibility_example_candidate_fingerprints
+            ),
             "selected_allocation_plan": selected_plan,
             "objective_vector": (
                 list(result.allocation_plan.objective_vector)
