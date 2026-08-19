@@ -3,6 +3,11 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
+from test_contract_v1_two_stage_allocator import (
+    _dense_half_hour_stage1_request,
+    _record,
+    _stage1_request,
+)
 
 from bus_schedule_engine.contracts_v1 import (
     ContractDirection,
@@ -12,11 +17,6 @@ from bus_schedule_engine.contracts_v1 import (
 )
 from bus_schedule_engine.contracts_v1 import v3_global_regularity as global_policy
 from bus_schedule_engine.models import Direction
-from test_contract_v1_two_stage_allocator import (
-    _dense_half_hour_stage1_request,
-    _record,
-    _stage1_request,
-)
 
 
 @pytest.fixture()
@@ -123,6 +123,19 @@ def test_sixteen_regimes_is_a_cap_not_a_coarsening_target(installed_global_polic
     )
 
 
+def test_tail_demand_decline_is_detected() -> None:
+    problem = SimpleNamespace(
+        analysis_blocks=(
+            SimpleNamespace(block_id="before", duration_minutes=60, observed_passengers=120.0),
+            SimpleNamespace(block_id="tail", duration_minutes=60, observed_passengers=20.0),
+        )
+    )
+    earlier = SimpleNamespace(covered_demand_block_ids=("before",))
+    tail = SimpleNamespace(covered_demand_block_ids=("tail",))
+
+    assert global_policy._tail_demand_not_rising(problem, earlier, tail)
+
+
 def test_declining_tail_cannot_be_denser_than_previous_regime(installed_global_policy) -> None:
     problem, authority, *_ = _stage1_request()
     policy = UniformIntegerRegimePolicyV3(
@@ -132,7 +145,6 @@ def test_declining_tail_cannot_be_denser_than_previous_regime(installed_global_p
     plan, candidate = _first_feasible_candidate(problem, authority, policy)
     raw = {item.regime_id: item for item in candidate.headway_regimes}
 
-    checked = 0
     for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
         regimes = sorted(
             (item for item in plan.proposed_regimes if item.direction == direction),
@@ -144,11 +156,12 @@ def test_declining_tail_cannot_be_denser_than_previous_regime(installed_global_p
         earlier, tail = regimes[-2:]
         earlier_raw = raw[earlier.regime_id]
         tail_raw = raw[tail.regime_id]
-        if earlier_raw.actual_headway_sequence and tail_raw.actual_headway_sequence:
-            if global_policy._tail_demand_not_rising(problem, earlier, tail):
-                assert tail_raw.actual_headway_sequence[0] >= earlier_raw.actual_headway_sequence[0]
-                checked += 1
-    assert checked >= 1
+        if (
+            earlier_raw.actual_headway_sequence
+            and tail_raw.actual_headway_sequence
+            and global_policy._tail_demand_not_rising(problem, earlier, tail)
+        ):
+            assert tail_raw.actual_headway_sequence[0] >= earlier_raw.actual_headway_sequence[0]
 
 
 def test_global_transition_jump_is_not_worse_than_scenario_b(installed_global_policy) -> None:
