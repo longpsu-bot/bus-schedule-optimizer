@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -65,8 +66,9 @@ def _jsonable(value: Any) -> Any:
 def _normalization_options(path: Path, imported: ImportedV3WorkbookV1) -> NormalizationOptions:
     authority = imported.base_workbook.authority_metadata
     imported_at = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
+    content_fingerprint = hashlib.sha256(path.read_bytes()).hexdigest()
     return NormalizationOptions(
-        source_id=path.name,
+        source_id=f"v3-workbook-sha256:{content_fingerprint}",
         imported_at=imported_at,
         demand_source_type=(authority.demand_source_type or DemandSourceType.AGGREGATE_REPORT),
         demand_confidence=(authority.demand_confidence or DemandConfidence.UNKNOWN),
@@ -213,6 +215,7 @@ def build_v3_result_payload_v1(
 ) -> dict[str, object]:
     scenario_b = normalized.scenario_b
     solution = result.candidate_outcome.solution if result.candidate_outcome is not None else None
+    scenario_c_available = solution is not None
     selected_plan = (
         trip_allocation_plan_to_contract_dict_v1(result.allocation_plan)
         if result.allocation_plan is not None
@@ -229,6 +232,7 @@ def build_v3_result_payload_v1(
         "input_file": run_input_path.name,
         "route_id": scenario_b.route_id,
         "route_name": scenario_b.route_name,
+        "scenario_c_available": scenario_c_available,
         "selected_profile": {
             "profile_id": derivation.profile.profile_id,
             "profile_fingerprint": derivation.profile.profile_fingerprint,
@@ -294,16 +298,15 @@ def build_v3_result_payload_v1(
             for item in result.final_tail_metrics
         ],
         "shift_metrics": {
-            "shifted_trip_count": solution.shifted_trip_count if solution else 0,
-            "total_shift_minutes": solution.total_shift_minutes if solution else 0,
-            "maximum_shift_minutes": solution.maximum_shift_minutes if solution else 0,
+            "shifted_trip_count": solution.shifted_trip_count if solution else None,
+            "total_shift_minutes": solution.total_shift_minutes if solution else None,
+            "maximum_shift_minutes": solution.maximum_shift_minutes if solution else None,
         },
         "fleet": {
             "available": scenario_b.available_fleet_limit,
-            "required": (
-                solution.minimum_required_fleet
-                if solution is not None
-                else b_evaluation.fleet_assessment.minimum_required_fleet
+            "scenario_b_required": b_evaluation.fleet_assessment.minimum_required_fleet,
+            "scenario_c_required": (
+                solution.minimum_required_fleet if solution is not None else None
             ),
         },
         "budget": {

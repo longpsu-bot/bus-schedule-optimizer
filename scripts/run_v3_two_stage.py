@@ -99,9 +99,13 @@ def main(argv: list[str] | None = None) -> int:
                 comparison,
                 output_root / "profile_comparison.xlsx",
             )
+            comparison_state = (
+                comparison["stability_classification"]
+                or comparison["review_code"]
+                or comparison["comparison_eligibility"]
+            )
             print(
-                f"profile comparison: {comparison['stability_classification']}"
-                + (f" / {comparison['review_code']}" if comparison["review_code"] else "")
+                f"profile comparison: {comparison['comparison_eligibility']} / {comparison_state}"
             )
     except (FileNotFoundError, OSError, ValueError) as exc:
         print(f"V3 runner failed: {exc}", file=sys.stderr)

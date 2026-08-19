@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import math
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, replace
 from datetime import date
 from enum import StrEnum
+from numbers import Real
 
 from .models import ContractDirection, VolumeClassification
 from .serialization import canonical_sha256
@@ -164,6 +166,24 @@ def calculate_demand_period_fingerprint_v1(period: DemandObservationPeriodV1) ->
     return canonical_sha256(_period_payload(period))
 
 
+def _strict_integral_number(value: object, *, code: str, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise MultiPeriodDemandError(code, f"{field} must be a finite integer")
+    numeric = float(value)
+    if not math.isfinite(numeric) or not numeric.is_integer():
+        raise MultiPeriodDemandError(code, f"{field} must be a finite integer")
+    return int(numeric)
+
+
+def _finite_nonnegative_number(value: object, *, code: str, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise MultiPeriodDemandError(code, f"{field} must be finite and non-negative")
+    numeric = float(value)
+    if not math.isfinite(numeric) or numeric < 0:
+        raise MultiPeriodDemandError(code, f"{field} must be finite and non-negative")
+    return numeric
+
+
 def _validate_period(period: DemandObservationPeriodV1) -> None:
     if not period.period_id.strip():
         raise MultiPeriodDemandError("PERIOD_ID_MISSING", "period_id is required")
@@ -172,7 +192,12 @@ def _validate_period(period: DemandObservationPeriodV1) -> None:
             "PERIOD_DATE_RANGE_INVALID",
             f"period {period.period_id} has period_end before period_start",
         )
-    if period.observation_days <= 0:
+    observation_days = _strict_integral_number(
+        period.observation_days,
+        code="OBSERVATION_DAYS_INVALID",
+        field=f"period {period.period_id} observation_days",
+    )
+    if observation_days <= 0:
         raise MultiPeriodDemandError(
             "OBSERVATION_DAYS_INVALID",
             f"period {period.period_id} requires positive observation_days",
@@ -191,11 +216,26 @@ def _validate_period(period: DemandObservationPeriodV1) -> None:
     interval_counts: Counter[tuple[ContractDirection, int, int]] = Counter()
     by_direction: dict[ContractDirection, list[DemandPeriodObservationV1]] = defaultdict(list)
     for observation in period.observations:
-        if not (0 <= observation.interval_start < observation.interval_end <= 24 * 3600):
+        interval_start = _strict_integral_number(
+            observation.interval_start,
+            code="TIME_BLOCK_BOUNDARY_INVALID",
+            field=f"period {period.period_id} interval_start",
+        )
+        interval_end = _strict_integral_number(
+            observation.interval_end,
+            code="TIME_BLOCK_BOUNDARY_INVALID",
+            field=f"period {period.period_id} interval_end",
+        )
+        if not (0 <= interval_start < interval_end <= 24 * 3600):
             raise MultiPeriodDemandError(
                 "TIME_BLOCK_BOUNDARY_INVALID",
                 f"period {period.period_id} contains an invalid time block",
             )
+        _finite_nonnegative_number(
+            observation.passenger_volume,
+            code="PASSENGER_VOLUME_INVALID",
+            field=f"period {period.period_id} passenger_volume",
+        )
         if not observation.source_time_basis.strip():
             raise MultiPeriodDemandError(
                 "SOURCE_TIME_BASIS_MISSING",
@@ -232,14 +272,43 @@ def _validate_period(period: DemandObservationPeriodV1) -> None:
 def finalize_demand_observation_period_v1(
     period: DemandObservationPeriodV1,
 ) -> DemandObservationPeriodV1:
-    _validate_period(period)
-    fingerprint = calculate_demand_period_fingerprint_v1(period)
+    canonical = replace(
+        period,
+        observation_days=_strict_integral_number(
+            period.observation_days,
+            code="OBSERVATION_DAYS_INVALID",
+            field=f"period {period.period_id} observation_days",
+        ),
+        observations=tuple(
+            replace(
+                item,
+                interval_start=_strict_integral_number(
+                    item.interval_start,
+                    code="TIME_BLOCK_BOUNDARY_INVALID",
+                    field=f"period {period.period_id} interval_start",
+                ),
+                interval_end=_strict_integral_number(
+                    item.interval_end,
+                    code="TIME_BLOCK_BOUNDARY_INVALID",
+                    field=f"period {period.period_id} interval_end",
+                ),
+                passenger_volume=_finite_nonnegative_number(
+                    item.passenger_volume,
+                    code="PASSENGER_VOLUME_INVALID",
+                    field=f"period {period.period_id} passenger_volume",
+                ),
+            )
+            for item in period.observations
+        ),
+    )
+    _validate_period(canonical)
+    fingerprint = calculate_demand_period_fingerprint_v1(canonical)
     if period.period_fingerprint and period.period_fingerprint != fingerprint:
         raise MultiPeriodDemandError(
             "PERIOD_FINGERPRINT_INVALID",
             f"period {period.period_id} fingerprint does not match its authority payload",
         )
-    return replace(period, period_fingerprint=fingerprint)
+    return replace(canonical, period_fingerprint=fingerprint)
 
 
 def validate_multi_period_demand_input_v1(
@@ -331,7 +400,12 @@ def _shape_diagnostics(
     periods: tuple[DemandObservationPeriodV1, ...],
     threshold: float,
 ) -> tuple[DemandPeriodShapeDiagnosticV1, ...]:
-    if not 0 <= threshold <= 1:
+    if (
+        isinstance(threshold, bool)
+        or not isinstance(threshold, Real)
+        or not math.isfinite(float(threshold))
+        or not 0 <= threshold <= 1
+    ):
         raise MultiPeriodDemandError(
             "SHAPE_DISTANCE_THRESHOLD_INVALID",
             "shape distance threshold must be between zero and one",
@@ -346,6 +420,11 @@ def _shape_diagnostics(
             ] = observation.average_daily_passengers(period.observation_days)
         for direction, values in by_direction.items():
             total = sum(values.values())
+            if not math.isfinite(total):
+                raise MultiPeriodDemandError(
+                    "PASSENGER_VOLUME_INVALID",
+                    f"period {period.period_id} daily passenger total is non-finite",
+                )
             totals[(period.period_id, direction)] = total
             vectors[(period.period_id, direction)] = {
                 block: (value / total if total > 0 else 0.0) for block, value in values.items()
@@ -530,6 +609,11 @@ def derive_demand_profile_v1(
         raise MultiPeriodDemandError(
             "AGGREGATION_METHOD_UNSUPPORTED",
             str(config.aggregation_method),
+        )
+    if any(not math.isfinite(item.average_daily_passengers) for item in derived):
+        raise MultiPeriodDemandError(
+            "PASSENGER_VOLUME_INVALID",
+            f"profile {profile_id} produced a non-finite derived passenger value",
         )
 
     limitations = (

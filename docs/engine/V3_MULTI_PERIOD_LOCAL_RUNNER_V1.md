@@ -67,6 +67,18 @@ Stage 2 attempts share that budget. No run is retried automatically.
 
 ## Batch classification
 
+Classification first checks whether Scenario C is comparable. A profile is comparable only when
+it has a genuine C solution, a C quality vector, and final service regimes for a route with
+measurable demand regimes.
+
+- If no profile has comparable C, `comparison_eligibility` is `INCONCLUSIVE`,
+  `stability_classification` is null, and the review code is
+  `PROFILE_COMPARISON_INCONCLUSIVE_NO_COMPARABLE_C`.
+- If only some profiles have comparable C, `comparison_eligibility` is
+  `PARTIALLY_COMPARABLE` and the result is `MATERIAL_PROFILE_SENSITIVITY` with
+  `PROFILE_SENSITIVITY_REVIEW_REQUIRED`.
+- Only when every profile has comparable C does the stable/minor/material numeric comparison run.
+
 - `STABLE_ACROSS_PROFILES`: status, Stage 1 allocation, regime structure/headways, fleet,
   maximum service gap, and shift metrics all match.
 - `MATERIAL_PROFILE_SENSITIVITY`: any status, allocation, regime structure/headway, or fleet
@@ -76,6 +88,16 @@ Stage 2 attempts share that budget. No run is retried automatically.
 
 Material sensitivity also emits `PROFILE_SENSITIVITY_REVIEW_REQUIRED`. Classification never
 changes the configured primary profile.
+
+Result payloads expose `scenario_c_available`. When C is absent, C quality, C required fleet,
+C service counts, and C shift metrics are null rather than zero-valued or Scenario B substitutes.
+The demand-profile workbook chart uses separate axes for passengers per block and trips per block;
+an unavailable C series is omitted.
+
+Core Scenario B, selected-profile, demand-authority, adapter-context, and solver-problem identities
+are content-derived. Copying identical workbook bytes to another local path or changing only the
+filesystem modification time does not change those identities; filenames and timestamps remain
+human-facing provenance only.
 
 Private input workbooks and generated pilot outputs belong outside version control. The
 repository ignores `local_inputs/` and `local_outputs/` for this purpose.

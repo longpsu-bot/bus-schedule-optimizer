@@ -217,3 +217,79 @@ def test_profile_fingerprint_changes_with_values_days_and_config() -> None:
     ).profile.profile_fingerprint
 
     assert len({baseline, changed_value, changed_days, changed_config}) == 4
+
+
+@pytest.mark.parametrize("days", [31.5, 0, -1, True, float("nan"), float("inf")])
+def test_contract_rejects_non_integral_or_non_finite_observation_days(days: object) -> None:
+    period = replace(_period("p1", 10), observation_days=days)
+
+    with pytest.raises(MultiPeriodDemandError) as exc_info:
+        derive_demand_profile_v1(
+            _input(
+                periods=(period,),
+                profiles=(
+                    _profile(
+                        periods=("p1",),
+                        method=DemandProfileAggregationMethodV1.SINGLE_PERIOD,
+                    ),
+                ),
+            ),
+            "stable",
+        )
+
+    assert exc_info.value.code == "OBSERVATION_DAYS_INVALID"
+
+
+@pytest.mark.parametrize(
+    "passengers",
+    [-1, True, float("nan"), float("inf"), -float("inf")],
+)
+def test_contract_rejects_invalid_passenger_volume(passengers: object) -> None:
+    period = _period("p1", 10)
+    invalid = replace(
+        period,
+        observations=(
+            replace(period.observations[0], passenger_volume=passengers),
+            period.observations[1],
+        ),
+    )
+
+    with pytest.raises(MultiPeriodDemandError) as exc_info:
+        derive_demand_profile_v1(
+            _input(
+                periods=(invalid,),
+                profiles=(
+                    _profile(
+                        periods=("p1",),
+                        method=DemandProfileAggregationMethodV1.SINGLE_PERIOD,
+                    ),
+                ),
+            ),
+            "stable",
+        )
+
+    assert exc_info.value.code == "PASSENGER_VOLUME_INVALID"
+
+
+@pytest.mark.parametrize("threshold", [True, float("nan"), float("inf"), -0.1, 1.1])
+def test_shape_distance_threshold_must_be_finite_and_bounded(threshold: object) -> None:
+    with pytest.raises(MultiPeriodDemandError) as exc_info:
+        derive_demand_profile_v1(
+            _input(),
+            "stable",
+            shape_distance_threshold=threshold,
+        )
+
+    assert exc_info.value.code == "SHAPE_DISTANCE_THRESHOLD_INVALID"
+
+
+def test_zero_daily_passenger_shape_is_deterministic_and_finite() -> None:
+    periods = (_period("p1", 10, (0.0, 0.0)), _period("p2", 20, (0.0, 0.0)))
+
+    result = derive_demand_profile_v1(_input(periods=periods), "stable")
+
+    for diagnostic in result.period_diagnostics:
+        assert diagnostic.average_daily_passengers == 0
+        assert diagnostic.peak_share == 0
+        assert diagnostic.maximum_shape_distance == 0
+        assert [share for _, _, share in diagnostic.normalized_block_shares] == [0, 0]

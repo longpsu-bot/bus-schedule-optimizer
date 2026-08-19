@@ -14,6 +14,10 @@ from .contracts_v1 import ContractDirection
 from .v3_runner import V3ProfileRunV1
 
 PROFILE_COMPARISON_PROFILE_V1 = "v3_profile_comparison_v1"
+PROFILE_COMPARISON_ELIGIBLE = "ELIGIBLE"
+PROFILE_COMPARISON_INCONCLUSIVE = "INCONCLUSIVE"
+PROFILE_COMPARISON_PARTIALLY_COMPARABLE = "PARTIALLY_COMPARABLE"
+PROFILE_COMPARISON_INCONCLUSIVE_NO_COMPARABLE_C = "PROFILE_COMPARISON_INCONCLUSIVE_NO_COMPARABLE_C"
 STABLE_ACROSS_PROFILES = "STABLE_ACROSS_PROFILES"
 MINOR_PROFILE_SENSITIVITY = "MINOR_PROFILE_SENSITIVITY"
 MATERIAL_PROFILE_SENSITIVITY = "MATERIAL_PROFILE_SENSITIVITY"
@@ -87,12 +91,12 @@ def _service_count(
     end: int,
     *,
     scenario_c: bool,
-) -> int:
+) -> int | None:
     if scenario_c:
         outcome = run.result.candidate_outcome
         solution = outcome.solution if outcome is not None else None
         if solution is None:
-            return 0
+            return None
         departures = (
             (item.direction, item.c_departure_time) for item in solution.c_exact_timetable
         )
@@ -124,9 +128,12 @@ def _write_summary(ws, run: V3ProfileRunV1) -> None:
         ("Included periods", ", ".join(profile["included_period_ids"])),
         ("Total observation days", profile["total_observation_days"]),
         ("Direction grain", profile["direction_grain"]),
+        ("Scenario C available", run.payload["scenario_c_available"]),
         ("Final acceptance", run.payload["final_acceptance_state"]),
         ("Aggregate native status", run.payload["aggregate_native_status"]),
-        ("Fleet available / required", f"{fleet['available']} / {fleet['required']}"),
+        ("Fleet available", fleet["available"]),
+        ("Scenario B required fleet", fleet["scenario_b_required"]),
+        ("Scenario C required fleet", fleet["scenario_c_required"]),
         ("Shifted trips", shifts["shifted_trip_count"]),
         ("Total shift minutes", shifts["total_shift_minutes"]),
         ("Maximum shift minutes", shifts["maximum_shift_minutes"]),
@@ -158,7 +165,10 @@ def _write_summary(ws, run: V3ProfileRunV1) -> None:
         ws.cell(offset, 2, b_value)
         ws.cell(offset, 3, c_value)
         ws.cell(offset, 4, None if c_value is None else c_value - b_value)
-    acceptance_cell = ws.cell(10, 2)
+    acceptance_row = next(
+        row for row, values in enumerate(rows, start=4) if values[0] == "Final acceptance"
+    )
+    acceptance_cell = ws.cell(acceptance_row, 2)
     acceptance_cell.fill = PatternFill(
         "solid",
         fgColor=(
@@ -215,19 +225,43 @@ def _write_demand_profile(ws, run: V3ProfileRunV1) -> None:
     ws.column_dimensions["D"].width = 24
     ws.column_dimensions["E"].width = 24
     ws.column_dimensions["F"].width = 24
-    chart = LineChart()
-    chart.title = "Demand profile vs Scenario B / C service"
-    chart.y_axis.title = "Passengers or trips per block"
-    chart.x_axis.title = "Direction and block start"
-    chart.height = 12
-    chart.width = 23
-    chart.add_data(
-        Reference(ws, min_col=4, max_col=6, min_row=3, max_row=end_row),
+    categories = Reference(ws, min_col=7, min_row=4, max_row=end_row)
+    demand_chart = LineChart()
+    demand_chart.title = "Demand profile (passengers per block)"
+    demand_chart.y_axis.title = "Passengers per block"
+    demand_chart.x_axis.title = "Direction and block start"
+    demand_chart.height = 10
+    demand_chart.width = 23
+    demand_chart.add_data(
+        Reference(ws, min_col=4, max_col=4, min_row=3, max_row=end_row),
         titles_from_data=True,
     )
-    chart.set_categories(Reference(ws, min_col=7, min_row=4, max_row=end_row))
-    chart.legend.position = "b"
-    ws.add_chart(chart, "I3")
+    demand_chart.set_categories(categories)
+
+    service_chart = LineChart()
+    service_chart.title = (
+        "Service count B vs C (trips per block)"
+        if run.payload["scenario_c_available"]
+        else "Scenario B service (trips per block); Scenario C not available"
+    )
+    service_chart.y_axis.title = "Trips per block"
+    service_chart.x_axis.title = "Direction and block start"
+    service_chart.height = 10
+    service_chart.width = 23
+    service_chart.add_data(
+        Reference(ws, min_col=5, max_col=5, min_row=3, max_row=end_row),
+        titles_from_data=True,
+    )
+    if run.payload["scenario_c_available"]:
+        service_chart.add_data(
+            Reference(ws, min_col=6, max_col=6, min_row=3, max_row=end_row),
+            titles_from_data=True,
+        )
+    service_chart.set_categories(categories)
+    demand_chart.legend.position = "b"
+    service_chart.legend.position = "b"
+    ws.add_chart(demand_chart, "I3")
+    ws.add_chart(service_chart, "I24")
     ws.freeze_panes = "A4"
     ws.auto_filter.ref = f"A3:G{end_row}"
     _autowidth(ws, maximum=30)
@@ -468,6 +502,19 @@ def export_v3_result_xlsx_v1(run: V3ProfileRunV1, path: str | Path) -> Path:
     return output
 
 
+def _c_comparison_eligibility(run: V3ProfileRunV1) -> tuple[bool, tuple[str, ...]]:
+    outcome = run.result.candidate_outcome
+    solution = outcome.solution if outcome is not None else None
+    reasons: list[str] = []
+    if solution is None:
+        reasons.append("SCENARIO_C_SOLUTION_MISSING")
+    if run.payload["quality"]["C"] is None:
+        reasons.append("SCENARIO_C_QUALITY_MISSING")
+    if run.derivation.profile.derived_observations and not run.payload["final_service_regimes"]:
+        reasons.append("SCENARIO_C_REGIMES_MISSING")
+    return not reasons, tuple(reasons)
+
+
 def _comparison_row(run: V3ProfileRunV1) -> dict[str, object]:
     selected = run.payload["stage_1"]["selected_allocation_plan"]
     allocation = (
@@ -485,10 +532,14 @@ def _comparison_row(run: V3ProfileRunV1) -> dict[str, object]:
         else []
     )
     regimes = run.payload["final_service_regimes"]
-    c_quality = run.payload["quality"]["C"] or run.payload["quality"]["B"]
+    c_quality = run.payload["quality"]["C"]
+    c_comparable, unavailable_reasons = _c_comparison_eligibility(run)
     return {
         "profile_id": run.derivation.profile.profile_id,
         "profile_fingerprint": run.derivation.profile.profile_fingerprint,
+        "scenario_c_available": run.payload["scenario_c_available"],
+        "c_comparable": c_comparable,
+        "c_comparison_unavailable_reasons": list(unavailable_reasons),
         "final_acceptance_state": run.payload["final_acceptance_state"],
         "aggregate_native_status": run.payload["aggregate_native_status"],
         "stage_1_allocation_by_block": allocation,
@@ -510,8 +561,12 @@ def _comparison_row(run: V3ProfileRunV1) -> dict[str, object]:
             }
             for item in regimes
         ],
-        "fleet_required": run.payload["fleet"]["required"],
-        "maximum_service_gap": c_quality["maximum_positive_demand_service_gap_minutes"],
+        "fleet_required_c": run.payload["fleet"]["scenario_c_required"],
+        "maximum_service_gap": (
+            c_quality["maximum_positive_demand_service_gap_minutes"]
+            if c_quality is not None
+            else None
+        ),
         "shifted_trips": run.payload["shift_metrics"]["shifted_trip_count"],
         "total_shift": run.payload["shift_metrics"]["total_shift_minutes"],
         "maximum_shift": run.payload["shift_metrics"]["maximum_shift_minutes"],
@@ -522,6 +577,19 @@ def build_profile_comparison_v1(runs: list[V3ProfileRunV1]) -> dict[str, object]
     if not runs:
         raise ValueError("at least one profile run is required")
     rows = [_comparison_row(run) for run in runs]
+    comparable = [bool(row["c_comparable"]) for row in rows]
+    if not any(comparable):
+        comparison_eligibility = PROFILE_COMPARISON_INCONCLUSIVE
+        classification = None
+        review_code = PROFILE_COMPARISON_INCONCLUSIVE_NO_COMPARABLE_C
+    elif not all(comparable):
+        comparison_eligibility = PROFILE_COMPARISON_PARTIALLY_COMPARABLE
+        classification = MATERIAL_PROFILE_SENSITIVITY
+        review_code = PROFILE_SENSITIVITY_REVIEW_REQUIRED
+    else:
+        comparison_eligibility = PROFILE_COMPARISON_ELIGIBLE
+        review_code = None
+
     exact_fields = (
         "final_acceptance_state",
         "aggregate_native_status",
@@ -529,7 +597,7 @@ def build_profile_comparison_v1(runs: list[V3ProfileRunV1]) -> dict[str, object]
         "regime_count",
         "regime_boundaries",
         "uniform_headways",
-        "fleet_required",
+        "fleet_required_c",
         "maximum_service_gap",
         "shifted_trips",
         "total_shift",
@@ -543,34 +611,49 @@ def build_profile_comparison_v1(runs: list[V3ProfileRunV1]) -> dict[str, object]
         "regime_count",
         "regime_boundaries",
         "uniform_headways",
-        "fleet_required",
+        "fleet_required_c",
     )
-    material = any(
-        any(row[field] != rows[0][field] for field in material_fields)
-        or abs(float(row["maximum_service_gap"]) - float(rows[0]["maximum_service_gap"])) > 5
-        or abs(float(row["maximum_shift"]) - float(rows[0]["maximum_shift"])) > 5
-        or abs(float(row["total_shift"]) - float(rows[0]["total_shift"]))
-        > run.normalized_inputs.scenario_b.total_daily_trips
-        for row, run in zip(rows[1:], runs[1:], strict=True)
-    )
-    classification = (
-        STABLE_ACROSS_PROFILES
-        if stable
-        else MATERIAL_PROFILE_SENSITIVITY
-        if material
-        else MINOR_PROFILE_SENSITIVITY
-    )
+    if all(comparable):
+        material = any(
+            any(row[field] != rows[0][field] for field in material_fields)
+            or abs(float(row["maximum_service_gap"]) - float(rows[0]["maximum_service_gap"])) > 5
+            or abs(float(row["maximum_shift"]) - float(rows[0]["maximum_shift"])) > 5
+            or abs(float(row["total_shift"]) - float(rows[0]["total_shift"]))
+            > run.normalized_inputs.scenario_b.total_daily_trips
+            for row, run in zip(rows[1:], runs[1:], strict=True)
+        )
+        classification = (
+            STABLE_ACROSS_PROFILES
+            if stable
+            else MATERIAL_PROFILE_SENSITIVITY
+            if material
+            else MINOR_PROFILE_SENSITIVITY
+        )
+        review_code = (
+            PROFILE_SENSITIVITY_REVIEW_REQUIRED
+            if classification == MATERIAL_PROFILE_SENSITIVITY
+            else None
+        )
     return {
         "comparison_profile": PROFILE_COMPARISON_PROFILE_V1,
         "route_id": runs[0].payload["route_id"],
         "route_name": runs[0].payload["route_name"],
+        "comparison_eligibility": comparison_eligibility,
         "stability_classification": classification,
-        "review_code": (
-            PROFILE_SENSITIVITY_REVIEW_REQUIRED
-            if classification == MATERIAL_PROFILE_SENSITIVITY
-            else None
-        ),
+        "review_code": review_code,
         "classification_rule": {
+            "eligibility": (
+                "C comparison requires a genuine Scenario C solution, a C quality vector, and "
+                "final service regimes for routes with measurable demand regimes."
+            ),
+            "inconclusive": (
+                "If no profile has comparable C, stability classification is null and review "
+                f"code is {PROFILE_COMPARISON_INCONCLUSIVE_NO_COMPARABLE_C}."
+            ),
+            "mixed_availability": (
+                "If only some profiles have comparable C, the result is material profile "
+                "sensitivity requiring review."
+            ),
             "stable": "All reported status, allocation, regime, fleet, gap, and shift fields match.",
             "material": (
                 "Any status, Stage 1 allocation, regime structure/headway, or fleet difference; "
@@ -598,8 +681,11 @@ def export_profile_comparison_xlsx_v1(
     _title(summary, "V3 PROFILE SENSITIVITY COMPARISON", 12)
     summary_rows = [
         ("Route", f"{comparison['route_id']} — {comparison['route_name']}"),
+        ("Comparison eligibility", comparison["comparison_eligibility"]),
         ("Stability classification", comparison["stability_classification"]),
         ("Review code", comparison["review_code"]),
+        ("Eligibility rule", comparison["classification_rule"]["eligibility"]),
+        ("Inconclusive rule", comparison["classification_rule"]["inconclusive"]),
         ("Material rule", comparison["classification_rule"]["material"]),
         ("Selection policy", comparison["classification_rule"]["selection_policy"]),
     ]
@@ -607,13 +693,17 @@ def export_profile_comparison_xlsx_v1(
     for row, (label, value) in enumerate(summary_rows, start=4):
         summary.cell(row, 1, label).font = Font(bold=True, color=_NAVY)
         summary.cell(row, 2, value).alignment = Alignment(wrap_text=True)
-    table_row = 11
+        if value is not None and len(str(value)) > 60:
+            summary.row_dimensions[row].height = 45
+    table_row = 14
     headers = [
         "profile_id",
+        "scenario_c_available",
+        "c_comparable",
         "final_acceptance_state",
         "aggregate_native_status",
         "regime_count",
-        "fleet_required",
+        "fleet_required_c",
         "maximum_service_gap",
         "shifted_trips",
         "total_shift",
@@ -672,7 +762,12 @@ def export_profile_comparison_xlsx_v1(
     for ws in workbook.worksheets:
         ws.freeze_panes = "A4"
         _autowidth(ws, maximum=42)
-    status_cell = summary.cell(5, 2)
+    summary.column_dimensions["B"].width = 80
+    status_cell = next(
+        summary.cell(row, 2)
+        for row in range(4, 4 + len(summary_rows))
+        if summary.cell(row, 1).value == "Stability classification"
+    )
     status_cell.fill = PatternFill(
         "solid",
         fgColor=(
@@ -690,6 +785,10 @@ def export_profile_comparison_xlsx_v1(
 __all__ = [
     "MATERIAL_PROFILE_SENSITIVITY",
     "MINOR_PROFILE_SENSITIVITY",
+    "PROFILE_COMPARISON_ELIGIBLE",
+    "PROFILE_COMPARISON_INCONCLUSIVE",
+    "PROFILE_COMPARISON_INCONCLUSIVE_NO_COMPARABLE_C",
+    "PROFILE_COMPARISON_PARTIALLY_COMPARABLE",
     "PROFILE_COMPARISON_PROFILE_V1",
     "PROFILE_SENSITIVITY_REVIEW_REQUIRED",
     "STABLE_ACROSS_PROFILES",

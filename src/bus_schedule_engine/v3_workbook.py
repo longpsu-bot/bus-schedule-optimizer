@@ -5,6 +5,7 @@ The legacy ``import_workbook`` path intentionally continues to read only ``SAN_L
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -102,25 +103,62 @@ def _required_text(value: object, *, field: str, sheet: str, row: int) -> str:
 
 
 def _positive_observation_days(value: object, *, sheet: str, row: int) -> int:
-    cleaned = _clean(value)
-    if cleaned is None:
+    if (
+        value is None
+        or (isinstance(value, str) and not value.strip())
+        or (not isinstance(value, str) and pd.isna(value))
+    ):
         raise MultiPeriodDemandError(
             "OBSERVATION_DAYS_MISSING",
             f"{sheet} row {row} is missing observation_days",
         )
+    cleaned = _clean(value)
+    if isinstance(cleaned, bool):
+        raise MultiPeriodDemandError(
+            "OBSERVATION_DAYS_INVALID",
+            f"{sheet} row {row} has invalid observation_days",
+        )
     try:
-        days = int(cleaned)
+        numeric = float(cleaned)
     except (TypeError, ValueError) as exc:
         raise MultiPeriodDemandError(
             "OBSERVATION_DAYS_INVALID",
             f"{sheet} row {row} has invalid observation_days",
         ) from exc
+    if not math.isfinite(numeric) or not numeric.is_integer():
+        raise MultiPeriodDemandError(
+            "OBSERVATION_DAYS_INVALID",
+            f"{sheet} row {row} requires integral observation_days",
+        )
+    days = int(numeric)
     if days <= 0:
         raise MultiPeriodDemandError(
             "OBSERVATION_DAYS_INVALID",
             f"{sheet} row {row} requires positive observation_days",
         )
     return days
+
+
+def _passenger_volume(value: object, *, sheet: str, row: int) -> float:
+    cleaned = _clean(value)
+    if cleaned is None or isinstance(cleaned, bool):
+        raise MultiPeriodDemandError(
+            "PASSENGER_VOLUME_INVALID",
+            f"{sheet} row {row} requires numeric passenger_volume",
+        )
+    try:
+        numeric = float(cleaned)
+    except (TypeError, ValueError) as exc:
+        raise MultiPeriodDemandError(
+            "PASSENGER_VOLUME_INVALID",
+            f"{sheet} row {row} requires numeric passenger_volume",
+        ) from exc
+    if not math.isfinite(numeric) or numeric < 0:
+        raise MultiPeriodDemandError(
+            "PASSENGER_VOLUME_INVALID",
+            f"{sheet} row {row} requires finite non-negative passenger_volume",
+        )
+    return numeric
 
 
 def _contract_direction(value: object) -> ContractDirection:
@@ -251,7 +289,11 @@ def _attach_observations(
                     interval_start=parse_time_to_seconds(row.get("time_block_start")),
                     interval_end=parse_time_to_seconds(row.get("time_block_end")),
                     direction=_contract_direction(row.get("direction")),
-                    passenger_volume=float(row.get("passenger_volume")),
+                    passenger_volume=_passenger_volume(
+                        row.get("passenger_volume"),
+                        sheet="SAN_LUONG_MULTI_PERIOD",
+                        row=excel_row,
+                    ),
                     volume_classification=_volume_classification(row.get("volume_type")),
                     source_time_basis=_required_text(
                         row.get("source_time_basis"),
@@ -269,7 +311,7 @@ def _attach_observations(
             )
         except MultiPeriodDemandError:
             raise
-        except (TypeError, ValueError) as exc:
+        except (OverflowError, TypeError, ValueError) as exc:
             raise MultiPeriodDemandError(
                 "DEMAND_ROW_INVALID",
                 f"SAN_LUONG_MULTI_PERIOD row {excel_row}: {exc}",
@@ -354,11 +396,17 @@ def import_v3_multi_period_workbook_v1(
             raise InputDataError("Workbook thiếu sheet V3: " + ", ".join(sorted(missing)))
         parameter_frame = pd.read_excel(excel_file, sheet_name="THONG_SO_B", header=1)
         timetable_frame = pd.read_excel(excel_file, sheet_name="BIEU_DO_B", header=2)
-        period_frame = pd.read_excel(excel_file, sheet_name="PERIOD_CATALOG", header=0)
+        period_frame = pd.read_excel(
+            excel_file,
+            sheet_name="PERIOD_CATALOG",
+            header=0,
+            dtype=object,
+        )
         demand_frame = pd.read_excel(
             excel_file,
             sheet_name="SAN_LUONG_MULTI_PERIOD",
             header=0,
+            dtype=object,
         )
         profile_frame = pd.read_excel(
             excel_file,
