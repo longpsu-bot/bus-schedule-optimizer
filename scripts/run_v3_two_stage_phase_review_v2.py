@@ -8,7 +8,13 @@ The production V3 runner remains unchanged.
 
 from __future__ import annotations
 
+import sys
 from collections import defaultdict
+from pathlib import Path
+
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
 
 import run_v3_two_stage_phase_review as base
 
@@ -90,8 +96,7 @@ def _bounded_phase_necessary_feasibility(
             if block.observed_passengers > 0 and expected > 0 and actual == 0:
                 failures.add(allocator.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP)
 
-    for direction, rows in rows_by_direction.items():
-        del direction
+    for rows in rows_by_direction.values():
         cumulative_actual = 0
         cumulative_target = 0
         for _block, expected, actual in sorted(
