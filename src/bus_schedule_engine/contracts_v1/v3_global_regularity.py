@@ -1,21 +1,12 @@
-"""Production V3 global-regularity policy installation.
+"""Production V3 timetable-wide regularity policy.
 
-This module promotes the real-route bounded-phase findings into the production V3 path and
-adds timetable-wide regularity authority.  The installer is explicit and idempotent so tests
-can install/uninstall it without mutating unrelated solver behavior.
+The baseline V3 solver guarantees exact uniformity inside each service regime. Real-route
+review showed that this is not sufficient: a timetable can contain many individually uniform
+regimes while still changing frequency too often, making large jumps between regimes, or
+running a denser final tail while late demand is declining.
 
-Policy order:
-
-1. preserve the existing no-service / critical / planning shortage priorities;
-2. allocate remaining fixed trips toward continuous passenger demand rather than treating the
-   85-percent planning floor as a symmetric target;
-3. minimize service-level change points and change magnitude;
-4. preserve Scenario B continuity;
-5. coarsen adjacent representable regimes to a fixed point (16 remains a cap, not a target);
-6. allow bounded +/-1 statistical 30-minute phase movement with zero full-horizon drift;
-7. do not allow Scenario C regime-transition jumps to exceed Scenario B's observed maximum;
-8. when final-tail demand is not rising, the final-tail headway may not be shorter than the
-   preceding measurable regime.
+This module installs one versioned production policy for the V3 runner. The installation is
+explicit and reversible so importing the CLI does not mutate unrelated tests or solver paths.
 """
 
 from __future__ import annotations
@@ -59,6 +50,7 @@ def _policy_fingerprint_payload() -> dict[str, object]:
         "declining_tail_non_densification": DECLINING_TAIL_NON_DENSIFICATION_V1,
         "regime_count_semantics": "HARD_MAXIMUM_WITH_REPRESENTABLE_FIXED_POINT_COARSENING",
         "stage_1_surplus_allocation": "PASSENGER_PROPORTIONAL_LARGEST_REMAINDER",
+        "stage_1_global_smoothness": "MINIMIZE_ADJACENT_SERVICE_CHANGE_POINTS",
     }
 
 
@@ -88,18 +80,28 @@ def _global_adapter_context_fingerprint(demand_authority, policy, protected_fing
 
 
 def _largest_remainder_targets(rows, total: int) -> dict[str, int]:
-    """Return deterministic integer trip targets proportional to observed passengers."""
+    """Allocate a fixed integer total proportionally to observed passenger volume."""
     if total < 0:
         raise ValueError("analytical trip total cannot be negative")
-    ordered = tuple(sorted(rows, key=lambda item: (item.start_time, item.end_time, item.block_id)))
+    ordered = tuple(
+        sorted(rows, key=lambda item: (item.start_time, item.end_time, item.block_id))
+    )
     if not ordered:
         return {}
-    weights = {row.block_id: Fraction(str(max(0.0, float(row.observed_passengers)))) for row in ordered}
+    weights = {
+        row.block_id: Fraction(str(max(0.0, float(row.observed_passengers))))
+        for row in ordered
+    }
     weight_sum = sum(weights.values(), Fraction(0, 1))
     if weight_sum == 0:
         return {row.block_id: 0 for row in ordered}
-    quotas = {row.block_id: Fraction(total, 1) * weights[row.block_id] / weight_sum for row in ordered}
-    targets = {block_id: quota.numerator // quota.denominator for block_id, quota in quotas.items()}
+    quotas = {
+        row.block_id: Fraction(total, 1) * weights[row.block_id] / weight_sum
+        for row in ordered
+    }
+    targets = {
+        block_id: quota.numerator // quota.denominator for block_id, quota in quotas.items()
+    }
     remaining = total - sum(targets.values())
     ranking = sorted(
         ordered,
@@ -133,7 +135,9 @@ def _aggregate_count_var(model, counts, direction, block, total_trips: int):
 def _demand_target_streams(problem, bundle):
     blocks = bundle.blocks
     sentinel_directions = {item.direction for item in bundle.final_service_sentinels}
-    if problem.demand_allocation_authority_mode == DemandAllocationAuthorityModeV1.COMBINED_FIXED_DIRECTION_COUNTS:
+    if problem.demand_allocation_authority_mode == (
+        DemandAllocationAuthorityModeV1.COMBINED_FIXED_DIRECTION_COUNTS
+    ):
         analytical_total = sum(
             allocator._direction_total(problem, direction) - int(direction in sentinel_directions)
             for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND)
@@ -162,22 +166,26 @@ def _fallback_source_targets(problem, direction, rows) -> dict[str, int]:
 
 
 def _global_build_allocation_model(problem, authority, policy, protected_authority):
-    """Replace the symmetric planning-floor target with demand fit and smoothness."""
+    """Keep demand-protection priorities, then optimize demand fit and global smoothness."""
     bundle = _ORIGINAL_BUILD_ALLOCATION_MODEL(problem, authority, policy, protected_authority)
     model = bundle.model
     total_trips = problem.scenario_b.total_daily_trips
     demand_errors = []
     change_points = []
-    service_change_magnitudes = []
 
     for direction, rows, analytical_total in _demand_target_streams(problem, bundle):
         observed_total = sum(float(row.observed_passengers) for row in rows)
-        if observed_total > 0:
-            targets = _largest_remainder_targets(rows, analytical_total)
-        else:
-            targets = _fallback_source_targets(problem, direction, rows)
+        targets = (
+            _largest_remainder_targets(rows, analytical_total)
+            if observed_total > 0
+            else _fallback_source_targets(problem, direction, rows)
+        )
         aggregates = []
-        for row in sorted(rows, key=lambda item: (item.start_time, item.end_time, item.block_id)):
+        ordered_rows = sorted(
+            rows,
+            key=lambda item: (item.start_time, item.end_time, item.block_id),
+        )
+        for row in ordered_rows:
             aggregate = _aggregate_count_var(
                 model,
                 bundle.count_by_direction_and_block,
@@ -185,7 +193,7 @@ def _global_build_allocation_model(problem, authority, policy, protected_authori
                 row,
                 total_trips,
             )
-            aggregates.append((row, aggregate))
+            aggregates.append(aggregate)
             target = targets[row.block_id]
             error = model.new_int_var(
                 0,
@@ -195,38 +203,19 @@ def _global_build_allocation_model(problem, authority, policy, protected_authori
             model.add_abs_equality(error, aggregate - target)
             demand_errors.append(error)
 
-        for index, ((left_block, left), (right_block, right)) in enumerate(
+        for index, (left, right) in enumerate(
             zip(aggregates, aggregates[1:], strict=False),
             start=1,
         ):
-            # Compare service rates, not raw counts, so non-30-minute blocks remain coherent.
-            left_duration = left_block.duration_minutes
-            right_duration = right_block.duration_minutes
-            rate_delta_bound = total_trips * max(left_duration, right_duration)
-            magnitude = model.new_int_var(
-                0,
-                rate_delta_bound,
-                f"stage1_service_rate_change_{direction.value}_{index:04d}",
+            changed = model.new_bool_var(
+                f"stage1_service_change_point_{direction.value}_{index:04d}"
             )
-            rate_delta = left * right_duration - right * left_duration
-            model.add_abs_equality(magnitude, rate_delta)
-            service_change_magnitudes.append(magnitude)
-            changed = model.new_bool_var(f"stage1_change_point_{direction.value}_{index:04d}")
-            model.add(rate_delta != 0).only_enforce_if(changed)
-            model.add(rate_delta == 0).only_enforce_if(changed.negated())
+            model.add(left != right).only_enforce_if(changed)
+            model.add(left == right).only_enforce_if(changed.negated())
             change_points.append(changed)
 
     demand_bound = len(demand_errors) * total_trips
     change_point_bound = len(change_points)
-    change_magnitude_bound = sum(
-        total_trips * max(left.duration_minutes, right.duration_minutes)
-        for _, rows, _ in _demand_target_streams(problem, bundle)
-        for left, right in zip(
-            sorted(rows, key=lambda item: (item.start_time, item.end_time, item.block_id)),
-            sorted(rows, key=lambda item: (item.start_time, item.end_time, item.block_id))[1:],
-            strict=False,
-        )
-    )
     old_terms = bundle.objective_terms
     old_bounds = bundle.objective_term_bounds
     terms = (
@@ -245,12 +234,6 @@ def _global_build_allocation_model(problem, authority, policy, protected_authori
             upper_bound=change_point_bound,
             name="stage1_service_change_point_count",
         ),
-        allocator._bounded_sum(
-            model,
-            service_change_magnitudes,
-            upper_bound=change_magnitude_bound,
-            name="stage1_total_service_rate_change",
-        ),
         old_terms[4],
     )
     bounds = (
@@ -259,17 +242,25 @@ def _global_build_allocation_model(problem, authority, policy, protected_authori
         old_bounds[2],
         demand_bound,
         change_point_bound,
-        change_magnitude_bound,
         old_bounds[4],
     )
-    model.Proto().ClearField("objective")
     weights = allocator._lexicographic_weights(bounds)
+    theoretical_maximum = sum(
+        bound * weight for bound, weight in zip(bounds, weights, strict=True)
+    )
+    if theoretical_maximum > 2**63 - 1:
+        raise allocator.Stage1AllocationError(
+            allocator.STAGE_1_PROBLEM_AUTHORITY_MISMATCH,
+            "global-regularity Stage 1 objective exceeds signed-int64 authority",
+        )
     model.minimize(sum(term * weight for term, weight in zip(terms, weights, strict=True)))
     return replace(bundle, objective_terms=terms, objective_term_bounds=bounds)
 
 
 def _phase_membership_ok(representation, group, allocation) -> bool:
-    ordered_blocks = tuple(sorted(group.blocks, key=lambda item: (item.start_time, item.end_time)))
+    ordered_blocks = tuple(
+        sorted(group.blocks, key=lambda item: (item.start_time, item.end_time, item.block_id))
+    )
     cumulative_actual = 0
     cumulative_target = 0
     for block in ordered_blocks:
@@ -284,15 +275,25 @@ def _phase_membership_ok(representation, group, allocation) -> bool:
             return False
         cumulative_actual += actual
         cumulative_target += target
-        if abs(cumulative_actual - cumulative_target) > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1:
+        if (
+            abs(cumulative_actual - cumulative_target)
+            > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1
+        ):
             return False
     sentinel_count = int(group.has_final_service_sentinel)
-    return cumulative_actual == cumulative_target and group.trip_count == cumulative_target + sentinel_count
+    return (
+        cumulative_actual == cumulative_target
+        and group.trip_count == cumulative_target + sentinel_count
+    )
 
 
 def _bounded_phase_membership_representation(candidates, group, allocation):
     return next(
-        (representation for representation in candidates if _phase_membership_ok(representation, group, allocation)),
+        (
+            representation
+            for representation in candidates
+            if _phase_membership_ok(representation, group, allocation)
+        ),
         None,
     )
 
@@ -350,7 +351,10 @@ def _singleton_aware_representation_candidates(
             uniform_headway_minutes=None,
             departure_minutes=(minute,),
         )
-        for minute in sorted(range(lower, upper + 1), key=lambda item: (abs(item - source_minute), item))
+        for minute in sorted(
+            range(lower, upper + 1),
+            key=lambda item: (abs(item - source_minute), item),
+        )
     )
     return candidates, (lower, upper), (lower, upper)
 
@@ -368,14 +372,14 @@ def _planned_departures(regime) -> tuple[int, ...]:
 
 def _bounded_phase_plan_ok(allocation_blocks, regimes) -> bool:
     rows_by_direction = defaultdict(list)
-    represented_by_regime = {regime.regime_id: _planned_departures(regime) for regime in regimes}
+    represented = {regime.regime_id: _planned_departures(regime) for regime in regimes}
     for block in allocation_blocks:
         for direction, expected in block.directional_trip_counts:
             actual = sum(
                 block.start_minute <= minute < block.end_minute
                 for regime in regimes
                 if regime.direction == direction
-                for minute in represented_by_regime.get(regime.regime_id, ())
+                for minute in represented.get(regime.regime_id, ())
             )
             if abs(actual - expected) > BLOCK_PHASE_MAX_DEVIATION_TRIPS_V1:
                 return False
@@ -383,7 +387,8 @@ def _bounded_phase_plan_ok(allocation_blocks, regimes) -> bool:
                 return False
             rows_by_direction[direction].append((block, expected, actual))
     for rows in rows_by_direction.values():
-        cumulative_actual = cumulative_target = 0
+        cumulative_actual = 0
+        cumulative_target = 0
         for block, expected, actual in sorted(
             rows,
             key=lambda item: (item[0].start_minute, item[0].end_minute, item[0].block_id),
@@ -391,7 +396,10 @@ def _bounded_phase_plan_ok(allocation_blocks, regimes) -> bool:
             del block
             cumulative_actual += actual
             cumulative_target += expected
-            if abs(cumulative_actual - cumulative_target) > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1:
+            if (
+                abs(cumulative_actual - cumulative_target)
+                > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1
+            ):
                 return False
         if cumulative_actual != cumulative_target:
             return False
@@ -406,38 +414,69 @@ def _bounded_phase_necessary_feasibility(
     final_service_sentinels,
     policy,
 ):
-    result = _ORIGINAL_NECESSARY_FEASIBILITY(
+    candidate_fingerprint = allocator._allocation_candidate_fingerprint(problem, allocation, policy)
+    source_by_id = {item.trip_id: item for item in problem.scenario_b.exact_timetable}
+    source_ids_by_regime = allocator._source_ids_by_regime(problem, regimes)
+    failures: set[models.Stage2ConstraintFamilyV1] = set()
+    if not source_ids_by_regime:
+        failures.add(models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP)
+
+    for regime in regimes:
+        source_ids = source_ids_by_regime.get(regime.regime_id, ())
+        departures = _planned_departures(regime)
+        if len(source_ids) != regime.trip_count or len(departures) != regime.trip_count:
+            failures.add(models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP)
+            continue
+        if (
+            departures[0] != regime.planned_start_minute
+            or departures[-1] != regime.planned_end_minute
+        ):
+            failures.update(
+                {
+                    models.Stage2ConstraintFamilyV1.UNIFORM_HEADWAY,
+                    models.Stage2ConstraintFamilyV1.REGIME_BOUNDARIES,
+                }
+            )
+            continue
+        for source_id, minute in zip(source_ids, departures, strict=True):
+            source_minute = source_by_id[source_id].departure_time // 60
+            if abs(minute - source_minute) > policy.absolute_max_shift_per_trip_minutes:
+                failures.add(models.Stage2ConstraintFamilyV1.B_SHIFT_BOUND)
+
+    if not _bounded_phase_plan_ok(allocation_blocks, regimes):
+        failures.add(models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP)
+
+    domains, domain_failures = allocator._necessary_departure_domains(
         problem,
-        allocation,
-        allocation_blocks,
         regimes,
         final_service_sentinels,
         policy,
     )
-    families = set(result.constraint_families)
-    if models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP in families and _bounded_phase_plan_ok(
-        allocation_blocks,
-        regimes,
-    ):
-        families.remove(models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP)
-    if families == set(result.constraint_families):
-        return result
-    passed = not families
+    failures.update(domain_failures)
+    fleet_lower_bound = None
+    if len(domains) == problem.scenario_b.total_daily_trips:
+        fleet_lower_bound = allocator._fleet_lower_bound(problem, domains)
+        if fleet_lower_bound > problem.scenario_b.available_fleet_limit:
+            failures.add(models.Stage2ConstraintFamilyV1.FLEET)
+
+    passed = not failures
     explanation = (
         "Stage 1 plan passed bounded block-phase, B-anchor, final-tail, and safe fleet checks."
         if passed
         else "Stage 1 plan failed necessary Stage 2 checks for: "
-        + ", ".join(item.value for item in sorted(families, key=lambda item: item.value))
+        + ", ".join(item.value for item in sorted(failures, key=lambda item: item.value))
         + "."
     )
-    corrected = replace(
-        result,
-        passed=passed,
-        constraint_families=tuple(sorted(families, key=lambda item: item.value)),
-        explanation=explanation,
-        diagnostic_fingerprint="",
+    return allocator.finalize_stage_1_necessary_feasibility(
+        models.Stage1NecessaryFeasibilityResultV1(
+            allocation_candidate_fingerprint=candidate_fingerprint,
+            passed=passed,
+            constraint_families=tuple(sorted(failures, key=lambda item: item.value)),
+            fleet_lower_bound=fleet_lower_bound,
+            explanation=explanation,
+            diagnostic_fingerprint="",
+        )
     )
-    return allocator.finalize_stage_1_necessary_feasibility(corrected)
 
 
 def _group_from_regime(regime, blocks_by_id, cursor: int):
@@ -454,14 +493,12 @@ def _group_from_regime(regime, blocks_by_id, cursor: int):
     )
 
 
-def _tail_span_from_probe(probe) -> int:
+def _tail_span(probe) -> int:
     representation = probe.representation
-    if representation is None:
-        return 0
-    return representation.end_minute - representation.start_minute
+    return 0 if representation is None else representation.end_minute - representation.start_minute
 
 
-def _proposed_regime(problem, direction, index, group, probe, policy, projection):
+def _proposed_regime(direction, index, group, probe, policy, projection):
     representation = probe.representation
     assert representation is not None
     maximum = (
@@ -522,13 +559,18 @@ def _global_representable_regimes(
     )
     if outcome.regimes is None:
         return outcome
+
     blocks_by_id = {block.block_id: block for block in blocks}
     requirements = {item.block_id: item.required_trips_85 for item in problem.block_requirements}
     output = []
     for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
         original = sorted(
             (item for item in outcome.regimes if item.direction == direction),
-            key=lambda item: (item.planned_start_minute, item.planned_end_minute, item.regime_id),
+            key=lambda item: (
+                item.planned_start_minute,
+                item.planned_end_minute,
+                item.regime_id,
+            ),
         )
         groups = []
         cursor = 0
@@ -542,6 +584,7 @@ def _global_representable_regimes(
             if block.direction in {direction, ContractDirection.COMBINED}
         }
         tail_target = policy.final_service_tail.final_service_tail_window_minutes
+
         while len(groups) >= 2:
             options = []
             for pair_index in range(len(groups) - 1):
@@ -549,14 +592,14 @@ def _global_representable_regimes(
                 if not allocator._groups_are_contiguous(left, right):
                     continue
                 if right.is_final_service_tail:
-                    current_tail_probe = allocator._representation_for_group(
+                    current_tail = allocator._representation_for_group(
                         problem,
                         right,
                         policy,
                         projection,
                         allocation,
                     )
-                    if _tail_span_from_probe(current_tail_probe) >= max(
+                    if _tail_span(current_tail) >= max(
                         0,
                         tail_target - policy.maximum_regime_boundary_adjustment_minutes,
                     ):
@@ -598,38 +641,46 @@ def _global_representable_regimes(
         if any(probe.representation is None for probe in probes):
             return outcome
         output.extend(
-            _proposed_regime(problem, direction, index, group, probe, policy, projection)
-            for index, (group, probe) in enumerate(zip(groups, probes, strict=True), start=1)
+            _proposed_regime(direction, index, group, probe, policy, projection)
+            for index, (group, probe) in enumerate(
+                zip(groups, probes, strict=True),
+                start=1,
+            )
         )
     return allocator._RegimeBuildOutcome(regimes=tuple(output), diagnostic=None)
 
 
-def _add_bounded_phase_block_membership_constraints(model, problem, plan, departure_by_source_id):
+def _add_bounded_phase_block_membership_constraints(
+    model,
+    problem,
+    plan,
+    departure_by_source_id,
+):
     directional = stage2._ordered_directional_trips(problem)
-    by_direction_and_block = {}
-    count_by_direction_and_block = {}
-    target_by_direction_and_block = {}
+    memberships_by_key = {}
+    counts_by_key = {}
+    targets_by_key = {}
     blocks_by_direction = defaultdict(list)
-    for allocation_block in plan.allocation_blocks:
-        targets = dict(allocation_block.directional_trip_counts)
-        for direction, target in targets.items():
+
+    for block in plan.allocation_blocks:
+        for direction, target in block.directional_trip_counts:
             memberships = []
             for source in directional[direction]:
                 departure = departure_by_source_id[source.trip_id]
                 at_or_after = stage2._reified_less_than_or_equal(
                     model,
-                    allocation_block.start_minute,
+                    block.start_minute,
                     departure,
-                    name=f"v3_phase_after_{source.trip_id}_{allocation_block.block_id}",
+                    name=f"v3_phase_after_{source.trip_id}_{block.block_id}",
                 )
                 before_end = stage2._reified_less_than_or_equal(
                     model,
                     departure,
-                    allocation_block.end_minute - 1,
-                    name=f"v3_phase_before_{source.trip_id}_{allocation_block.block_id}",
+                    block.end_minute - 1,
+                    name=f"v3_phase_before_{source.trip_id}_{block.block_id}",
                 )
                 member = model.new_bool_var(
-                    f"v3_phase_member_{source.trip_id}_{allocation_block.block_id}"
+                    f"v3_phase_member_{source.trip_id}_{block.block_id}"
                 )
                 model.add(member <= at_or_after)
                 model.add(member <= before_end)
@@ -638,20 +689,23 @@ def _add_bounded_phase_block_membership_constraints(model, problem, plan, depart
             count = model.new_int_var(
                 0,
                 len(directional[direction]),
-                f"v3_phase_count_{direction.value}_{allocation_block.block_id}",
+                f"v3_phase_count_{direction.value}_{block.block_id}",
             )
             model.add(count == sum(memberships))
             lower = max(0, target - BLOCK_PHASE_MAX_DEVIATION_TRIPS_V1)
-            upper = min(len(directional[direction]), target + BLOCK_PHASE_MAX_DEVIATION_TRIPS_V1)
-            if allocation_block.observed_passengers > 0 and target > 0:
+            upper = min(
+                len(directional[direction]),
+                target + BLOCK_PHASE_MAX_DEVIATION_TRIPS_V1,
+            )
+            if block.observed_passengers > 0 and target > 0:
                 lower = max(lower, 1)
             model.add(count >= lower)
             model.add(count <= upper)
-            key = (direction, allocation_block.block_id)
-            by_direction_and_block[key] = tuple(memberships)
-            count_by_direction_and_block[key] = count
-            target_by_direction_and_block[key] = target
-            blocks_by_direction[direction].append(allocation_block)
+            key = (direction, block.block_id)
+            memberships_by_key[key] = tuple(memberships)
+            counts_by_key[key] = count
+            targets_by_key[key] = target
+            blocks_by_direction[direction].append(block)
 
     for direction, direction_blocks in blocks_by_direction.items():
         ordered = sorted(
@@ -662,23 +716,28 @@ def _add_bounded_phase_block_membership_constraints(model, problem, plan, depart
         cumulative_target = 0
         for block in ordered:
             key = (direction, block.block_id)
-            cumulative_counts.append(count_by_direction_and_block[key])
-            cumulative_target += target_by_direction_and_block[key]
+            cumulative_counts.append(counts_by_key[key])
+            cumulative_target += targets_by_key[key]
             prefix = sum(cumulative_counts)
-            model.add(prefix - cumulative_target <= CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1)
-            model.add(cumulative_target - prefix <= CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1)
+            model.add(
+                prefix - cumulative_target <= CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1
+            )
+            model.add(
+                cumulative_target - prefix <= CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1
+            )
         if ordered:
             model.add(sum(cumulative_counts) == cumulative_target)
-    return by_direction_and_block
+    return memberships_by_key
 
 
 def _scenario_b_max_headway_change(problem) -> int:
     maximum = 0
     has_comparable = False
-    directional = stage2._ordered_directional_trips(problem)
-    for trips in directional.values():
+    for trips in stage2._ordered_directional_trips(problem).values():
         minutes = [trip.departure_time // 60 for trip in trips]
-        headways = [later - earlier for earlier, later in zip(minutes, minutes[1:], strict=False)]
+        headways = [
+            later - earlier for earlier, later in zip(minutes, minutes[1:], strict=False)
+        ]
         for earlier, later in zip(headways, headways[1:], strict=False):
             has_comparable = True
             maximum = max(maximum, abs(later - earlier))
@@ -695,19 +754,24 @@ def _regime_passenger_rate(problem, regime) -> float:
 
 
 def _tail_demand_not_rising(problem, earlier, tail) -> bool:
-    return _regime_passenger_rate(problem, tail) <= _regime_passenger_rate(problem, earlier) + 1e-9
+    return (
+        _regime_passenger_rate(problem, tail)
+        <= _regime_passenger_rate(problem, earlier) + 1e-9
+    )
 
 
 def _global_build_stage2_model(problem, plan, policy, protected_projection):
     bundle = _ORIGINAL_BUILD_STAGE2_MODEL(problem, plan, policy, protected_projection)
     model = bundle.model
-    effective_transition_cap = min(
+    transition_cap = min(
         policy.maximum_transition_jump_minutes,
         _scenario_b_max_headway_change(problem),
     )
-    directional_regimes = stage2._directional_regimes(plan)
-    for direction, regimes in directional_regimes.items():
-        for index, (earlier, later) in enumerate(zip(regimes, regimes[1:], strict=False), start=1):
+    for direction, regimes in stage2._directional_regimes(plan).items():
+        for index, (earlier, later) in enumerate(
+            zip(regimes, regimes[1:], strict=False),
+            start=1,
+        ):
             earlier_ids = bundle.source_ids_by_regime_id[earlier.regime_id]
             later_ids = bundle.source_ids_by_regime_id[later.regime_id]
             transition = (
@@ -716,7 +780,7 @@ def _global_build_stage2_model(problem, plan, policy, protected_projection):
             )
             for suffix, regime in (("before", earlier), ("after", later)):
                 regime_headway = bundle.headway_by_regime_id.get(regime.regime_id)
-                if regime_headway is None or effective_transition_cap >= 10**9:
+                if regime_headway is None or transition_cap >= 10**9:
                     continue
                 jump = model.new_int_var(
                     0,
@@ -724,7 +788,7 @@ def _global_build_stage2_model(problem, plan, policy, protected_projection):
                     f"v3_global_transition_{direction.value}_{index:04d}_{suffix}",
                 )
                 model.add_abs_equality(jump, transition - regime_headway)
-                model.add(jump <= effective_transition_cap)
+                model.add(jump <= transition_cap)
             if (
                 later.is_final_service_tail
                 and _tail_demand_not_rising(problem, earlier, later)
@@ -760,7 +824,8 @@ def _candidate_bounded_phase_ok(candidate, allocation_plan) -> bool:
                 return False
             rows_by_direction[direction].append((block, expected, actual))
     for rows in rows_by_direction.values():
-        cumulative_actual = cumulative_target = 0
+        cumulative_actual = 0
+        cumulative_target = 0
         for block, expected, actual in sorted(
             rows,
             key=lambda item: (item[0].start_minute, item[0].end_minute, item[0].block_id),
@@ -768,7 +833,10 @@ def _candidate_bounded_phase_ok(candidate, allocation_plan) -> bool:
             del block
             cumulative_actual += actual
             cumulative_target += expected
-            if abs(cumulative_actual - cumulative_target) > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1:
+            if (
+                abs(cumulative_actual - cumulative_target)
+                > CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1
+            ):
                 return False
         if cumulative_actual != cumulative_target:
             return False
@@ -780,37 +848,48 @@ def _candidate_global_regularity_errors(problem, candidate, allocation_plan, pol
     exact_code = "V3_STAGE_1_BLOCK_ALLOCATION_NOT_REPRODUCED"
     if exact_code in errors and _candidate_bounded_phase_ok(candidate, allocation_plan):
         errors = [item for item in errors if item != exact_code]
-
     if allocation_plan is None:
         return errors
+
     raw_by_id = {item.regime_id: item for item in candidate.headway_regimes}
     members_by_id = defaultdict(list)
     for trip in candidate.exact_timetable:
         members_by_id[trip.headway_regime_id].append(trip)
-    effective_transition_cap = min(
+    transition_cap = min(
         policy.maximum_transition_jump_minutes,
         _scenario_b_max_headway_change(problem),
     )
     for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
         regimes = sorted(
             (item for item in allocation_plan.proposed_regimes if item.direction == direction),
-            key=lambda item: (item.planned_start_minute, item.planned_end_minute, item.regime_id),
+            key=lambda item: (
+                item.planned_start_minute,
+                item.planned_end_minute,
+                item.regime_id,
+            ),
         )
         for earlier, later in zip(regimes, regimes[1:], strict=False):
-            earlier_members = sorted(members_by_id[earlier.regime_id], key=lambda item: item.c_departure_time)
-            later_members = sorted(members_by_id[later.regime_id], key=lambda item: item.c_departure_time)
+            earlier_members = sorted(
+                members_by_id[earlier.regime_id],
+                key=lambda item: item.c_departure_time,
+            )
+            later_members = sorted(
+                members_by_id[later.regime_id],
+                key=lambda item: item.c_departure_time,
+            )
             if not earlier_members or not later_members:
                 continue
             transition = (
                 later_members[0].c_departure_time - earlier_members[-1].c_departure_time
             ) // 60
-            adjacent = [raw_by_id[item.regime_id] for item in (earlier, later) if item.regime_id in raw_by_id]
-            if any(
-                raw.actual_headway_sequence
-                and abs(transition - raw.actual_headway_sequence[0]) > effective_transition_cap
-                for raw in adjacent
-            ):
-                errors.append("V3_GLOBAL_TRANSITION_JUMP_WORSE_THAN_SCENARIO_B")
+            for regime in (earlier, later):
+                raw = raw_by_id.get(regime.regime_id)
+                if (
+                    raw is not None
+                    and raw.actual_headway_sequence
+                    and abs(transition - raw.actual_headway_sequence[0]) > transition_cap
+                ):
+                    errors.append("V3_GLOBAL_TRANSITION_JUMP_WORSE_THAN_SCENARIO_B")
             earlier_raw = raw_by_id.get(earlier.regime_id)
             later_raw = raw_by_id.get(later.regime_id)
             if (
@@ -845,7 +924,7 @@ def install_global_regularity_v1() -> None:
 
 
 def uninstall_global_regularity_v1() -> None:
-    """Restore merged baseline functions; intended for isolated regression tests."""
+    """Restore the merged baseline; useful for isolation and regression tests."""
     global _INSTALLED
     if not _INSTALLED:
         return
