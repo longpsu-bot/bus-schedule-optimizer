@@ -23,6 +23,7 @@ from bus_schedule_engine.contracts_v1.v3_global_regularity_v2 import (  # noqa: 
 )
 from bus_schedule_engine.contracts_v1.v3_global_regularity_v3 import (  # noqa: E402
     GLOBAL_REGULARITY_POLICY_PROFILE_V3,
+    NECESSARY_MEMBERSHIP_REQUIRES_UNIFORM_PHASE_REACHABILITY_V3,
     NECESSARY_MEMBERSHIP_USES_DEPARTURE_DOMAINS_V3,
     PHASE_AWARE_SOURCE_SLICING_V3,
     REGIME_LOCAL_ZERO_DRIFT_REQUIRED_V3,
@@ -100,6 +101,9 @@ def _with_global_regularity_metadata(run):
         "regime_local_zero_drift_required": REGIME_LOCAL_ZERO_DRIFT_REQUIRED_V3,
         "necessary_membership_uses_departure_domains": (
             NECESSARY_MEMBERSHIP_USES_DEPARTURE_DOMAINS_V3
+        ),
+        "necessary_membership_requires_uniform_phase_reachability": (
+            NECESSARY_MEMBERSHIP_REQUIRES_UNIFORM_PHASE_REACHABILITY_V3
         ),
         "regime_count_semantics": "HARD_MAXIMUM_WITH_REPRESENTABLE_FIXED_POINT_COARSENING",
         "surplus_allocation": "PASSENGER_TARGET_ENVELOPE_WITH_GLOBAL_SMOOTHNESS",

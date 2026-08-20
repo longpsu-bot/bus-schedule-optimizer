@@ -34,7 +34,11 @@ def test_stage1_v2_allocation_respects_cumulative_b_shift_envelope() -> None:
         direction: tuple(
             trip.departure_time // 60
             for trip in sorted(
-                (item for item in problem.scenario_b.exact_timetable if item.direction == direction),
+                (
+                    item
+                    for item in problem.scenario_b.exact_timetable
+                    if item.direction == direction
+                ),
                 key=lambda item: (item.departure_time, item.trip_id),
             )
         )

@@ -10,14 +10,18 @@ V3 carries that same bounded phase into source-slice construction. It chooses de
 per-block realized counts near Scenario B while preserving +/-1 block deviation, +/-1
 cumulative deviation, positive-demand service, and zero final drift. Regime-local membership
 no longer requires an artificial zero drift at every regime boundary. The cheap necessary
-feasibility check uses Stage 2 departure domains, rather than one fixed Stage 1 planned witness,
-so it rejects bounded-phase membership only when the permitted domains themselves cannot reach
-an admissible prefix-count path. Exact membership remains Stage 2 CP-SAT authority.
+feasibility check uses a bounded CP-SAT projection of the Stage 2 departure domains, exact
+uniform regimes, and bounded-phase membership, rather than one fixed Stage 1 planned witness.
+It rejects only when that joint subset is proven infeasible. The full operational model remains
+Stage 2 authority.
 """
 
 from __future__ import annotations
 
 from dataclasses import replace
+from types import SimpleNamespace
+
+from ortools.sat.python import cp_model
 
 from . import two_stage_allocator as allocator
 from . import two_stage_models as models
@@ -31,6 +35,8 @@ GLOBAL_REGULARITY_POLICY_PROFILE_V3 = "scenario_c_global_regularity_policy_v3"
 PHASE_AWARE_SOURCE_SLICING_V3 = True
 REGIME_LOCAL_ZERO_DRIFT_REQUIRED_V3 = False
 NECESSARY_MEMBERSHIP_USES_DEPARTURE_DOMAINS_V3 = True
+NECESSARY_MEMBERSHIP_REQUIRES_UNIFORM_PHASE_REACHABILITY_V3 = True
+NECESSARY_UNIFORM_PHASE_SOLVE_LIMIT_SECONDS_V3 = 1.0
 
 _INSTALLED = False
 _V2_INITIAL_GROUPS = None
@@ -50,6 +56,9 @@ def _policy_fingerprint_payload() -> dict[str, object]:
         "full_direction_zero_drift_required": True,
         "necessary_membership_uses_departure_domains": (
             NECESSARY_MEMBERSHIP_USES_DEPARTURE_DOMAINS_V3
+        ),
+        "necessary_membership_requires_uniform_phase_reachability": (
+            NECESSARY_MEMBERSHIP_REQUIRES_UNIFORM_PHASE_REACHABILITY_V3
         ),
         "source_slice_selection": "MINIMIZE_B_BLOCK_COUNT_DEVIATION_THEN_PHASE_MOVEMENT",
     }
@@ -212,18 +221,18 @@ def _phase_aware_membership_representation(candidates, group, allocation):
     )
 
 
-def _domain_phase_membership_possible(
+def _uniform_phase_membership_reachability(
     problem,
     allocation_blocks,
     regimes,
     final_service_sentinels,
     policy,
-) -> bool:
-    """Return a cheap necessary bounded-phase check over Stage 2 departure domains.
+) -> bool | None:
+    """Prove or find joint uniform-regime and bounded-phase domain reachability.
 
-    For every analytical boundary, the reachable number of departures before that boundary
-    must overlap the authoritative cumulative target +/-1. This deliberately does not choose
-    exact minutes; CP-SAT remains responsible for proving simultaneous block membership.
+    ``False`` is a safe necessary-feasibility rejection because this model is a strict subset
+    of Stage 2 hard constraints. ``None`` means the bounded diagnostic solve was inconclusive
+    and must never reject a candidate.
     """
     domains, domain_failures = allocator._necessary_departure_domains(
         problem,
@@ -233,50 +242,62 @@ def _domain_phase_membership_possible(
     )
     if domain_failures or len(domains) != problem.scenario_b.total_daily_trips:
         return False
+    source_ids_by_regime = allocator._source_ids_by_regime(problem, regimes)
+    if not source_ids_by_regime:
+        return False
 
-    directional = allocator._ordered_directional_trips(problem)
-    for direction in (ContractDirection.OUTBOUND, ContractDirection.INBOUND):
-        rows = []
-        for block in allocation_blocks:
-            counts = dict(block.directional_trip_counts)
-            if direction in counts:
-                rows.append((block, counts[direction]))
-        ordered = sorted(
-            rows,
-            key=lambda item: (item[0].start_minute, item[0].end_minute, item[0].block_id),
+    model = cp_model.CpModel()
+    departures = {
+        trip.trip_id: model.new_int_var(
+            domains[trip.trip_id][0],
+            domains[trip.trip_id][1],
+            f"v3_necessary_departure_{trip.trip_id}",
         )
-        if not ordered:
-            continue
-
-        source_domains = tuple(domains[trip.trip_id] for trip in directional[direction])
-        cumulative_target = 0
-        for index, (block, expected) in enumerate(ordered):
-            cumulative_target += expected
-            boundary = block.end_minute
-            mandatory_before = sum(upper < boundary for _, upper in source_domains)
-            possible_before = sum(lower < boundary for lower, _ in source_domains)
-            authority_lower = max(
-                0,
-                cumulative_target - v1.CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1,
+        for trip in problem.scenario_b.exact_timetable
+    }
+    directional = allocator._ordered_directional_trips(problem)
+    for trips in directional.values():
+        model.add(departures[trips[0].trip_id] == trips[0].departure_time // 60)
+        model.add(departures[trips[-1].trip_id] == trips[-1].departure_time // 60)
+        for earlier, later in zip(trips, trips[1:], strict=False):
+            model.add(
+                departures[later.trip_id] - departures[earlier.trip_id]
+                >= policy.minimum_operational_headway_minutes
             )
-            authority_upper = min(
-                len(source_domains),
-                cumulative_target + v1.CUMULATIVE_PHASE_MAX_DEVIATION_TRIPS_V1,
-            )
-            if index == len(ordered) - 1:
-                authority_lower = cumulative_target
-                authority_upper = cumulative_target
-            if max(mandatory_before, authority_lower) > min(possible_before, authority_upper):
-                return False
 
-            if block.observed_passengers > 0 and expected > 0:
-                can_serve_block = any(
-                    lower < block.end_minute and upper >= block.start_minute
-                    for lower, upper in source_domains
-                )
-                if not can_serve_block:
-                    return False
-    return True
+    for regime in regimes:
+        source_ids = source_ids_by_regime[regime.regime_id]
+        first = departures[source_ids[0]]
+        last = departures[source_ids[-1]]
+        model.add(first >= regime.permitted_start_window[0])
+        model.add(first <= regime.permitted_start_window[1])
+        model.add(last >= regime.permitted_end_window[0])
+        model.add(last <= regime.permitted_end_window[1])
+        if regime.trip_count >= 2:
+            headway = model.new_int_var(
+                regime.minimum_headway_minutes,
+                regime.maximum_headway_minutes,
+                f"v3_necessary_uniform_headway_{regime.regime_id}",
+            )
+            for earlier_id, later_id in zip(source_ids, source_ids[1:], strict=False):
+                model.add(departures[later_id] - departures[earlier_id] == headway)
+
+    v1._add_bounded_phase_block_membership_constraints(
+        model,
+        problem,
+        SimpleNamespace(allocation_blocks=allocation_blocks),
+        departures,
+    )
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = NECESSARY_UNIFORM_PHASE_SOLVE_LIMIT_SECONDS_V3
+    solver.parameters.num_search_workers = 1
+    solver.parameters.random_seed = 0
+    status = solver.solve(model)
+    if status == cp_model.INFEASIBLE:
+        return False
+    if status in {cp_model.OPTIMAL, cp_model.FEASIBLE}:
+        return True
+    return None
 
 
 def _phase_aware_necessary_feasibility(
@@ -300,23 +321,44 @@ def _phase_aware_necessary_feasibility(
     membership = models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP
     if result.passed or membership not in result.constraint_families:
         return result
-    if not _domain_phase_membership_possible(
+    reachability = _uniform_phase_membership_reachability(
         problem,
         allocation_blocks,
         regimes,
         final_service_sentinels,
         policy,
-    ):
-        return result
+    )
+    if reachability is False:
+        families = tuple(
+            sorted(
+                {
+                    *result.constraint_families,
+                    models.Stage2ConstraintFamilyV1.UNIFORM_HEADWAY,
+                },
+                key=lambda item: item.value,
+            )
+        )
+        return allocator.finalize_stage_1_necessary_feasibility(
+            replace(
+                result,
+                passed=False,
+                constraint_families=families,
+                explanation=(
+                    "Stage 1 plan cannot jointly satisfy exact uniform headways, B-anchored "
+                    "departure domains, and bounded full-direction phase membership."
+                ),
+                diagnostic_fingerprint="",
+            )
+        )
 
     remaining = tuple(item for item in result.constraint_families if item != membership)
     passed = not remaining
     explanation = (
-        "Stage 1 plan passed domain-reachable bounded-phase membership; exact block membership "
-        "is deferred to Stage 2 CP-SAT."
+        "Stage 1 plan passed joint uniform-regime and bounded-phase domain reachability; full "
+        "operational feasibility remains Stage 2 CP-SAT authority."
         if passed
-        else "Stage 1 planned witness was phase-inexact but the departure domains can satisfy "
-        "bounded-phase membership; remaining necessary failures: "
+        else "Stage 1 planned witness was phase-inexact but joint uniform-regime and bounded-"
+        "phase domain reachability was not disproven; remaining necessary failures: "
         + ", ".join(item.value for item in remaining)
         + "."
     )
@@ -388,7 +430,9 @@ def uninstall_global_regularity_v3() -> None:
 
 __all__ = [
     "GLOBAL_REGULARITY_POLICY_PROFILE_V3",
+    "NECESSARY_MEMBERSHIP_REQUIRES_UNIFORM_PHASE_REACHABILITY_V3",
     "NECESSARY_MEMBERSHIP_USES_DEPARTURE_DOMAINS_V3",
+    "NECESSARY_UNIFORM_PHASE_SOLVE_LIMIT_SECONDS_V3",
     "PHASE_AWARE_SOURCE_SLICING_V3",
     "REGIME_LOCAL_ZERO_DRIFT_REQUIRED_V3",
     "install_global_regularity_v3",

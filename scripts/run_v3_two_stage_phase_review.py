@@ -222,7 +222,9 @@ def _add_bounded_phase_block_membership_constraints(
             blocks_by_direction[direction].append(allocation_block)
 
     for direction, blocks in blocks_by_direction.items():
-        ordered = sorted(blocks, key=lambda item: (item.start_minute, item.end_minute, item.block_id))
+        ordered = sorted(
+            blocks, key=lambda item: (item.start_minute, item.end_minute, item.block_id)
+        )
         cumulative_counts = []
         cumulative_target = 0
         for block in ordered:

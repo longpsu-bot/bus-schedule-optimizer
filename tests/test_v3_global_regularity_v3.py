@@ -76,13 +76,13 @@ def _necessary_result(*families):
     )
 
 
-def test_domain_reachable_membership_is_deferred_to_stage2(monkeypatch) -> None:
+def test_uniform_phase_reachable_membership_is_deferred_to_stage2(monkeypatch) -> None:
     membership = global_policy_v3.models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP
     base = _necessary_result(membership)
     monkeypatch.setattr(global_policy_v3, "_V2_NECESSARY_FEASIBILITY", lambda *args: base)
     monkeypatch.setattr(
         global_policy_v3,
-        "_domain_phase_membership_possible",
+        "_uniform_phase_membership_reachability",
         lambda *args: True,
     )
 
@@ -97,17 +97,17 @@ def test_domain_reachable_membership_is_deferred_to_stage2(monkeypatch) -> None:
 
     assert result.passed
     assert result.constraint_families == ()
-    assert "Stage 2 CP-SAT" in result.explanation
+    assert "Stage 2 CP-SAT authority" in result.explanation
 
 
-def test_domain_reachable_membership_does_not_clear_other_failures(monkeypatch) -> None:
+def test_uniform_phase_reachable_membership_does_not_clear_other_failures(monkeypatch) -> None:
     membership = global_policy_v3.models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP
     fleet = global_policy_v3.models.Stage2ConstraintFamilyV1.FLEET
     base = _necessary_result(membership, fleet)
     monkeypatch.setattr(global_policy_v3, "_V2_NECESSARY_FEASIBILITY", lambda *args: base)
     monkeypatch.setattr(
         global_policy_v3,
-        "_domain_phase_membership_possible",
+        "_uniform_phase_membership_reachability",
         lambda *args: True,
     )
 
@@ -122,6 +122,31 @@ def test_domain_reachable_membership_does_not_clear_other_failures(monkeypatch) 
 
     assert not result.passed
     assert result.constraint_families == (fleet,)
+
+
+def test_uniform_phase_infeasibility_remains_a_necessary_rejection(monkeypatch) -> None:
+    membership = global_policy_v3.models.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP
+    uniform = global_policy_v3.models.Stage2ConstraintFamilyV1.UNIFORM_HEADWAY
+    base = _necessary_result(membership)
+    monkeypatch.setattr(global_policy_v3, "_V2_NECESSARY_FEASIBILITY", lambda *args: base)
+    monkeypatch.setattr(
+        global_policy_v3,
+        "_uniform_phase_membership_reachability",
+        lambda *args: False,
+    )
+
+    result = global_policy_v3._phase_aware_necessary_feasibility(
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+
+    assert not result.passed
+    assert result.constraint_families == (membership, uniform)
+    assert "cannot jointly satisfy" in result.explanation
 
 
 def test_v3_policy_fingerprint_is_versioned_and_reversible() -> None:
