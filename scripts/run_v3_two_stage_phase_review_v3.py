@@ -58,10 +58,7 @@ def _bounded_phase_candidate_membership_ok(candidate, allocation_plan) -> bool:
             del block
             cumulative_actual += actual
             cumulative_target += expected
-            if (
-                abs(cumulative_actual - cumulative_target)
-                > base.base._PHASE_DEVIATION_CUMULATIVE
-            ):
+            if abs(cumulative_actual - cumulative_target) > base.base._PHASE_DEVIATION_CUMULATIVE:
                 return False
         if cumulative_actual != cumulative_target:
             return False

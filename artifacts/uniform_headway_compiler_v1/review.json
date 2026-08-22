@@ -1,0 +1,2280 @@
+{
+  "bridge_profile": "TEMPORARY_AUTHORITATIVE_BRIDGE_V1",
+  "candidate_count": 12,
+  "candidate_summaries": [
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-10-inbound-c1-demand-fit.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 420,
+          "boundary_time": "07:00",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 17,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 22,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 20
+        },
+        {
+          "boundary_minute": 930,
+          "boundary_time": "15:30",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 22,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 19
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 21,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 18
+        },
+        {
+          "boundary_minute": 1200,
+          "boundary_time": "20:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 21,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 23,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 22
+        }
+      ],
+      "candidate_id": "C1_DEMAND_FIT",
+      "direction": "INBOUND",
+      "edge_balance_error": 14,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:17",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 23,
+      "minimum_internal_headway_minutes": 15,
+      "route_id": "10",
+      "service_end_gap_minutes": 13,
+      "service_regime_count": 5,
+      "service_regimes": [
+        {
+          "departure_count": 9,
+          "end": "07:00",
+          "first_departure": "04:38",
+          "headway_minutes": 17,
+          "last_departure": "06:54",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 23,
+          "end": "15:30",
+          "first_departure": "07:14",
+          "headway_minutes": 22,
+          "last_departure": "15:18",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "07:00"
+        },
+        {
+          "departure_count": 8,
+          "end": "17:30",
+          "first_departure": "15:37",
+          "headway_minutes": 15,
+          "last_departure": "17:22",
+          "member_demand_regime_ids": [
+            "R3"
+          ],
+          "service_regime_id": "SR3",
+          "start": "15:30"
+        },
+        {
+          "departure_count": 7,
+          "end": "20:00",
+          "first_departure": "17:40",
+          "headway_minutes": 21,
+          "last_departure": "19:46",
+          "member_demand_regime_ids": [
+            "R4"
+          ],
+          "service_regime_id": "SR4",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 4,
+          "end": "21:30",
+          "first_departure": "20:08",
+          "headway_minutes": 23,
+          "last_departure": "21:17",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR5",
+          "start": "20:00"
+        }
+      ],
+      "service_start_gap_minutes": 8,
+      "status": "COMPILED",
+      "successful_merges": [],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "268/3825",
+      "total_trip_count": 51,
+      "transition_shape_error_exact": "1",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 22
+    },
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-10-inbound-c2-conservative.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 420,
+          "boundary_time": "07:00",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 19,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 21,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 20
+        },
+        {
+          "boundary_minute": 930,
+          "boundary_time": "15:30",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 21,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 18
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 21,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 18
+        },
+        {
+          "boundary_minute": 1200,
+          "boundary_time": "20:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 21,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 23,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 22
+        }
+      ],
+      "candidate_id": "C2_CONSERVATIVE",
+      "direction": "INBOUND",
+      "edge_balance_error": 24,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:17",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 23,
+      "minimum_internal_headway_minutes": 15,
+      "route_id": "10",
+      "service_end_gap_minutes": 13,
+      "service_regime_count": 5,
+      "service_regimes": [
+        {
+          "departure_count": 8,
+          "end": "07:00",
+          "first_departure": "04:43",
+          "headway_minutes": 19,
+          "last_departure": "06:56",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 24,
+          "end": "15:30",
+          "first_departure": "07:16",
+          "headway_minutes": 21,
+          "last_departure": "15:19",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "07:00"
+        },
+        {
+          "departure_count": 8,
+          "end": "17:30",
+          "first_departure": "15:37",
+          "headway_minutes": 15,
+          "last_departure": "17:22",
+          "member_demand_regime_ids": [
+            "R3"
+          ],
+          "service_regime_id": "SR3",
+          "start": "15:30"
+        },
+        {
+          "departure_count": 7,
+          "end": "20:00",
+          "first_departure": "17:40",
+          "headway_minutes": 21,
+          "last_departure": "19:46",
+          "member_demand_regime_ids": [
+            "R4"
+          ],
+          "service_regime_id": "SR4",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 4,
+          "end": "21:30",
+          "first_departure": "20:08",
+          "headway_minutes": 23,
+          "last_departure": "21:17",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR5",
+          "start": "20:00"
+        }
+      ],
+      "service_start_gap_minutes": 13,
+      "status": "COMPILED",
+      "successful_merges": [],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "103/1530",
+      "total_trip_count": 51,
+      "transition_shape_error_exact": "0",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 22
+    },
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-10-inbound-c3-balanced.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 420,
+          "boundary_time": "07:00",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 19,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 21,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 20
+        },
+        {
+          "boundary_minute": 930,
+          "boundary_time": "15:30",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 21,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 18
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 21,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 18
+        },
+        {
+          "boundary_minute": 1200,
+          "boundary_time": "20:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 21,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 23,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 22
+        }
+      ],
+      "candidate_id": "C3_BALANCED",
+      "direction": "INBOUND",
+      "edge_balance_error": 24,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:17",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 23,
+      "minimum_internal_headway_minutes": 15,
+      "route_id": "10",
+      "service_end_gap_minutes": 13,
+      "service_regime_count": 5,
+      "service_regimes": [
+        {
+          "departure_count": 8,
+          "end": "07:00",
+          "first_departure": "04:43",
+          "headway_minutes": 19,
+          "last_departure": "06:56",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 24,
+          "end": "15:30",
+          "first_departure": "07:16",
+          "headway_minutes": 21,
+          "last_departure": "15:19",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "07:00"
+        },
+        {
+          "departure_count": 8,
+          "end": "17:30",
+          "first_departure": "15:37",
+          "headway_minutes": 15,
+          "last_departure": "17:22",
+          "member_demand_regime_ids": [
+            "R3"
+          ],
+          "service_regime_id": "SR3",
+          "start": "15:30"
+        },
+        {
+          "departure_count": 7,
+          "end": "20:00",
+          "first_departure": "17:40",
+          "headway_minutes": 21,
+          "last_departure": "19:46",
+          "member_demand_regime_ids": [
+            "R4"
+          ],
+          "service_regime_id": "SR4",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 4,
+          "end": "21:30",
+          "first_departure": "20:08",
+          "headway_minutes": 23,
+          "last_departure": "21:17",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR5",
+          "start": "20:00"
+        }
+      ],
+      "service_start_gap_minutes": 13,
+      "status": "COMPILED",
+      "successful_merges": [],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "103/1530",
+      "total_trip_count": 51,
+      "transition_shape_error_exact": "0",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 22
+    },
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-10-outbound-c1-demand-fit.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 390,
+          "boundary_time": "06:30",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 24,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 20
+        },
+        {
+          "boundary_minute": 480,
+          "boundary_time": "08:00",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 24,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 20
+        },
+        {
+          "boundary_minute": 600,
+          "boundary_time": "10:00",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 24,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 17,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 21
+        },
+        {
+          "boundary_minute": 720,
+          "boundary_time": "12:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 17,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 23,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 20
+        },
+        {
+          "boundary_minute": 930,
+          "boundary_time": "15:30",
+          "left_demand_regime_id": "R5",
+          "left_headway_minutes": 23,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R6",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 19
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R6",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R7",
+          "right_headway_minutes": 23,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 19
+        },
+        {
+          "boundary_minute": 1140,
+          "boundary_time": "19:00",
+          "left_demand_regime_id": "R7",
+          "left_headway_minutes": 23,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R8",
+          "right_headway_minutes": 21,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 22
+        }
+      ],
+      "candidate_id": "C1_DEMAND_FIT",
+      "direction": "OUTBOUND",
+      "edge_balance_error": 19,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:16",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 24,
+      "minimum_internal_headway_minutes": 15,
+      "route_id": "10",
+      "service_end_gap_minutes": 14,
+      "service_regime_count": 8,
+      "service_regimes": [
+        {
+          "departure_count": 5,
+          "end": "06:30",
+          "first_departure": "04:42",
+          "headway_minutes": 24,
+          "last_departure": "06:18",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 6,
+          "end": "08:00",
+          "first_departure": "06:38",
+          "headway_minutes": 15,
+          "last_departure": "07:53",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "06:30"
+        },
+        {
+          "departure_count": 5,
+          "end": "10:00",
+          "first_departure": "08:13",
+          "headway_minutes": 24,
+          "last_departure": "09:49",
+          "member_demand_regime_ids": [
+            "R3"
+          ],
+          "service_regime_id": "SR3",
+          "start": "08:00"
+        },
+        {
+          "departure_count": 7,
+          "end": "12:00",
+          "first_departure": "10:10",
+          "headway_minutes": 17,
+          "last_departure": "11:52",
+          "member_demand_regime_ids": [
+            "R4"
+          ],
+          "service_regime_id": "SR4",
+          "start": "10:00"
+        },
+        {
+          "departure_count": 9,
+          "end": "15:30",
+          "first_departure": "12:12",
+          "headway_minutes": 23,
+          "last_departure": "15:16",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR5",
+          "start": "12:00"
+        },
+        {
+          "departure_count": 8,
+          "end": "17:30",
+          "first_departure": "15:35",
+          "headway_minutes": 15,
+          "last_departure": "17:20",
+          "member_demand_regime_ids": [
+            "R6"
+          ],
+          "service_regime_id": "SR6",
+          "start": "15:30"
+        },
+        {
+          "departure_count": 4,
+          "end": "19:00",
+          "first_departure": "17:39",
+          "headway_minutes": 23,
+          "last_departure": "18:48",
+          "member_demand_regime_ids": [
+            "R7"
+          ],
+          "service_regime_id": "SR7",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 7,
+          "end": "21:30",
+          "first_departure": "19:10",
+          "headway_minutes": 21,
+          "last_departure": "21:16",
+          "member_demand_regime_ids": [
+            "R8"
+          ],
+          "service_regime_id": "SR8",
+          "start": "19:00"
+        }
+      ],
+      "service_start_gap_minutes": 12,
+      "status": "COMPILED",
+      "successful_merges": [],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "817/12600",
+      "total_trip_count": 51,
+      "transition_shape_error_exact": "3/2",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 22
+    },
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-10-outbound-c2-conservative.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 390,
+          "boundary_time": "06:30",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 20,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 18,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 19
+        },
+        {
+          "boundary_minute": 480,
+          "boundary_time": "08:00",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 18,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 20,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 19
+        },
+        {
+          "boundary_minute": 600,
+          "boundary_time": "10:00",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 20,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 24,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 22
+        },
+        {
+          "boundary_minute": 720,
+          "boundary_time": "12:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 24,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 19,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 22
+        },
+        {
+          "boundary_minute": 930,
+          "boundary_time": "15:30",
+          "left_demand_regime_id": "R5",
+          "left_headway_minutes": 19,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R6",
+          "right_headway_minutes": 17,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 18
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R6",
+          "left_headway_minutes": 17,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R7",
+          "right_headway_minutes": 23,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 20
+        },
+        {
+          "boundary_minute": 1140,
+          "boundary_time": "19:00",
+          "left_demand_regime_id": "R7",
+          "left_headway_minutes": 23,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R8",
+          "right_headway_minutes": 21,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 22
+        }
+      ],
+      "candidate_id": "C2_CONSERVATIVE",
+      "direction": "OUTBOUND",
+      "edge_balance_error": 5,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:17",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 24,
+      "minimum_internal_headway_minutes": 17,
+      "route_id": "10",
+      "service_end_gap_minutes": 13,
+      "service_regime_count": 8,
+      "service_regimes": [
+        {
+          "departure_count": 6,
+          "end": "06:30",
+          "first_departure": "04:40",
+          "headway_minutes": 20,
+          "last_departure": "06:20",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 5,
+          "end": "08:00",
+          "first_departure": "06:39",
+          "headway_minutes": 18,
+          "last_departure": "07:51",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "06:30"
+        },
+        {
+          "departure_count": 6,
+          "end": "10:00",
+          "first_departure": "08:10",
+          "headway_minutes": 20,
+          "last_departure": "09:50",
+          "member_demand_regime_ids": [
+            "R3"
+          ],
+          "service_regime_id": "SR3",
+          "start": "08:00"
+        },
+        {
+          "departure_count": 5,
+          "end": "12:00",
+          "first_departure": "10:12",
+          "headway_minutes": 24,
+          "last_departure": "11:48",
+          "member_demand_regime_ids": [
+            "R4"
+          ],
+          "service_regime_id": "SR4",
+          "start": "10:00"
+        },
+        {
+          "departure_count": 11,
+          "end": "15:30",
+          "first_departure": "12:10",
+          "headway_minutes": 19,
+          "last_departure": "15:20",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR5",
+          "start": "12:00"
+        },
+        {
+          "departure_count": 7,
+          "end": "17:30",
+          "first_departure": "15:38",
+          "headway_minutes": 17,
+          "last_departure": "17:20",
+          "member_demand_regime_ids": [
+            "R6"
+          ],
+          "service_regime_id": "SR6",
+          "start": "15:30"
+        },
+        {
+          "departure_count": 4,
+          "end": "19:00",
+          "first_departure": "17:40",
+          "headway_minutes": 23,
+          "last_departure": "18:49",
+          "member_demand_regime_ids": [
+            "R7"
+          ],
+          "service_regime_id": "SR7",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 7,
+          "end": "21:30",
+          "first_departure": "19:11",
+          "headway_minutes": 21,
+          "last_departure": "21:17",
+          "member_demand_regime_ids": [
+            "R8"
+          ],
+          "service_regime_id": "SR8",
+          "start": "19:00"
+        }
+      ],
+      "service_start_gap_minutes": 10,
+      "status": "COMPILED",
+      "successful_merges": [],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "697/12600",
+      "total_trip_count": 51,
+      "transition_shape_error_exact": "1/2",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 22
+    },
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-10-outbound-c3-balanced.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 390,
+          "boundary_time": "06:30",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 20,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 18,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 19
+        },
+        {
+          "boundary_minute": 480,
+          "boundary_time": "08:00",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 18,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 20,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 19
+        },
+        {
+          "boundary_minute": 600,
+          "boundary_time": "10:00",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 20,
+          "reason": "same actual integer headway and transition gap exactly equals headway",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 20,
+          "status": "MERGED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 20
+        },
+        {
+          "boundary_minute": 720,
+          "boundary_time": "12:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 20,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 21,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 21
+        },
+        {
+          "boundary_minute": 930,
+          "boundary_time": "15:30",
+          "left_demand_regime_id": "R5",
+          "left_headway_minutes": 21,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R6",
+          "right_headway_minutes": 17,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 19
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R6",
+          "left_headway_minutes": 17,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R7",
+          "right_headway_minutes": 23,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 20
+        },
+        {
+          "boundary_minute": 1140,
+          "boundary_time": "19:00",
+          "left_demand_regime_id": "R7",
+          "left_headway_minutes": 23,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R8",
+          "right_headway_minutes": 21,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 22
+        }
+      ],
+      "candidate_id": "C3_BALANCED",
+      "direction": "OUTBOUND",
+      "edge_balance_error": 2,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:18",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 23,
+      "minimum_internal_headway_minutes": 17,
+      "route_id": "10",
+      "service_end_gap_minutes": 12,
+      "service_regime_count": 7,
+      "service_regimes": [
+        {
+          "departure_count": 6,
+          "end": "06:30",
+          "first_departure": "04:40",
+          "headway_minutes": 20,
+          "last_departure": "06:20",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 5,
+          "end": "08:00",
+          "first_departure": "06:39",
+          "headway_minutes": 18,
+          "last_departure": "07:51",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "06:30"
+        },
+        {
+          "departure_count": 12,
+          "end": "12:00",
+          "first_departure": "08:10",
+          "headway_minutes": 20,
+          "last_departure": "11:50",
+          "member_demand_regime_ids": [
+            "R3",
+            "R4"
+          ],
+          "service_regime_id": "SR3",
+          "start": "08:00"
+        },
+        {
+          "departure_count": 10,
+          "end": "15:30",
+          "first_departure": "12:11",
+          "headway_minutes": 21,
+          "last_departure": "15:20",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR4",
+          "start": "12:00"
+        },
+        {
+          "departure_count": 7,
+          "end": "17:30",
+          "first_departure": "15:39",
+          "headway_minutes": 17,
+          "last_departure": "17:21",
+          "member_demand_regime_ids": [
+            "R6"
+          ],
+          "service_regime_id": "SR5",
+          "start": "15:30"
+        },
+        {
+          "departure_count": 4,
+          "end": "19:00",
+          "first_departure": "17:41",
+          "headway_minutes": 23,
+          "last_departure": "18:50",
+          "member_demand_regime_ids": [
+            "R7"
+          ],
+          "service_regime_id": "SR6",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 7,
+          "end": "21:30",
+          "first_departure": "19:12",
+          "headway_minutes": 21,
+          "last_departure": "21:18",
+          "member_demand_regime_ids": [
+            "R8"
+          ],
+          "service_regime_id": "SR7",
+          "start": "19:00"
+        }
+      ],
+      "service_start_gap_minutes": 10,
+      "status": "COMPILED",
+      "successful_merges": [
+        {
+          "boundary_minute": 600,
+          "boundary_time": "10:00",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 20,
+          "reason": "same actual integer headway and transition gap exactly equals headway",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 20,
+          "status": "MERGED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 20
+        }
+      ],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "91/1800",
+      "total_trip_count": 51,
+      "transition_shape_error_exact": "1/2",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 22
+    },
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-6-inbound-c1-demand-fit.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 360,
+          "boundary_time": "06:00",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 18,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 8,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 13
+        },
+        {
+          "boundary_minute": 450,
+          "boundary_time": "07:30",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 8,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 14,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 11
+        },
+        {
+          "boundary_minute": 630,
+          "boundary_time": "10:30",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 14,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 11,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 720,
+          "boundary_time": "12:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 11,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 16,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 13
+        },
+        {
+          "boundary_minute": 960,
+          "boundary_time": "16:00",
+          "left_demand_regime_id": "R5",
+          "left_headway_minutes": 16,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R6",
+          "right_headway_minutes": 8,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R6",
+          "left_headway_minutes": 8,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R7",
+          "right_headway_minutes": 18,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 13
+        },
+        {
+          "boundary_minute": 1140,
+          "boundary_time": "19:00",
+          "left_demand_regime_id": "R7",
+          "left_headway_minutes": 18,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R8",
+          "right_headway_minutes": 17,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 17
+        }
+      ],
+      "candidate_id": "C1_DEMAND_FIT",
+      "direction": "INBOUND",
+      "edge_balance_error": 27,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:27",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 18,
+      "minimum_internal_headway_minutes": 8,
+      "route_id": "6",
+      "service_end_gap_minutes": 3,
+      "service_regime_count": 8,
+      "service_regimes": [
+        {
+          "departure_count": 5,
+          "end": "06:00",
+          "first_departure": "04:39",
+          "headway_minutes": 18,
+          "last_departure": "05:51",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 11,
+          "end": "07:30",
+          "first_departure": "06:04",
+          "headway_minutes": 8,
+          "last_departure": "07:24",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "06:00"
+        },
+        {
+          "departure_count": 13,
+          "end": "10:30",
+          "first_departure": "07:35",
+          "headway_minutes": 14,
+          "last_departure": "10:23",
+          "member_demand_regime_ids": [
+            "R3"
+          ],
+          "service_regime_id": "SR3",
+          "start": "07:30"
+        },
+        {
+          "departure_count": 8,
+          "end": "12:00",
+          "first_departure": "10:35",
+          "headway_minutes": 11,
+          "last_departure": "11:52",
+          "member_demand_regime_ids": [
+            "R4"
+          ],
+          "service_regime_id": "SR4",
+          "start": "10:30"
+        },
+        {
+          "departure_count": 15,
+          "end": "16:00",
+          "first_departure": "12:05",
+          "headway_minutes": 16,
+          "last_departure": "15:49",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR5",
+          "start": "12:00"
+        },
+        {
+          "departure_count": 12,
+          "end": "17:30",
+          "first_departure": "16:01",
+          "headway_minutes": 8,
+          "last_departure": "17:29",
+          "member_demand_regime_ids": [
+            "R6"
+          ],
+          "service_regime_id": "SR6",
+          "start": "16:00"
+        },
+        {
+          "departure_count": 5,
+          "end": "19:00",
+          "first_departure": "17:42",
+          "headway_minutes": 18,
+          "last_departure": "18:54",
+          "member_demand_regime_ids": [
+            "R7"
+          ],
+          "service_regime_id": "SR7",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "21:30",
+          "first_departure": "19:11",
+          "headway_minutes": 17,
+          "last_departure": "21:27",
+          "member_demand_regime_ids": [
+            "R8"
+          ],
+          "service_regime_id": "SR8",
+          "start": "19:00"
+        }
+      ],
+      "service_start_gap_minutes": 9,
+      "status": "COMPILED",
+      "successful_merges": [],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "32/225",
+      "total_trip_count": 78,
+      "transition_shape_error_exact": "3/2",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 17
+    },
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-6-inbound-c2-conservative.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 360,
+          "boundary_time": "06:00",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 18,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 9,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 13
+        },
+        {
+          "boundary_minute": 450,
+          "boundary_time": "07:30",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 9,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 14,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 11
+        },
+        {
+          "boundary_minute": 630,
+          "boundary_time": "10:30",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 14,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 9,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 11
+        },
+        {
+          "boundary_minute": 720,
+          "boundary_time": "12:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 9,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 960,
+          "boundary_time": "16:00",
+          "left_demand_regime_id": "R5",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R6",
+          "right_headway_minutes": 9,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R6",
+          "left_headway_minutes": 9,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R7",
+          "right_headway_minutes": 18,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 13
+        },
+        {
+          "boundary_minute": 1140,
+          "boundary_time": "19:00",
+          "left_demand_regime_id": "R7",
+          "left_headway_minutes": 18,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R8",
+          "right_headway_minutes": 17,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 17
+        }
+      ],
+      "candidate_id": "C2_CONSERVATIVE",
+      "direction": "INBOUND",
+      "edge_balance_error": 6,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:24",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 18,
+      "minimum_internal_headway_minutes": 9,
+      "route_id": "6",
+      "service_end_gap_minutes": 6,
+      "service_regime_count": 8,
+      "service_regimes": [
+        {
+          "departure_count": 5,
+          "end": "06:00",
+          "first_departure": "04:39",
+          "headway_minutes": 18,
+          "last_departure": "05:51",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 10,
+          "end": "07:30",
+          "first_departure": "06:04",
+          "headway_minutes": 9,
+          "last_departure": "07:25",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "06:00"
+        },
+        {
+          "departure_count": 13,
+          "end": "10:30",
+          "first_departure": "07:36",
+          "headway_minutes": 14,
+          "last_departure": "10:24",
+          "member_demand_regime_ids": [
+            "R3"
+          ],
+          "service_regime_id": "SR3",
+          "start": "07:30"
+        },
+        {
+          "departure_count": 10,
+          "end": "12:00",
+          "first_departure": "10:35",
+          "headway_minutes": 9,
+          "last_departure": "11:56",
+          "member_demand_regime_ids": [
+            "R4"
+          ],
+          "service_regime_id": "SR4",
+          "start": "10:30"
+        },
+        {
+          "departure_count": 16,
+          "end": "16:00",
+          "first_departure": "12:08",
+          "headway_minutes": 15,
+          "last_departure": "15:53",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR5",
+          "start": "12:00"
+        },
+        {
+          "departure_count": 10,
+          "end": "17:30",
+          "first_departure": "16:05",
+          "headway_minutes": 9,
+          "last_departure": "17:26",
+          "member_demand_regime_ids": [
+            "R6"
+          ],
+          "service_regime_id": "SR6",
+          "start": "16:00"
+        },
+        {
+          "departure_count": 5,
+          "end": "19:00",
+          "first_departure": "17:39",
+          "headway_minutes": 18,
+          "last_departure": "18:51",
+          "member_demand_regime_ids": [
+            "R7"
+          ],
+          "service_regime_id": "SR7",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "21:30",
+          "first_departure": "19:08",
+          "headway_minutes": 17,
+          "last_departure": "21:24",
+          "member_demand_regime_ids": [
+            "R8"
+          ],
+          "service_regime_id": "SR8",
+          "start": "19:00"
+        }
+      ],
+      "service_start_gap_minutes": 9,
+      "status": "COMPILED",
+      "successful_merges": [],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "7/225",
+      "total_trip_count": 78,
+      "transition_shape_error_exact": "5/2",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 17
+    },
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-6-inbound-c3-balanced.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 360,
+          "boundary_time": "06:00",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 18,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 9,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 13
+        },
+        {
+          "boundary_minute": 450,
+          "boundary_time": "07:30",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 9,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 14,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 11
+        },
+        {
+          "boundary_minute": 630,
+          "boundary_time": "10:30",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 14,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 9,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 11
+        },
+        {
+          "boundary_minute": 720,
+          "boundary_time": "12:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 9,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 960,
+          "boundary_time": "16:00",
+          "left_demand_regime_id": "R5",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R6",
+          "right_headway_minutes": 9,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R6",
+          "left_headway_minutes": 9,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R7",
+          "right_headway_minutes": 18,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 13
+        },
+        {
+          "boundary_minute": 1140,
+          "boundary_time": "19:00",
+          "left_demand_regime_id": "R7",
+          "left_headway_minutes": 18,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R8",
+          "right_headway_minutes": 17,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 17
+        }
+      ],
+      "candidate_id": "C3_BALANCED",
+      "direction": "INBOUND",
+      "edge_balance_error": 6,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:24",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 18,
+      "minimum_internal_headway_minutes": 9,
+      "route_id": "6",
+      "service_end_gap_minutes": 6,
+      "service_regime_count": 8,
+      "service_regimes": [
+        {
+          "departure_count": 5,
+          "end": "06:00",
+          "first_departure": "04:39",
+          "headway_minutes": 18,
+          "last_departure": "05:51",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 10,
+          "end": "07:30",
+          "first_departure": "06:04",
+          "headway_minutes": 9,
+          "last_departure": "07:25",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "06:00"
+        },
+        {
+          "departure_count": 13,
+          "end": "10:30",
+          "first_departure": "07:36",
+          "headway_minutes": 14,
+          "last_departure": "10:24",
+          "member_demand_regime_ids": [
+            "R3"
+          ],
+          "service_regime_id": "SR3",
+          "start": "07:30"
+        },
+        {
+          "departure_count": 10,
+          "end": "12:00",
+          "first_departure": "10:35",
+          "headway_minutes": 9,
+          "last_departure": "11:56",
+          "member_demand_regime_ids": [
+            "R4"
+          ],
+          "service_regime_id": "SR4",
+          "start": "10:30"
+        },
+        {
+          "departure_count": 16,
+          "end": "16:00",
+          "first_departure": "12:08",
+          "headway_minutes": 15,
+          "last_departure": "15:53",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR5",
+          "start": "12:00"
+        },
+        {
+          "departure_count": 10,
+          "end": "17:30",
+          "first_departure": "16:05",
+          "headway_minutes": 9,
+          "last_departure": "17:26",
+          "member_demand_regime_ids": [
+            "R6"
+          ],
+          "service_regime_id": "SR6",
+          "start": "16:00"
+        },
+        {
+          "departure_count": 5,
+          "end": "19:00",
+          "first_departure": "17:39",
+          "headway_minutes": 18,
+          "last_departure": "18:51",
+          "member_demand_regime_ids": [
+            "R7"
+          ],
+          "service_regime_id": "SR7",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "21:30",
+          "first_departure": "19:08",
+          "headway_minutes": 17,
+          "last_departure": "21:24",
+          "member_demand_regime_ids": [
+            "R8"
+          ],
+          "service_regime_id": "SR8",
+          "start": "19:00"
+        }
+      ],
+      "service_start_gap_minutes": 9,
+      "status": "COMPILED",
+      "successful_merges": [],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "7/225",
+      "total_trip_count": 78,
+      "transition_shape_error_exact": "5/2",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 17
+    },
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-6-outbound-c1-demand-fit.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 360,
+          "boundary_time": "06:00",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 18,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 10,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 14
+        },
+        {
+          "boundary_minute": 450,
+          "boundary_time": "07:30",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 10,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 630,
+          "boundary_time": "10:30",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 10,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 13
+        },
+        {
+          "boundary_minute": 720,
+          "boundary_time": "12:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 10,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 16,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 13
+        },
+        {
+          "boundary_minute": 960,
+          "boundary_time": "16:00",
+          "left_demand_regime_id": "R5",
+          "left_headway_minutes": 16,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R6",
+          "right_headway_minutes": 7,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 11
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R6",
+          "left_headway_minutes": 7,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R7",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 11
+        },
+        {
+          "boundary_minute": 1140,
+          "boundary_time": "19:00",
+          "left_demand_regime_id": "R7",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R8",
+          "right_headway_minutes": 17,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 16
+        }
+      ],
+      "candidate_id": "C1_DEMAND_FIT",
+      "direction": "OUTBOUND",
+      "edge_balance_error": 6,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:25",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 18,
+      "minimum_internal_headway_minutes": 7,
+      "route_id": "6",
+      "service_end_gap_minutes": 5,
+      "service_regime_count": 8,
+      "service_regimes": [
+        {
+          "departure_count": 5,
+          "end": "06:00",
+          "first_departure": "04:39",
+          "headway_minutes": 18,
+          "last_departure": "05:51",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "07:30",
+          "first_departure": "06:05",
+          "headway_minutes": 10,
+          "last_departure": "07:25",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "06:00"
+        },
+        {
+          "departure_count": 12,
+          "end": "10:30",
+          "first_departure": "07:37",
+          "headway_minutes": 15,
+          "last_departure": "10:22",
+          "member_demand_regime_ids": [
+            "R3"
+          ],
+          "service_regime_id": "SR3",
+          "start": "07:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "12:00",
+          "first_departure": "10:35",
+          "headway_minutes": 10,
+          "last_departure": "11:55",
+          "member_demand_regime_ids": [
+            "R4"
+          ],
+          "service_regime_id": "SR4",
+          "start": "10:30"
+        },
+        {
+          "departure_count": 15,
+          "end": "16:00",
+          "first_departure": "12:08",
+          "headway_minutes": 16,
+          "last_departure": "15:52",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR5",
+          "start": "12:00"
+        },
+        {
+          "departure_count": 13,
+          "end": "17:30",
+          "first_departure": "16:03",
+          "headway_minutes": 7,
+          "last_departure": "17:27",
+          "member_demand_regime_ids": [
+            "R6"
+          ],
+          "service_regime_id": "SR6",
+          "start": "16:00"
+        },
+        {
+          "departure_count": 6,
+          "end": "19:00",
+          "first_departure": "17:38",
+          "headway_minutes": 15,
+          "last_departure": "18:53",
+          "member_demand_regime_ids": [
+            "R7"
+          ],
+          "service_regime_id": "SR7",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "21:30",
+          "first_departure": "19:09",
+          "headway_minutes": 17,
+          "last_departure": "21:25",
+          "member_demand_regime_ids": [
+            "R8"
+          ],
+          "service_regime_id": "SR8",
+          "start": "19:00"
+        }
+      ],
+      "service_start_gap_minutes": 9,
+      "status": "COMPILED",
+      "successful_merges": [],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "7/225",
+      "total_trip_count": 78,
+      "transition_shape_error_exact": "3/2",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 16
+    },
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-6-outbound-c2-conservative.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 360,
+          "boundary_time": "06:00",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 18,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 10,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 14
+        },
+        {
+          "boundary_minute": 450,
+          "boundary_time": "07:30",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 10,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 14,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 630,
+          "boundary_time": "10:30",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 14,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 10,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 720,
+          "boundary_time": "12:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 10,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 960,
+          "boundary_time": "16:00",
+          "left_demand_regime_id": "R5",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R6",
+          "right_headway_minutes": 8,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R6",
+          "left_headway_minutes": 8,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R7",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 11
+        },
+        {
+          "boundary_minute": 1140,
+          "boundary_time": "19:00",
+          "left_demand_regime_id": "R7",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R8",
+          "right_headway_minutes": 17,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 16
+        }
+      ],
+      "candidate_id": "C2_CONSERVATIVE",
+      "direction": "OUTBOUND",
+      "edge_balance_error": 10,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:23",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 18,
+      "minimum_internal_headway_minutes": 8,
+      "route_id": "6",
+      "service_end_gap_minutes": 7,
+      "service_regime_count": 8,
+      "service_regimes": [
+        {
+          "departure_count": 5,
+          "end": "06:00",
+          "first_departure": "04:38",
+          "headway_minutes": 18,
+          "last_departure": "05:50",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "07:30",
+          "first_departure": "06:04",
+          "headway_minutes": 10,
+          "last_departure": "07:24",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "06:00"
+        },
+        {
+          "departure_count": 13,
+          "end": "10:30",
+          "first_departure": "07:36",
+          "headway_minutes": 14,
+          "last_departure": "10:24",
+          "member_demand_regime_ids": [
+            "R3"
+          ],
+          "service_regime_id": "SR3",
+          "start": "07:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "12:00",
+          "first_departure": "10:36",
+          "headway_minutes": 10,
+          "last_departure": "11:56",
+          "member_demand_regime_ids": [
+            "R4"
+          ],
+          "service_regime_id": "SR4",
+          "start": "10:30"
+        },
+        {
+          "departure_count": 16,
+          "end": "16:00",
+          "first_departure": "12:08",
+          "headway_minutes": 15,
+          "last_departure": "15:53",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR5",
+          "start": "12:00"
+        },
+        {
+          "departure_count": 11,
+          "end": "17:30",
+          "first_departure": "16:05",
+          "headway_minutes": 8,
+          "last_departure": "17:25",
+          "member_demand_regime_ids": [
+            "R6"
+          ],
+          "service_regime_id": "SR6",
+          "start": "16:00"
+        },
+        {
+          "departure_count": 6,
+          "end": "19:00",
+          "first_departure": "17:36",
+          "headway_minutes": 15,
+          "last_departure": "18:51",
+          "member_demand_regime_ids": [
+            "R7"
+          ],
+          "service_regime_id": "SR7",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "21:30",
+          "first_departure": "19:07",
+          "headway_minutes": 17,
+          "last_departure": "21:23",
+          "member_demand_regime_ids": [
+            "R8"
+          ],
+          "service_regime_id": "SR8",
+          "start": "19:00"
+        }
+      ],
+      "service_start_gap_minutes": 8,
+      "status": "COMPILED",
+      "successful_merges": [],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "4/75",
+      "total_trip_count": 78,
+      "transition_shape_error_exact": "3/2",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 16
+    },
+    {
+      "artifact_path": "artifacts/uniform_headway_compiler_v1/route-6-outbound-c3-balanced.json",
+      "boundary_reviews": [
+        {
+          "boundary_minute": 360,
+          "boundary_time": "06:00",
+          "left_demand_regime_id": "R1",
+          "left_headway_minutes": 18,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R2",
+          "right_headway_minutes": 10,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 14
+        },
+        {
+          "boundary_minute": 450,
+          "boundary_time": "07:30",
+          "left_demand_regime_id": "R2",
+          "left_headway_minutes": 10,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R3",
+          "right_headway_minutes": 14,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 630,
+          "boundary_time": "10:30",
+          "left_demand_regime_id": "R3",
+          "left_headway_minutes": 14,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R4",
+          "right_headway_minutes": 10,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 720,
+          "boundary_time": "12:00",
+          "left_demand_regime_id": "R4",
+          "left_headway_minutes": 10,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R5",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 960,
+          "boundary_time": "16:00",
+          "left_demand_regime_id": "R5",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R6",
+          "right_headway_minutes": 8,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 12
+        },
+        {
+          "boundary_minute": 1050,
+          "boundary_time": "17:30",
+          "left_demand_regime_id": "R6",
+          "left_headway_minutes": 8,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R7",
+          "right_headway_minutes": 15,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 11
+        },
+        {
+          "boundary_minute": 1140,
+          "boundary_time": "19:00",
+          "left_demand_regime_id": "R7",
+          "left_headway_minutes": 15,
+          "reason": "selected actual integer headways differ",
+          "right_demand_regime_id": "R8",
+          "right_headway_minutes": 17,
+          "status": "RETAINED_IN_SERVICE_PLAN",
+          "transition_gap_minutes": 16
+        }
+      ],
+      "candidate_id": "C3_BALANCED",
+      "direction": "OUTBOUND",
+      "edge_balance_error": 10,
+      "equal_headway_boundaries_not_merged": [],
+      "final_departure": "21:23",
+      "fleet_validation_status": "NOT_FLEET_VALIDATED",
+      "maximum_internal_headway_minutes": 18,
+      "minimum_internal_headway_minutes": 8,
+      "route_id": "6",
+      "service_end_gap_minutes": 7,
+      "service_regime_count": 8,
+      "service_regimes": [
+        {
+          "departure_count": 5,
+          "end": "06:00",
+          "first_departure": "04:38",
+          "headway_minutes": 18,
+          "last_departure": "05:50",
+          "member_demand_regime_ids": [
+            "R1"
+          ],
+          "service_regime_id": "SR1",
+          "start": "04:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "07:30",
+          "first_departure": "06:04",
+          "headway_minutes": 10,
+          "last_departure": "07:24",
+          "member_demand_regime_ids": [
+            "R2"
+          ],
+          "service_regime_id": "SR2",
+          "start": "06:00"
+        },
+        {
+          "departure_count": 13,
+          "end": "10:30",
+          "first_departure": "07:36",
+          "headway_minutes": 14,
+          "last_departure": "10:24",
+          "member_demand_regime_ids": [
+            "R3"
+          ],
+          "service_regime_id": "SR3",
+          "start": "07:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "12:00",
+          "first_departure": "10:36",
+          "headway_minutes": 10,
+          "last_departure": "11:56",
+          "member_demand_regime_ids": [
+            "R4"
+          ],
+          "service_regime_id": "SR4",
+          "start": "10:30"
+        },
+        {
+          "departure_count": 16,
+          "end": "16:00",
+          "first_departure": "12:08",
+          "headway_minutes": 15,
+          "last_departure": "15:53",
+          "member_demand_regime_ids": [
+            "R5"
+          ],
+          "service_regime_id": "SR5",
+          "start": "12:00"
+        },
+        {
+          "departure_count": 11,
+          "end": "17:30",
+          "first_departure": "16:05",
+          "headway_minutes": 8,
+          "last_departure": "17:25",
+          "member_demand_regime_ids": [
+            "R6"
+          ],
+          "service_regime_id": "SR6",
+          "start": "16:00"
+        },
+        {
+          "departure_count": 6,
+          "end": "19:00",
+          "first_departure": "17:36",
+          "headway_minutes": 15,
+          "last_departure": "18:51",
+          "member_demand_regime_ids": [
+            "R7"
+          ],
+          "service_regime_id": "SR7",
+          "start": "17:30"
+        },
+        {
+          "departure_count": 9,
+          "end": "21:30",
+          "first_departure": "19:07",
+          "headway_minutes": 17,
+          "last_departure": "21:23",
+          "member_demand_regime_ids": [
+            "R8"
+          ],
+          "service_regime_id": "SR8",
+          "start": "19:00"
+        }
+      ],
+      "service_start_gap_minutes": 8,
+      "status": "COMPILED",
+      "successful_merges": [],
+      "total_gap_excess_exact": "0",
+      "total_quantization_error_exact": "4/75",
+      "total_trip_count": 78,
+      "transition_shape_error_exact": "3/2",
+      "worst_gap_excess_exact": "0",
+      "worst_transition_or_edge_gap_minutes": 16
+    }
+  ],
+  "compiled_count": 12,
+  "compiler_input_authority": "CompilerInputV1",
+  "compiler_input_fingerprints_preserved": true,
+  "equal_headway_boundaries_not_merged": [],
+  "fixture_integrity": [
+    {
+      "compiler_input_count": 6,
+      "fixture_fingerprint": "237b49ff992da6955eb7b80e94939591c3cedeb40097e1f22dfe459f719289f3",
+      "fixture_path": "tests/fixtures/compiler_bridge/authoritative_route_10_allocation_v1.json",
+      "route_id": "10",
+      "scenario_b_comparison_reason": "No canonical MST10 ScenarioBInput or exact timetable is tracked on this branch. Regime counts must not be expanded into invented exact departures.",
+      "scenario_b_comparison_status": "UNAVAILABLE"
+    },
+    {
+      "compiler_input_count": 6,
+      "fixture_fingerprint": "e481c2d76ed25cdb97500d85d6fc51d10b57286e4ba60a39ebccf153654250de",
+      "fixture_path": "tests/fixtures/compiler_bridge/authoritative_route_6_allocation_v1.json",
+      "route_id": "6",
+      "scenario_b_comparison_reason": "No canonical MST6 ScenarioBInput or exact timetable is tracked on this branch. Regime counts must not be expanded into invented exact departures.",
+      "scenario_b_comparison_status": "UNAVAILABLE"
+    }
+  ],
+  "objective_order": [
+    "maximum_transition_or_edge_gap_excess",
+    "total_gap_excess",
+    "total_headway_quantization_error",
+    "resulting_service_regime_count",
+    "transition_shape_error",
+    "phase_edge_imbalance",
+    "lexicographic_integer_headway_vector",
+    "lexicographic_phase_vector",
+    "lexicographic_departure_vector_redundant_after_prior_vectors"
+  ],
+  "review_fingerprint": "faae8c20a3acc5df549ea837d99ea77e5e437bfe5267562d86f9e4c5194afef5",
+  "review_profile": "uniform_headway_compiler_v1_bridge_review",
+  "route_10_outbound_c3_10_00_boundary": {
+    "boundary_minute": 600,
+    "boundary_time": "10:00",
+    "left_demand_regime_id": "R3",
+    "left_headway_minutes": 20,
+    "reason": "same actual integer headway and transition gap exactly equals headway",
+    "right_demand_regime_id": "R4",
+    "right_headway_minutes": 20,
+    "status": "MERGED_IN_SERVICE_PLAN",
+    "transition_gap_minutes": 20
+  },
+  "route_6_inbound_least_clean_candidate": {
+    "candidate_id": "C1_DEMAND_FIT",
+    "review_vector": [
+      "0",
+      "0",
+      "32/225",
+      "8",
+      "3/2",
+      "27",
+      "17"
+    ]
+  },
+  "scenario_b_comparison": {
+    "reason": "No canonical MST6/MST10 ScenarioBInput exact timetable is tracked on this branch; exact B departures were not reconstructed from counts.",
+    "status": "UNAVAILABLE"
+  },
+  "successful_merges": [
+    {
+      "boundary_minute": 600,
+      "boundary_time": "10:00",
+      "candidate_id": "C3_BALANCED",
+      "direction": "OUTBOUND",
+      "left_demand_regime_id": "R3",
+      "left_headway_minutes": 20,
+      "reason": "same actual integer headway and transition gap exactly equals headway",
+      "right_demand_regime_id": "R4",
+      "right_headway_minutes": 20,
+      "route_id": "10",
+      "status": "MERGED_IN_SERVICE_PLAN",
+      "transition_gap_minutes": 20
+    }
+  ],
+  "uncompilable_count": 0,
+  "upstream_fingerprint_semantics": "PROVENANCE_ASSERTION_NOT_REPRODUCED_ON_THIS_MACHINE"
+}

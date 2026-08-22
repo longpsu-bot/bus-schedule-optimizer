@@ -282,6 +282,28 @@ from .two_stage_solver import (
     build_two_stage_uniform_request_v1,
     solve_exact_timetable_stage_2_v1,
 )
+from .uniform_headway_compiler import (
+    LocalScheduleCandidateV1,
+    compile_uniform_headway_schedule_v1,
+    enumerate_local_schedule_candidates_v1,
+    validate_compiled_schedule_v1,
+)
+from .uniform_headway_compiler_models import (
+    COMPILER_INPUT_PROFILE_V1,
+    TEMPORARY_AUTHORITATIVE_BRIDGE_V1,
+    CompilationStatusV1,
+    CompiledDepartureV1,
+    CompiledScheduleCandidateV1,
+    CompilerDemandRegimeInputV1,
+    CompilerInputV1,
+    DemandRegimeCompilationV1,
+    FleetValidationStatusV1,
+    ServiceRegimeV1,
+    compiler_input_payload,
+)
+from .uniform_headway_compiler_serialization import (
+    compiled_schedule_to_contract_dict_v1,
+)
 from .validation import (
     ContractValidationError,
     ContractValidationIssue,
@@ -294,6 +316,7 @@ from .validation import (
 )
 
 __all__ = [
+    "COMPILER_INPUT_PROFILE_V1",
     "DEFAULT_SHAPE_DISTANCE_THRESHOLD_V1",
     "DEMAND_PERIOD_FINGERPRINT_PROFILE_V1",
     "DEMAND_PROFILE_DERIVATION_PROFILE_V1",
@@ -348,6 +371,11 @@ __all__ = [
     "BoundedInitialFleetV1",
     "CandidateValidationResultV1",
     "CandidateValidationStatus",
+    "CompilationStatusV1",
+    "CompiledDepartureV1",
+    "CompiledScheduleCandidateV1",
+    "CompilerDemandRegimeInputV1",
+    "CompilerInputV1",
     "ContractDirection",
     "ContractValidationError",
     "ContractValidationIssue",
@@ -362,6 +390,7 @@ __all__ = [
     "DemandResolutionResultV1",
     "DemandResolutionType",
     "DemandResponseMode",
+    "DemandRegimeCompilationV1",
     "DemandSourceType",
     "DemandAllocationAuthorityModeV1",
     "DailyAdjustmentEvidenceV1",
@@ -377,6 +406,7 @@ __all__ = [
     "FleetAssessmentV1",
     "FleetAssignmentV1",
     "FleetConstraintMode",
+    "FleetValidationStatusV1",
     "FINAL_SERVICE_SENTINEL",
     "FinalAcceptanceStateV1",
     "FinalServiceSentinelV1",
@@ -411,6 +441,7 @@ __all__ = [
     "ProposedServiceRegimeV1",
     "JointDonorValidationEvidenceV1",
     "JointReductionValidationEvidenceV1",
+    "LocalScheduleCandidateV1",
     "RepeatabilityDayEvidenceV1",
     "RepeatabilityEvidenceV1",
     "RespaceDiagnosticEvidenceV1",
@@ -423,6 +454,7 @@ __all__ = [
     "ScenarioId",
     "ScenarioCOptimizationModeV1",
     "ServiceBoundarySemanticsV1",
+    "ServiceRegimeV1",
     "Stage1AllocationResultV1",
     "Stage1NecessaryFeasibilityResultV1",
     "Stage1RegimeBuildDiagnosticV1",
@@ -459,6 +491,7 @@ __all__ = [
     "TerminalStockEventV1",
     "TechnicalAdjustmentEvidenceV1",
     "TechnicalEventEvidenceV1",
+    "TEMPORARY_AUTHORITATIVE_BRIDGE_V1",
     "TripsByDirection",
     "TripAllocationBlockV1",
     "TripAllocationPlanV1",
@@ -508,6 +541,10 @@ __all__ = [
     "calculate_two_stage_quality_vector_v1",
     "calculate_two_stage_demand_authority_fingerprint_v1",
     "classify_two_stage_final_acceptance_v1",
+    "compile_uniform_headway_schedule_v1",
+    "compiled_schedule_to_contract_dict_v1",
+    "compiler_input_payload",
+    "enumerate_local_schedule_candidates_v1",
     "finalize_allocation_plan",
     "finalize_stage_1_necessary_feasibility",
     "finalize_stage_1_regime_build_diagnostic",
@@ -530,6 +567,7 @@ __all__ = [
     "schedule_solution_to_contract_dict",
     "solve_exact_timetable_stage_2_v1",
     "validate_and_build_solution_v1",
+    "validate_compiled_schedule_v1",
     "validate_schedule_generation_context_v1",
     "validate_schedule_problem_v1",
     "validate_normalized_bundle",

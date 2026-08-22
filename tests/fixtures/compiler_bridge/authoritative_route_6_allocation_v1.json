@@ -1,0 +1,54 @@
+{
+  "bridge_profile": "TEMPORARY_AUTHORITATIVE_BRIDGE_V1",
+  "provenance_note": "Frozen transcription of authoritative allocator output from an unavailable source machine; upstream hashes are assertions and were not reproduced here.",
+  "route_id": "6",
+  "service_start": "04:30",
+  "service_end": "21:30",
+  "direction_total_trip_count": 78,
+  "demand_regime_fingerprint_assertion": "F9C89F16CF7A9B0F29EE76DB065C0CC182DE2B0698C4BA71CE8437F1E1F5E3B6",
+  "trip_allocation_fingerprint_assertion": "F75DF2D8BAE9D6FBB7FE0721D2058999A143E8333161EA4A82E857231A462953",
+  "scenario_b_exact_timetable": {
+    "status": "UNAVAILABLE",
+    "reason": "No canonical MST6 ScenarioBInput or exact timetable is tracked on this branch. Regime counts must not be expanded into invented exact departures."
+  },
+  "directions": [
+    {
+      "direction": "OUTBOUND",
+      "demand_regimes": [
+        {"regime_id": "R1", "start": "04:30", "end": "06:00"},
+        {"regime_id": "R2", "start": "06:00", "end": "07:30"},
+        {"regime_id": "R3", "start": "07:30", "end": "10:30"},
+        {"regime_id": "R4", "start": "10:30", "end": "12:00"},
+        {"regime_id": "R5", "start": "12:00", "end": "16:00"},
+        {"regime_id": "R6", "start": "16:00", "end": "17:30"},
+        {"regime_id": "R7", "start": "17:30", "end": "19:00"},
+        {"regime_id": "R8", "start": "19:00", "end": "21:30"}
+      ],
+      "scenario_b_regime_counts": [5, 9, 13, 10, 16, 10, 6, 9],
+      "allocation_candidates": {
+        "C1_DEMAND_FIT": [5, 9, 12, 9, 15, 13, 6, 9],
+        "C2_CONSERVATIVE": [5, 9, 13, 9, 16, 11, 6, 9],
+        "C3_BALANCED": [5, 9, 13, 9, 16, 11, 6, 9]
+      }
+    },
+    {
+      "direction": "INBOUND",
+      "demand_regimes": [
+        {"regime_id": "R1", "start": "04:30", "end": "06:00"},
+        {"regime_id": "R2", "start": "06:00", "end": "07:30"},
+        {"regime_id": "R3", "start": "07:30", "end": "10:30"},
+        {"regime_id": "R4", "start": "10:30", "end": "12:00"},
+        {"regime_id": "R5", "start": "12:00", "end": "16:00"},
+        {"regime_id": "R6", "start": "16:00", "end": "17:30"},
+        {"regime_id": "R7", "start": "17:30", "end": "19:00"},
+        {"regime_id": "R8", "start": "19:00", "end": "21:30"}
+      ],
+      "scenario_b_regime_counts": [5, 9, 13, 10, 16, 10, 6, 9],
+      "allocation_candidates": {
+        "C1_DEMAND_FIT": [5, 11, 13, 8, 15, 12, 5, 9],
+        "C2_CONSERVATIVE": [5, 10, 13, 10, 16, 10, 5, 9],
+        "C3_BALANCED": [5, 10, 13, 10, 16, 10, 5, 9]
+      }
+    }
+  ]
+}

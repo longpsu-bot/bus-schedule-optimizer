@@ -62,7 +62,10 @@ def _bounded_phase_necessary_feasibility(
             failures.add(allocator.Stage2ConstraintFamilyV1.ALLOCATION_MEMBERSHIP)
             continue
 
-        if departures[0] != regime.planned_start_minute or departures[-1] != regime.planned_end_minute:
+        if (
+            departures[0] != regime.planned_start_minute
+            or departures[-1] != regime.planned_end_minute
+        ):
             failures.update(
                 {
                     allocator.Stage2ConstraintFamilyV1.UNIFORM_HEADWAY,
