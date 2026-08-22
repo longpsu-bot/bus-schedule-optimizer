@@ -1,0 +1,999 @@
+{
+  "compiled_schedule_fingerprint": "edb1d3d6f92bd47a7ec8f5b48c7c7f4aad24cf3677d49c9349d2cef86b868ed0",
+  "compiler_profile": "uniform_headway_schedule_compiler_v1",
+  "demand_regime_compilations": [
+    {
+      "actual_trip_count": 5,
+      "allocated_trip_count": 5,
+      "count_verified": true,
+      "duration_minutes": 90,
+      "end": "06:00",
+      "end_minute": 360,
+      "first_departure": "04:39",
+      "first_departure_minute": 279,
+      "internal_headway_count": 4,
+      "last_departure": "05:51",
+      "last_departure_minute": 351,
+      "leading_slack_minutes": 9,
+      "nominal_headway": {
+        "decimal": 18.0,
+        "denominator": 1,
+        "exact": "18",
+        "numerator": 18
+      },
+      "phase_offset_minutes": 9,
+      "quantization_error": {
+        "decimal": 0.0,
+        "denominator": 1,
+        "exact": "0",
+        "numerator": 0
+      },
+      "regime_id": "R1",
+      "selected_integer_headway": 18,
+      "start": "04:30",
+      "start_minute": 270,
+      "trailing_slack_minutes": 9
+    },
+    {
+      "actual_trip_count": 9,
+      "allocated_trip_count": 9,
+      "count_verified": true,
+      "duration_minutes": 90,
+      "end": "07:30",
+      "end_minute": 450,
+      "first_departure": "06:05",
+      "first_departure_minute": 365,
+      "internal_headway_count": 8,
+      "last_departure": "07:25",
+      "last_departure_minute": 445,
+      "leading_slack_minutes": 5,
+      "nominal_headway": {
+        "decimal": 10.0,
+        "denominator": 1,
+        "exact": "10",
+        "numerator": 10
+      },
+      "phase_offset_minutes": 5,
+      "quantization_error": {
+        "decimal": 0.0,
+        "denominator": 1,
+        "exact": "0",
+        "numerator": 0
+      },
+      "regime_id": "R2",
+      "selected_integer_headway": 10,
+      "start": "06:00",
+      "start_minute": 360,
+      "trailing_slack_minutes": 5
+    },
+    {
+      "actual_trip_count": 12,
+      "allocated_trip_count": 12,
+      "count_verified": true,
+      "duration_minutes": 180,
+      "end": "10:30",
+      "end_minute": 630,
+      "first_departure": "07:37",
+      "first_departure_minute": 457,
+      "internal_headway_count": 11,
+      "last_departure": "10:22",
+      "last_departure_minute": 622,
+      "leading_slack_minutes": 7,
+      "nominal_headway": {
+        "decimal": 15.0,
+        "denominator": 1,
+        "exact": "15",
+        "numerator": 15
+      },
+      "phase_offset_minutes": 7,
+      "quantization_error": {
+        "decimal": 0.0,
+        "denominator": 1,
+        "exact": "0",
+        "numerator": 0
+      },
+      "regime_id": "R3",
+      "selected_integer_headway": 15,
+      "start": "07:30",
+      "start_minute": 450,
+      "trailing_slack_minutes": 8
+    },
+    {
+      "actual_trip_count": 9,
+      "allocated_trip_count": 9,
+      "count_verified": true,
+      "duration_minutes": 90,
+      "end": "12:00",
+      "end_minute": 720,
+      "first_departure": "10:35",
+      "first_departure_minute": 635,
+      "internal_headway_count": 8,
+      "last_departure": "11:55",
+      "last_departure_minute": 715,
+      "leading_slack_minutes": 5,
+      "nominal_headway": {
+        "decimal": 10.0,
+        "denominator": 1,
+        "exact": "10",
+        "numerator": 10
+      },
+      "phase_offset_minutes": 5,
+      "quantization_error": {
+        "decimal": 0.0,
+        "denominator": 1,
+        "exact": "0",
+        "numerator": 0
+      },
+      "regime_id": "R4",
+      "selected_integer_headway": 10,
+      "start": "10:30",
+      "start_minute": 630,
+      "trailing_slack_minutes": 5
+    },
+    {
+      "actual_trip_count": 15,
+      "allocated_trip_count": 15,
+      "count_verified": true,
+      "duration_minutes": 240,
+      "end": "16:00",
+      "end_minute": 960,
+      "first_departure": "12:08",
+      "first_departure_minute": 728,
+      "internal_headway_count": 14,
+      "last_departure": "15:52",
+      "last_departure_minute": 952,
+      "leading_slack_minutes": 8,
+      "nominal_headway": {
+        "decimal": 16.0,
+        "denominator": 1,
+        "exact": "16",
+        "numerator": 16
+      },
+      "phase_offset_minutes": 8,
+      "quantization_error": {
+        "decimal": 0.0,
+        "denominator": 1,
+        "exact": "0",
+        "numerator": 0
+      },
+      "regime_id": "R5",
+      "selected_integer_headway": 16,
+      "start": "12:00",
+      "start_minute": 720,
+      "trailing_slack_minutes": 8
+    },
+    {
+      "actual_trip_count": 13,
+      "allocated_trip_count": 13,
+      "count_verified": true,
+      "duration_minutes": 90,
+      "end": "17:30",
+      "end_minute": 1050,
+      "first_departure": "16:03",
+      "first_departure_minute": 963,
+      "internal_headway_count": 12,
+      "last_departure": "17:27",
+      "last_departure_minute": 1047,
+      "leading_slack_minutes": 3,
+      "nominal_headway": {
+        "decimal": 6.923076923076923,
+        "denominator": 13,
+        "exact": "90/13",
+        "numerator": 90
+      },
+      "phase_offset_minutes": 3,
+      "quantization_error": {
+        "decimal": 0.011111111111111112,
+        "denominator": 90,
+        "exact": "1/90",
+        "numerator": 1
+      },
+      "regime_id": "R6",
+      "selected_integer_headway": 7,
+      "start": "16:00",
+      "start_minute": 960,
+      "trailing_slack_minutes": 3
+    },
+    {
+      "actual_trip_count": 6,
+      "allocated_trip_count": 6,
+      "count_verified": true,
+      "duration_minutes": 90,
+      "end": "19:00",
+      "end_minute": 1140,
+      "first_departure": "17:38",
+      "first_departure_minute": 1058,
+      "internal_headway_count": 5,
+      "last_departure": "18:53",
+      "last_departure_minute": 1133,
+      "leading_slack_minutes": 8,
+      "nominal_headway": {
+        "decimal": 15.0,
+        "denominator": 1,
+        "exact": "15",
+        "numerator": 15
+      },
+      "phase_offset_minutes": 8,
+      "quantization_error": {
+        "decimal": 0.0,
+        "denominator": 1,
+        "exact": "0",
+        "numerator": 0
+      },
+      "regime_id": "R7",
+      "selected_integer_headway": 15,
+      "start": "17:30",
+      "start_minute": 1050,
+      "trailing_slack_minutes": 7
+    },
+    {
+      "actual_trip_count": 9,
+      "allocated_trip_count": 9,
+      "count_verified": true,
+      "duration_minutes": 150,
+      "end": "21:30",
+      "end_minute": 1290,
+      "first_departure": "19:09",
+      "first_departure_minute": 1149,
+      "internal_headway_count": 8,
+      "last_departure": "21:25",
+      "last_departure_minute": 1285,
+      "leading_slack_minutes": 9,
+      "nominal_headway": {
+        "decimal": 16.666666666666668,
+        "denominator": 3,
+        "exact": "50/3",
+        "numerator": 50
+      },
+      "phase_offset_minutes": 9,
+      "quantization_error": {
+        "decimal": 0.02,
+        "denominator": 50,
+        "exact": "1/50",
+        "numerator": 1
+      },
+      "regime_id": "R8",
+      "selected_integer_headway": 17,
+      "start": "19:00",
+      "start_minute": 1140,
+      "trailing_slack_minutes": 5
+    }
+  ],
+  "direction": "OUTBOUND",
+  "exact_departures": [
+    {
+      "departure_minute": 279,
+      "departure_time": "04:39",
+      "service_regime_id": "SR1",
+      "source_demand_regime_id": "R1",
+      "trip_sequence": 1
+    },
+    {
+      "departure_minute": 297,
+      "departure_time": "04:57",
+      "service_regime_id": "SR1",
+      "source_demand_regime_id": "R1",
+      "trip_sequence": 2
+    },
+    {
+      "departure_minute": 315,
+      "departure_time": "05:15",
+      "service_regime_id": "SR1",
+      "source_demand_regime_id": "R1",
+      "trip_sequence": 3
+    },
+    {
+      "departure_minute": 333,
+      "departure_time": "05:33",
+      "service_regime_id": "SR1",
+      "source_demand_regime_id": "R1",
+      "trip_sequence": 4
+    },
+    {
+      "departure_minute": 351,
+      "departure_time": "05:51",
+      "service_regime_id": "SR1",
+      "source_demand_regime_id": "R1",
+      "trip_sequence": 5
+    },
+    {
+      "departure_minute": 365,
+      "departure_time": "06:05",
+      "service_regime_id": "SR2",
+      "source_demand_regime_id": "R2",
+      "trip_sequence": 6
+    },
+    {
+      "departure_minute": 375,
+      "departure_time": "06:15",
+      "service_regime_id": "SR2",
+      "source_demand_regime_id": "R2",
+      "trip_sequence": 7
+    },
+    {
+      "departure_minute": 385,
+      "departure_time": "06:25",
+      "service_regime_id": "SR2",
+      "source_demand_regime_id": "R2",
+      "trip_sequence": 8
+    },
+    {
+      "departure_minute": 395,
+      "departure_time": "06:35",
+      "service_regime_id": "SR2",
+      "source_demand_regime_id": "R2",
+      "trip_sequence": 9
+    },
+    {
+      "departure_minute": 405,
+      "departure_time": "06:45",
+      "service_regime_id": "SR2",
+      "source_demand_regime_id": "R2",
+      "trip_sequence": 10
+    },
+    {
+      "departure_minute": 415,
+      "departure_time": "06:55",
+      "service_regime_id": "SR2",
+      "source_demand_regime_id": "R2",
+      "trip_sequence": 11
+    },
+    {
+      "departure_minute": 425,
+      "departure_time": "07:05",
+      "service_regime_id": "SR2",
+      "source_demand_regime_id": "R2",
+      "trip_sequence": 12
+    },
+    {
+      "departure_minute": 435,
+      "departure_time": "07:15",
+      "service_regime_id": "SR2",
+      "source_demand_regime_id": "R2",
+      "trip_sequence": 13
+    },
+    {
+      "departure_minute": 445,
+      "departure_time": "07:25",
+      "service_regime_id": "SR2",
+      "source_demand_regime_id": "R2",
+      "trip_sequence": 14
+    },
+    {
+      "departure_minute": 457,
+      "departure_time": "07:37",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 15
+    },
+    {
+      "departure_minute": 472,
+      "departure_time": "07:52",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 16
+    },
+    {
+      "departure_minute": 487,
+      "departure_time": "08:07",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 17
+    },
+    {
+      "departure_minute": 502,
+      "departure_time": "08:22",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 18
+    },
+    {
+      "departure_minute": 517,
+      "departure_time": "08:37",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 19
+    },
+    {
+      "departure_minute": 532,
+      "departure_time": "08:52",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 20
+    },
+    {
+      "departure_minute": 547,
+      "departure_time": "09:07",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 21
+    },
+    {
+      "departure_minute": 562,
+      "departure_time": "09:22",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 22
+    },
+    {
+      "departure_minute": 577,
+      "departure_time": "09:37",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 23
+    },
+    {
+      "departure_minute": 592,
+      "departure_time": "09:52",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 24
+    },
+    {
+      "departure_minute": 607,
+      "departure_time": "10:07",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 25
+    },
+    {
+      "departure_minute": 622,
+      "departure_time": "10:22",
+      "service_regime_id": "SR3",
+      "source_demand_regime_id": "R3",
+      "trip_sequence": 26
+    },
+    {
+      "departure_minute": 635,
+      "departure_time": "10:35",
+      "service_regime_id": "SR4",
+      "source_demand_regime_id": "R4",
+      "trip_sequence": 27
+    },
+    {
+      "departure_minute": 645,
+      "departure_time": "10:45",
+      "service_regime_id": "SR4",
+      "source_demand_regime_id": "R4",
+      "trip_sequence": 28
+    },
+    {
+      "departure_minute": 655,
+      "departure_time": "10:55",
+      "service_regime_id": "SR4",
+      "source_demand_regime_id": "R4",
+      "trip_sequence": 29
+    },
+    {
+      "departure_minute": 665,
+      "departure_time": "11:05",
+      "service_regime_id": "SR4",
+      "source_demand_regime_id": "R4",
+      "trip_sequence": 30
+    },
+    {
+      "departure_minute": 675,
+      "departure_time": "11:15",
+      "service_regime_id": "SR4",
+      "source_demand_regime_id": "R4",
+      "trip_sequence": 31
+    },
+    {
+      "departure_minute": 685,
+      "departure_time": "11:25",
+      "service_regime_id": "SR4",
+      "source_demand_regime_id": "R4",
+      "trip_sequence": 32
+    },
+    {
+      "departure_minute": 695,
+      "departure_time": "11:35",
+      "service_regime_id": "SR4",
+      "source_demand_regime_id": "R4",
+      "trip_sequence": 33
+    },
+    {
+      "departure_minute": 705,
+      "departure_time": "11:45",
+      "service_regime_id": "SR4",
+      "source_demand_regime_id": "R4",
+      "trip_sequence": 34
+    },
+    {
+      "departure_minute": 715,
+      "departure_time": "11:55",
+      "service_regime_id": "SR4",
+      "source_demand_regime_id": "R4",
+      "trip_sequence": 35
+    },
+    {
+      "departure_minute": 728,
+      "departure_time": "12:08",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 36
+    },
+    {
+      "departure_minute": 744,
+      "departure_time": "12:24",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 37
+    },
+    {
+      "departure_minute": 760,
+      "departure_time": "12:40",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 38
+    },
+    {
+      "departure_minute": 776,
+      "departure_time": "12:56",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 39
+    },
+    {
+      "departure_minute": 792,
+      "departure_time": "13:12",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 40
+    },
+    {
+      "departure_minute": 808,
+      "departure_time": "13:28",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 41
+    },
+    {
+      "departure_minute": 824,
+      "departure_time": "13:44",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 42
+    },
+    {
+      "departure_minute": 840,
+      "departure_time": "14:00",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 43
+    },
+    {
+      "departure_minute": 856,
+      "departure_time": "14:16",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 44
+    },
+    {
+      "departure_minute": 872,
+      "departure_time": "14:32",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 45
+    },
+    {
+      "departure_minute": 888,
+      "departure_time": "14:48",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 46
+    },
+    {
+      "departure_minute": 904,
+      "departure_time": "15:04",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 47
+    },
+    {
+      "departure_minute": 920,
+      "departure_time": "15:20",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 48
+    },
+    {
+      "departure_minute": 936,
+      "departure_time": "15:36",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 49
+    },
+    {
+      "departure_minute": 952,
+      "departure_time": "15:52",
+      "service_regime_id": "SR5",
+      "source_demand_regime_id": "R5",
+      "trip_sequence": 50
+    },
+    {
+      "departure_minute": 963,
+      "departure_time": "16:03",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 51
+    },
+    {
+      "departure_minute": 970,
+      "departure_time": "16:10",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 52
+    },
+    {
+      "departure_minute": 977,
+      "departure_time": "16:17",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 53
+    },
+    {
+      "departure_minute": 984,
+      "departure_time": "16:24",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 54
+    },
+    {
+      "departure_minute": 991,
+      "departure_time": "16:31",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 55
+    },
+    {
+      "departure_minute": 998,
+      "departure_time": "16:38",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 56
+    },
+    {
+      "departure_minute": 1005,
+      "departure_time": "16:45",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 57
+    },
+    {
+      "departure_minute": 1012,
+      "departure_time": "16:52",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 58
+    },
+    {
+      "departure_minute": 1019,
+      "departure_time": "16:59",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 59
+    },
+    {
+      "departure_minute": 1026,
+      "departure_time": "17:06",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 60
+    },
+    {
+      "departure_minute": 1033,
+      "departure_time": "17:13",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 61
+    },
+    {
+      "departure_minute": 1040,
+      "departure_time": "17:20",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 62
+    },
+    {
+      "departure_minute": 1047,
+      "departure_time": "17:27",
+      "service_regime_id": "SR6",
+      "source_demand_regime_id": "R6",
+      "trip_sequence": 63
+    },
+    {
+      "departure_minute": 1058,
+      "departure_time": "17:38",
+      "service_regime_id": "SR7",
+      "source_demand_regime_id": "R7",
+      "trip_sequence": 64
+    },
+    {
+      "departure_minute": 1073,
+      "departure_time": "17:53",
+      "service_regime_id": "SR7",
+      "source_demand_regime_id": "R7",
+      "trip_sequence": 65
+    },
+    {
+      "departure_minute": 1088,
+      "departure_time": "18:08",
+      "service_regime_id": "SR7",
+      "source_demand_regime_id": "R7",
+      "trip_sequence": 66
+    },
+    {
+      "departure_minute": 1103,
+      "departure_time": "18:23",
+      "service_regime_id": "SR7",
+      "source_demand_regime_id": "R7",
+      "trip_sequence": 67
+    },
+    {
+      "departure_minute": 1118,
+      "departure_time": "18:38",
+      "service_regime_id": "SR7",
+      "source_demand_regime_id": "R7",
+      "trip_sequence": 68
+    },
+    {
+      "departure_minute": 1133,
+      "departure_time": "18:53",
+      "service_regime_id": "SR7",
+      "source_demand_regime_id": "R7",
+      "trip_sequence": 69
+    },
+    {
+      "departure_minute": 1149,
+      "departure_time": "19:09",
+      "service_regime_id": "SR8",
+      "source_demand_regime_id": "R8",
+      "trip_sequence": 70
+    },
+    {
+      "departure_minute": 1166,
+      "departure_time": "19:26",
+      "service_regime_id": "SR8",
+      "source_demand_regime_id": "R8",
+      "trip_sequence": 71
+    },
+    {
+      "departure_minute": 1183,
+      "departure_time": "19:43",
+      "service_regime_id": "SR8",
+      "source_demand_regime_id": "R8",
+      "trip_sequence": 72
+    },
+    {
+      "departure_minute": 1200,
+      "departure_time": "20:00",
+      "service_regime_id": "SR8",
+      "source_demand_regime_id": "R8",
+      "trip_sequence": 73
+    },
+    {
+      "departure_minute": 1217,
+      "departure_time": "20:17",
+      "service_regime_id": "SR8",
+      "source_demand_regime_id": "R8",
+      "trip_sequence": 74
+    },
+    {
+      "departure_minute": 1234,
+      "departure_time": "20:34",
+      "service_regime_id": "SR8",
+      "source_demand_regime_id": "R8",
+      "trip_sequence": 75
+    },
+    {
+      "departure_minute": 1251,
+      "departure_time": "20:51",
+      "service_regime_id": "SR8",
+      "source_demand_regime_id": "R8",
+      "trip_sequence": 76
+    },
+    {
+      "departure_minute": 1268,
+      "departure_time": "21:08",
+      "service_regime_id": "SR8",
+      "source_demand_regime_id": "R8",
+      "trip_sequence": 77
+    },
+    {
+      "departure_minute": 1285,
+      "departure_time": "21:25",
+      "service_regime_id": "SR8",
+      "source_demand_regime_id": "R8",
+      "trip_sequence": 78
+    }
+  ],
+  "failure_evidence": [],
+  "fleet_validation_status": "NOT_FLEET_VALIDATED",
+  "objective": {
+    "edge_balance_error": 6,
+    "service_regime_count": 8,
+    "total_gap_excess": {
+      "decimal": 0.0,
+      "denominator": 1,
+      "exact": "0",
+      "numerator": 0
+    },
+    "total_quantization_error": {
+      "decimal": 0.03111111111111111,
+      "denominator": 225,
+      "exact": "7/225",
+      "numerator": 7
+    },
+    "transition_shape_error": {
+      "decimal": 1.5,
+      "denominator": 2,
+      "exact": "3/2",
+      "numerator": 3
+    },
+    "worst_gap_excess": {
+      "decimal": 0.0,
+      "denominator": 1,
+      "exact": "0",
+      "numerator": 0
+    }
+  },
+  "review_metrics": {
+    "maximum_actual_gap_minutes": 18,
+    "median_actual_gap_minutes": {
+      "decimal": 15.0,
+      "denominator": 1,
+      "exact": "15",
+      "numerator": 15
+    },
+    "minimum_actual_gap_minutes": 7,
+    "service_end_gap_minutes": 5,
+    "service_start_gap_minutes": 9,
+    "worst_transition_or_edge_gap_minutes": 16
+  },
+  "route_id": "6",
+  "service_end": "21:30",
+  "service_end_minute": 1290,
+  "service_regimes": [
+    {
+      "departure_count": 5,
+      "end": "06:00",
+      "end_minute": 360,
+      "first_departure": "04:39",
+      "first_departure_minute": 279,
+      "headway_minutes": 18,
+      "last_departure": "05:51",
+      "last_departure_minute": 351,
+      "member_demand_regime_ids": [
+        "R1"
+      ],
+      "service_regime_id": "SR1",
+      "start": "04:30",
+      "start_minute": 270
+    },
+    {
+      "departure_count": 9,
+      "end": "07:30",
+      "end_minute": 450,
+      "first_departure": "06:05",
+      "first_departure_minute": 365,
+      "headway_minutes": 10,
+      "last_departure": "07:25",
+      "last_departure_minute": 445,
+      "member_demand_regime_ids": [
+        "R2"
+      ],
+      "service_regime_id": "SR2",
+      "start": "06:00",
+      "start_minute": 360
+    },
+    {
+      "departure_count": 12,
+      "end": "10:30",
+      "end_minute": 630,
+      "first_departure": "07:37",
+      "first_departure_minute": 457,
+      "headway_minutes": 15,
+      "last_departure": "10:22",
+      "last_departure_minute": 622,
+      "member_demand_regime_ids": [
+        "R3"
+      ],
+      "service_regime_id": "SR3",
+      "start": "07:30",
+      "start_minute": 450
+    },
+    {
+      "departure_count": 9,
+      "end": "12:00",
+      "end_minute": 720,
+      "first_departure": "10:35",
+      "first_departure_minute": 635,
+      "headway_minutes": 10,
+      "last_departure": "11:55",
+      "last_departure_minute": 715,
+      "member_demand_regime_ids": [
+        "R4"
+      ],
+      "service_regime_id": "SR4",
+      "start": "10:30",
+      "start_minute": 630
+    },
+    {
+      "departure_count": 15,
+      "end": "16:00",
+      "end_minute": 960,
+      "first_departure": "12:08",
+      "first_departure_minute": 728,
+      "headway_minutes": 16,
+      "last_departure": "15:52",
+      "last_departure_minute": 952,
+      "member_demand_regime_ids": [
+        "R5"
+      ],
+      "service_regime_id": "SR5",
+      "start": "12:00",
+      "start_minute": 720
+    },
+    {
+      "departure_count": 13,
+      "end": "17:30",
+      "end_minute": 1050,
+      "first_departure": "16:03",
+      "first_departure_minute": 963,
+      "headway_minutes": 7,
+      "last_departure": "17:27",
+      "last_departure_minute": 1047,
+      "member_demand_regime_ids": [
+        "R6"
+      ],
+      "service_regime_id": "SR6",
+      "start": "16:00",
+      "start_minute": 960
+    },
+    {
+      "departure_count": 6,
+      "end": "19:00",
+      "end_minute": 1140,
+      "first_departure": "17:38",
+      "first_departure_minute": 1058,
+      "headway_minutes": 15,
+      "last_departure": "18:53",
+      "last_departure_minute": 1133,
+      "member_demand_regime_ids": [
+        "R7"
+      ],
+      "service_regime_id": "SR7",
+      "start": "17:30",
+      "start_minute": 1050
+    },
+    {
+      "departure_count": 9,
+      "end": "21:30",
+      "end_minute": 1290,
+      "first_departure": "19:09",
+      "first_departure_minute": 1149,
+      "headway_minutes": 17,
+      "last_departure": "21:25",
+      "last_departure_minute": 1285,
+      "member_demand_regime_ids": [
+        "R8"
+      ],
+      "service_regime_id": "SR8",
+      "start": "19:00",
+      "start_minute": 1140
+    }
+  ],
+  "service_start": "04:30",
+  "service_start_minute": 270,
+  "source_allocation_candidate_id": "C1_DEMAND_FIT",
+  "source_compiler_input_fingerprint": "4f670d1fc4c3909b98ec37c32141a956e7e65c7390fe33b6f34ab7628b7a2495",
+  "source_provenance": "TEMPORARY_AUTHORITATIVE_BRIDGE_V1",
+  "status": "COMPILED",
+  "total_trip_count": 78,
+  "upstream_fingerprint_assertions": {
+    "demand_regime": "F9C89F16CF7A9B0F29EE76DB065C0CC182DE2B0698C4BA71CE8437F1E1F5E3B6",
+    "status": "PROVENANCE_ASSERTION_NOT_REPRODUCED_ON_THIS_MACHINE",
+    "trip_allocation": "F75DF2D8BAE9D6FBB7FE0721D2058999A143E8333161EA4A82E857231A462953"
+  }
+}

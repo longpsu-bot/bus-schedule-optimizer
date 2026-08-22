@@ -1,0 +1,51 @@
+{
+  "bridge_profile": "TEMPORARY_AUTHORITATIVE_BRIDGE_V1",
+  "provenance_note": "Frozen transcription of authoritative allocator output from an unavailable source machine; upstream hashes are assertions and were not reproduced here.",
+  "route_id": "10",
+  "service_start": "04:30",
+  "service_end": "21:30",
+  "direction_total_trip_count": 51,
+  "demand_regime_fingerprint_assertion": "F60E06F5DE337A0ACB1AA4716B951A6C6D5477C0CCBE9DC41E57C4814871600D",
+  "trip_allocation_fingerprint_assertion": "FD494436C456D259F0DF13D79F0753B329AF489FB91EDE74E95D8465F38564FF",
+  "scenario_b_exact_timetable": {
+    "status": "UNAVAILABLE",
+    "reason": "No canonical MST10 ScenarioBInput or exact timetable is tracked on this branch. Regime counts must not be expanded into invented exact departures."
+  },
+  "directions": [
+    {
+      "direction": "OUTBOUND",
+      "demand_regimes": [
+        {"regime_id": "R1", "start": "04:30", "end": "06:30"},
+        {"regime_id": "R2", "start": "06:30", "end": "08:00"},
+        {"regime_id": "R3", "start": "08:00", "end": "10:00"},
+        {"regime_id": "R4", "start": "10:00", "end": "12:00"},
+        {"regime_id": "R5", "start": "12:00", "end": "15:30"},
+        {"regime_id": "R6", "start": "15:30", "end": "17:30"},
+        {"regime_id": "R7", "start": "17:30", "end": "19:00"},
+        {"regime_id": "R8", "start": "19:00", "end": "21:30"}
+      ],
+      "scenario_b_regime_counts": [6, 4, 6, 5, 11, 7, 5, 7],
+      "allocation_candidates": {
+        "C1_DEMAND_FIT": [5, 6, 5, 7, 9, 8, 4, 7],
+        "C2_CONSERVATIVE": [6, 5, 6, 5, 11, 7, 4, 7],
+        "C3_BALANCED": [6, 5, 6, 6, 10, 7, 4, 7]
+      }
+    },
+    {
+      "direction": "INBOUND",
+      "demand_regimes": [
+        {"regime_id": "R1", "start": "04:30", "end": "07:00"},
+        {"regime_id": "R2", "start": "07:00", "end": "15:30"},
+        {"regime_id": "R3", "start": "15:30", "end": "17:30"},
+        {"regime_id": "R4", "start": "17:30", "end": "20:00"},
+        {"regime_id": "R5", "start": "20:00", "end": "21:30"}
+      ],
+      "scenario_b_regime_counts": [8, 25, 7, 7, 4],
+      "allocation_candidates": {
+        "C1_DEMAND_FIT": [9, 23, 8, 7, 4],
+        "C2_CONSERVATIVE": [8, 24, 8, 7, 4],
+        "C3_BALANCED": [8, 24, 8, 7, 4]
+      }
+    }
+  ]
+}
