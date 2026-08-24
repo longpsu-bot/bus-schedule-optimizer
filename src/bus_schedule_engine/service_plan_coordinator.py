@@ -22,10 +22,12 @@ from .contracts_v1.clean_compile_frontier import (
     compile_service_plan_frontier_v1,
 )
 from .contracts_v1.closed_loop_service_protection import (
+    INVALID_TRANSLATED_PROTECTION_AUTHORITY,
     ClosedLoopServiceProtectionAuthorityV1,
+    ClosedLoopServiceProtectionAuthorityValidationV1,
     ClosedLoopServiceProtectionViolationV1,
-    closed_loop_service_protection_status_v1,
-    validate_closed_loop_service_protection_v1,
+    _validate_trusted_closed_loop_service_protection_v1,
+    validate_closed_loop_service_protection_authority_v1,
 )
 from .contracts_v1.service_plan_state import (
     ServicePlanMoveV1,
@@ -216,6 +218,7 @@ class RouteCoordinatorResultV1:
     revision_examples: Mapping[str, tuple[str, ...]]
     evaluated_state_fingerprints: tuple[str, ...]
     protection_violations: tuple[ClosedLoopServiceProtectionViolationV1, ...]
+    protection_authority_validation: ClosedLoopServiceProtectionAuthorityValidationV1
 
 
 def _sha256(path: Path) -> str:
@@ -863,6 +866,23 @@ def search_route_service_plans_v1(
     compiler: Callable[..., Any] = compile_service_plan_frontier_v1,
 ) -> RouteCoordinatorResultV1:
     stats = CoordinatorSearchStatisticsV1()
+    authority_validation = validate_closed_loop_service_protection_authority_v1(
+        context.service_protection_authority
+    )
+    if not authority_validation.passed:
+        return RouteCoordinatorResultV1(
+            route_id=context.route_id,
+            status=INVALID_TRANSLATED_PROTECTION_AUTHORITY,
+            search_budget=budget,
+            statistics=stats,
+            seed_states=tuple(seeds),
+            pareto_frontier=(),
+            feedback_code_counts={INVALID_TRANSLATED_PROTECTION_AUTHORITY: 1},
+            revision_examples={},
+            evaluated_state_fingerprints=(),
+            protection_violations=(),
+            protection_authority_validation=authority_validation,
+        )
     queue = _BoundedOpenQueue(budget.max_open_states)
     seen: set[str] = set()
     pair_seen: set[str] = set()
@@ -977,10 +997,11 @@ def search_route_service_plans_v1(
         direction_feedback: list[FeedbackEvidenceV1] = []
         current_records: list[DirectionalCompilationCandidateV1] = []
         for variant in compile_frontier.variants:
-            protection = validate_closed_loop_service_protection_v1(
+            protection = _validate_trusted_closed_loop_service_protection_v1(
                 authority=context.service_protection_authority,
                 direction=state.direction,
                 exact_departures=variant.compilation.exact_departures,
+                authority_validation=authority_validation,
             )
             if not protection.passed:
                 stats.protected_compile_variants_rejected += 1
@@ -1079,6 +1100,7 @@ def search_route_service_plans_v1(
         revision_examples=dict(sorted(revision_examples.items())),
         evaluated_state_fingerprints=tuple(sorted(seen)),
         protection_violations=tuple(protection_violations),
+        protection_authority_validation=authority_validation,
     )
 
 
@@ -1480,6 +1502,9 @@ def route_result_payload_v1(
     prior_artifact_verification: Mapping[str, Any],
 ) -> dict[str, Any]:
     protection_authority = context.service_protection_authority
+    protection_authority_has_expected_type = isinstance(
+        protection_authority, ClosedLoopServiceProtectionAuthorityV1
+    )
     frontier = []
     for index, item in enumerate(result.pareto_frontier, start=1):
         value = _pair_to_dict(index, item)
@@ -1537,30 +1562,43 @@ def route_result_payload_v1(
         "immutable_demand_sha256": context.immutable_demand_sha256,
         "seed_headway_prior_minutes": dict(sorted(context.seed_headway_prior_minutes.items())),
         "protected_service_authority": {
-            "status": closed_loop_service_protection_status_v1(protection_authority),
+            "status": result.protection_authority_validation.status,
+            "validation_errors": list(result.protection_authority_validation.errors),
+            "validation_fingerprint": (
+                result.protection_authority_validation.validation_fingerprint
+            ),
             "authority_supplied": protection_authority is not None,
             "source_authority_profile": (
                 None
-                if protection_authority is None
+                if not protection_authority_has_expected_type
                 else protection_authority.source_authority_profile
             ),
             "source_authority_fingerprint": (
                 None
-                if protection_authority is None
+                if not protection_authority_has_expected_type
                 else protection_authority.source_authority_fingerprint
             ),
             "translation_profile": (
-                None if protection_authority is None else protection_authority.translation_profile
+                None
+                if not protection_authority_has_expected_type
+                else protection_authority.translation_profile
             ),
             "translation_fingerprint": (
                 None
-                if protection_authority is None
+                if not protection_authority_has_expected_type
                 else protection_authority.translation_fingerprint
             ),
-            "semantics": None if protection_authority is None else protection_authority.semantics,
+            "semantics": (
+                None
+                if not protection_authority_has_expected_type
+                else protection_authority.semantics
+            ),
             "windows": (
                 []
-                if protection_authority is None
+                if (
+                    not protection_authority_has_expected_type
+                    or not result.protection_authority_validation.passed
+                )
                 else [asdict(window) for window in protection_authority.windows]
             ),
             "violations": [asdict(item) for item in result.protection_violations],

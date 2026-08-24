@@ -27,28 +27,40 @@ The coordinator keeps three concepts separate:
 
 ### Hard authority
 
-Hard service protection exists only when a verified
+Hard service protection exists only when a
 `ProtectedServiceFloorEnforcementAuthorityV1` is explicitly translated into evidence-bound
-`ClosedLoopProtectedServiceWindowV1` records. The translation carries the source regime ID,
-direction, protected window, boundary tolerance, maximum headway, and minimum trip count, and has
-its own deterministic fingerprint. With no explicit source authority, diagnostics report
+`ClosedLoopProtectedServiceWindowV1` records. When Scenario B is supplied at translation, the
+canonical 6A2B verifier establishes current source provenance. Separately, the translated
+authority verifies its canonical profile and semantics, source metadata shape, window invariants
+and ordering, and translation fingerprint. Translated-authority internal verification does not
+prove that its source remains current against Scenario B; source verification and internal
+verification are distinct boundaries.
+
+A malformed non-`None` translated authority reports
+`INVALID_TRANSLATED_PROTECTION_AUTHORITY` and stops the route before compilation or fleet
+validation. It is not reinterpreted as no protection, route/fleet infeasibility, or a seed prior.
+With no authority, or with a valid authority containing no windows, diagnostics report
 `VALID_NO_ENFORCEABLE_WINDOW`; the coordinator does not infer protection from demand regimes,
 block demand, end-tail artifacts, or a baseline headway.
 
-Each compiled directional timetable is checked before fleet pairing. A protected window must have
-an exact departure covering each boundary within tolerance, at least its minimum number of
-same-direction departures between those two boundary departures, and positive whole-minute
-internal headways no greater than its maximum. Transition gaps outside the protected span are not
-counted. Rejections retain the direction, window, source regime ID, violated rule, and observed
-count or headway. This is operational service-level/timestamp-level enforcement; it does not claim
-Scenario-B source-trip identity or donor-removal semantics and invents no source trip IDs.
+Each compiled directional timetable is checked before fleet pairing. For each protected window,
+validation enumerates every eligible start/end departure pair inside the boundary tolerances and
+accepts when at least one legal pair satisfies the minimum trip count plus positive, whole-minute
+internal headways no greater than the maximum. A nearest failing boundary pair therefore cannot
+mask another valid pair. When several pairs pass, minimum total boundary deviation and stable
+tie-breaks select one diagnostic/fingerprint witness; witness selection never changes acceptance.
+Transition gaps outside the protected span are not counted. Rejections retain the direction,
+window, source regime ID, violated rule, and observed count, headway, or departure pair. This is
+operational service-level/timestamp-level enforcement; it does not claim Scenario-B source-trip
+identity or donor-removal semantics and invents no source trip IDs.
 
 ### Seed prior
 
-The Scenario-B/end-tail-derived headway is a `seed_headway_prior_minutes` value. It is used only by
-the initial sqrt-demand allocation to construct a reasonable seed. It is not ServicePlan validity
-authority and is not passed to merge, split, shift, one-trip, or tail neighborhood feasibility.
-Frozen C1/C2/C3 seed artifacts remain unchanged.
+The Scenario-B/end-tail-derived headway is a `seed_headway_prior_minutes` value. It remains
+completely separate from hard protection and is used only by the initial sqrt-demand allocation to
+construct a reasonable seed. It is not ServicePlan validity authority and is not passed to merge,
+split, shift, one-trip, or tail neighborhood feasibility. Frozen C1/C2/C3 seed artifacts remain
+unchanged.
 
 ### Optimization objectives
 

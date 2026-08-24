@@ -16,6 +16,7 @@ from bus_schedule_engine.contracts_v1.clean_compile_frontier import (
 )
 from bus_schedule_engine.contracts_v1.closed_loop_service_protection import (
     ACTIVE_TRANSLATED_PROTECTED_WINDOWS,
+    INVALID_TRANSLATED_PROTECTION_AUTHORITY,
     PROTECTED_INTERNAL_HEADWAY_ABOVE_MAXIMUM,
     PROTECTED_TRIP_COUNT_BELOW_MINIMUM,
     VALID_NO_ENFORCEABLE_WINDOW,
@@ -353,6 +354,54 @@ def test_exact_candidate_satisfying_protected_peak_reaches_fleet_validation() ->
     assert result.statistics.fleet_validations_run == 1
     assert result.pareto_frontier
     assert result.protection_violations == ()
+
+
+def test_invalid_translated_authority_fails_closed_before_compile_or_fleet(
+    monkeypatch,
+) -> None:
+    valid = _protection_authority()
+    invalid = dataclasses.replace(
+        valid,
+        windows=(dataclasses.replace(valid.windows[0], maximum_headway_minutes=16),),
+    )
+    compile_calls = 0
+    fleet_calls = 0
+
+    def unexpected_compile(*_args, **_kwargs):
+        nonlocal compile_calls
+        compile_calls += 1
+        raise AssertionError("invalid authority must stop before unprotected compilation")
+
+    def unexpected_fleet(**_kwargs):
+        nonlocal fleet_calls
+        fleet_calls += 1
+        raise AssertionError("invalid authority must stop before fleet validation")
+
+    monkeypatch.setattr(coordinator, "validate_fleet_combination_v1", unexpected_fleet)
+    context = _context(seed_prior=15.0, protection=invalid)
+    result = search_route_service_plans_v1(
+        context=context,
+        seeds=(_state("outbound"), _state("inbound")),
+        compiler=unexpected_compile,
+    )
+    payload = route_result_payload_v1(
+        context=context,
+        result=result,
+        prior_artifact_verification={},
+    )
+
+    assert result.status == INVALID_TRANSLATED_PROTECTION_AUTHORITY
+    assert result.feedback_code_counts == {INVALID_TRANSLATED_PROTECTION_AUTHORITY: 1}
+    assert result.evaluated_state_fingerprints == ()
+    assert result.statistics.states_evaluated == 0
+    assert result.statistics.fleet_validations_run == 0
+    assert FLEET_LIMIT_EXCEEDED not in result.feedback_code_counts
+    assert compile_calls == fleet_calls == 0
+    assert payload["protected_service_authority"]["status"] == (
+        INVALID_TRANSLATED_PROTECTION_AUTHORITY
+    )
+    assert payload["protected_service_authority"]["validation_errors"]
+    assert payload["seed_headway_prior_minutes"] == {"inbound": 15.0, "outbound": 15.0}
 
 
 def test_protected_authority_translation_is_deterministic_and_fact_sensitive() -> None:
