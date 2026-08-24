@@ -1328,8 +1328,9 @@ def _retain_directional_archive(
 @dataclass(slots=True)
 class _BoundedOpenQueue:
     limit: int
-    heap: list[tuple[tuple[Any, ...], str, ServicePlanStateV1]] = field(default_factory=list)
-    active: dict[str, tuple[Any, ...]] = field(default_factory=dict)
+    heap: list[tuple[tuple[Any, ...], str, int, ServicePlanStateV1]] = field(default_factory=list)
+    active: dict[str, tuple[tuple[Any, ...], int]] = field(default_factory=dict)
+    _next_ticket: int = field(default=0, init=False)
 
     def push(
         self,
@@ -1338,25 +1339,27 @@ class _BoundedOpenQueue:
     ) -> tuple[bool, bool, str | None]:
         fingerprint = service_plan_fingerprint_v1(state)
         incumbent = self.active.get(fingerprint)
-        if incumbent is not None and incumbent <= priority:
+        if incumbent is not None and incumbent[0] <= priority:
             return False, False, None
         removed: str | None = None
         if incumbent is None and len(self.active) >= self.limit:
-            worst_fingerprint, worst_priority = max(
-                self.active.items(), key=lambda item: (item[1], item[0])
+            worst_fingerprint, (worst_priority, _) = max(
+                self.active.items(), key=lambda item: (item[1][0], item[0])
             )
             if (priority, fingerprint) >= (worst_priority, worst_fingerprint):
                 return False, True, fingerprint
             removed = worst_fingerprint
             del self.active[worst_fingerprint]
-        self.active[fingerprint] = priority
-        heapq.heappush(self.heap, (priority, fingerprint, state))
+        ticket = self._next_ticket
+        self._next_ticket += 1
+        self.active[fingerprint] = (priority, ticket)
+        heapq.heappush(self.heap, (priority, fingerprint, ticket, state))
         return True, removed is not None, removed
 
     def pop(self) -> tuple[ServicePlanStateV1, tuple[Any, ...]] | None:
         while self.heap:
-            priority, fingerprint, state = heapq.heappop(self.heap)
-            if self.active.get(fingerprint) == priority:
+            priority, fingerprint, ticket, state = heapq.heappop(self.heap)
+            if self.active.get(fingerprint) == (priority, ticket):
                 del self.active[fingerprint]
                 return state, priority
         return None

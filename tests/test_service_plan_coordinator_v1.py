@@ -116,6 +116,101 @@ def _authority(
     )
 
 
+def test_bounded_open_queue_reintroduction_ignores_stale_same_priority_entry() -> None:
+    queue = coordinator._BoundedOpenQueue(limit=2)
+    state_a = _state(seed="A")
+    state_b = dataclasses.replace(state_a, seed_id="B")
+    state_c = dataclasses.replace(state_a, seed_id="C")
+    old_priority = (2, "old")
+    new_priority = (1, "new")
+
+    assert queue.push(state_a, old_priority) == (True, False, None)
+    assert queue.push(state_b, new_priority) == (True, False, None)
+    assert queue.pop() == (state_b, new_priority)
+    assert not queue
+
+    assert queue.push(state_c, old_priority) == (True, False, None)
+    assert queue.pop() == (state_c, old_priority)
+    assert not queue
+    assert queue.pop() is None
+
+
+def test_bounded_open_queue_rejects_active_equal_or_worse_duplicate() -> None:
+    queue = coordinator._BoundedOpenQueue(limit=2)
+    state = _state(seed="ACTIVE")
+    duplicate = dataclasses.replace(state, seed_id="DUPLICATE")
+
+    assert queue.push(state, (1,)) == (True, False, None)
+    active_before = dict(queue.active)
+    ticket_before = queue._next_ticket
+
+    assert queue.push(duplicate, (1,)) == (False, False, None)
+    assert queue.push(duplicate, (2,)) == (False, False, None)
+    assert queue.active == active_before
+    assert queue._next_ticket == ticket_before
+    assert queue.pop() == (state, (1,))
+
+
+def test_bounded_open_queue_better_replacement_returns_current_state() -> None:
+    queue = coordinator._BoundedOpenQueue(limit=2)
+    old = _state(seed="OLD")
+    replacement = dataclasses.replace(old, seed_id="REPLACEMENT")
+
+    assert queue.push(old, (2,)) == (True, False, None)
+    old_ticket = queue.active[service_plan_fingerprint_v1(old)][1]
+    assert queue.push(replacement, (1,)) == (True, False, None)
+    new_ticket = queue.active[service_plan_fingerprint_v1(old)][1]
+
+    assert new_ticket > old_ticket
+    assert queue.pop() == (replacement, (1,))
+    assert not queue
+    assert queue.pop() is None
+
+
+def test_bounded_open_queue_capacity_evicts_semantic_worst_and_ignores_stale() -> None:
+    queue = coordinator._BoundedOpenQueue(limit=2)
+    best = _state(first_count=3, second_count=5, seed="BEST")
+    worst = _state(first_count=5, second_count=3, seed="WORST")
+    middle = _state(first_count=6, second_count=2, seed="MIDDLE")
+    worst_fingerprint = service_plan_fingerprint_v1(worst)
+
+    assert queue.push(best, (1,)) == (True, False, None)
+    assert queue.push(worst, (3,)) == (True, False, None)
+    assert len(queue.active) == 2
+    assert queue.push(middle, (2,)) == (True, True, worst_fingerprint)
+    assert len(queue.active) == 2
+    assert worst_fingerprint not in queue.active
+
+    assert queue.pop() == (best, (1,))
+    assert queue.pop() == (middle, (2,))
+    assert not queue
+    assert queue.pop() is None
+
+
+def test_bounded_open_queue_pop_order_is_priority_then_fingerprint() -> None:
+    queue = coordinator._BoundedOpenQueue(limit=4)
+    states = (
+        _state(first_count=3, second_count=5, seed="ONE"),
+        _state(first_count=5, second_count=3, seed="TWO"),
+        _state(first_count=6, second_count=2, seed="THREE"),
+    )
+    priorities = ((2,), (1,), (1,))
+    for state, priority in zip(states, priorities, strict=True):
+        assert queue.push(state, priority)[0]
+
+    expected = sorted(
+        zip(priorities, states, strict=True),
+        key=lambda item: (item[0], service_plan_fingerprint_v1(item[1])),
+    )
+    actual = []
+    while queue:
+        state, priority = queue.pop()
+        actual.append((priority, state))
+
+    assert actual == expected
+    assert queue.heap == []
+
+
 def _context(
     *,
     fleet_ceiling: int = 20,
