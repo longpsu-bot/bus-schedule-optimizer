@@ -203,17 +203,24 @@ def _is_floor_feasible(
     )
 
 
+def _target_indices(length: int, affected_indices: Iterable[int] | None) -> tuple[int, ...]:
+    if affected_indices is None:
+        return tuple(range(length))
+    return tuple(sorted(index for index in set(affected_indices) if 0 <= index < length))
+
+
 def merge_adjacent_neighbors_v1(
     state: ServicePlanStateV1,
     *,
     floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
+    affected_indices: Iterable[int] | None = None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     result: list[ServicePlanNeighborV1] = []
-    for index, (left, right) in enumerate(
-        zip(state.service_regimes, state.service_regimes[1:], strict=False)
-    ):
+    for index in _target_indices(len(state.service_regimes) - 1, affected_indices):
+        left = state.service_regimes[index]
+        right = state.service_regimes[index + 1]
         merged = ServiceRegimeDecisionV1(left.start, right.end, left.trip_count + right.trip_count)
         if not _is_floor_feasible(state, (merged,), floor_headway_minutes):
             continue
@@ -243,15 +250,21 @@ def split_regime_neighbors_v1(
     floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
+    affected_indices: Iterable[int] | None = None,
+    split_boundary_seconds: Iterable[int] | None = None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     """Enumerate every grid-aligned split and every floor-feasible integer allocation."""
 
     result: list[ServicePlanNeighborV1] = []
     window_start = state.service_regimes[0].start
-    for index, parent in enumerate(state.service_regimes):
+    target_boundaries = None if split_boundary_seconds is None else set(split_boundary_seconds)
+    for index in _target_indices(len(state.service_regimes), affected_indices):
+        parent = state.service_regimes[index]
         first = parent.start + planning_grid_seconds
         for boundary in range(first, parent.end, planning_grid_seconds):
             if (boundary - window_start) % planning_grid_seconds:
+                continue
+            if target_boundaries is not None and boundary not in target_boundaries:
                 continue
             left_shell = ServiceRegimeDecisionV1(parent.start, boundary, 2)
             right_shell = ServiceRegimeDecisionV1(boundary, parent.end, 2)
@@ -294,13 +307,14 @@ def _shift_boundary_neighbors(
     floor_headway_minutes: float | None,
     evidence_code: str | None,
     priority: int,
+    affected_indices: Iterable[int] | None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     if abs(delta_seconds) != planning_grid_seconds:
         raise ValueError("boundary shifts must be exactly one planning bucket")
     result: list[ServicePlanNeighborV1] = []
-    for index, (left, right) in enumerate(
-        zip(state.service_regimes, state.service_regimes[1:], strict=False)
-    ):
+    for index in _target_indices(len(state.service_regimes) - 1, affected_indices):
+        left = state.service_regimes[index]
+        right = state.service_regimes[index + 1]
         boundary = left.end + delta_seconds
         if boundary <= left.start or boundary >= right.end:
             continue
@@ -343,6 +357,7 @@ def shift_boundary_left_neighbors_v1(
     floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
+    affected_indices: Iterable[int] | None = None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     return _shift_boundary_neighbors(
         state,
@@ -352,6 +367,7 @@ def shift_boundary_left_neighbors_v1(
         floor_headway_minutes=floor_headway_minutes,
         evidence_code=evidence_code,
         priority=priority,
+        affected_indices=affected_indices,
     )
 
 
@@ -362,6 +378,7 @@ def shift_boundary_right_neighbors_v1(
     floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
+    affected_indices: Iterable[int] | None = None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     return _shift_boundary_neighbors(
         state,
@@ -371,6 +388,7 @@ def shift_boundary_right_neighbors_v1(
         floor_headway_minutes=floor_headway_minutes,
         evidence_code=evidence_code,
         priority=priority,
+        affected_indices=affected_indices,
     )
 
 
@@ -383,11 +401,14 @@ def _move_one_neighbors(
     evidence_code: str | None,
     priority: int,
     only_final_pair: bool = False,
+    affected_indices: Iterable[int] | None = None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     result: list[ServicePlanNeighborV1] = []
     pairs = range(len(state.service_regimes) - 1)
     if only_final_pair:
         pairs = range(max(0, len(state.service_regimes) - 2), len(state.service_regimes) - 1)
+    elif affected_indices is not None:
+        pairs = _target_indices(len(state.service_regimes) - 1, affected_indices)
     for index in pairs:
         left = state.service_regimes[index]
         right = state.service_regimes[index + 1]
@@ -429,6 +450,7 @@ def move_one_trip_left_to_right_neighbors_v1(
     floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
+    affected_indices: Iterable[int] | None = None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     return _move_one_neighbors(
         state,
@@ -437,6 +459,7 @@ def move_one_trip_left_to_right_neighbors_v1(
         floor_headway_minutes=floor_headway_minutes,
         evidence_code=evidence_code,
         priority=priority,
+        affected_indices=affected_indices,
     )
 
 
@@ -446,6 +469,7 @@ def move_one_trip_right_to_left_neighbors_v1(
     floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
+    affected_indices: Iterable[int] | None = None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     return _move_one_neighbors(
         state,
@@ -454,6 +478,7 @@ def move_one_trip_right_to_left_neighbors_v1(
         floor_headway_minutes=floor_headway_minutes,
         evidence_code=evidence_code,
         priority=priority,
+        affected_indices=affected_indices,
     )
 
 

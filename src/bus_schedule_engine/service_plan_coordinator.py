@@ -63,6 +63,10 @@ TAIL_UNDER_SERVICE = "TAIL_UNDER_SERVICE"
 DEMAND_UNDERSERVED_INTERVAL = "DEMAND_UNDERSERVED_INTERVAL"
 DEMAND_OVERSERVED_INTERVAL = "DEMAND_OVERSERVED_INTERVAL"
 FIXED_ENDPOINT_CONFLICT = "FIXED_ENDPOINT_CONFLICT"
+DEMAND_RESPONSE_DIRECTION_MISMATCH = "DEMAND_RESPONSE_DIRECTION_MISMATCH"
+
+NUMERICAL_EPSILON = 1e-12
+UNIFORM_WITHIN_DEMAND_BUCKET_ASSUMPTION = "UNIFORM_WITHIN_DEMAND_BUCKET_ASSUMPTION"
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +115,59 @@ class DemandBucketEvidenceV1:
 
 
 @dataclass(frozen=True, slots=True)
+class DemandResponseRegimeEvidenceV1:
+    regime_id: str
+    direction: str
+    start: int
+    end: int
+    integrated_demand_mass: float
+    demand_rate_per_hour: float
+
+    def __post_init__(self) -> None:
+        if not self.regime_id.strip():
+            raise ValueError("DemandRegime regime_id is required")
+        if self.direction not in {"outbound", "inbound"}:
+            raise ValueError("unsupported DemandRegime direction")
+        if self.start < 0 or self.end <= self.start:
+            raise ValueError("DemandRegime must have a positive interval")
+        if self.start % 60 or self.end % 60:
+            raise ValueError("DemandRegime boundaries must be whole-minute values")
+        if not math.isfinite(self.integrated_demand_mass) or self.integrated_demand_mass <= 0:
+            raise ValueError("DemandRegime integrated demand mass must be finite and positive")
+        if not math.isfinite(self.demand_rate_per_hour) or self.demand_rate_per_hour <= 0:
+            raise ValueError("DemandRegime demand rate must be finite and positive")
+
+
+@dataclass(frozen=True, slots=True)
+class DemandResponseRegimeProjectionV1:
+    regime_id: str
+    direction: str
+    start: int
+    end: int
+    integrated_demand_mass: float
+    demand_rate_per_hour: float
+    effective_service_frequency_per_hour: float
+    equivalent_effective_headway_minutes: float
+
+
+@dataclass(frozen=True, slots=True)
+class DemandResponseTransitionV1:
+    direction: str
+    boundary_time: int
+    interval_start: int
+    interval_end: int
+    left_demand_regime_id: str
+    right_demand_regime_id: str
+    delta_log_demand: float
+    delta_log_service: float
+    demand_direction: str
+    service_direction: str
+    direction_aligned: bool
+    sqrt_expected_delta_log_service: float
+    sqrt_response_residual: float
+
+
+@dataclass(frozen=True, slots=True)
 class FeedbackEvidenceV1:
     code: str
     direction: str
@@ -124,6 +181,14 @@ class FeedbackEvidenceV1:
     violated_rule: str | None = None
     observed_trip_count: int | None = None
     observed_headway_minutes: float | None = None
+    left_demand_regime_id: str | None = None
+    right_demand_regime_id: str | None = None
+    delta_log_demand: float | None = None
+    delta_log_service: float | None = None
+    expected_demand_direction: str | None = None
+    observed_service_direction: str | None = None
+    sqrt_expected_delta_log_service: float | None = None
+    sqrt_response_residual: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,6 +207,16 @@ class ActualServiceMetricsV1:
     bucket_service_counts: tuple[int, ...]
     bucket_demand_shares: tuple[float, ...]
     bucket_service_shares: tuple[float, ...]
+    demand_weighted_expected_passenger_wait_minutes: float
+    maximum_bucket_expected_wait_minutes: float
+    per_bucket_expected_wait_minutes: tuple[float | None, ...]
+    active_demand_mass: float
+    demand_response_regime_projections: tuple[DemandResponseRegimeProjectionV1, ...]
+    demand_response_transitions: tuple[DemandResponseTransitionV1, ...]
+    demand_response_direction_accuracy: float | None
+    demand_response_transition_count: int
+    demand_response_aligned_transition_count: int
+    sqrt_seed_response_deviation: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +232,7 @@ class DirectionalCompilationCandidateV1:
 @dataclass(frozen=True, slots=True)
 class OperatingPairMetricsV1:
     observed_demand_mismatch: float
+    demand_weighted_expected_passenger_wait_minutes: float
     actual_service_regime_count: int
     max_frequency_jump: float
     total_frequency_variation: float
@@ -169,6 +245,7 @@ class OperatingPairMetricsV1:
     def pareto_vector(self) -> tuple[float | int, ...]:
         return (
             self.observed_demand_mismatch,
+            self.demand_weighted_expected_passenger_wait_minutes,
             self.actual_service_regime_count,
             self.max_frequency_jump,
             self.total_frequency_variation,
@@ -203,6 +280,7 @@ class RouteCoordinatorContextV1:
     minimum_layover_minutes: int
     fleet_ceiling: int
     immutable_demand_sha256: str
+    demand_response_regimes: Mapping[str, tuple[DemandResponseRegimeEvidenceV1, ...]] | None = None
     service_protection_authority: ClosedLoopServiceProtectionAuthorityV1 | None = None
 
 
@@ -274,11 +352,193 @@ def _tail_demand_share(
     return demand / total
 
 
+def expected_passenger_wait_metrics_v1(
+    departures: Sequence[int],
+    demand_buckets: Sequence[DemandBucketEvidenceV1],
+) -> tuple[float, float, tuple[float | None, ...], float]:
+    """Integrate exact next-departure wait over piecewise-constant demand buckets."""
+
+    exact = tuple(departures)
+    if len(exact) < 2 or exact != tuple(sorted(set(exact))):
+        raise ValueError("at least two strictly increasing exact departures are required")
+    first, last = exact[0], exact[-1]
+    total_mass = 0.0
+    total_weighted_wait_seconds = 0.0
+    per_bucket: list[float | None] = []
+    for bucket in demand_buckets:
+        active_start = max(first, bucket.start)
+        active_end = min(last, bucket.end)
+        if active_end <= active_start or bucket.observed_demand == 0:
+            per_bucket.append(None)
+            continue
+        intensity = bucket.observed_demand / (bucket.end - bucket.start)
+        bucket_mass = intensity * (active_end - active_start)
+        bucket_weighted_wait_seconds = 0.0
+        for left, right in zip(exact, exact[1:], strict=False):
+            overlap_start = max(left, active_start)
+            overlap_end = min(right, active_end)
+            if overlap_end <= overlap_start:
+                continue
+            integrated_wait_seconds_squared = (
+                right * (overlap_end - overlap_start) - (overlap_end**2 - overlap_start**2) / 2
+            )
+            bucket_weighted_wait_seconds += intensity * integrated_wait_seconds_squared
+        expected_minutes = bucket_weighted_wait_seconds / bucket_mass / 60
+        per_bucket.append(expected_minutes)
+        total_mass += bucket_mass
+        total_weighted_wait_seconds += bucket_weighted_wait_seconds
+    if not math.isfinite(total_mass) or total_mass <= 0:
+        raise ValueError("no positive immutable demand mass intersects the active service span")
+    expected_wait = total_weighted_wait_seconds / total_mass / 60
+    active_bucket_waits = tuple(value for value in per_bucket if value is not None)
+    if not active_bucket_waits:
+        raise ValueError("active demand buckets must contain expected-wait evidence")
+    return expected_wait, max(active_bucket_waits), tuple(per_bucket), total_mass
+
+
+def _effective_service_frequency_per_hour_v1(
+    departures: Sequence[int],
+    *,
+    window_start: int,
+    window_end: int,
+) -> float:
+    if window_end <= window_start:
+        raise ValueError("service projection window must have positive duration")
+    integral = 0.0
+    covered = 0
+    for left, right in zip(departures, departures[1:], strict=False):
+        overlap = _overlap(left, right, window_start, window_end)
+        if overlap:
+            integral += 3600.0 / (right - left) * overlap
+            covered += overlap
+    if covered != window_end - window_start:
+        raise ValueError(
+            "exact timetable does not cover the complete canonical DemandRegime window"
+        )
+    frequency = integral / (window_end - window_start)
+    if not math.isfinite(frequency) or frequency <= 0:
+        raise ValueError("projected service frequency must be finite and positive")
+    return frequency
+
+
+def demand_response_diagnostics_v1(
+    departures: Sequence[int],
+    regimes: Sequence[DemandResponseRegimeEvidenceV1],
+) -> tuple[
+    tuple[DemandResponseRegimeProjectionV1, ...],
+    tuple[DemandResponseTransitionV1, ...],
+    float | None,
+    int,
+    int,
+    float | None,
+]:
+    """Project an exact timetable onto immutable canonical DemandRegime windows."""
+
+    exact = tuple(departures)
+    if len(exact) < 2 or exact != tuple(sorted(set(exact))):
+        raise ValueError("at least two strictly increasing exact departures are required")
+    ordered = tuple(regimes)
+    if not ordered:
+        return (), (), None, 0, 0, None
+    direction = ordered[0].direction
+    if any(item.direction != direction for item in ordered):
+        raise ValueError("canonical DemandRegime evidence cannot mix directions")
+    if tuple(sorted(ordered, key=lambda item: (item.start, item.end, item.regime_id))) != ordered:
+        raise ValueError("canonical DemandRegime evidence must be deterministically ordered")
+    for left, right in zip(ordered, ordered[1:], strict=False):
+        if left.end != right.start:
+            raise ValueError("canonical DemandRegime evidence must be contiguous")
+    projections = tuple(
+        DemandResponseRegimeProjectionV1(
+            regime_id=item.regime_id,
+            direction=item.direction,
+            start=item.start,
+            end=item.end,
+            integrated_demand_mass=item.integrated_demand_mass,
+            demand_rate_per_hour=item.demand_rate_per_hour,
+            effective_service_frequency_per_hour=(
+                frequency := _effective_service_frequency_per_hour_v1(
+                    exact,
+                    window_start=item.start,
+                    window_end=item.end,
+                )
+            ),
+            equivalent_effective_headway_minutes=60.0 / frequency,
+        )
+        for item in ordered
+    )
+    transitions: list[DemandResponseTransitionV1] = []
+    weights: list[float] = []
+    for left, right in zip(projections, projections[1:], strict=False):
+        delta_demand = math.log(right.demand_rate_per_hour / left.demand_rate_per_hour)
+        if abs(delta_demand) <= NUMERICAL_EPSILON:
+            raise ValueError("adjacent canonical DemandRegimes must have distinct demand rates")
+        delta_service = math.log(
+            right.effective_service_frequency_per_hour / left.effective_service_frequency_per_hour
+        )
+        demand_direction = "UP" if delta_demand > 0 else "DOWN"
+        service_direction = (
+            "FLAT"
+            if abs(delta_service) <= NUMERICAL_EPSILON
+            else ("UP" if delta_service > 0 else "DOWN")
+        )
+        expected = 0.5 * delta_demand
+        transitions.append(
+            DemandResponseTransitionV1(
+                direction=direction,
+                boundary_time=right.start,
+                interval_start=left.start,
+                interval_end=right.end,
+                left_demand_regime_id=left.regime_id,
+                right_demand_regime_id=right.regime_id,
+                delta_log_demand=delta_demand,
+                delta_log_service=delta_service,
+                demand_direction=demand_direction,
+                service_direction=service_direction,
+                direction_aligned=(demand_direction == service_direction),
+                sqrt_expected_delta_log_service=expected,
+                sqrt_response_residual=delta_service - expected,
+            )
+        )
+        weights.append(((left.end - left.start) + (right.end - right.start)) / 2)
+    transition_tuple = tuple(transitions)
+    weight_sum = sum(weights)
+    aligned_count = sum(item.direction_aligned for item in transition_tuple)
+    accuracy = (
+        None
+        if weight_sum <= 0
+        else sum(
+            weight
+            for item, weight in zip(transition_tuple, weights, strict=True)
+            if item.direction_aligned
+        )
+        / weight_sum
+    )
+    sqrt_deviation = (
+        None
+        if weight_sum <= 0
+        else sum(
+            weight * abs(item.sqrt_response_residual)
+            for item, weight in zip(transition_tuple, weights, strict=True)
+        )
+        / weight_sum
+    )
+    return (
+        projections,
+        transition_tuple,
+        accuracy,
+        len(transition_tuple),
+        aligned_count,
+        sqrt_deviation,
+    )
+
+
 def evaluate_actual_service_v1(
     candidate: CleanCompileVariantV1,
     *,
     demand_buckets: Sequence[DemandBucketEvidenceV1],
     scenario_b_departures: Sequence[int],
+    demand_response_regimes: Sequence[DemandResponseRegimeEvidenceV1] | None = None,
 ) -> tuple[ActualServiceMetricsV1, tuple[FeedbackEvidenceV1, ...]]:
     """Evaluate the exact compiled timestamps against immutable demand buckets."""
 
@@ -319,6 +579,23 @@ def evaluate_actual_service_v1(
     tail_service_share = tail.trip_count / total_trips
     tail_demand_share = _tail_demand_share(demand_buckets, tail_start=tail.first_departure)
     tail_debt = tail_demand_share - tail_service_share
+    (
+        expected_wait,
+        maximum_bucket_wait,
+        per_bucket_wait,
+        active_demand_mass,
+    ) = expected_passenger_wait_metrics_v1(compilation.exact_departures, demand_buckets)
+    (
+        response_projections,
+        response_transitions,
+        response_accuracy,
+        response_transition_count,
+        response_aligned_count,
+        sqrt_response_deviation,
+    ) = demand_response_diagnostics_v1(
+        compilation.exact_departures,
+        () if demand_response_regimes is None else demand_response_regimes,
+    )
     metrics = ActualServiceMetricsV1(
         observed_demand_mismatch=mismatch,
         actual_service_regime_count=len(services),
@@ -334,6 +611,16 @@ def evaluate_actual_service_v1(
         bucket_service_counts=actual_counts,
         bucket_demand_shares=demand_shares,
         bucket_service_shares=service_shares,
+        demand_weighted_expected_passenger_wait_minutes=expected_wait,
+        maximum_bucket_expected_wait_minutes=maximum_bucket_wait,
+        per_bucket_expected_wait_minutes=per_bucket_wait,
+        active_demand_mass=active_demand_mass,
+        demand_response_regime_projections=response_projections,
+        demand_response_transitions=response_transitions,
+        demand_response_direction_accuracy=response_accuracy,
+        demand_response_transition_count=response_transition_count,
+        demand_response_aligned_transition_count=response_aligned_count,
+        sqrt_seed_response_deviation=sqrt_response_deviation,
     )
     feedback: list[FeedbackEvidenceV1] = []
     for index, diagnostic in enumerate(compilation.boundary_diagnostics):
@@ -363,7 +650,15 @@ def evaluate_actual_service_v1(
     )
     under_index = min(range(len(differences)), key=lambda index: (differences[index], index))
     over_index = max(range(len(differences)), key=lambda index: (differences[index], -index))
-    if differences[under_index] < 0:
+    under_error = differences[under_index]
+    over_error = differences[over_index]
+    quantum = 1 / total_trips
+    transfer_before = under_error**2 + over_error**2
+    transfer_after = (under_error + quantum) ** 2 + (over_error - quantum) ** 2
+    demand_transfer_material = (
+        under_error < 0 and over_error > 0 and transfer_after < transfer_before - NUMERICAL_EPSILON
+    )
+    if demand_transfer_material:
         bucket = demand_buckets[under_index]
         feedback.append(
             FeedbackEvidenceV1(
@@ -375,7 +670,7 @@ def evaluate_actual_service_v1(
                 detail="Largest immutable-bucket demand share minus compiled service share.",
             )
         )
-    if differences[over_index] > 0:
+    if demand_transfer_material:
         bucket = demand_buckets[over_index]
         feedback.append(
             FeedbackEvidenceV1(
@@ -387,16 +682,49 @@ def evaluate_actual_service_v1(
                 detail="Largest compiled service share minus immutable-bucket demand share.",
             )
         )
-    feedback.append(
-        FeedbackEvidenceV1(
-            TAIL_UNDER_SERVICE if tail_debt > 0 else TAIL_OVER_SERVICE,
-            compilation.direction,
-            interval_start=tail.first_departure,
-            interval_end=demand_buckets[-1].end,
-            magnitude=abs(tail_debt),
-            detail="Signed tail demand share minus compiled tail service share.",
+    tail_adjusted_debt = tail_debt - quantum if tail_debt > 0 else tail_debt + quantum
+    if tail_adjusted_debt**2 < tail_debt**2 - NUMERICAL_EPSILON:
+        feedback.append(
+            FeedbackEvidenceV1(
+                TAIL_UNDER_SERVICE if tail_debt > 0 else TAIL_OVER_SERVICE,
+                compilation.direction,
+                interval_start=tail.first_departure,
+                interval_end=demand_buckets[-1].end,
+                magnitude=abs(tail_debt),
+                detail="Signed tail demand share minus compiled tail service share.",
+            )
         )
-    )
+    defects = tuple(item for item in response_transitions if not item.direction_aligned)
+    if defects:
+        defect = min(
+            defects,
+            key=lambda item: (
+                -abs(item.sqrt_response_residual),
+                -abs(item.delta_log_demand),
+                item.boundary_time,
+                item.left_demand_regime_id,
+                item.right_demand_regime_id,
+            ),
+        )
+        feedback.append(
+            FeedbackEvidenceV1(
+                code=DEMAND_RESPONSE_DIRECTION_MISMATCH,
+                direction=compilation.direction,
+                boundary_time=defect.boundary_time,
+                interval_start=defect.interval_start,
+                interval_end=defect.interval_end,
+                magnitude=abs(defect.sqrt_response_residual),
+                detail="Exact service response is flat or opposite to immutable demand direction.",
+                left_demand_regime_id=defect.left_demand_regime_id,
+                right_demand_regime_id=defect.right_demand_regime_id,
+                delta_log_demand=defect.delta_log_demand,
+                delta_log_service=defect.delta_log_service,
+                expected_demand_direction=defect.demand_direction,
+                observed_service_direction=defect.service_direction,
+                sqrt_expected_delta_log_service=(defect.sqrt_expected_delta_log_service),
+                sqrt_response_residual=defect.sqrt_response_residual,
+            )
+        )
     return metrics, tuple(feedback)
 
 
@@ -507,10 +835,28 @@ def evaluate_operating_pair_v1(
         for item in fleet_plan.assignments
         if item.connection_layover_minutes is not None
     )
+    outbound_mass = outbound.metrics.active_demand_mass
+    inbound_mass = inbound.metrics.active_demand_mass
+    pair_mass = outbound_mass + inbound_mass
+    directional_wait_values = (
+        outbound.metrics.demand_weighted_expected_passenger_wait_minutes,
+        inbound.metrics.demand_weighted_expected_passenger_wait_minutes,
+    )
+    if (
+        not all(math.isfinite(value) and value > 0 for value in (outbound_mass, inbound_mass))
+        or not all(math.isfinite(value) and value >= 0 for value in directional_wait_values)
+        or not math.isfinite(pair_mass)
+        or pair_mass <= 0
+    ):
+        raise ValueError("pair expected wait requires finite positive active demand mass")
+    pair_expected_wait = (
+        directional_wait_values[0] * outbound_mass + directional_wait_values[1] * inbound_mass
+    ) / pair_mass
     metrics = OperatingPairMetricsV1(
         observed_demand_mismatch=(
             outbound.metrics.observed_demand_mismatch + inbound.metrics.observed_demand_mismatch
         ),
+        demand_weighted_expected_passenger_wait_minutes=pair_expected_wait,
         actual_service_regime_count=(
             outbound.metrics.actual_service_regime_count
             + inbound.metrics.actual_service_regime_count
@@ -570,8 +916,56 @@ def _state_precompile_mismatch(
     )
 
 
-def _neighbor_priority_codes(feedback: Sequence[FeedbackEvidenceV1]) -> set[str]:
-    return {item.code for item in feedback}
+def _nearest_state_boundary_index(
+    state: ServicePlanStateV1,
+    boundary_time: int | None,
+    regime_index: int | None,
+) -> int | None:
+    if not state.boundaries:
+        return None
+    if boundary_time is not None:
+        return min(
+            range(len(state.boundaries)),
+            key=lambda index: (abs(state.boundaries[index] - boundary_time), index),
+        )
+    if regime_index is not None and 0 <= regime_index < len(state.boundaries):
+        return regime_index
+    return None
+
+
+def _overlapping_state_regime_indices(
+    state: ServicePlanStateV1,
+    interval_start: int | None,
+    interval_end: int | None,
+) -> tuple[int, ...]:
+    if interval_start is None or interval_end is None or interval_end <= interval_start:
+        return ()
+    return tuple(
+        index
+        for index, regime in enumerate(state.service_regimes)
+        if _overlap(regime.start, regime.end, interval_start, interval_end)
+    )
+
+
+def _local_regime_and_pair_indices(
+    state: ServicePlanStateV1,
+    core_indices: Sequence[int],
+) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    allowed = set(core_indices)
+    for index in core_indices:
+        if index > 0:
+            allowed.add(index - 1)
+        if index + 1 < len(state.service_regimes):
+            allowed.add(index + 1)
+    regimes = tuple(sorted(allowed))
+    pairs = tuple(
+        index
+        for index in range(len(state.service_regimes) - 1)
+        if index in allowed
+        and index + 1 in allowed
+        and (index in core_indices or index + 1 in core_indices)
+    )
+    return regimes, pairs
 
 
 def generate_targeted_neighbors_v1(
@@ -581,106 +975,209 @@ def generate_targeted_neighbors_v1(
     planning_grid_seconds: int,
     floor_headway_minutes: float | None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
-    """Generate only explicit finite operators, ordering evidence-targeted moves first."""
+    """Generate finite existing operators only where structured evidence is located."""
 
-    codes = _neighbor_priority_codes(feedback)
-    evidence_code = min(codes) if codes else None
     all_neighbors: list[ServicePlanNeighborV1] = []
 
     def add(items: Iterable[ServicePlanNeighborV1]) -> None:
         all_neighbors.extend(items)
 
-    add(
-        merge_adjacent_neighbors_v1(
-            state,
-            floor_headway_minutes=floor_headway_minutes,
-            evidence_code=(
-                REDUNDANT_SERVICE_BOUNDARY if REDUNDANT_SERVICE_BOUNDARY in codes else evidence_code
-            ),
-            priority=0 if REDUNDANT_SERVICE_BOUNDARY in codes else 3,
+    def add_local_revision(
+        evidence: FeedbackEvidenceV1,
+        *,
+        regime_indices: Sequence[int],
+        pair_indices: Sequence[int],
+        split_boundaries: Sequence[int] | None = None,
+    ) -> None:
+        add(
+            split_regime_neighbors_v1(
+                state,
+                planning_grid_seconds=planning_grid_seconds,
+                floor_headway_minutes=floor_headway_minutes,
+                evidence_code=evidence.code,
+                priority=0,
+                affected_indices=regime_indices,
+                split_boundary_seconds=split_boundaries,
+            )
         )
-    )
-    add(
-        split_regime_neighbors_v1(
-            state,
-            planning_grid_seconds=planning_grid_seconds,
-            floor_headway_minutes=floor_headway_minutes,
-            evidence_code=(
-                LARGEST_SERVICE_FREQUENCY_JUMP
-                if LARGEST_SERVICE_FREQUENCY_JUMP in codes
-                else evidence_code
-            ),
-            priority=0 if LARGEST_SERVICE_FREQUENCY_JUMP in codes else 3,
+        for operator in (shift_boundary_left_neighbors_v1, shift_boundary_right_neighbors_v1):
+            add(
+                operator(
+                    state,
+                    planning_grid_seconds=planning_grid_seconds,
+                    floor_headway_minutes=floor_headway_minutes,
+                    evidence_code=evidence.code,
+                    priority=0,
+                    affected_indices=pair_indices,
+                )
+            )
+        for operator in (
+            move_one_trip_left_to_right_neighbors_v1,
+            move_one_trip_right_to_left_neighbors_v1,
+        ):
+            add(
+                operator(
+                    state,
+                    floor_headway_minutes=floor_headway_minutes,
+                    evidence_code=evidence.code,
+                    priority=0,
+                    affected_indices=pair_indices,
+                )
+            )
+
+    def add_global(evidence_code: str | None, *, targeted: bool) -> None:
+        common_priority = 0 if targeted else 2
+        add(
+            merge_adjacent_neighbors_v1(
+                state,
+                floor_headway_minutes=floor_headway_minutes,
+                evidence_code=evidence_code,
+                priority=3,
+            )
         )
-    )
-    shift_priority = (
-        0
-        if codes
-        & {CLEAN_BOUNDARY_UNCOMPILABLE, LARGEST_SERVICE_FREQUENCY_JUMP, FLEET_LIMIT_EXCEEDED}
-        else 2
-    )
-    add(
-        shift_boundary_left_neighbors_v1(
-            state,
-            planning_grid_seconds=planning_grid_seconds,
-            floor_headway_minutes=floor_headway_minutes,
-            evidence_code=evidence_code,
-            priority=shift_priority,
+        add(
+            split_regime_neighbors_v1(
+                state,
+                planning_grid_seconds=planning_grid_seconds,
+                floor_headway_minutes=floor_headway_minutes,
+                evidence_code=evidence_code,
+                priority=3,
+            )
         )
-    )
-    add(
-        shift_boundary_right_neighbors_v1(
-            state,
-            planning_grid_seconds=planning_grid_seconds,
-            floor_headway_minutes=floor_headway_minutes,
-            evidence_code=evidence_code,
-            priority=shift_priority,
+        for operator in (shift_boundary_left_neighbors_v1, shift_boundary_right_neighbors_v1):
+            add(
+                operator(
+                    state,
+                    planning_grid_seconds=planning_grid_seconds,
+                    floor_headway_minutes=floor_headway_minutes,
+                    evidence_code=evidence_code,
+                    priority=common_priority,
+                )
+            )
+        for operator in (
+            move_one_trip_left_to_right_neighbors_v1,
+            move_one_trip_right_to_left_neighbors_v1,
+        ):
+            add(
+                operator(
+                    state,
+                    floor_headway_minutes=floor_headway_minutes,
+                    evidence_code=evidence_code,
+                    priority=common_priority,
+                )
+            )
+        add(
+            tail_absorb_one_neighbors_v1(
+                state,
+                floor_headway_minutes=floor_headway_minutes,
+                evidence_code=evidence_code,
+                priority=3,
+            )
         )
-    )
-    move_priority = (
-        0
-        if codes
-        & {
-            CLEAN_BOUNDARY_UNCOMPILABLE,
-            LARGEST_SERVICE_FREQUENCY_JUMP,
-            FLEET_LIMIT_EXCEEDED,
-            DEMAND_UNDERSERVED_INTERVAL,
-            DEMAND_OVERSERVED_INTERVAL,
-        }
-        else 2
-    )
-    add(
-        move_one_trip_left_to_right_neighbors_v1(
-            state,
-            floor_headway_minutes=floor_headway_minutes,
-            evidence_code=evidence_code,
-            priority=move_priority,
+        add(
+            tail_release_one_neighbors_v1(
+                state,
+                floor_headway_minutes=floor_headway_minutes,
+                evidence_code=evidence_code,
+                priority=3,
+            )
         )
-    )
-    add(
-        move_one_trip_right_to_left_neighbors_v1(
-            state,
-            floor_headway_minutes=floor_headway_minutes,
-            evidence_code=evidence_code,
-            priority=move_priority,
-        )
-    )
-    add(
-        tail_absorb_one_neighbors_v1(
-            state,
-            floor_headway_minutes=floor_headway_minutes,
-            evidence_code=(TAIL_UNDER_SERVICE if TAIL_UNDER_SERVICE in codes else evidence_code),
-            priority=0 if TAIL_UNDER_SERVICE in codes else 3,
-        )
-    )
-    add(
-        tail_release_one_neighbors_v1(
-            state,
-            floor_headway_minutes=floor_headway_minutes,
-            evidence_code=(TAIL_OVER_SERVICE if TAIL_OVER_SERVICE in codes else evidence_code),
-            priority=0 if TAIL_OVER_SERVICE in codes else 3,
-        )
-    )
+
+    if not feedback:
+        add_global(None, targeted=False)
+    for evidence in feedback:
+        if evidence.code == REDUNDANT_SERVICE_BOUNDARY:
+            boundary_index = _nearest_state_boundary_index(
+                state, evidence.boundary_time, evidence.regime_index
+            )
+            if boundary_index is not None:
+                add(
+                    merge_adjacent_neighbors_v1(
+                        state,
+                        floor_headway_minutes=floor_headway_minutes,
+                        evidence_code=evidence.code,
+                        priority=0,
+                        affected_indices=(boundary_index,),
+                    )
+                )
+        elif evidence.code == LARGEST_SERVICE_FREQUENCY_JUMP:
+            boundary_index = _nearest_state_boundary_index(
+                state, evidence.boundary_time, evidence.regime_index
+            )
+            if boundary_index is not None:
+                add_local_revision(
+                    evidence,
+                    regime_indices=(boundary_index, boundary_index + 1),
+                    pair_indices=(boundary_index,),
+                )
+        elif evidence.code in {DEMAND_UNDERSERVED_INTERVAL, DEMAND_OVERSERVED_INTERVAL}:
+            core = _overlapping_state_regime_indices(
+                state, evidence.interval_start, evidence.interval_end
+            )
+            if core:
+                regimes, pairs = _local_regime_and_pair_indices(state, core)
+                add_local_revision(evidence, regime_indices=core, pair_indices=pairs)
+        elif evidence.code == DEMAND_RESPONSE_DIRECTION_MISMATCH:
+            boundary = evidence.boundary_time
+            if boundary is None:
+                continue
+            nearest = _nearest_state_boundary_index(state, boundary, evidence.regime_index)
+            if nearest is not None and state.boundaries[nearest] == boundary:
+                add_local_revision(
+                    evidence,
+                    regime_indices=(nearest, nearest + 1),
+                    pair_indices=(nearest,),
+                )
+            else:
+                containing = next(
+                    (
+                        index
+                        for index, regime in enumerate(state.service_regimes)
+                        if regime.start < boundary < regime.end
+                    ),
+                    None,
+                )
+                if containing is not None:
+                    adjacent_pairs = tuple(
+                        index
+                        for index in (containing - 1, containing)
+                        if 0 <= index < len(state.service_regimes) - 1
+                    )
+                    add_local_revision(
+                        evidence,
+                        regime_indices=(containing,),
+                        pair_indices=adjacent_pairs,
+                        split_boundaries=(boundary,),
+                    )
+        elif evidence.code == TAIL_UNDER_SERVICE:
+            add(
+                tail_absorb_one_neighbors_v1(
+                    state,
+                    floor_headway_minutes=floor_headway_minutes,
+                    evidence_code=evidence.code,
+                    priority=0,
+                )
+            )
+        elif evidence.code == TAIL_OVER_SERVICE:
+            add(
+                tail_release_one_neighbors_v1(
+                    state,
+                    floor_headway_minutes=floor_headway_minutes,
+                    evidence_code=evidence.code,
+                    priority=0,
+                )
+            )
+        elif evidence.code == FLEET_LIMIT_EXCEEDED:
+            add_global(evidence.code, targeted=True)
+        else:
+            core = _overlapping_state_regime_indices(
+                state, evidence.interval_start, evidence.interval_end
+            )
+            if core:
+                _, pairs = _local_regime_and_pair_indices(state, core)
+                add_local_revision(evidence, regime_indices=core, pair_indices=pairs)
+            else:
+                add_global(evidence.code, targeted=True)
     move_rank = {move: index for index, move in enumerate(ServicePlanMoveV1)}
     unique: dict[str, ServicePlanNeighborV1] = {}
     for neighbor in all_neighbors:
@@ -786,6 +1283,33 @@ def _retain_directional_archive(
         selected.append(candidate)
         selected_fingerprints.add(candidate.compile_variant.compilation_fingerprint)
         state_candidates.remove(candidate)
+
+    # With capacity left after state diversity, retain exact wait and sqrt-response anchors.
+    anchor_order = (
+        min(
+            ordered,
+            key=lambda item: (
+                item.metrics.demand_weighted_expected_passenger_wait_minutes,
+                _directional_local_quality_key(item),
+            ),
+        ),
+        min(
+            ordered,
+            key=lambda item: (
+                math.inf
+                if item.metrics.sqrt_seed_response_deviation is None
+                else item.metrics.sqrt_seed_response_deviation,
+                _directional_local_quality_key(item),
+            ),
+        ),
+    )
+    for candidate in anchor_order:
+        fingerprint = candidate.compile_variant.compilation_fingerprint
+        if len(selected) >= limit:
+            break
+        if fingerprint not in selected_fingerprints:
+            selected.append(candidate)
+            selected_fingerprints.add(fingerprint)
 
     # Use remaining slots for phase-distinct variants, again by exact max-min distance.
     remaining = [
@@ -1030,6 +1554,11 @@ def search_route_service_plans_v1(
                 variant,
                 demand_buckets=context.demand_buckets[state.direction],
                 scenario_b_departures=context.scenario_b_departures[state.direction],
+                demand_response_regimes=(
+                    None
+                    if context.demand_response_regimes is None
+                    else context.demand_response_regimes[state.direction]
+                ),
             )
             feedback_counts.update(item.code for item in feedback)
             direction_feedback.extend(feedback)
@@ -1262,6 +1791,80 @@ def build_initial_service_plan_seeds_v1(
     return tuple(ordered)
 
 
+def load_canonical_demand_response_regimes_v1(
+    *,
+    demand_payload: Mapping[str, Any],
+    demand_buckets: Mapping[str, Sequence[DemandBucketEvidenceV1]],
+    endpoint_authority: Mapping[str, OperationalEndpointAuthorityV1],
+) -> dict[str, tuple[DemandResponseRegimeEvidenceV1, ...]]:
+    """Load already-selected canonical DemandRegimes without rerunning model selection."""
+
+    try:
+        selections = demand_payload["model_selection"]["selections"]
+    except (KeyError, TypeError) as exc:
+        raise ValueError("canonical DemandRegime selections are missing") from exc
+    by_direction: dict[str, Mapping[str, Any]] = {}
+    for selection in selections:
+        direction = str(selection.get("direction", ""))
+        if direction in by_direction:
+            raise ValueError(f"duplicate canonical DemandRegime selection for {direction}")
+        if direction not in {"outbound", "inbound"}:
+            raise ValueError(f"unsupported canonical DemandRegime direction: {direction}")
+        if selection.get("selection_status") != "SUCCESS":
+            raise ValueError(f"canonical DemandRegime selection failed for {direction}")
+        by_direction[direction] = selection
+    expected_directions = {"outbound", "inbound"}
+    if set(by_direction) != expected_directions:
+        raise ValueError("canonical DemandRegime evidence must contain both independent directions")
+
+    result: dict[str, tuple[DemandResponseRegimeEvidenceV1, ...]] = {}
+    for direction in sorted(expected_directions):
+        endpoint = endpoint_authority[direction]
+        buckets = demand_buckets[direction]
+        evidence: list[DemandResponseRegimeEvidenceV1] = []
+        raw_regimes = by_direction[direction].get("final_plan", {}).get("regimes", ())
+        for raw in raw_regimes:
+            if str(raw.get("direction")) != direction:
+                raise ValueError(f"canonical DemandRegime direction mismatch for {direction}")
+            start = max(int(raw["start_time"]), endpoint.fixed_first_departure)
+            end = min(int(raw["end_time"]), endpoint.fixed_last_departure)
+            if end <= start:
+                continue
+            mass = sum(
+                bucket.observed_demand
+                * _overlap(bucket.start, bucket.end, start, end)
+                / (bucket.end - bucket.start)
+                for bucket in buckets
+            )
+            evidence.append(
+                DemandResponseRegimeEvidenceV1(
+                    regime_id=str(raw["regime_id"]),
+                    direction=direction,
+                    start=start,
+                    end=end,
+                    integrated_demand_mass=mass,
+                    demand_rate_per_hour=mass / ((end - start) / 3600),
+                )
+            )
+        ordered = tuple(sorted(evidence, key=lambda item: (item.start, item.end, item.regime_id)))
+        if not ordered:
+            raise ValueError(f"no canonical DemandRegime overlaps active {direction} service")
+        if len({item.regime_id for item in ordered}) != len(ordered):
+            raise ValueError(f"canonical DemandRegime IDs are not unique for {direction}")
+        if (
+            ordered[0].start != endpoint.fixed_first_departure
+            or ordered[-1].end != endpoint.fixed_last_departure
+            or any(
+                left.end != right.start for left, right in zip(ordered, ordered[1:], strict=False)
+            )
+        ):
+            raise ValueError(
+                f"canonical DemandRegime evidence does not cover exact {direction} service span"
+            )
+        result[direction] = ordered
+    return result
+
+
 def load_route_coordinator_inputs_v1(
     *,
     repo_root: Path,
@@ -1326,13 +1929,19 @@ def load_route_coordinator_inputs_v1(
     grid_minutes = min(
         int(item["bucket_granularity_minutes"]) for item in demand["model_selection"]["coverage"]
     )
+    frozen_buckets = {
+        key: tuple(sorted(value, key=lambda item: item.start)) for key, value in buckets.items()
+    }
+    response_regimes = load_canonical_demand_response_regimes_v1(
+        demand_payload=demand,
+        demand_buckets=frozen_buckets,
+        endpoint_authority=endpoints,
+    )
     context = RouteCoordinatorContextV1(
         route_id=route_id,
         route_name=str(allocation["route_name"]),
         endpoint_authority=endpoints,
-        demand_buckets={
-            key: tuple(sorted(value, key=lambda item: item.start)) for key, value in buckets.items()
-        },
+        demand_buckets=frozen_buckets,
         scenario_b_departures=b_departures,
         seed_headway_prior_minutes=seed_priors,
         planning_grid_seconds=grid_minutes * 60,
@@ -1340,6 +1949,7 @@ def load_route_coordinator_inputs_v1(
         minimum_layover_minutes=int(end_tail_route["minimum_layover_minutes"]),
         fleet_ceiling=int(end_tail_route["fleet_ceiling"]),
         immutable_demand_sha256=_sha256(demand_path),
+        demand_response_regimes=response_regimes,
     )
     seeds = build_initial_service_plan_seeds_v1(
         route_id=route_id,
@@ -1431,8 +2041,8 @@ def _result_markdown(payload: Mapping[str, Any]) -> str:
         "",
         "## Nondominated operating pairs",
         "",
-        "| Plan | Out service regimes | In service regimes | Demand mismatch | Max frequency jump | Total variation | Moved trips | Fleet | Terminal wait |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Plan | Out service regimes | In service regimes | Demand mismatch | Expected wait | Max frequency jump | Total variation | Moved trips | Fleet | Terminal wait |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for item in payload["pareto_frontier"]:
         metrics = item["metrics"]
@@ -1440,6 +2050,7 @@ def _result_markdown(payload: Mapping[str, Any]) -> str:
             f"| {item['plan']} | {item['outbound']['actual_service_metrics']['actual_service_regime_count']} "
             f"| {item['inbound']['actual_service_metrics']['actual_service_regime_count']} "
             f"| {metrics['observed_demand_mismatch']:.8f} "
+            f"| {metrics['demand_weighted_expected_passenger_wait_minutes']:.6f} "
             f"| {metrics['max_frequency_jump']:.6f} "
             f"| {metrics['total_frequency_variation']:.6f} "
             f"| {metrics['moved_trips_vs_b']} | {metrics['fleet_required']} "
@@ -1560,6 +2171,14 @@ def route_result_payload_v1(
         "route_name": context.route_name,
         "status": result.status,
         "immutable_demand_sha256": context.immutable_demand_sha256,
+        "canonical_demand_response_regimes": (
+            None
+            if context.demand_response_regimes is None
+            else {
+                direction: [asdict(item) for item in context.demand_response_regimes[direction]]
+                for direction in sorted(context.demand_response_regimes)
+            }
+        ),
         "seed_headway_prior_minutes": dict(sorted(context.seed_headway_prior_minutes.items())),
         "protected_service_authority": {
             "status": result.protection_authority_validation.status,
@@ -1634,7 +2253,8 @@ def route_result_payload_v1(
             ],
             "ordering_after_dominance": (
                 "not applicable pre-fleet; bounded order is compiler witness, local-quality "
-                "anchor, state/headway-shape diversity, exact-departure max-min distance"
+                "anchor, state/headway-shape diversity, exact-wait and sqrt-response anchors, "
+                "exact-departure max-min distance"
             ),
             "pre_fleet_dominance_authority": False,
             "fleet_every_retained_variant": True,
@@ -1646,10 +2266,19 @@ def route_result_payload_v1(
             "frequency_jump": "abs(log((60/h_right)/(60/h_left)))",
             "total_variation": "sum(frequency_jump)",
             "moved_trips_vs_B": ("sum(abs(compiled_30m_count - exact_B_30m_count))/2"),
+            "demand_weighted_expected_passenger_wait_minutes": (
+                "exact integral of next-departure wait under "
+                f"{UNIFORM_WITHIN_DEMAND_BUCKET_ASSUMPTION}"
+            ),
+            "demand_response_projection": (
+                "overlap-weighted integral of exact interdeparture frequency on immutable "
+                "canonical DemandRegimes"
+            ),
             "terminal_wait": "sum/max(connection_layover - authoritative_minimum_layover)",
         },
         "pareto_dimensions": [
             "observed_demand_mismatch",
+            "demand_weighted_expected_passenger_wait_minutes",
             "actual_service_regime_count",
             "max_frequency_jump",
             "total_frequency_variation",
@@ -1666,6 +2295,7 @@ def route_result_payload_v1(
             TAIL_UNDER_SERVICE,
             DEMAND_UNDERSERVED_INTERVAL,
             DEMAND_OVERSERVED_INTERVAL,
+            DEMAND_RESPONSE_DIRECTION_MISMATCH,
             FIXED_ENDPOINT_CONFLICT,
         ],
         "targeted_neighbor_logic": {
@@ -1692,6 +2322,15 @@ def route_result_payload_v1(
             ],
             TAIL_OVER_SERVICE: ["TAIL_RELEASE_ONE"],
             TAIL_UNDER_SERVICE: ["TAIL_ABSORB_ONE"],
+            DEMAND_UNDERSERVED_INTERVAL: [
+                "localized split, shift, and one-trip moves around the diagnosed interval"
+            ],
+            DEMAND_OVERSERVED_INTERVAL: [
+                "localized split, shift, and one-trip moves around the diagnosed interval"
+            ],
+            DEMAND_RESPONSE_DIRECTION_MISMATCH: [
+                "localized split, shift, and one-trip moves around the canonical boundary"
+            ],
         },
         "queue_ordering": (
             "feedback/operator priority, estimated immutable-bucket mismatch, regime count, "
@@ -1763,9 +2402,13 @@ __all__ = [
     "CoordinatorSearchBudgetV1",
     "CoordinatorSearchStatisticsV1",
     "DEMAND_OVERSERVED_INTERVAL",
+    "DEMAND_RESPONSE_DIRECTION_MISMATCH",
     "DEMAND_UNDERSERVED_INTERVAL",
     "DEFAULT_COORDINATOR_SEARCH_BUDGET_V1",
     "DemandBucketEvidenceV1",
+    "DemandResponseRegimeEvidenceV1",
+    "DemandResponseRegimeProjectionV1",
+    "DemandResponseTransitionV1",
     "FLEET_LIMIT_EXCEEDED",
     "FeedbackEvidenceV1",
     "LARGEST_SERVICE_FREQUENCY_JUMP",
@@ -1780,10 +2423,13 @@ __all__ = [
     "TAIL_OVER_SERVICE",
     "TAIL_UNDER_SERVICE",
     "build_initial_service_plan_seeds_v1",
+    "demand_response_diagnostics_v1",
     "dominates_operating_pair_v1",
     "evaluate_actual_service_v1",
     "evaluate_operating_pair_v1",
+    "expected_passenger_wait_metrics_v1",
     "generate_targeted_neighbors_v1",
+    "load_canonical_demand_response_regimes_v1",
     "load_route_coordinator_inputs_v1",
     "route_result_payload_v1",
     "run_service_plan_coordinator_pilot_v1",

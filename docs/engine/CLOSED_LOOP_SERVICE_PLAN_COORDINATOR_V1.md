@@ -12,8 +12,8 @@ DAILY_VALIDATED DemandRegime evidence (immutable)
   -> frozen ServicePlanStateV1 (boundaries + integer counts)
   -> bounded CleanCompileFrontierV1
   -> exact-timestamp protected-window validation, when evidence-bound authority exists
-  -> unchanged exact-timetable fleet validator for every retained pair
   -> actual compiled-service metrics and structured feedback
+  -> unchanged exact-timetable fleet validator for every retained pair
   -> explicit finite neighbors
   -> feasible operating-pair Pareto frontier
 ```
@@ -24,6 +24,15 @@ history, feedback, and seed labels are deliberately excluded. A fingerprint is e
 once.
 
 The coordinator keeps three concepts separate:
+
+The immutable evidence now includes both the original DAILY_VALIDATED demand buckets and the
+already-selected canonical `DemandRegime` windows. Canonical regime IDs, directions, windows,
+integrated demand mass, and demand rate are loaded from the frozen Route 6/10 model-selection
+artifacts. The coordinator does not rerun detection or select K. These facts never contain mutable
+service results. `ServicePlanStateV1` and its compiled `ServiceRegime` realization remain the
+mutable decision side of the boundary. A pilot route with missing, failed, mixed-direction,
+non-contiguous, or incomplete canonical evidence fails closed; generic synthetic contexts may
+explicitly omit response evidence and then expose no response diagnostics.
 
 ### Hard authority
 
@@ -89,6 +98,15 @@ redistribution of the two affected regimes. Every regime retains at least two tr
 preserves the authoritative direction total. The generic helpers remain backward compatible with
 callers that intentionally provide a headway floor, but this coordinator passes no global floor.
 
+Structured feedback location now constrains those same operators. A redundant boundary can only
+request that boundary's merge. Frequency-jump feedback touches only the adjacent ServicePlan
+regimes. Demand under/over feedback touches regimes overlapping the diagnosed interval and their
+immediate donors. A canonical response boundary inside a ServiceRegime targets that regime's local
+split and adjacent revision opportunities; an existing ServicePlan boundary targets only its two
+adjacent regimes. Tail feedback remains tail-local, while fleet feedback remains globally
+informative because feasibility is cross-directional. Fingerprint deduplication and deterministic
+ordering are unchanged, and localization does not increase the neighbor bound.
+
 ## Compilation frontier
 
 The legacy clean compiler's feasible path is retained as a mandatory witness, followed by a local-
@@ -101,6 +119,9 @@ safeguards, not transport policy or mathematical dominance.
 Every emitted timetable preserves the fixed first/last departures and exact state total, uses
 whole-minute internal headways, has boundary gap `g in {h_left, h_right}`, merges continuous equal
 rhythms, and has no transition headway/category.
+
+These clean-boundary compiler semantics are unchanged. Arithmetic settlement, the Route 6
+14-minute boundary residual, and a `TRANSITION` ServiceRegime remain out of scope.
 
 ## Actual-service metrics
 
@@ -116,15 +137,44 @@ total variation = sum(frequency jump_i)
 moved trips vs B = sum(abs(compiled bucket count - exact B bucket count)) / 2
 ```
 
-It also records actual ServiceRegime count, tail service/debt, fleet requirement, and total/maximum
-connection layover above the authoritative minimum.
+Expected passenger wait is integrated from exact timestamps. For every interdeparture interval
+`[d_i, d_(i+1))`, an arrival at `t` waits `d_(i+1) - t`; piecewise-constant demand intensity is
+integrated over exact overlap with each immutable demand bucket. The only passenger-arrival model
+is `UNIFORM_WITHIN_DEMAND_BUCKET_ASSUMPTION`. The active span is the exact fixed first-to-last
+departure span. The evaluator reports demand-weighted expected wait, maximum bucket expected wait,
+the deterministic per-bucket tuple, and active demand mass. It does not approximate wait as
+ServiceRegime headway divided by two.
+
+Exact interdeparture frequency is also projected by temporal overlap onto every canonical
+DemandRegime, independently of ServiceRegime boundaries. Adjacent canonical regimes expose
+`delta_log_demand`, `delta_log_service`, demand/service direction, direction alignment, the
+`0.5 * delta_log_demand` sqrt benchmark, and its residual. Schedule diagnostics include direction
+accuracy, transition/aligned counts, and sqrt-response deviation. Sqrt demand remains benchmark
+and seed semantics only: it is not protection, validity, a required elasticity, or a production
+Pareto dimension.
+
+At most one `DEMAND_RESPONSE_DIRECTION_MISMATCH` is emitted per exact direction when service is
+flat or opposite to an UP/DOWN demand transition. The chosen transition maximizes absolute sqrt
+residual, then absolute demand contrast, with stable time/regime-ID tie-breaks. A correctly directed
+response is not called a mismatch merely because its amplitude differs from sqrt demand, and a
+mismatch remains revision evidence rather than a validity failure.
+
+Demand under/over feedback is emitted as a pair only when theoretically transferring one service
+share quantum `q = 1 / exact_departure_count` from the selected overserved bucket to the selected
+underserved bucket strictly reduces their squared mismatch beyond numerical epsilon. Tail
+under/over feedback likewise requires adding/removing one trip share to reduce tail mismatch.
+These checks establish discrete actionability only; the normal compile/evaluate loop remains the
+authority on whether a local ServicePlan move is feasible.
 
 ## Pairing and Pareto rule
 
 Outbound and inbound modes are independent. Every new directional compilation is paired with the
 bounded phase-diverse archive for the opposite direction before its own archive is compacted.
 Directional demand, regularity, movement, quantization, and phase-quality metrics order retention
-but are not cross-direction dominance authority. The existing fixed-timetable validator is called
+but are not cross-direction dominance authority. When archive capacity remains after state
+diversity, deterministic anchors retain the lowest exact passenger wait and lowest sqrt-response
+deviation before remaining exact-phase max-min selection. These anchors are retention diversity,
+not dominance or validity. The existing fixed-timetable validator is called
 without moving departures, repairing headways, inventing deadheads, or changing runtime/layover
 authority. Final fleet feasibility is determined only after pairing exact outbound and inbound
 timetables.
@@ -132,12 +182,16 @@ timetables.
 Fleet-feasible pairs are nondominated over:
 
 1. observed-demand mismatch;
-2. actual ServiceRegime count;
-3. maximum frequency jump;
-4. total frequency variation;
-5. moved trips versus exact Scenario B;
-6. fleet required;
-7. total excess terminal wait.
+2. demand-weighted expected passenger wait, combined across directions by active demand mass;
+3. actual ServiceRegime count;
+4. maximum frequency jump;
+5. total frequency variation;
+6. moved trips versus exact Scenario B;
+7. fleet required;
+8. total excess terminal wait.
+
+Gamma, rank correlation, peak/low ratio, direction accuracy, and sqrt-response deviation are not
+additional Pareto dimensions in V1.
 
 No weighted scalar objective selects a timetable.
 

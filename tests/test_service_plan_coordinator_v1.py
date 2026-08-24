@@ -50,13 +50,19 @@ from bus_schedule_engine.protected_service_floor_enforcement import (
 )
 from bus_schedule_engine.service_plan_coordinator import (
     CLEAN_BOUNDARY_UNCOMPILABLE,
+    DEFAULT_COORDINATOR_SEARCH_BUDGET_V1,
+    DEMAND_OVERSERVED_INTERVAL,
+    DEMAND_RESPONSE_DIRECTION_MISMATCH,
+    DEMAND_UNDERSERVED_INTERVAL,
     FLEET_LIMIT_EXCEEDED,
     LARGEST_SERVICE_FREQUENCY_JUMP,
     REDUNDANT_SERVICE_BOUNDARY,
     SEARCH_BUDGET_EXHAUSTED,
     TAIL_OVER_SERVICE,
+    TAIL_UNDER_SERVICE,
     CoordinatorSearchBudgetV1,
     DemandBucketEvidenceV1,
+    DemandResponseRegimeEvidenceV1,
     DirectionalCompilationCandidateV1,
     FeedbackEvidenceV1,
     OperatingPairCandidateV1,
@@ -64,7 +70,10 @@ from bus_schedule_engine.service_plan_coordinator import (
     RouteCoordinatorContextV1,
     dominates_operating_pair_v1,
     evaluate_actual_service_v1,
+    evaluate_operating_pair_v1,
+    expected_passenger_wait_metrics_v1,
     generate_targeted_neighbors_v1,
+    load_route_coordinator_inputs_v1,
     route_result_payload_v1,
     search_route_service_plans_v1,
     update_operating_pair_pareto_v1,
@@ -195,6 +204,36 @@ def _pair(pair_id: str, values: tuple[float | int, ...]) -> OperatingPairCandida
     )
 
 
+def _variant_with_departures(departures: tuple[int, ...], direction: str = "outbound"):
+    base = _compile(_state(direction), limit=1).variants[0]
+    return dataclasses.replace(
+        base,
+        compilation_fingerprint=f"synthetic-{direction}-{departures}",
+        compilation=dataclasses.replace(base.compilation, exact_departures=departures),
+    )
+
+
+def _response_evidence(
+    rates: tuple[float, ...],
+    *,
+    direction: str = "outbound",
+    boundaries: tuple[int, ...] = (0, 1200, 2400, 3600),
+) -> tuple[DemandResponseRegimeEvidenceV1, ...]:
+    return tuple(
+        DemandResponseRegimeEvidenceV1(
+            regime_id=f"D-{direction}-{index}",
+            direction=direction,
+            start=start,
+            end=end,
+            integrated_demand_mass=rate * (end - start) / 3600,
+            demand_rate_per_hour=rate,
+        )
+        for index, (start, end, rate) in enumerate(
+            zip(boundaries[:-1], boundaries[1:], rates, strict=True)
+        )
+    )
+
+
 def _directional_record(
     state: ServicePlanStateV1,
     variant,
@@ -303,13 +342,20 @@ def test_protected_peak_rejects_exact_candidate_before_fleet_while_tail_stays_fr
         )
 
     fleet_calls = 0
+    scored_directions: list[str] = []
+    real_evaluate = coordinator.evaluate_actual_service_v1
 
     def unexpected_fleet(**_kwargs):
         nonlocal fleet_calls
         fleet_calls += 1
         raise AssertionError("protected rejection must occur before fleet validation")
 
+    def recording_evaluate(candidate, **kwargs):
+        scored_directions.append(candidate.compilation.direction)
+        return real_evaluate(candidate, **kwargs)
+
     monkeypatch.setattr(coordinator, "validate_fleet_combination_v1", unexpected_fleet)
+    monkeypatch.setattr(coordinator, "evaluate_actual_service_v1", recording_evaluate)
     result = search_route_service_plans_v1(
         context=_context(seed_prior=15.0, protection=_protection_authority()),
         seeds=(outbound_state, inbound_state),
@@ -318,6 +364,7 @@ def test_protected_peak_rejects_exact_candidate_before_fleet_while_tail_stays_fr
     )
 
     assert fleet_calls == 0
+    assert "outbound" not in scored_directions
     assert result.statistics.protected_compile_variants_rejected == 1
     assert {item.source_regime_id for item in result.protection_violations} == {"PEAK-OUTBOUND-1"}
     assert {item.violated_rule for item in result.protection_violations} >= {
@@ -767,15 +814,15 @@ def test_tail_over_service_generates_release_proposal() -> None:
 
 
 def test_dominated_candidate_is_removed_from_pareto() -> None:
-    better = _pair("better", (1.0, 2, 0.1, 0.2, 1, 3, 4))
-    worse = _pair("worse", (2.0, 3, 0.2, 0.3, 2, 4, 5))
+    better = _pair("better", (1.0, 5.0, 2, 0.1, 0.2, 1, 3, 4))
+    worse = _pair("worse", (2.0, 6.0, 3, 0.2, 0.3, 2, 4, 5))
     assert dominates_operating_pair_v1(better, worse)
     assert update_operating_pair_pareto_v1((worse,), better) == (better,)
 
 
 def test_nondominated_tradeoff_candidates_survive() -> None:
-    demand_best = _pair("demand", (1.0, 3, 0.2, 0.3, 2, 4, 5))
-    fleet_best = _pair("fleet", (2.0, 2, 0.1, 0.2, 1, 3, 4))
+    demand_best = _pair("demand", (1.0, 5.0, 3, 0.2, 0.3, 2, 4, 5))
+    fleet_best = _pair("fleet", (2.0, 6.0, 2, 0.1, 0.2, 1, 3, 4))
     frontier = update_operating_pair_pareto_v1((demand_best,), fleet_best)
     assert {item.pair_fingerprint for item in frontier} == {"demand", "fleet"}
 
@@ -874,3 +921,399 @@ def test_compile_failure_feedback_keeps_search_finite() -> None:
     )
     assert result.statistics.states_evaluated <= 3
     assert CLEAN_BOUNDARY_UNCOMPILABLE in result.feedback_code_counts
+
+
+def test_exact_expected_wait_integral_for_uniform_bucket() -> None:
+    wait, maximum, per_bucket, mass = expected_passenger_wait_metrics_v1(
+        (0, 600, 1200),
+        (DemandBucketEvidenceV1("outbound", 0, 1200, 20.0),),
+    )
+    assert wait == pytest.approx(5.0)
+    assert maximum == pytest.approx(5.0)
+    assert per_bucket == pytest.approx((5.0,))
+    assert mass == pytest.approx(20.0)
+
+
+def test_same_bucket_counts_can_have_different_exact_wait_and_pareto_quality() -> None:
+    buckets = (
+        DemandBucketEvidenceV1("outbound", 0, 1800, 10.0),
+        DemandBucketEvidenceV1("outbound", 1800, 3600, 10.0),
+    )
+    regular = _variant_with_departures((0, 600, 1200, 1800, 2400, 3000, 3600))
+    uneven = _variant_with_departures((0, 300, 1500, 1800, 2100, 3300, 3600))
+    regular_metrics, _ = evaluate_actual_service_v1(
+        regular, demand_buckets=buckets, scenario_b_departures=regular.compilation.exact_departures
+    )
+    uneven_metrics, _ = evaluate_actual_service_v1(
+        uneven, demand_buckets=buckets, scenario_b_departures=regular.compilation.exact_departures
+    )
+    assert regular_metrics.bucket_service_counts == uneven_metrics.bucket_service_counts
+    assert regular_metrics.observed_demand_mismatch == pytest.approx(
+        uneven_metrics.observed_demand_mismatch
+    )
+    assert regular_metrics.demand_weighted_expected_passenger_wait_minutes < (
+        uneven_metrics.demand_weighted_expected_passenger_wait_minutes
+    )
+
+    lower_wait = _pair("lower", (1.0, 5.0, 2, 0.1, 0.2, 1, 3, 4))
+    higher_wait = _pair("higher", (1.0, 7.5, 2, 0.1, 0.2, 1, 3, 4))
+    assert dominates_operating_pair_v1(lower_wait, higher_wait)
+
+
+def test_pair_expected_wait_is_weighted_by_directional_active_demand_mass() -> None:
+    outbound_state = _state("outbound")
+    inbound_state = _state("inbound")
+    outbound = _directional_record(outbound_state, _compile(outbound_state, limit=1).variants[0])
+    inbound = _directional_record(inbound_state, _compile(inbound_state, limit=1).variants[0])
+    outbound = dataclasses.replace(
+        outbound,
+        metrics=dataclasses.replace(
+            outbound.metrics,
+            demand_weighted_expected_passenger_wait_minutes=4.0,
+            active_demand_mass=10.0,
+        ),
+    )
+    inbound = dataclasses.replace(
+        inbound,
+        metrics=dataclasses.replace(
+            inbound.metrics,
+            demand_weighted_expected_passenger_wait_minutes=10.0,
+            active_demand_mass=30.0,
+        ),
+    )
+    pair, feedback = evaluate_operating_pair_v1(outbound, inbound, context=_context())
+    assert feedback == ()
+    assert pair is not None
+    assert pair.metrics.demand_weighted_expected_passenger_wait_minutes == pytest.approx(8.5)
+    assert pair.metrics.demand_weighted_expected_passenger_wait_minutes != pytest.approx(7.0)
+
+
+@pytest.mark.parametrize(
+    ("departures", "expected_feedback_count", "expected_boundary"),
+    [
+        ((0, 600, 1200, 1500, 1800, 2100, 2400, 3000, 3600), 0, None),
+        ((0, 600, 1200, 1800, 2400, 3000, 3600), 1, 1200),
+        ((0, 300, 600, 900, 1200, 1800, 2400, 2700, 3000, 3300, 3600), 1, 1200),
+    ],
+)
+def test_response_direction_feedback_is_localized_and_not_validity(
+    departures: tuple[int, ...], expected_feedback_count: int, expected_boundary: int | None
+) -> None:
+    variant = _variant_with_departures(departures)
+    metrics, feedback = evaluate_actual_service_v1(
+        variant,
+        demand_buckets=(DemandBucketEvidenceV1("outbound", 0, 3600, 30.0),),
+        scenario_b_departures=departures,
+        demand_response_regimes=_response_evidence((10.0, 40.0, 10.0)),
+    )
+    response_feedback = tuple(
+        item for item in feedback if item.code == DEMAND_RESPONSE_DIRECTION_MISMATCH
+    )
+    assert len(response_feedback) == expected_feedback_count
+    assert metrics.demand_response_transition_count == 2
+    if response_feedback:
+        item = response_feedback[0]
+        assert item.boundary_time == expected_boundary
+        assert item.left_demand_regime_id is not None
+        assert item.right_demand_regime_id is not None
+        assert item.delta_log_demand is not None
+        assert item.delta_log_service is not None
+        assert item.expected_demand_direction in {"UP", "DOWN"}
+        assert item.observed_service_direction in {"UP", "DOWN", "FLAT"}
+        assert item.sqrt_expected_delta_log_service is not None
+        assert item.sqrt_response_residual is not None
+
+
+def test_small_correctly_directed_response_is_not_a_mismatch() -> None:
+    departures = (0, 600, 1200, 1600, 2000, 2400, 3000, 3600)
+    metrics, feedback = evaluate_actual_service_v1(
+        _variant_with_departures(departures),
+        demand_buckets=(DemandBucketEvidenceV1("outbound", 0, 3600, 30.0),),
+        scenario_b_departures=departures,
+        demand_response_regimes=_response_evidence((10.0, 40.0, 10.0)),
+    )
+    assert DEMAND_RESPONSE_DIRECTION_MISMATCH not in {item.code for item in feedback}
+    assert metrics.sqrt_seed_response_deviation is not None
+    assert metrics.sqrt_seed_response_deviation > 0
+
+
+def test_response_feedback_selects_one_deterministic_largest_severity() -> None:
+    departures = tuple(range(0, 3601, 300))
+    regimes = _response_evidence((10.0, 40.0, 20.0, 80.0), boundaries=(0, 900, 1800, 2700, 3600))
+    selected = []
+    for _ in range(10):
+        _, feedback = evaluate_actual_service_v1(
+            _variant_with_departures(departures),
+            demand_buckets=(DemandBucketEvidenceV1("outbound", 0, 3600, 30.0),),
+            scenario_b_departures=departures,
+            demand_response_regimes=regimes,
+        )
+        response = [item for item in feedback if item.code == DEMAND_RESPONSE_DIRECTION_MISMATCH]
+        assert len(response) == 1
+        selected.append((response[0].boundary_time, response[0].left_demand_regime_id))
+    assert set(selected) == {(900, "D-outbound-0")}
+
+
+def _multi_regime_state() -> ServicePlanStateV1:
+    return ServicePlanStateV1(
+        route_id="X",
+        direction="outbound",
+        fixed_first_departure=0,
+        fixed_last_departure=3540,
+        service_regimes=tuple(
+            ServiceRegimeDecisionV1(start, start + 900, 4) for start in (0, 900, 1800, 2700)
+        ),
+        seed_id="MULTI",
+    )
+
+
+def test_redundant_boundary_generates_only_the_diagnosed_merge() -> None:
+    neighbors = generate_targeted_neighbors_v1(
+        _multi_regime_state(),
+        feedback=(FeedbackEvidenceV1(REDUNDANT_SERVICE_BOUNDARY, "outbound", boundary_time=1800),),
+        planning_grid_seconds=300,
+        floor_headway_minutes=None,
+    )
+    merges = [item for item in neighbors if item.move == ServicePlanMoveV1.MERGE_ADJACENT]
+    assert {item.affected_index for item in merges} == {1}
+    assert {item.move for item in neighbors} == {ServicePlanMoveV1.MERGE_ADJACENT}
+
+
+def test_demand_interval_neighbors_do_not_touch_distant_regimes() -> None:
+    neighbors = generate_targeted_neighbors_v1(
+        _multi_regime_state(),
+        feedback=(
+            FeedbackEvidenceV1(
+                DEMAND_UNDERSERVED_INTERVAL,
+                "outbound",
+                interval_start=900,
+                interval_end=1800,
+            ),
+        ),
+        planning_grid_seconds=300,
+        floor_headway_minutes=None,
+    )
+    assert neighbors
+    assert all(item.affected_index in {0, 1} for item in neighbors)
+    assert not any(item.affected_index >= 2 for item in neighbors)
+
+
+@pytest.mark.parametrize(
+    ("boundary", "expected_split_indices", "expected_pair_indices"),
+    [(1200, {1}, {0, 1}), (1800, {1, 2}, {1})],
+)
+def test_response_boundary_neighbors_stay_local(
+    boundary: int, expected_split_indices: set[int], expected_pair_indices: set[int]
+) -> None:
+    neighbors = generate_targeted_neighbors_v1(
+        _multi_regime_state(),
+        feedback=(
+            FeedbackEvidenceV1(
+                DEMAND_RESPONSE_DIRECTION_MISMATCH,
+                "outbound",
+                boundary_time=boundary,
+                interval_start=boundary - 300,
+                interval_end=boundary + 300,
+            ),
+        ),
+        planning_grid_seconds=300,
+        floor_headway_minutes=None,
+    )
+    split_indices = {
+        item.affected_index for item in neighbors if item.move == ServicePlanMoveV1.SPLIT_REGIME
+    }
+    pair_indices = {
+        item.affected_index
+        for item in neighbors
+        if item.move
+        in {
+            ServicePlanMoveV1.SHIFT_BOUNDARY_LEFT,
+            ServicePlanMoveV1.SHIFT_BOUNDARY_RIGHT,
+            ServicePlanMoveV1.MOVE_ONE_TRIP_LEFT_TO_RIGHT,
+            ServicePlanMoveV1.MOVE_ONE_TRIP_RIGHT_TO_LEFT,
+        }
+    }
+    assert split_indices == expected_split_indices
+    assert pair_indices == expected_pair_indices
+
+
+@pytest.mark.parametrize(
+    ("demand", "expected"),
+    [((51.0, 49.0), False), ((80.0, 20.0), True)],
+)
+def test_demand_feedback_requires_one_trip_transfer_materiality(
+    demand: tuple[float, float], expected: bool
+) -> None:
+    departures = (0, 900, 1800, 3540)
+    buckets = (
+        DemandBucketEvidenceV1("outbound", 0, 1800, demand[0]),
+        DemandBucketEvidenceV1("outbound", 1800, 3600, demand[1]),
+    )
+    _, feedback = evaluate_actual_service_v1(
+        _variant_with_departures(departures),
+        demand_buckets=buckets,
+        scenario_b_departures=departures,
+    )
+    codes = {item.code for item in feedback}
+    assert (DEMAND_UNDERSERVED_INTERVAL in codes) is expected
+    assert (DEMAND_OVERSERVED_INTERVAL in codes) is expected
+
+
+@pytest.mark.parametrize(
+    ("tail_share", "expected"),
+    [(0.68, False), (0.80, True)],
+)
+def test_tail_feedback_requires_one_trip_materiality(tail_share: float, expected: bool) -> None:
+    state = _state(first_count=2, second_count=4)
+    variant = _compile(state, limit=1).variants[0]
+    tail_start = variant.compilation.service_regimes[-1].first_departure
+    buckets = (
+        DemandBucketEvidenceV1("outbound", 0, tail_start, 1 - tail_share),
+        DemandBucketEvidenceV1("outbound", tail_start, 3600, tail_share),
+    )
+    _, feedback = evaluate_actual_service_v1(
+        variant,
+        demand_buckets=buckets,
+        scenario_b_departures=variant.compilation.exact_departures,
+    )
+    assert (TAIL_UNDER_SERVICE in {item.code for item in feedback}) is expected
+
+
+def test_response_quality_anchor_survives_when_archive_has_capacity() -> None:
+    state = _state(first_count=2, second_count=2)
+    variants = _compile(state, limit=3).variants
+    assert len(variants) == 3
+    records = [_directional_record(state, variant) for variant in variants]
+    flat = dataclasses.replace(
+        records[0],
+        metrics=dataclasses.replace(
+            records[0].metrics,
+            demand_weighted_expected_passenger_wait_minutes=1.0,
+            sqrt_seed_response_deviation=1.0,
+        ),
+    )
+    response = dataclasses.replace(
+        records[1],
+        metrics=dataclasses.replace(
+            records[1].metrics,
+            observed_demand_mismatch=records[0].metrics.observed_demand_mismatch + 10,
+            demand_weighted_expected_passenger_wait_minutes=2.0,
+            sqrt_seed_response_deviation=0.1,
+        ),
+    )
+    distractor = dataclasses.replace(
+        records[2],
+        metrics=dataclasses.replace(
+            records[2].metrics,
+            observed_demand_mismatch=records[0].metrics.observed_demand_mismatch + 20,
+            demand_weighted_expected_passenger_wait_minutes=3.0,
+            sqrt_seed_response_deviation=2.0,
+        ),
+    )
+    retained = coordinator._retain_directional_archive((distractor, response, flat), limit=2)
+    assert {item.compile_variant.compilation_fingerprint for item in retained} == {
+        flat.compile_variant.compilation_fingerprint,
+        response.compile_variant.compilation_fingerprint,
+    }
+
+
+def test_exact_wait_anchor_survives_when_archive_has_capacity() -> None:
+    state = _state(first_count=2, second_count=2)
+    variants = _compile(state, limit=3).variants
+    records = [_directional_record(state, variant) for variant in variants]
+    local = dataclasses.replace(
+        records[0],
+        metrics=dataclasses.replace(
+            records[0].metrics,
+            demand_weighted_expected_passenger_wait_minutes=3.0,
+            sqrt_seed_response_deviation=0.1,
+        ),
+    )
+    wait = dataclasses.replace(
+        records[1],
+        metrics=dataclasses.replace(
+            records[1].metrics,
+            observed_demand_mismatch=records[0].metrics.observed_demand_mismatch + 10,
+            demand_weighted_expected_passenger_wait_minutes=1.0,
+            sqrt_seed_response_deviation=1.0,
+        ),
+    )
+    distractor = dataclasses.replace(
+        records[2],
+        metrics=dataclasses.replace(
+            records[2].metrics,
+            observed_demand_mismatch=records[0].metrics.observed_demand_mismatch + 20,
+            demand_weighted_expected_passenger_wait_minutes=4.0,
+            sqrt_seed_response_deviation=2.0,
+        ),
+    )
+    retained = coordinator._retain_directional_archive((distractor, wait, local), limit=2)
+    assert {item.compile_variant.compilation_fingerprint for item in retained} == {
+        local.compile_variant.compilation_fingerprint,
+        wait.compile_variant.compilation_fingerprint,
+    }
+
+
+def test_default_search_budgets_are_unchanged() -> None:
+    assert dataclasses.asdict(DEFAULT_COORDINATOR_SEARCH_BUDGET_V1) == {
+        "max_service_plan_evaluations": 24,
+        "max_open_states": 512,
+        "max_compile_frontier_per_state": 4,
+        "max_directional_compilations": 24,
+        "max_pair_frontier": 512,
+    }
+
+
+@pytest.mark.parametrize(
+    ("route_id", "workbook_name"),
+    [
+        ("6", "Engine_Input_MST_6_V3_MultiPeriod_Mar-Jul_2026.xlsx"),
+        ("10", "Engine_Input_MST_10_V3_MultiPeriod_Mar-Jul_2026.xlsx"),
+    ],
+)
+def test_local_pilot_context_loads_canonical_response_evidence_and_compiles_smoke(
+    route_id: str, workbook_name: str
+) -> None:
+    workspace = Path(__file__).resolve().parents[1]
+    artifact_root = workspace
+    demand_path = (
+        artifact_root
+        / "outputs"
+        / "demand_regime_model_selection"
+        / f"route_{route_id}_demand_regimes.json"
+    )
+    if not demand_path.is_file():
+        artifact_root = workspace / "bus-schedule-optimizer-main-run"
+        demand_path = (
+            artifact_root
+            / "outputs"
+            / "demand_regime_model_selection"
+            / f"route_{route_id}_demand_regimes.json"
+        )
+    workbook = workspace / workbook_name
+    if not demand_path.is_file() or not workbook.is_file():
+        pytest.skip("optional frozen pilot artifacts or route workbook are unavailable")
+    context, seeds = load_route_coordinator_inputs_v1(
+        repo_root=artifact_root, route_id=route_id, workbook_path=workbook
+    )
+    assert context.demand_response_regimes is not None
+    assert set(context.demand_response_regimes) == {"outbound", "inbound"}
+    for direction in ("outbound", "inbound"):
+        regimes = context.demand_response_regimes[direction]
+        assert regimes
+        assert {item.direction for item in regimes} == {direction}
+        seed = next(item for item in seeds if item.direction == direction)
+        frontier = compile_service_plan_frontier_v1(
+            seed,
+            endpoint_authority=context.endpoint_authority[direction],
+            compile_frontier_limit=1,
+        )
+        assert frontier.variants
+        metrics, _ = evaluate_actual_service_v1(
+            frontier.variants[0],
+            demand_buckets=context.demand_buckets[direction],
+            scenario_b_departures=context.scenario_b_departures[direction],
+            demand_response_regimes=regimes,
+        )
+        assert metrics.active_demand_mass > 0
+        assert metrics.demand_response_transition_count == len(regimes) - 1
