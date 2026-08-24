@@ -37,6 +37,7 @@ from bus_schedule_engine.service_plan_coordinator import (
     TAIL_OVER_SERVICE,
     CoordinatorSearchBudgetV1,
     DemandBucketEvidenceV1,
+    DirectionalCompilationCandidateV1,
     FeedbackEvidenceV1,
     OperatingPairCandidateV1,
     OperatingPairMetricsV1,
@@ -85,7 +86,7 @@ def _authority(
     )
 
 
-def _context(*, fleet_ceiling: int = 20) -> RouteCoordinatorContextV1:
+def _context(*, fleet_ceiling: int = 20, runtime_minutes: int = 1) -> RouteCoordinatorContextV1:
     buckets = (
         DemandBucketEvidenceV1("outbound", 0, 1800, 10.0),
         DemandBucketEvidenceV1("outbound", 1800, 3600, 10.0),
@@ -105,7 +106,7 @@ def _context(*, fleet_ceiling: int = 20) -> RouteCoordinatorContextV1:
         },
         service_floor_headway_minutes={"outbound": 30.0, "inbound": 30.0},
         planning_grid_seconds=900,
-        runtime_minutes=1,
+        runtime_minutes=runtime_minutes,
         minimum_layover_minutes=1,
         fleet_ceiling=fleet_ceiling,
         immutable_demand_sha256="immutable",
@@ -144,6 +145,27 @@ def _pair(pair_id: str, values: tuple[float | int, ...]) -> OperatingPairCandida
         fleet_ceiling=99,
         minimum_connection_layover_minutes=None,
         feedback=(),
+        history=(),
+    )
+
+
+def _directional_record(
+    state: ServicePlanStateV1,
+    variant,
+    *,
+    state_fingerprint: str | None = None,
+) -> DirectionalCompilationCandidateV1:
+    metrics, feedback = evaluate_actual_service_v1(
+        variant,
+        demand_buckets=_context().demand_buckets[state.direction],
+        scenario_b_departures=_context().scenario_b_departures[state.direction],
+    )
+    return DirectionalCompilationCandidateV1(
+        state=state,
+        state_fingerprint=state_fingerprint or service_plan_fingerprint_v1(state),
+        compile_variant=variant,
+        metrics=metrics,
+        feedback=feedback,
         history=(),
     )
 
@@ -243,6 +265,115 @@ def test_compile_frontier_preserves_multiple_clean_variants() -> None:
     assert len({item.compilation_fingerprint for item in frontier.variants}) == len(
         frontier.variants
     )
+
+
+def test_compile_local_dominance_does_not_eliminate_distinct_exact_phase() -> None:
+    frontier = _compile(_state(first_count=2, second_count=3), limit=5)
+    assert len(frontier.variants) == 5
+    local_vectors = [
+        (
+            item.headway_quantization,
+            item.actual_service_regime_count,
+            item.phase_edge_quality_minutes,
+        )
+        for item in frontier.variants
+    ]
+    better = local_vectors[0]
+    worse = local_vectors[-1]
+    assert all(left <= right for left, right in zip(better, worse, strict=True))
+    assert any(left < right for left, right in zip(better, worse, strict=True))
+    assert (
+        frontier.variants[0].compilation.exact_departures
+        != frontier.variants[-1].compilation.exact_departures
+    )
+    assert frontier.variants_dominance_pruned == 0
+
+
+def test_directional_dominance_does_not_eliminate_distinct_exact_phase() -> None:
+    state = _state(first_count=2, second_count=2)
+    variants = _compile(state, limit=2).variants
+    better = _directional_record(state, variants[0])
+    worse = dataclasses.replace(
+        _directional_record(state, variants[1]),
+        metrics=dataclasses.replace(
+            better.metrics,
+            observed_demand_mismatch=better.metrics.observed_demand_mismatch + 1.0,
+            actual_service_regime_count=better.metrics.actual_service_regime_count + 1,
+            max_frequency_jump=better.metrics.max_frequency_jump + 1.0,
+            total_frequency_variation=better.metrics.total_frequency_variation + 1.0,
+            moved_trips_vs_b=better.metrics.moved_trips_vs_b + 1,
+        ),
+        compile_variant=dataclasses.replace(
+            variants[1],
+            headway_quantization=better.compile_variant.headway_quantization + 1.0,
+            phase_edge_quality_minutes=(better.compile_variant.phase_edge_quality_minutes + 1),
+        ),
+    )
+    a = coordinator._directional_vector(better)
+    b = coordinator._directional_vector(worse)
+    assert all(left <= right for left, right in zip(a, b, strict=True))
+    assert any(left < right for left, right in zip(a, b, strict=True))
+    assert (
+        better.compile_variant.compilation.exact_departures
+        != worse.compile_variant.compilation.exact_departures
+    )
+
+    retained = coordinator._retain_directional_archive((worse, better), limit=2)
+    assert [item.compile_variant.compilation_fingerprint for item in retained] == [
+        better.compile_variant.compilation_fingerprint,
+        worse.compile_variant.compilation_fingerprint,
+    ]
+
+
+def test_phase_distinct_directional_candidate_reaches_exact_fleet_validation(
+    monkeypatch,
+) -> None:
+    outbound_state = _state("outbound", first_count=2, second_count=2)
+    inbound_state = _state("inbound", first_count=2, second_count=2)
+    outbound_frontier = _compile(outbound_state, limit=8)
+    inbound_frontier = _compile(inbound_state, limit=8)
+    locally_preferred = outbound_frontier.variants[0]
+    phase_distinct = outbound_frontier.variants[1]
+    opposite = inbound_frontier.variants[0]
+    assert locally_preferred.headway_quantization < phase_distinct.headway_quantization
+
+    def compiler(state, **_kwargs):
+        variants = (
+            (locally_preferred, phase_distinct) if state.direction == "outbound" else (opposite,)
+        )
+        return SimpleNamespace(variants=variants, failure=None)
+
+    exact_validations: dict[tuple[int, ...], tuple[str, int | None]] = {}
+    exact_validator = coordinator.validate_fleet_combination_v1
+
+    def recording_validator(**kwargs):
+        validation = exact_validator(**kwargs)
+        exact_validations[kwargs["outbound"].exact_departures] = (
+            validation.status,
+            validation.fleet_requirement,
+        )
+        return validation
+
+    monkeypatch.setattr(coordinator, "validate_fleet_combination_v1", recording_validator)
+    result = search_route_service_plans_v1(
+        context=_context(fleet_ceiling=3, runtime_minutes=15),
+        seeds=(outbound_state, inbound_state),
+        budget=CoordinatorSearchBudgetV1(2, 16, 2, 2, 8),
+        compiler=compiler,
+    )
+
+    assert exact_validations[locally_preferred.compilation.exact_departures] == (
+        "FLEET_INFEASIBLE",
+        4,
+    )
+    assert exact_validations[phase_distinct.compilation.exact_departures] == (
+        "FLEET_FEASIBLE",
+        3,
+    )
+    assert result.pareto_frontier
+    assert {
+        item.outbound.compile_variant.compilation_fingerprint for item in result.pareto_frontier
+    } == {phase_distinct.compilation_fingerprint}
 
 
 def test_fleet_validation_happens_after_both_direction_compilations(monkeypatch) -> None:
@@ -381,17 +512,39 @@ def test_budget_exhaustion_returns_useful_frontier() -> None:
     assert result.pareto_frontier
 
 
-def test_one_hundred_run_search_is_deterministic() -> None:
+def test_compile_archive_and_pair_retention_are_deterministic_and_bounded() -> None:
     signatures = []
-    budget = CoordinatorSearchBudgetV1(2, 16, 2, 8, 8)
+    budget = CoordinatorSearchBudgetV1(2, 16, 4, 4, 4)
     seeds = (
         _state("outbound", first_count=2, second_count=2),
         _state("inbound", first_count=2, second_count=2),
     )
-    for _ in range(100):
+    archive_source = _compile(seeds[0], limit=8).variants[:6]
+    archive_records = tuple(
+        _directional_record(
+            seeds[0],
+            variant,
+            state_fingerprint=("STATE-0" if index < 3 else f"STATE-{index - 2}"),
+        )
+        for index, variant in enumerate(archive_source)
+    )
+    assert len(_compile(seeds[0], limit=1).variants) == 1
+    for _ in range(20):
+        compile_frontier = _compile(seeds[0], limit=budget.max_compile_frontier_per_state)
+        archive = coordinator._retain_directional_archive(
+            archive_records,
+            limit=budget.max_directional_compilations,
+        )
         result = search_route_service_plans_v1(context=_context(), seeds=seeds, budget=budget)
+        assert len(compile_frontier.variants) <= budget.max_compile_frontier_per_state
+        assert len(archive) <= budget.max_directional_compilations
+        assert len({item.state_fingerprint for item in archive}) == 4
+        assert len(result.pareto_frontier) <= budget.max_pair_frontier
+        assert result.statistics.states_evaluated <= budget.max_service_plan_evaluations
         signatures.append(
             (
+                tuple(item.compilation_fingerprint for item in compile_frontier.variants),
+                tuple(item.compile_variant.compilation_fingerprint for item in archive),
                 tuple(item.pair_fingerprint for item in result.pareto_frontier),
                 dataclasses.asdict(result.statistics),
                 result.evaluated_state_fingerprints,

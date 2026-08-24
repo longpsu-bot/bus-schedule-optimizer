@@ -702,14 +702,27 @@ def _directional_vector(item: DirectionalCompilationCandidateV1) -> tuple[float 
     )
 
 
-def _directional_dominates(
+def _directional_local_quality_key(
+    item: DirectionalCompilationCandidateV1,
+) -> tuple[Any, ...]:
+    return (
+        *_directional_vector(item),
+        item.compile_variant.compilation.exact_departures,
+        item.compile_variant.compilation_fingerprint,
+    )
+
+
+def _directional_departure_distance(
     left: DirectionalCompilationCandidateV1,
     right: DirectionalCompilationCandidateV1,
-) -> bool:
-    a = _directional_vector(left)
-    b = _directional_vector(right)
-    return all(float(x) <= float(y) + 1e-12 for x, y in zip(a, b, strict=True)) and any(
-        float(x) < float(y) - 1e-12 for x, y in zip(a, b, strict=True)
+) -> int:
+    return sum(
+        abs(a - b)
+        for a, b in zip(
+            left.compile_variant.compilation.exact_departures,
+            right.compile_variant.compilation.exact_departures,
+            strict=True,
+        )
     )
 
 
@@ -718,31 +731,58 @@ def _retain_directional_archive(
     *,
     limit: int,
 ) -> list[DirectionalCompilationCandidateV1]:
-    unique = {
-        item.compile_variant.compilation_fingerprint: item
-        for item in sorted(
-            items,
-            key=lambda value: (
-                *_directional_vector(value),
-                value.compile_variant.compilation_fingerprint,
+    """Bound an exact-compilation archive with state and phase diversity."""
+
+    if limit <= 0:
+        raise ValueError("directional archive limit must be positive")
+    unique: dict[str, DirectionalCompilationCandidateV1] = {}
+    for item in sorted(items, key=_directional_local_quality_key):
+        unique.setdefault(item.compile_variant.compilation_fingerprint, item)
+    ordered = sorted(unique.values(), key=_directional_local_quality_key)
+    if len(ordered) <= limit:
+        return ordered
+
+    selected = [ordered[0]]
+    selected_fingerprints = {ordered[0].compile_variant.compilation_fingerprint}
+
+    def select_max_min(
+        candidates: Sequence[DirectionalCompilationCandidateV1],
+    ) -> DirectionalCompilationCandidateV1:
+        return min(
+            candidates,
+            key=lambda item: (
+                -min(_directional_departure_distance(item, retained) for retained in selected),
+                _directional_local_quality_key(item),
             ),
         )
-    }
-    values = list(unique.values())
-    nondominated = [
+
+    # When capacity permits, keep the best local representative of every state first.
+    representative_by_state: dict[str, DirectionalCompilationCandidateV1] = {}
+    for candidate in ordered:
+        representative_by_state.setdefault(candidate.state_fingerprint, candidate)
+    state_candidates = [
         candidate
-        for candidate in values
-        if not any(
-            other is not candidate and _directional_dominates(other, candidate) for other in values
-        )
+        for candidate in representative_by_state.values()
+        if candidate.compile_variant.compilation_fingerprint not in selected_fingerprints
     ]
-    nondominated.sort(
-        key=lambda value: (
-            *_directional_vector(value),
-            value.compile_variant.compilation_fingerprint,
-        )
-    )
-    return nondominated[:limit]
+    while state_candidates and len(selected) < limit:
+        candidate = select_max_min(state_candidates)
+        selected.append(candidate)
+        selected_fingerprints.add(candidate.compile_variant.compilation_fingerprint)
+        state_candidates.remove(candidate)
+
+    # Use remaining slots for phase-distinct variants, again by exact max-min distance.
+    remaining = [
+        candidate
+        for candidate in ordered
+        if candidate.compile_variant.compilation_fingerprint not in selected_fingerprints
+    ]
+    while remaining and len(selected) < limit:
+        candidate = select_max_min(remaining)
+        selected.append(candidate)
+        selected_fingerprints.add(candidate.compile_variant.compilation_fingerprint)
+        remaining.remove(candidate)
+    return selected
 
 
 @dataclass(slots=True)
@@ -1383,7 +1423,7 @@ def _result_markdown(payload: Mapping[str, Any]) -> str:
             "",
             "## Authority and safeguards",
             "",
-            "Demand evidence and Scenario B are read-only. Every state is fingerprint-cached; all moves are finite; compiler and final pair frontiers use dominance; technical budgets stop the search deterministically. Every retained clean compilation is fleet-validated before final Pareto pruning.",
+            "Demand evidence and Scenario B are read-only. Every state is fingerprint-cached; all moves are finite; pre-fleet archives use deterministic phase-diversity caps, while only the final operating-pair frontier uses dominance. Technical budgets stop the search deterministically. Every retained clean compilation is fleet-validated before final Pareto pruning.",
             "",
         ]
     )
@@ -1481,9 +1521,10 @@ def route_result_payload_v1(
                 "phase_edge_quality_minutes",
             ],
             "ordering_after_dominance": (
-                "witness-preserving phase cap, quantization, service-regime count, "
-                "phase/edge quality, headways, departures"
+                "not applicable pre-fleet; bounded order is compiler witness, local-quality "
+                "anchor, state/headway-shape diversity, exact-departure max-min distance"
             ),
+            "pre_fleet_dominance_authority": False,
             "fleet_every_retained_variant": True,
         },
         "actual_service_formulas": {
@@ -1549,7 +1590,8 @@ def route_result_payload_v1(
         "anti_loop_guarantees": [
             "SHA-256 state fingerprint cache",
             "finite explicit neighborhood",
-            "compiler/directional/pair dominance pruning",
+            "exact-timetable deduplication and deterministic pre-fleet diversity caps",
+            "final operating-pair dominance pruning after exact fleet validation",
             "bounded state, OPEN, compile, directional, and pair frontiers",
         ],
         "seed_states": [_state_to_dict(item) for item in result.seed_states],

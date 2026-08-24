@@ -90,38 +90,102 @@ def clean_compilation_fingerprint_v1(compilation: CleanBoundaryCompilationV1) ->
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _dominates_path(left: _FrontierPath, right: _FrontierPath) -> bool:
-    left_values = left.objective
-    right_values = right.objective
-    return all(a <= b for a, b in zip(left_values, right_values, strict=True)) and any(
-        a < b for a, b in zip(left_values, right_values, strict=True)
-    )
+def _deduplicate_paths(paths: list[_FrontierPath]) -> list[_FrontierPath]:
+    """Deduplicate only identical exact departure vectors."""
 
-
-def _nondominated_paths(paths: list[_FrontierPath]) -> list[_FrontierPath]:
     unique: dict[tuple[int, ...], _FrontierPath] = {}
     for path in paths:
         incumbent = unique.get(path.departures)
         if incumbent is None or path.order_key < incumbent.order_key:
             unique[path.departures] = path
-    ordered = sorted(unique.values(), key=lambda item: item.order_key)
-    return [
-        candidate
-        for candidate in ordered
-        if not any(
-            other is not candidate and _dominates_path(other, candidate) for other in ordered
+    return sorted(unique.values(), key=lambda item: item.order_key)
+
+
+def _departure_distance(left: _FrontierPath, right: _FrontierPath) -> int:
+    return sum(abs(a - b) for a, b in zip(left.departures, right.departures, strict=True))
+
+
+def _select_diverse_paths(
+    paths: list[_FrontierPath],
+    *,
+    limit: int,
+    witness_departures: tuple[int, ...] | None = None,
+) -> list[_FrontierPath]:
+    """Apply a deterministic technical cap without treating local quality as dominance."""
+
+    ordered = _deduplicate_paths(paths)
+    if len(ordered) <= limit:
+        return ordered
+
+    selected: list[_FrontierPath] = []
+    selected_departures: set[tuple[int, ...]] = set()
+
+    def keep(candidate: _FrontierPath | None) -> None:
+        if candidate is None or candidate.departures in selected_departures:
+            return
+        selected.append(candidate)
+        selected_departures.add(candidate.departures)
+
+    # The legacy compiler witness remains the first retention authority when reachable.
+    keep(
+        next(
+            (candidate for candidate in ordered if candidate.departures == witness_departures),
+            None,
         )
+    )
+    # Local compiler quality is an ordering anchor, never an elimination proof.
+    if len(selected) < limit:
+        keep(ordered[0])
+
+    # Preserve distinct regime-headway shapes before adding more variants of a shape.
+    best_by_shape: dict[tuple[int, ...], _FrontierPath] = {}
+    for candidate in ordered:
+        best_by_shape.setdefault(candidate.headways, candidate)
+    shape_candidates = [
+        candidate
+        for candidate in best_by_shape.values()
+        if candidate.departures not in selected_departures
     ]
+    while shape_candidates and len(selected) < limit:
+        candidate = min(
+            shape_candidates,
+            key=lambda item: (
+                -min(_departure_distance(item, retained) for retained in selected),
+                item.order_key,
+                item.departures,
+            ),
+        )
+        keep(candidate)
+        shape_candidates.remove(candidate)
+
+    # Fill remaining capacity by exact-timetable max-min phase distance.
+    remaining = [
+        candidate for candidate in ordered if candidate.departures not in selected_departures
+    ]
+    while remaining and len(selected) < limit:
+        candidate = min(
+            remaining,
+            key=lambda item: (
+                -min(_departure_distance(item, retained) for retained in selected),
+                item.order_key,
+                item.departures,
+            ),
+        )
+        keep(candidate)
+        remaining.remove(candidate)
+    return selected
 
 
 def _reachable_frontier_paths(
     phase_candidates: tuple[tuple[Any, ...], ...],
     *,
     compile_frontier_limit: int,
-) -> list[_FrontierPath]:
+    witness_path: tuple[Any, ...] | None,
+) -> tuple[list[_FrontierPath], int]:
     if not phase_candidates or not phase_candidates[0]:
-        return []
+        return [], 0
     per_terminal_limit = max(16, compile_frontier_limit * 8)
+    technical_pruned = 0
     reachable: dict[int, list[_FrontierPath]] = {
         index: [
             _FrontierPath(
@@ -136,7 +200,7 @@ def _reachable_frontier_paths(
     for regime_index in range(1, len(phase_candidates)):
         current_candidates = phase_candidates[regime_index]
         if not current_candidates:
-            return []
+            return [], technical_pruned
         by_start: dict[int, list[int]] = {}
         by_predecessor: dict[int, list[int]] = {}
         for index, candidate in enumerate(current_candidates):
@@ -168,13 +232,32 @@ def _reachable_frontier_paths(
                         )
                     )
         if not next_reachable:
-            return []
-        reachable = {
-            index: _nondominated_paths(paths)[:per_terminal_limit]
-            for index, paths in next_reachable.items()
-        }
-    return _nondominated_paths(
-        [path for terminal_paths in reachable.values() for path in terminal_paths]
+            return [], technical_pruned
+        bounded_reachable: dict[int, list[_FrontierPath]] = {}
+        witness_prefix = (
+            tuple(
+                value
+                for candidate in witness_path[: regime_index + 1]
+                for value in candidate.departures_minutes
+            )
+            if witness_path is not None
+            else None
+        )
+        for index, paths in next_reachable.items():
+            unique_count = len(_deduplicate_paths(paths))
+            retained = _select_diverse_paths(
+                paths,
+                limit=per_terminal_limit,
+                witness_departures=witness_prefix,
+            )
+            technical_pruned += unique_count - len(retained)
+            bounded_reachable[index] = retained
+        reachable = bounded_reachable
+    return (
+        _deduplicate_paths(
+            [path for terminal_paths in reachable.values() for path in terminal_paths]
+        ),
+        technical_pruned,
     )
 
 
@@ -316,7 +399,7 @@ def compile_service_plan_frontier_v1(
     endpoint_authority: OperationalEndpointAuthorityV1,
     compile_frontier_limit: int,
 ) -> CleanCompileFrontierV1:
-    """Retain compiler-nondominated exact timetables before any fleet decision."""
+    """Retain bounded, phase-diverse exact timetables before any fleet decision."""
 
     if compile_frontier_limit <= 0:
         raise ValueError("compile_frontier_limit must be positive")
@@ -349,9 +432,10 @@ def compile_service_plan_frontier_v1(
         len(raw) - len(bounded)
         for raw, bounded in zip(raw_phase_candidates, phase_candidates, strict=True)
     )
-    paths = _reachable_frontier_paths(
+    paths, intermediate_pruned = _reachable_frontier_paths(
         phase_candidates,
         compile_frontier_limit=compile_frontier_limit,
+        witness_path=witness_path,
     )
     state_fingerprint = service_plan_fingerprint_v1(state)
     if not paths:
@@ -369,15 +453,23 @@ def compile_service_plan_frontier_v1(
             variants_considered=0,
             phase_candidates_technical_pruned=phase_pruned,
             variants_dominance_pruned=0,
-            variants_limit_pruned=0,
+            variants_limit_pruned=intermediate_pruned,
             deterministic_limit_order=(
-                "phase-cap-witness,quantization,service_regime_count,phase_edge_quality,headways,departures"
+                "witness,local-quality,headway-shape,exact-departure-max-min"
             ),
             variants=(),
             failure=failure,
         )
-    paths.sort(key=lambda item: item.order_key)
-    retained = paths[:compile_frontier_limit]
+    witness_departures = (
+        tuple(value for candidate in witness_path for value in candidate.departures_minutes)
+        if witness_path is not None
+        else None
+    )
+    retained = _select_diverse_paths(
+        paths,
+        limit=compile_frontier_limit,
+        witness_departures=witness_departures,
+    )
     variants: list[CleanCompileVariantV1] = []
     for rank, path in enumerate(retained, start=1):
         compilation = _compilation_from_path(
@@ -405,11 +497,9 @@ def compile_service_plan_frontier_v1(
         compile_frontier_limit=compile_frontier_limit,
         variants_considered=considered,
         phase_candidates_technical_pruned=phase_pruned,
-        variants_dominance_pruned=max(0, considered - len(paths)),
-        variants_limit_pruned=max(0, len(paths) - len(retained)),
-        deterministic_limit_order=(
-            "phase-cap-witness,quantization,service_regime_count,phase_edge_quality,headways,departures"
-        ),
+        variants_dominance_pruned=0,
+        variants_limit_pruned=(intermediate_pruned + max(0, len(paths) - len(retained))),
+        deterministic_limit_order=("witness,local-quality,headway-shape,exact-departure-max-min"),
         variants=tuple(variants),
         failure=None,
     )

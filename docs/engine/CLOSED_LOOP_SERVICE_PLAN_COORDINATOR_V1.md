@@ -41,11 +41,12 @@ affected regimes. Every move preserves the authoritative direction total.
 
 ## Compilation frontier
 
-The legacy clean compiler's best path is retained as a mandatory witness. Additional phase and
-headway paths are retained when nondominated over headway quantization, actual operational
-ServiceRegime count, and phase/edge quality. Exact departure vectors remain distinct. A
-deterministic witness-preserving phase cap and `max_compile_frontier_per_state` bound computation;
-these are technical safeguards, not transport policy.
+The legacy clean compiler's feasible path is retained as a mandatory witness, followed by a local-
+quality anchor and deterministic headway-shape/exact-phase diversity. Headway quantization, actual
+operational ServiceRegime count, and phase/edge quality are ordering and diversity signals only;
+they are not pre-fleet dominance authority. Distinct exact departure vectors remain distinct. The
+witness-preserving intermediate caps and `max_compile_frontier_per_state` are technical diversity
+safeguards, not transport policy or mathematical dominance.
 
 Every emitted timetable preserves the fixed first/last departures and exact state total, uses
 whole-minute internal headways, has boundary gap `g in {h_left, h_right}`, merges continuous equal
@@ -70,10 +71,13 @@ connection layover above the authoritative minimum.
 
 ## Pairing and Pareto rule
 
-Outbound and inbound modes are independent. Every new retained directional compilation is paired
-with the bounded nondominated archive for the opposite direction. The existing fixed-timetable
-validator is called without moving departures, repairing headways, inventing deadheads, or changing
-runtime/layover authority.
+Outbound and inbound modes are independent. Every new directional compilation is paired with the
+bounded phase-diverse archive for the opposite direction before its own archive is compacted.
+Directional demand, regularity, movement, quantization, and phase-quality metrics order retention
+but are not cross-direction dominance authority. The existing fixed-timetable validator is called
+without moving departures, repairing headways, inventing deadheads, or changing runtime/layover
+authority. Final fleet feasibility is determined only after pairing exact outbound and inbound
+timetables.
 
 Fleet-feasible pairs are nondominated over:
 
@@ -92,7 +96,9 @@ No weighted scalar objective selects a timetable.
 The V1 defaults are 24 state evaluations per route, 512 OPEN states, 4 compilations per state,
 24 directional compilations, and 512 final pair candidates. Exhaustion returns
 `SEARCH_BUDGET_EXHAUSTED` with the best feasible frontier already found. Reports expose generated,
-evaluated, duplicate, pruned, compile, fleet, and iteration counters.
+evaluated, duplicate, pruned, compile, fleet, and iteration counters. Bounded diversity retention
+is a V1 search approximation; technical phase/limit pruning remains visible in diagnostics and is
+not reported as dominance pruning.
 
 Prior demand, V2, and V3 artifacts are guarded by a checked SHA-256 manifest before and after each
 route run. Outputs are written only under `outputs/service_plan_coordinator_v1/`.
