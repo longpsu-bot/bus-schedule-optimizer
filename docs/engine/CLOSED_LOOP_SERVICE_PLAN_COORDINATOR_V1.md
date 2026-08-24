@@ -107,6 +107,17 @@ adjacent regimes. Tail feedback remains tail-local, while fleet feedback remains
 informative because feasibility is cross-directional. Fingerprint deduplication and deterministic
 ordering are unchanged, and localization does not increase the neighbor bound.
 
+Within one coordinator search, a semantic ServicePlan parent receives the global
+`FLEET_LIMIT_EXCEEDED` revision family at most once when an enqueue request contains only fleet
+feedback. Independently evaluated infeasible exact pairs still count as separate feedback events,
+while fleet expansion requests, executions, and skips are reported separately. Mixed or non-fleet
+feedback remains unaffected. The cache is intentionally keyed by the semantic ServicePlan
+fingerprint rather than compilation, pair, history, or fleet-excess magnitude. If bounded-queue
+admission rejects a generated child, later pair multiplicity does not regenerate that unchanged
+child for another admission attempt. This changes bounded search-control semantics and may change
+the explored frontier; it does not change queue priority, search budgets, or the fleet neighbor
+operator family.
+
 ## Compilation frontier
 
 The legacy clean compiler's feasible path is retained as a mandatory witness, followed by a local-

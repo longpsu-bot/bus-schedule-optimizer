@@ -285,6 +285,53 @@ def _compile(state: ServicePlanStateV1, limit: int = 8):
     )
 
 
+def _run_scripted_pair_feedback_search(monkeypatch, pair_feedback_script):
+    seeds = (
+        _state("outbound", first_count=2, second_count=2),
+        _state("inbound", first_count=2, second_count=2),
+    )
+    neighbor_calls = []
+    pair_call_index = 0
+
+    def compiler(state, **_kwargs):
+        return SimpleNamespace(variants=_compile(state, limit=2).variants, failure=None)
+
+    def without_direction_feedback(candidate, **kwargs):
+        metrics, _ = evaluate_actual_service_v1(candidate, **kwargs)
+        return metrics, ()
+
+    def scripted_pair_feedback(_outbound, _inbound, *, context):
+        nonlocal pair_call_index
+        del context
+        feedback = pair_feedback_script[pair_call_index]
+        pair_call_index += 1
+        return None, feedback
+
+    def recording_neighbors(state, *, feedback, **kwargs):
+        neighbors = generate_targeted_neighbors_v1(state, feedback=feedback, **kwargs)
+        neighbor_calls.append(
+            (
+                service_plan_fingerprint_v1(state),
+                tuple(item.code for item in feedback),
+                tuple(item.magnitude for item in feedback),
+                len(neighbors),
+            )
+        )
+        return neighbors
+
+    monkeypatch.setattr(coordinator, "evaluate_actual_service_v1", without_direction_feedback)
+    monkeypatch.setattr(coordinator, "evaluate_operating_pair_v1", scripted_pair_feedback)
+    monkeypatch.setattr(coordinator, "generate_targeted_neighbors_v1", recording_neighbors)
+    result = search_route_service_plans_v1(
+        context=_context(),
+        seeds=seeds,
+        budget=CoordinatorSearchBudgetV1(2, 512, 2, 8, 8),
+        compiler=compiler,
+    )
+    assert pair_call_index == len(pair_feedback_script) == 4
+    return result, neighbor_calls, seeds
+
+
 def _pair(pair_id: str, values: tuple[float | int, ...]) -> OperatingPairCandidateV1:
     metrics = OperatingPairMetricsV1(*values, max_excess_terminal_wait=0)
     return OperatingPairCandidateV1(
@@ -894,6 +941,78 @@ def test_fleet_exceeded_feedback_generates_targeted_neighbors() -> None:
     moves = {item.move for item in neighbors if item.priority == 0}
     assert ServicePlanMoveV1.SHIFT_BOUNDARY_LEFT in moves
     assert ServicePlanMoveV1.MOVE_ONE_TRIP_RIGHT_TO_LEFT in moves
+
+
+def test_repeated_fleet_feedback_expands_each_semantic_parent_once(monkeypatch) -> None:
+    feedback_script = tuple(
+        (FeedbackEvidenceV1(FLEET_LIMIT_EXCEEDED, "pair", magnitude=magnitude),)
+        for magnitude in (1, 2, 1, 2)
+    )
+    result, neighbor_calls, seeds = _run_scripted_pair_feedback_search(monkeypatch, feedback_script)
+    fleet_calls = [call for call in neighbor_calls if call[1] == (FLEET_LIMIT_EXCEEDED,)]
+    parent_fingerprints = {service_plan_fingerprint_v1(state) for state in seeds}
+
+    assert result.statistics.fleet_validations_run == 4
+    assert result.feedback_code_counts[FLEET_LIMIT_EXCEEDED] == 4
+    assert result.statistics.fleet_feedback_expansion_requests == 8
+    assert result.statistics.fleet_feedback_expansions_executed == 2
+    assert result.statistics.fleet_feedback_expansions_skipped == 6
+    assert len(fleet_calls) == 2
+    assert {call[0] for call in fleet_calls} == parent_fingerprints
+    assert {call[2] for call in fleet_calls} == {(1,)}
+    assert result.statistics.states_generated == 2 + sum(call[3] for call in neighbor_calls)
+
+
+def test_nonfleet_and_mixed_feedback_are_not_suppressed_by_fleet_cache(monkeypatch) -> None:
+    localized = FeedbackEvidenceV1(
+        DEMAND_UNDERSERVED_INTERVAL,
+        "outbound",
+        interval_start=0,
+        interval_end=1800,
+    )
+    feedback_script = (
+        (FeedbackEvidenceV1(FLEET_LIMIT_EXCEEDED, "pair", magnitude=1),),
+        (localized,),
+        (FeedbackEvidenceV1(FLEET_LIMIT_EXCEEDED, "pair", magnitude=9), localized),
+        (FeedbackEvidenceV1(FLEET_LIMIT_EXCEEDED, "pair", magnitude=2),),
+    )
+    result, neighbor_calls, _ = _run_scripted_pair_feedback_search(monkeypatch, feedback_script)
+    fleet_calls = [call for call in neighbor_calls if call[1] == (FLEET_LIMIT_EXCEEDED,)]
+    localized_calls = [call for call in neighbor_calls if call[1] == (DEMAND_UNDERSERVED_INTERVAL,)]
+    mixed_calls = [
+        call
+        for call in neighbor_calls
+        if call[1] == (FLEET_LIMIT_EXCEEDED, DEMAND_UNDERSERVED_INTERVAL)
+    ]
+
+    assert len(fleet_calls) == len(localized_calls) == len(mixed_calls) == 2
+    assert all(call[3] > 0 for call in (*localized_calls, *mixed_calls))
+    assert result.statistics.fleet_feedback_expansion_requests == 4
+    assert result.statistics.fleet_feedback_expansions_executed == 2
+    assert result.statistics.fleet_feedback_expansions_skipped == 2
+    assert result.feedback_code_counts[FLEET_LIMIT_EXCEEDED] == 3
+    assert result.feedback_code_counts[DEMAND_UNDERSERVED_INTERVAL] == 2
+    assert result.feedback_code_counts[FLEET_LIMIT_EXCEEDED] > (
+        result.statistics.fleet_feedback_expansions_executed
+    )
+
+
+def test_fleet_feedback_control_is_deterministic(monkeypatch) -> None:
+    feedback_script = tuple(
+        (FeedbackEvidenceV1(FLEET_LIMIT_EXCEEDED, "pair", magnitude=magnitude),)
+        for magnitude in (1, 2, 1, 2)
+    )
+    first, first_calls, _ = _run_scripted_pair_feedback_search(monkeypatch, feedback_script)
+    second, second_calls, _ = _run_scripted_pair_feedback_search(monkeypatch, feedback_script)
+
+    assert first.status == second.status
+    assert dataclasses.asdict(first.statistics) == dataclasses.asdict(second.statistics)
+    assert first.evaluated_state_fingerprints == second.evaluated_state_fingerprints
+    assert tuple(item.pair_fingerprint for item in first.pareto_frontier) == tuple(
+        item.pair_fingerprint for item in second.pareto_frontier
+    )
+    assert first.feedback_code_counts == second.feedback_code_counts
+    assert first_calls == second_calls
 
 
 def test_tail_over_service_generates_release_proposal() -> None:

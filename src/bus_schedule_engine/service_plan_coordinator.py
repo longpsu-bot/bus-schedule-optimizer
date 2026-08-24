@@ -94,6 +94,9 @@ class CoordinatorSearchStatisticsV1:
     compile_variants_evaluated: int = 0
     protected_compile_variants_rejected: int = 0
     fleet_validations_run: int = 0
+    fleet_feedback_expansion_requests: int = 0
+    fleet_feedback_expansions_executed: int = 0
+    fleet_feedback_expansions_skipped: int = 0
     search_iterations: int = 0
     budget_exhausted: bool = False
 
@@ -1413,6 +1416,7 @@ def search_route_service_plans_v1(
     queue = _BoundedOpenQueue(budget.max_open_states)
     seen: set[str] = set()
     pair_seen: set[str] = set()
+    expanded_fleet_feedback_parents: set[str] = set()
     history_by_state: dict[str, tuple[str, ...]] = {}
     archive: dict[str, list[DirectionalCompilationCandidateV1]] = {
         "outbound": [],
@@ -1440,6 +1444,20 @@ def search_route_service_plans_v1(
         parent_history: tuple[str, ...],
         feedback: Sequence[FeedbackEvidenceV1],
     ) -> None:
+        pure_fleet_feedback = bool(feedback) and all(
+            item.code == FLEET_LIMIT_EXCEEDED for item in feedback
+        )
+        if pure_fleet_feedback:
+            stats.fleet_feedback_expansion_requests += 1
+            parent_fingerprint = service_plan_fingerprint_v1(parent)
+            if parent_fingerprint in expanded_fleet_feedback_parents:
+                stats.fleet_feedback_expansions_skipped += 1
+                return
+            # Mark the semantic parent before generation. A child rejected by the
+            # bounded queue must not get another admission attempt merely because
+            # another exact opposite compilation produces the same fleet feedback.
+            expanded_fleet_feedback_parents.add(parent_fingerprint)
+            stats.fleet_feedback_expansions_executed += 1
         neighbors = generate_targeted_neighbors_v1(
             parent,
             feedback=feedback,
