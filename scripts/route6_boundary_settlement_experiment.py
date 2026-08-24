@@ -525,8 +525,7 @@ def _strict_classification(
     if dominating:
         return "STRICT_DOMINATING_REFERENCE_EXISTS", sorted(dominating)
     if all(
-        all(a <= b for a, b in zip(human_vector, _comparison_vector(candidate), strict=True))
-        for candidate in strict_candidates
+        _dominates(human_vector, _comparison_vector(candidate)) for candidate in strict_candidates
     ):
         return "HUMAN_FINAL_DOMINATES_ALL_STRICT", []
     return "TRADEOFF_INCONCLUSIVE", []
@@ -662,6 +661,19 @@ def run_experiment(
     ):
         raise ValueError(
             f"selected residual does not support the required local window: {local_gaps}"
+        )
+    human_inbound_gaps = tuple(
+        (right - left) // 60 for left, right in zip(human_inbound, human_inbound[1:], strict=False)
+    )
+    human_inbound_histogram = Counter(human_inbound_gaps)
+    principal_residual_arithmetic_verified = (
+        len(human_inbound_gaps) == 77
+        and sum(human_inbound_gaps) == 965
+        and human_inbound_histogram == Counter({8: 27, 14: 1, 15: 49})
+    )
+    if not principal_residual_arithmetic_verified:
+        raise ValueError(
+            "Human Final inbound does not verify the expected conditional residual arithmetic"
         )
 
     enumerated = enumerate_strict_local_candidates(
@@ -826,6 +838,30 @@ def run_experiment(
             "anchor_duration_minutes": (local_human[-1] - local_human[0]) // 60,
             "outside_window_must_remain_human_final": True,
         },
+        "c0_scope_framing": {
+            "classification_scope": "C0_LOCAL_STRICT_FAMILIES_ONLY",
+            "human_final_residual_interpretation": (
+                "The 14-minute gap is the conditional arithmetic residue of the supplied "
+                "principal 8/15-minute composition, not an independently selected standard "
+                "headway. The Human editor moved that residue from the final trip to the start "
+                "of the slower 15-minute regime."
+            ),
+            "whole_day_human_final_inbound_arithmetic": {
+                "total_gaps": len(human_inbound_gaps),
+                "operating_span_minutes": sum(human_inbound_gaps),
+                "headway_histogram": {
+                    str(key): human_inbound_histogram[key]
+                    for key in sorted(human_inbound_histogram)
+                },
+                "verified_equation": "27 × 8 + 1 × 14 + 49 × 15 = 965",
+                "verified": principal_residual_arithmetic_verified,
+            },
+            "interpretive_limits": [
+                "C0 local strict alternatives alter the local rhythm composition.",
+                "C0 does not establish global optimality of the supplied 8/15 + residual design.",
+                "Removing the residual may require redesigning the wider whole-day timetable.",
+            ],
+        },
         "strict_enumeration": {
             "deterministic": True,
             "deduplicated_by_exact_departure_vector": True,
@@ -850,6 +886,7 @@ def run_experiment(
             },
         },
         "human_final_comparison": {
+            "classification_scope": "C0_LOCAL_STRICT_FAMILIES_ONLY",
             "human_final_peak_preservation": human_peak,
             "strict_candidates_dominating_human_final": dominating,
             "classification": classification,
@@ -857,6 +894,7 @@ def run_experiment(
         },
         "evidence_classification": classification,
         "limitations": [
+            "C0 is conditional on the supplied surrounding principal-rhythm composition.",
             "Single Route 6 private reference workbook; no cross-route generalization.",
             "External AI is a supplied reference only and has no project-engine lineage.",
             "Clockface descriptors are non-objective engine diagnostics in this milestone.",
@@ -877,6 +915,7 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
     source = payload["source_workbook"]
     residual = payload["detected_settlement_residual"]["selected"]
     arithmetic = payload["local_arithmetic"]
+    scope = payload["c0_scope_framing"]
     enumeration = payload["strict_enumeration"]
     candidates = {item["candidate_id"]: item for item in enumeration["candidates"]}
     frontier_ids = payload["strict_pareto_frontier"]["candidate_ids"]
@@ -900,6 +939,16 @@ def render_markdown(payload: Mapping[str, Any]) -> str:
         "",
         "All three references parse as 78 outbound + 78 inbound departures, with fixed "
         "04:55 and 21:00 endpoints.",
+        "",
+        "## Corrected C0 scope framing",
+        "",
+        scope["human_final_residual_interpretation"],
+        "",
+        "The exact Human Final inbound arithmetic is "
+        f"`{scope['whole_day_human_final_inbound_arithmetic']['verified_equation']}` over "
+        f"{scope['whole_day_human_final_inbound_arithmetic']['total_gaps']} gaps. C0 compares "
+        "only local strict families; it does not establish global optimality of this supplied "
+        "composition. Removing the residue may require a wider timetable redesign.",
         "",
         "## CURRENT → EXTERNAL_AI → HUMAN_FINAL benchmark",
         "",

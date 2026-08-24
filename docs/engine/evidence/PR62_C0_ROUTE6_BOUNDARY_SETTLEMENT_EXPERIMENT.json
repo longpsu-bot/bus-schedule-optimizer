@@ -1,4 +1,24 @@
 {
+  "c0_scope_framing": {
+    "classification_scope": "C0_LOCAL_STRICT_FAMILIES_ONLY",
+    "human_final_residual_interpretation": "The 14-minute gap is the conditional arithmetic residue of the supplied principal 8/15-minute composition, not an independently selected standard headway. The Human editor moved that residue from the final trip to the start of the slower 15-minute regime.",
+    "interpretive_limits": [
+      "C0 local strict alternatives alter the local rhythm composition.",
+      "C0 does not establish global optimality of the supplied 8/15 + residual design.",
+      "Removing the residual may require redesigning the wider whole-day timetable."
+    ],
+    "whole_day_human_final_inbound_arithmetic": {
+      "headway_histogram": {
+        "14": 1,
+        "15": 49,
+        "8": 27
+      },
+      "operating_span_minutes": 965,
+      "total_gaps": 77,
+      "verified": true,
+      "verified_equation": "27 × 8 + 1 × 14 + 49 × 15 = 965"
+    }
+  },
   "detected_settlement_residual": {
     "all_supported_residuals": [
       {
@@ -28,6 +48,7 @@
   "experiment_status": "COMPLETED",
   "human_final_comparison": {
     "classification": "HUMAN_FINAL_DOMINATES_ALL_STRICT",
+    "classification_scope": "C0_LOCAL_STRICT_FAMILIES_ONLY",
     "human_final_peak_preservation": {
       "last_departure_on_left_rhythm": "17:16",
       "left_rhythm_ends_earlier_than_human_minutes": 0,
@@ -38,6 +59,7 @@
     "strict_candidates_dominating_human_final": []
   },
   "limitations": [
+    "C0 is conditional on the supplied surrounding principal-rhythm composition.",
     "Single Route 6 private reference workbook; no cross-route generalization.",
     "External AI is a supplied reference only and has no project-engine lineage.",
     "Clockface descriptors are non-objective engine diagnostics in this milestone.",

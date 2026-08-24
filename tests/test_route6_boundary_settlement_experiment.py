@@ -83,6 +83,11 @@ def test_reference_labels_never_claim_project_engine_lineage() -> None:
     assert "SCENARIO_C_FROM_ENGINE" not in serialized
 
 
+def test_equal_comparison_vectors_are_not_dominance() -> None:
+    vector = (1.0, 2.0, 3.0)
+    assert not experiment._dominates(vector, vector)
+
+
 def test_discovered_workbook_layout_parses_explicit_direction_columns(tmp_path: Path) -> None:
     workbook = Workbook()
     workbook.remove(workbook.active)

@@ -12,6 +12,12 @@
 
 All three references parse as 78 outbound + 78 inbound departures, with fixed 04:55 and 21:00 endpoints.
 
+## Corrected C0 scope framing
+
+The 14-minute gap is the conditional arithmetic residue of the supplied principal 8/15-minute composition, not an independently selected standard headway. The Human editor moved that residue from the final trip to the start of the slower 15-minute regime.
+
+The exact Human Final inbound arithmetic is `27 × 8 + 1 × 14 + 49 × 15 = 965` over 77 gaps. C0 compares only local strict families; it does not establish global optimality of this supplied composition. Removing the residue may require a wider timetable redesign.
+
 ## CURRENT → EXTERNAL_AI → HUMAN_FINAL benchmark
 
 The `EXTERNAL_AI` timetable is an external supplied reference and is not engine lineage.
@@ -63,6 +69,7 @@ This classification is evidence only. It does not decide whether the clean-bound
 
 ## Limitations
 
+- C0 is conditional on the supplied surrounding principal-rhythm composition.
 - Single Route 6 private reference workbook; no cross-route generalization.
 - External AI is a supplied reference only and has no project-engine lineage.
 - Clockface descriptors are non-objective engine diagnostics in this milestone.
