@@ -123,7 +123,12 @@ def service_plan_fingerprint_v1(state: ServicePlanStateV1) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def minimum_trip_count_v1(regime: ServiceRegimeDecisionV1, floor_headway_minutes: float) -> int:
+def minimum_trip_count_v1(
+    regime: ServiceRegimeDecisionV1,
+    floor_headway_minutes: float | None,
+) -> int:
+    if floor_headway_minutes is None:
+        return 2
     if not math.isfinite(floor_headway_minutes) or floor_headway_minutes <= 0:
         raise ValueError("floor_headway_minutes must be finite and positive")
     return max(2, math.ceil(regime.duration_minutes / floor_headway_minutes))
@@ -132,8 +137,10 @@ def minimum_trip_count_v1(regime: ServiceRegimeDecisionV1, floor_headway_minutes
 def _state_minimum_trip_count(
     state: ServicePlanStateV1,
     regime: ServiceRegimeDecisionV1,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
 ) -> int:
+    if floor_headway_minutes is None:
+        return 2
     effective_start = max(regime.start, state.fixed_first_departure)
     effective_end = min(regime.end, state.fixed_last_departure)
     effective_minutes = max(1, (effective_end - effective_start) // 60)
@@ -145,7 +152,7 @@ def validate_service_plan_state_v1(
     *,
     authoritative_total_trips: int,
     planning_grid_seconds: int,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
 ) -> tuple[str, ...]:
     errors: list[str] = []
     if state.total_trips != authoritative_total_trips:
@@ -188,7 +195,7 @@ def _child_state(
 def _is_floor_feasible(
     state: ServicePlanStateV1,
     regimes: Iterable[ServiceRegimeDecisionV1],
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
 ) -> bool:
     return all(
         regime.trip_count >= _state_minimum_trip_count(state, regime, floor_headway_minutes)
@@ -199,7 +206,7 @@ def _is_floor_feasible(
 def merge_adjacent_neighbors_v1(
     state: ServicePlanStateV1,
     *,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
 ) -> tuple[ServicePlanNeighborV1, ...]:
@@ -233,7 +240,7 @@ def split_regime_neighbors_v1(
     state: ServicePlanStateV1,
     *,
     planning_grid_seconds: int,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
 ) -> tuple[ServicePlanNeighborV1, ...]:
@@ -284,7 +291,7 @@ def _shift_boundary_neighbors(
     delta_seconds: int,
     move: ServicePlanMoveV1,
     planning_grid_seconds: int,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
     evidence_code: str | None,
     priority: int,
 ) -> tuple[ServicePlanNeighborV1, ...]:
@@ -333,7 +340,7 @@ def shift_boundary_left_neighbors_v1(
     state: ServicePlanStateV1,
     *,
     planning_grid_seconds: int,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
 ) -> tuple[ServicePlanNeighborV1, ...]:
@@ -352,7 +359,7 @@ def shift_boundary_right_neighbors_v1(
     state: ServicePlanStateV1,
     *,
     planning_grid_seconds: int,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
 ) -> tuple[ServicePlanNeighborV1, ...]:
@@ -372,7 +379,7 @@ def _move_one_neighbors(
     *,
     left_delta: int,
     move: ServicePlanMoveV1,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
     evidence_code: str | None,
     priority: int,
     only_final_pair: bool = False,
@@ -419,7 +426,7 @@ def _move_one_neighbors(
 def move_one_trip_left_to_right_neighbors_v1(
     state: ServicePlanStateV1,
     *,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
 ) -> tuple[ServicePlanNeighborV1, ...]:
@@ -436,7 +443,7 @@ def move_one_trip_left_to_right_neighbors_v1(
 def move_one_trip_right_to_left_neighbors_v1(
     state: ServicePlanStateV1,
     *,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
 ) -> tuple[ServicePlanNeighborV1, ...]:
@@ -453,7 +460,7 @@ def move_one_trip_right_to_left_neighbors_v1(
 def tail_absorb_one_neighbors_v1(
     state: ServicePlanStateV1,
     *,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
 ) -> tuple[ServicePlanNeighborV1, ...]:
@@ -471,7 +478,7 @@ def tail_absorb_one_neighbors_v1(
 def tail_release_one_neighbors_v1(
     state: ServicePlanStateV1,
     *,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
     evidence_code: str | None = None,
     priority: int = 1,
 ) -> tuple[ServicePlanNeighborV1, ...]:

@@ -21,6 +21,12 @@ from .contracts_v1.clean_compile_frontier import (
     CleanCompileVariantV1,
     compile_service_plan_frontier_v1,
 )
+from .contracts_v1.closed_loop_service_protection import (
+    ClosedLoopServiceProtectionAuthorityV1,
+    ClosedLoopServiceProtectionViolationV1,
+    closed_loop_service_protection_status_v1,
+    validate_closed_loop_service_protection_v1,
+)
 from .contracts_v1.service_plan_state import (
     ServicePlanMoveV1,
     ServicePlanNeighborV1,
@@ -80,6 +86,7 @@ class CoordinatorSearchStatisticsV1:
     duplicate_states_skipped: int = 0
     states_pruned: int = 0
     compile_variants_evaluated: int = 0
+    protected_compile_variants_rejected: int = 0
     fleet_validations_run: int = 0
     search_iterations: int = 0
     budget_exhausted: bool = False
@@ -111,6 +118,10 @@ class FeedbackEvidenceV1:
     interval_end: int | None = None
     magnitude: float | None = None
     detail: str = ""
+    source_protected_regime_id: str | None = None
+    violated_rule: str | None = None
+    observed_trip_count: int | None = None
+    observed_headway_minutes: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,12 +195,13 @@ class RouteCoordinatorContextV1:
     endpoint_authority: Mapping[str, OperationalEndpointAuthorityV1]
     demand_buckets: Mapping[str, tuple[DemandBucketEvidenceV1, ...]]
     scenario_b_departures: Mapping[str, tuple[int, ...]]
-    service_floor_headway_minutes: Mapping[str, float]
+    seed_headway_prior_minutes: Mapping[str, float]
     planning_grid_seconds: int
     runtime_minutes: int
     minimum_layover_minutes: int
     fleet_ceiling: int
     immutable_demand_sha256: str
+    service_protection_authority: ClosedLoopServiceProtectionAuthorityV1 | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,6 +215,7 @@ class RouteCoordinatorResultV1:
     feedback_code_counts: Mapping[str, int]
     revision_examples: Mapping[str, tuple[str, ...]]
     evaluated_state_fingerprints: tuple[str, ...]
+    protection_violations: tuple[ClosedLoopServiceProtectionViolationV1, ...]
 
 
 def _sha256(path: Path) -> str:
@@ -563,7 +576,7 @@ def generate_targeted_neighbors_v1(
     *,
     feedback: Sequence[FeedbackEvidenceV1],
     planning_grid_seconds: int,
-    floor_headway_minutes: float,
+    floor_headway_minutes: float | None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     """Generate only explicit finite operators, ordering evidence-targeted moves first."""
 
@@ -861,6 +874,7 @@ def search_route_service_plans_v1(
     pareto: tuple[OperatingPairCandidateV1, ...] = ()
     feedback_counts: Counter[str] = Counter()
     revision_examples: dict[str, tuple[str, ...]] = {}
+    protection_violations: list[ClosedLoopServiceProtectionViolationV1] = []
 
     for seed_rank, state in enumerate(seeds):
         fingerprint = service_plan_fingerprint_v1(state)
@@ -883,7 +897,7 @@ def search_route_service_plans_v1(
             parent,
             feedback=feedback,
             planning_grid_seconds=context.planning_grid_seconds,
-            floor_headway_minutes=context.service_floor_headway_minutes[parent.direction],
+            floor_headway_minutes=None,
         )
         for neighbor in neighbors:
             stats.states_generated += 1
@@ -928,7 +942,7 @@ def search_route_service_plans_v1(
             if seeds[0].direction == state.direction
             else next(item.total_trips for item in seeds if item.direction == state.direction),
             planning_grid_seconds=context.planning_grid_seconds,
-            floor_headway_minutes=context.service_floor_headway_minutes[state.direction],
+            floor_headway_minutes=None,
         )
         if errors:
             stats.states_pruned += 1
@@ -963,6 +977,34 @@ def search_route_service_plans_v1(
         direction_feedback: list[FeedbackEvidenceV1] = []
         current_records: list[DirectionalCompilationCandidateV1] = []
         for variant in compile_frontier.variants:
+            protection = validate_closed_loop_service_protection_v1(
+                authority=context.service_protection_authority,
+                direction=state.direction,
+                exact_departures=variant.compilation.exact_departures,
+            )
+            if not protection.passed:
+                stats.protected_compile_variants_rejected += 1
+                protection_violations.extend(protection.violations)
+                feedback = tuple(
+                    FeedbackEvidenceV1(
+                        code=violation.violated_rule,
+                        direction=violation.direction,
+                        interval_start=violation.protected_window_start,
+                        interval_end=violation.protected_window_end,
+                        magnitude=violation.observed_headway_minutes,
+                        detail=(
+                            "Exact compiled service violates translated operational protection."
+                        ),
+                        source_protected_regime_id=violation.source_regime_id,
+                        violated_rule=violation.violated_rule,
+                        observed_trip_count=violation.observed_trip_count,
+                        observed_headway_minutes=violation.observed_headway_minutes,
+                    )
+                    for violation in protection.violations
+                )
+                feedback_counts.update(item.code for item in feedback)
+                direction_feedback.extend(feedback)
+                continue
             metrics, feedback = evaluate_actual_service_v1(
                 variant,
                 demand_buckets=context.demand_buckets[state.direction],
@@ -1036,6 +1078,7 @@ def search_route_service_plans_v1(
         feedback_code_counts=dict(sorted(feedback_counts.items())),
         revision_examples=dict(sorted(revision_examples.items())),
         evaluated_state_fingerprints=tuple(sorted(seen)),
+        protection_violations=tuple(protection_violations),
     )
 
 
@@ -1072,7 +1115,7 @@ def _sqrt_demand_counts(
     *,
     total_trips: int,
     endpoint: OperationalEndpointAuthorityV1,
-    floor_headway_minutes: float,
+    seed_headway_prior_minutes: float,
 ) -> tuple[int, ...]:
     shells = tuple(
         ServiceRegimeDecisionV1(int(item["start_time"]), int(item["end_time"]), 2)
@@ -1084,12 +1127,12 @@ def _sqrt_demand_counts(
         effective_start = max(shell.start, endpoint.fixed_first_departure)
         effective_end = min(shell.end, endpoint.fixed_last_departure)
         effective_minutes = max(1, (effective_end - effective_start) // 60)
-        minimums.append(max(2, math.ceil(effective_minutes / floor_headway_minutes)))
+        minimums.append(max(2, math.ceil(effective_minutes / seed_headway_prior_minutes)))
         intensity = float(evidence["demand_sum"]) / float(evidence["duration_minutes"])
         weights.append(shell.duration_minutes * math.sqrt(max(0.0, intensity)))
     remaining = total_trips - sum(minimums)
     if remaining < 0:
-        raise ValueError("sqrt demand seed cannot satisfy immutable service floors")
+        raise ValueError("sqrt demand seed cannot satisfy its baseline headway priors")
     if remaining == 0:
         return tuple(minimums)
     weight_total = sum(weights)
@@ -1156,7 +1199,7 @@ def build_initial_service_plan_seeds_v1(
             demand_regimes,
             total_trips=int(candidate_set["total_trips"]),
             endpoint=endpoint,
-            floor_headway_minutes=float(
+            seed_headway_prior_minutes=float(
                 tail_by_direction[direction]["service_floor_headway_minutes"]
             ),
         )
@@ -1254,7 +1297,7 @@ def load_route_coordinator_inputs_v1(
             )
         ),
     }
-    floors = {
+    seed_priors = {
         str(item["direction"]): float(item["service_floor_headway_minutes"])
         for item in end_tail_route["directions"]
     }
@@ -1269,7 +1312,7 @@ def load_route_coordinator_inputs_v1(
             key: tuple(sorted(value, key=lambda item: item.start)) for key, value in buckets.items()
         },
         scenario_b_departures=b_departures,
-        service_floor_headway_minutes=floors,
+        seed_headway_prior_minutes=seed_priors,
         planning_grid_seconds=grid_minutes * 60,
         runtime_minutes=int(end_tail_route["runtime_minutes"]),
         minimum_layover_minutes=int(end_tail_route["minimum_layover_minutes"]),
@@ -1423,7 +1466,7 @@ def _result_markdown(payload: Mapping[str, Any]) -> str:
             "",
             "## Authority and safeguards",
             "",
-            "Demand evidence and Scenario B are read-only. Every state is fingerprint-cached; all moves are finite; pre-fleet archives use deterministic phase-diversity caps, while only the final operating-pair frontier uses dominance. Technical budgets stop the search deterministically. Every retained clean compilation is fleet-validated before final Pareto pruning.",
+            "Demand evidence and Scenario B are read-only. The baseline headway is a seed prior, not global hard authority. Evidence-bound translated windows are checked on exact timestamps before fleet pairing. Every state is fingerprint-cached; all moves are finite; pre-fleet archives use deterministic phase-diversity caps, while only the final operating-pair frontier uses dominance. Technical budgets stop the search deterministically. Every retained clean compilation is fleet-validated before final Pareto pruning.",
             "",
         ]
     )
@@ -1436,6 +1479,7 @@ def route_result_payload_v1(
     result: RouteCoordinatorResultV1,
     prior_artifact_verification: Mapping[str, Any],
 ) -> dict[str, Any]:
+    protection_authority = context.service_protection_authority
     frontier = []
     for index, item in enumerate(result.pareto_frontier, start=1):
         value = _pair_to_dict(index, item)
@@ -1491,6 +1535,36 @@ def route_result_payload_v1(
         "route_name": context.route_name,
         "status": result.status,
         "immutable_demand_sha256": context.immutable_demand_sha256,
+        "seed_headway_prior_minutes": dict(sorted(context.seed_headway_prior_minutes.items())),
+        "protected_service_authority": {
+            "status": closed_loop_service_protection_status_v1(protection_authority),
+            "authority_supplied": protection_authority is not None,
+            "source_authority_profile": (
+                None
+                if protection_authority is None
+                else protection_authority.source_authority_profile
+            ),
+            "source_authority_fingerprint": (
+                None
+                if protection_authority is None
+                else protection_authority.source_authority_fingerprint
+            ),
+            "translation_profile": (
+                None if protection_authority is None else protection_authority.translation_profile
+            ),
+            "translation_fingerprint": (
+                None
+                if protection_authority is None
+                else protection_authority.translation_fingerprint
+            ),
+            "semantics": None if protection_authority is None else protection_authority.semantics,
+            "windows": (
+                []
+                if protection_authority is None
+                else [asdict(window) for window in protection_authority.windows]
+            ),
+            "violations": [asdict(item) for item in result.protection_violations],
+        },
         "state_schema": {
             "frozen": True,
             "identity": [
@@ -1509,7 +1583,7 @@ def route_result_payload_v1(
         "seed_generation": [
             "A: clean-boundary V2 C1/C2/C3",
             "B: tail-aware V3 C1/C2/C3",
-            "C: duration * sqrt(observed demand intensity), floor-feasible largest remainder",
+            "C: duration * sqrt(observed demand intensity), seed-prior largest remainder",
             "D: exact Scenario B regime/count reference",
         ],
         "neighborhood_operators": [item.value for item in ServicePlanMoveV1],

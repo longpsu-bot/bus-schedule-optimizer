@@ -11,6 +11,7 @@ DAILY_VALIDATED DemandRegime evidence (immutable)
   -> deterministic ServicePlan seeds
   -> frozen ServicePlanStateV1 (boundaries + integer counts)
   -> bounded CleanCompileFrontierV1
+  -> exact-timestamp protected-window validation, when evidence-bound authority exists
   -> unchanged exact-timetable fleet validator for every retained pair
   -> actual compiled-service metrics and structured feedback
   -> explicit finite neighbors
@@ -21,6 +22,41 @@ The state fingerprint is SHA-256 over canonical JSON containing the profile, rou
 fixed endpoints, complete ServiceRegime boundary vector, and integer trip-count vector. Parent
 history, feedback, and seed labels are deliberately excluded. A fingerprint is evaluated at most
 once.
+
+The coordinator keeps three concepts separate:
+
+### Hard authority
+
+Hard service protection exists only when a verified
+`ProtectedServiceFloorEnforcementAuthorityV1` is explicitly translated into evidence-bound
+`ClosedLoopProtectedServiceWindowV1` records. The translation carries the source regime ID,
+direction, protected window, boundary tolerance, maximum headway, and minimum trip count, and has
+its own deterministic fingerprint. With no explicit source authority, diagnostics report
+`VALID_NO_ENFORCEABLE_WINDOW`; the coordinator does not infer protection from demand regimes,
+block demand, end-tail artifacts, or a baseline headway.
+
+Each compiled directional timetable is checked before fleet pairing. A protected window must have
+an exact departure covering each boundary within tolerance, at least its minimum number of
+same-direction departures between those two boundary departures, and positive whole-minute
+internal headways no greater than its maximum. Transition gaps outside the protected span are not
+counted. Rejections retain the direction, window, source regime ID, violated rule, and observed
+count or headway. This is operational service-level/timestamp-level enforcement; it does not claim
+Scenario-B source-trip identity or donor-removal semantics and invents no source trip IDs.
+
+### Seed prior
+
+The Scenario-B/end-tail-derived headway is a `seed_headway_prior_minutes` value. It is used only by
+the initial sqrt-demand allocation to construct a reasonable seed. It is not ServicePlan validity
+authority and is not passed to merge, split, shift, one-trip, or tail neighborhood feasibility.
+Frozen C1/C2/C3 seed artifacts remain unchanged.
+
+### Optimization objectives
+
+Ordinary unprotected service remains exposed to demand mismatch, `max_frequency_jump`,
+`total_frequency_variation`, tail fit, exact directional totals, fixed endpoints, fleet, and
+waiting metrics. Continuity remains an objective rather than a new hard maximum jump, and demand
+does not map one-to-one to frequency. The final unprotected tail has no universal maximum headway
+inherited from Scenario B.
 
 ## Finite neighborhood
 
@@ -35,9 +71,11 @@ The only state transitions are:
 - `TAIL_ABSORB_ONE`
 - `TAIL_RELEASE_ONE`
 
-Splits enumerate every grid-aligned boundary and every floor-feasible integer split. Boundary
-shifts move exactly one planning bucket and enumerate every feasible redistribution of the two
-affected regimes. Every move preserves the authoritative direction total.
+Splits enumerate every grid-aligned boundary and every structurally feasible integer split.
+Boundary shifts move exactly one planning bucket and enumerate every structurally feasible
+redistribution of the two affected regimes. Every regime retains at least two trips and every move
+preserves the authoritative direction total. The generic helpers remain backward compatible with
+callers that intentionally provide a headway floor, but this coordinator passes no global floor.
 
 ## Compilation frontier
 

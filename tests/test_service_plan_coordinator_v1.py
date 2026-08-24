@@ -14,6 +14,16 @@ from bus_schedule_engine.contracts_v1.clean_boundary_compiler import (
 from bus_schedule_engine.contracts_v1.clean_compile_frontier import (
     compile_service_plan_frontier_v1,
 )
+from bus_schedule_engine.contracts_v1.closed_loop_service_protection import (
+    ACTIVE_TRANSLATED_PROTECTED_WINDOWS,
+    PROTECTED_INTERNAL_HEADWAY_ABOVE_MAXIMUM,
+    PROTECTED_TRIP_COUNT_BELOW_MINIMUM,
+    VALID_NO_ENFORCEABLE_WINDOW,
+    ClosedLoopProtectedServiceWindowV1,
+    build_closed_loop_service_protection_authority_v1,
+    translate_protected_service_floor_authority_v1,
+    validate_closed_loop_service_protection_v1,
+)
 from bus_schedule_engine.contracts_v1.service_plan_state import (
     ServicePlanMoveV1,
     ServicePlanStateV1,
@@ -27,6 +37,15 @@ from bus_schedule_engine.contracts_v1.service_plan_state import (
     split_regime_neighbors_v1,
     tail_absorb_one_neighbors_v1,
     tail_release_one_neighbors_v1,
+    validate_service_plan_state_v1,
+)
+from bus_schedule_engine.models import (
+    ProtectedServiceFloorEnforcementAuthorityV1,
+    ProtectedServiceFloorEnforcementRegimeV1,
+    TripRidershipDirectionV1,
+)
+from bus_schedule_engine.protected_service_floor_enforcement import (
+    PROTECTED_SERVICE_FLOOR_ENFORCEMENT_PROFILE,
 )
 from bus_schedule_engine.service_plan_coordinator import (
     CLEAN_BOUNDARY_UNCOMPILABLE,
@@ -45,6 +64,7 @@ from bus_schedule_engine.service_plan_coordinator import (
     dominates_operating_pair_v1,
     evaluate_actual_service_v1,
     generate_targeted_neighbors_v1,
+    route_result_payload_v1,
     search_route_service_plans_v1,
     update_operating_pair_pareto_v1,
     verify_frozen_prior_artifacts_v1,
@@ -86,7 +106,13 @@ def _authority(
     )
 
 
-def _context(*, fleet_ceiling: int = 20, runtime_minutes: int = 1) -> RouteCoordinatorContextV1:
+def _context(
+    *,
+    fleet_ceiling: int = 20,
+    runtime_minutes: int = 1,
+    seed_prior: float = 30.0,
+    protection=None,
+) -> RouteCoordinatorContextV1:
     buckets = (
         DemandBucketEvidenceV1("outbound", 0, 1800, 10.0),
         DemandBucketEvidenceV1("outbound", 1800, 3600, 10.0),
@@ -104,12 +130,31 @@ def _context(*, fleet_ceiling: int = 20, runtime_minutes: int = 1) -> RouteCoord
             "outbound": (0, 900, 1800, 2700, 3540),
             "inbound": (0, 900, 1800, 2700, 3540),
         },
-        service_floor_headway_minutes={"outbound": 30.0, "inbound": 30.0},
+        seed_headway_prior_minutes={"outbound": seed_prior, "inbound": seed_prior},
         planning_grid_seconds=900,
         runtime_minutes=runtime_minutes,
         minimum_layover_minutes=1,
         fleet_ceiling=fleet_ceiling,
         immutable_demand_sha256="immutable",
+        service_protection_authority=protection,
+    )
+
+
+def _protection_authority():
+    return build_closed_loop_service_protection_authority_v1(
+        source_authority_profile="synthetic_verified_6a2b",
+        source_authority_fingerprint="a" * 64,
+        windows=(
+            ClosedLoopProtectedServiceWindowV1(
+                source_regime_id="PEAK-OUTBOUND-1",
+                direction="outbound",
+                protected_window_start=0,
+                protected_window_end=1200,
+                boundary_tolerance_minutes=0,
+                maximum_headway_minutes=15,
+                minimum_trip_count=3,
+            ),
+        ),
     )
 
 
@@ -168,6 +213,207 @@ def _directional_record(
         feedback=feedback,
         history=(),
     )
+
+
+def test_baseline_seed_prior_is_not_global_hard_validity_or_tail_protection() -> None:
+    parent = ServicePlanStateV1(
+        route_id="X",
+        direction="outbound",
+        fixed_first_departure=0,
+        fixed_last_departure=5340,
+        service_regimes=(
+            ServiceRegimeDecisionV1(0, 1800, 5),
+            ServiceRegimeDecisionV1(1800, 5400, 3),
+        ),
+        seed_id="BASELINE-PRIOR-15",
+    )
+    relaxed = tail_release_one_neighbors_v1(parent, floor_headway_minutes=None)
+    assert [item.state.trip_count_vector for item in relaxed] == [(6, 2)]
+    assert tail_release_one_neighbors_v1(parent, floor_headway_minutes=15.0) == ()
+    tail_flexible = relaxed[0].state
+
+    assert (
+        validate_service_plan_state_v1(
+            tail_flexible,
+            authoritative_total_trips=8,
+            planning_grid_seconds=900,
+            floor_headway_minutes=None,
+        )
+        == ()
+    )
+    assert "MINIMUM_SERVICE_FLOOR" in validate_service_plan_state_v1(
+        tail_flexible,
+        authoritative_total_trips=8,
+        planning_grid_seconds=900,
+        floor_headway_minutes=15.0,
+    )
+
+    endpoint = OperationalEndpointAuthorityV1(
+        route_id="X",
+        direction="outbound",
+        analysis_window_start=0,
+        analysis_window_end=5400,
+        fixed_first_departure=0,
+        fixed_last_departure=5340,
+        authority_source="test",
+    )
+    frontier = compile_service_plan_frontier_v1(
+        tail_flexible,
+        endpoint_authority=endpoint,
+        compile_frontier_limit=8,
+    )
+    assert frontier.variants
+    candidate = frontier.variants[0].compilation
+    assert candidate.service_regimes[-1].uniform_headway_minutes > 15
+    assert candidate.exact_departures[0] == tail_flexible.fixed_first_departure
+    assert candidate.exact_departures[-1] == tail_flexible.fixed_last_departure
+    assert len(candidate.exact_departures) == tail_flexible.total_trips
+    assert all(
+        later > earlier and (later - earlier) % 60 == 0
+        for service in candidate.service_regimes
+        for earlier, later in zip(service.departures, service.departures[1:], strict=False)
+    )
+    protection = validate_closed_loop_service_protection_v1(
+        authority=None,
+        direction="outbound",
+        exact_departures=candidate.exact_departures,
+    )
+    assert protection.passed
+    assert protection.authority_status == VALID_NO_ENFORCEABLE_WINDOW
+
+
+def test_protected_peak_rejects_exact_candidate_before_fleet_while_tail_stays_free(
+    monkeypatch,
+) -> None:
+    outbound_state = _state("outbound", first_count=2, second_count=2)
+    inbound_state = _state("inbound", first_count=3, second_count=2)
+    weak = next(
+        item
+        for item in _compile(outbound_state, limit=8).variants
+        if item.compilation.exact_departures == (0, 1200, 2400, 3540)
+    )
+    inbound = _compile(inbound_state, limit=8).variants[0]
+    assert weak.compilation.service_regimes[-1].uniform_headway_minutes > 15
+
+    def compiler(state, **_kwargs):
+        return SimpleNamespace(
+            variants=(weak,) if state.direction == "outbound" else (inbound,),
+            failure=None,
+        )
+
+    fleet_calls = 0
+
+    def unexpected_fleet(**_kwargs):
+        nonlocal fleet_calls
+        fleet_calls += 1
+        raise AssertionError("protected rejection must occur before fleet validation")
+
+    monkeypatch.setattr(coordinator, "validate_fleet_combination_v1", unexpected_fleet)
+    result = search_route_service_plans_v1(
+        context=_context(seed_prior=15.0, protection=_protection_authority()),
+        seeds=(outbound_state, inbound_state),
+        budget=CoordinatorSearchBudgetV1(2, 16, 1, 4, 4),
+        compiler=compiler,
+    )
+
+    assert fleet_calls == 0
+    assert result.statistics.protected_compile_variants_rejected == 1
+    assert {item.source_regime_id for item in result.protection_violations} == {"PEAK-OUTBOUND-1"}
+    assert {item.violated_rule for item in result.protection_violations} >= {
+        PROTECTED_TRIP_COUNT_BELOW_MINIMUM,
+        PROTECTED_INTERNAL_HEADWAY_ABOVE_MAXIMUM,
+    }
+
+
+def test_exact_candidate_satisfying_protected_peak_reaches_fleet_validation() -> None:
+    outbound_state = _state("outbound", first_count=3, second_count=2)
+    inbound_state = _state("inbound", first_count=3, second_count=2)
+    outbound = next(
+        item
+        for item in _compile(outbound_state, limit=8).variants
+        if item.compilation.exact_departures == (0, 600, 1200, 1800, 3540)
+    )
+    inbound = _compile(inbound_state, limit=8).variants[0]
+    assert outbound.compilation.service_regimes[-1].uniform_headway_minutes > 15
+
+    def compiler(state, **_kwargs):
+        return SimpleNamespace(
+            variants=(outbound,) if state.direction == "outbound" else (inbound,),
+            failure=None,
+        )
+
+    result = search_route_service_plans_v1(
+        context=_context(seed_prior=15.0, protection=_protection_authority()),
+        seeds=(outbound_state, inbound_state),
+        budget=CoordinatorSearchBudgetV1(2, 16, 1, 4, 4),
+        compiler=compiler,
+    )
+
+    assert result.statistics.protected_compile_variants_rejected == 0
+    assert result.statistics.fleet_validations_run == 1
+    assert result.pareto_frontier
+    assert result.protection_violations == ()
+
+
+def test_protected_authority_translation_is_deterministic_and_fact_sensitive() -> None:
+    regime = ProtectedServiceFloorEnforcementRegimeV1(
+        regime_id="PEAK-OUTBOUND-1",
+        direction=TripRidershipDirectionV1.OUTBOUND,
+        ordered_b_trip_ids=("O01", "O02", "O03"),
+        maximum_future_c_headway_minutes=15,
+        minimum_future_c_trip_count=3,
+        protected_window_start=0,
+        protected_window_end=1800,
+        future_boundary_tolerance_minutes=2,
+        donor_removal_prohibited=True,
+    )
+    source = ProtectedServiceFloorEnforcementAuthorityV1(
+        scenario_b_fingerprint="1" * 64,
+        assessment_fingerprint="2" * 64,
+        policy_fingerprint="3" * 64,
+        regime_derivation_fingerprint="4" * 64,
+        trip_ridership_input_fingerprint="5" * 64,
+        trip_ridership_analysis_fingerprint="6" * 64,
+        target_load_factor=0.85,
+        maximum_load_factor=0.9,
+        protected_regimes=(regime,),
+        enforcement_profile=PROTECTED_SERVICE_FLOOR_ENFORCEMENT_PROFILE,
+        enforcement_fingerprint="7" * 64,
+    )
+
+    first = translate_protected_service_floor_authority_v1(source)
+    second = translate_protected_service_floor_authority_v1(source)
+    changed = translate_protected_service_floor_authority_v1(
+        dataclasses.replace(
+            source,
+            protected_regimes=(dataclasses.replace(regime, maximum_future_c_headway_minutes=16),),
+        )
+    )
+
+    assert first.status == ACTIVE_TRANSLATED_PROTECTED_WINDOWS
+    assert first.windows == second.windows
+    assert first.translation_fingerprint == second.translation_fingerprint
+    assert changed.translation_fingerprint != first.translation_fingerprint
+    assert not hasattr(first.windows[0], "ordered_b_trip_ids")
+
+
+def test_no_protected_authority_is_explicit_and_does_not_promote_seed_prior() -> None:
+    result = search_route_service_plans_v1(
+        context=_context(seed_prior=15.0),
+        seeds=(_state(),),
+        budget=CoordinatorSearchBudgetV1(1, 8, 1, 2, 2),
+    )
+    payload = route_result_payload_v1(
+        context=_context(seed_prior=15.0),
+        result=result,
+        prior_artifact_verification={},
+    )
+
+    authority = payload["protected_service_authority"]
+    assert authority["status"] == VALID_NO_ENFORCEABLE_WINDOW
+    assert authority["authority_supplied"] is False
+    assert authority["windows"] == []
+    assert payload["seed_headway_prior_minutes"] == {"inbound": 15.0, "outbound": 15.0}
 
 
 def test_fingerprint_cache_prevents_repeated_state_evaluation() -> None:
