@@ -308,9 +308,16 @@ def _shift_boundary_neighbors(
     evidence_code: str | None,
     priority: int,
     affected_indices: Iterable[int] | None,
+    max_trip_count_delta: int | None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     if abs(delta_seconds) != planning_grid_seconds:
         raise ValueError("boundary shifts must be exactly one planning bucket")
+    if max_trip_count_delta is not None and (
+        isinstance(max_trip_count_delta, bool)
+        or not isinstance(max_trip_count_delta, int)
+        or max_trip_count_delta < 0
+    ):
+        raise ValueError("max_trip_count_delta must be a non-negative integer or None")
     result: list[ServicePlanNeighborV1] = []
     for index in _target_indices(len(state.service_regimes) - 1, affected_indices):
         left = state.service_regimes[index]
@@ -323,7 +330,11 @@ def _shift_boundary_neighbors(
         combined = left.trip_count + right.trip_count
         left_min = _state_minimum_trip_count(state, left_shell, floor_headway_minutes)
         right_min = _state_minimum_trip_count(state, right_shell, floor_headway_minutes)
-        for left_count in range(left_min, combined - right_min + 1):
+        left_max = combined - right_min
+        if max_trip_count_delta is not None:
+            left_min = max(left_min, left.trip_count - max_trip_count_delta)
+            left_max = min(left_max, left.trip_count + max_trip_count_delta)
+        for left_count in range(left_min, left_max + 1):
             shifted_left = ServiceRegimeDecisionV1(left.start, boundary, left_count)
             shifted_right = ServiceRegimeDecisionV1(boundary, right.end, combined - left_count)
             regimes = (
@@ -358,6 +369,7 @@ def shift_boundary_left_neighbors_v1(
     evidence_code: str | None = None,
     priority: int = 1,
     affected_indices: Iterable[int] | None = None,
+    max_trip_count_delta: int | None = None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     return _shift_boundary_neighbors(
         state,
@@ -368,6 +380,7 @@ def shift_boundary_left_neighbors_v1(
         evidence_code=evidence_code,
         priority=priority,
         affected_indices=affected_indices,
+        max_trip_count_delta=max_trip_count_delta,
     )
 
 
@@ -379,6 +392,7 @@ def shift_boundary_right_neighbors_v1(
     evidence_code: str | None = None,
     priority: int = 1,
     affected_indices: Iterable[int] | None = None,
+    max_trip_count_delta: int | None = None,
 ) -> tuple[ServicePlanNeighborV1, ...]:
     return _shift_boundary_neighbors(
         state,
@@ -389,6 +403,7 @@ def shift_boundary_right_neighbors_v1(
         evidence_code=evidence_code,
         priority=priority,
         affected_indices=affected_indices,
+        max_trip_count_delta=max_trip_count_delta,
     )
 
 

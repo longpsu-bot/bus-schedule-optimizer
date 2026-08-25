@@ -1086,9 +1086,65 @@ def generate_targeted_neighbors_v1(
             )
         )
 
+    def add_fleet_relief(evidence_code: str) -> None:
+        """Generate structurally bounded one-step changes for pure fleet feedback."""
+
+        add(
+            merge_adjacent_neighbors_v1(
+                state,
+                floor_headway_minutes=floor_headway_minutes,
+                evidence_code=evidence_code,
+                priority=3,
+            )
+        )
+        for operator in (shift_boundary_left_neighbors_v1, shift_boundary_right_neighbors_v1):
+            add(
+                operator(
+                    state,
+                    planning_grid_seconds=planning_grid_seconds,
+                    floor_headway_minutes=floor_headway_minutes,
+                    evidence_code=evidence_code,
+                    priority=0,
+                    max_trip_count_delta=1,
+                )
+            )
+        for operator in (
+            move_one_trip_left_to_right_neighbors_v1,
+            move_one_trip_right_to_left_neighbors_v1,
+        ):
+            add(
+                operator(
+                    state,
+                    floor_headway_minutes=floor_headway_minutes,
+                    evidence_code=evidence_code,
+                    priority=0,
+                )
+            )
+        add(
+            tail_absorb_one_neighbors_v1(
+                state,
+                floor_headway_minutes=floor_headway_minutes,
+                evidence_code=evidence_code,
+                priority=3,
+            )
+        )
+        add(
+            tail_release_one_neighbors_v1(
+                state,
+                floor_headway_minutes=floor_headway_minutes,
+                evidence_code=evidence_code,
+                priority=3,
+            )
+        )
+
     if not feedback:
         add_global(None, targeted=False)
-    for evidence in feedback:
+    pure_fleet_feedback = bool(feedback) and all(
+        evidence.code == FLEET_LIMIT_EXCEEDED for evidence in feedback
+    )
+    if pure_fleet_feedback:
+        add_fleet_relief(FLEET_LIMIT_EXCEEDED)
+    for evidence in () if pure_fleet_feedback else feedback:
         if evidence.code == REDUNDANT_SERVICE_BOUNDARY:
             boundary_index = _nearest_state_boundary_index(
                 state, evidence.boundary_time, evidence.regime_index
@@ -2336,10 +2392,13 @@ def route_result_payload_v1(
                 "MOVE_ONE_TRIP_RIGHT_TO_LEFT",
             ],
             FLEET_LIMIT_EXCEEDED: [
+                "MERGE_ADJACENT",
                 "SHIFT_BOUNDARY_LEFT",
                 "SHIFT_BOUNDARY_RIGHT",
                 "MOVE_ONE_TRIP_LEFT_TO_RIGHT",
                 "MOVE_ONE_TRIP_RIGHT_TO_LEFT",
+                "TAIL_ABSORB_ONE",
+                "TAIL_RELEASE_ONE",
             ],
             TAIL_OVER_SERVICE: ["TAIL_RELEASE_ONE"],
             TAIL_UNDER_SERVICE: ["TAIL_ABSORB_ONE"],

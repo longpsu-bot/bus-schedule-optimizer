@@ -719,6 +719,63 @@ def test_boundary_shift_left_and_right_one_bucket() -> None:
     assert {item.state.boundaries for item in right} == {(2700,)}
 
 
+def test_boundary_shift_default_preserves_exhaustive_feasible_allocations() -> None:
+    state = _state(first_count=5, second_count=5)
+
+    neighbors = shift_boundary_left_neighbors_v1(
+        state,
+        planning_grid_seconds=900,
+        floor_headway_minutes=30.0,
+    )
+
+    assert {item.state.trip_count_vector for item in neighbors} == {
+        (left_count, 10 - left_count) for left_count in range(2, 9)
+    }
+
+
+def test_boundary_shift_fleet_bound_uses_parent_left_count_plus_or_minus_one() -> None:
+    state = _state(first_count=5, second_count=5)
+
+    neighbors = shift_boundary_left_neighbors_v1(
+        state,
+        planning_grid_seconds=900,
+        floor_headway_minutes=30.0,
+        max_trip_count_delta=1,
+    )
+
+    assert {item.state.trip_count_vector for item in neighbors} == {(4, 6), (5, 5), (6, 4)}
+    assert {item.state.total_trips for item in neighbors} == {state.total_trips}
+
+
+def test_boundary_shift_fleet_bound_has_no_exhaustive_fallback() -> None:
+    state = ServicePlanStateV1(
+        route_id="X",
+        direction="outbound",
+        fixed_first_departure=0,
+        fixed_last_departure=10740,
+        service_regimes=(
+            ServiceRegimeDecisionV1(0, 3600, 4),
+            ServiceRegimeDecisionV1(3600, 10800, 10),
+        ),
+        seed_id="NO_FALLBACK",
+    )
+
+    exhaustive = shift_boundary_right_neighbors_v1(
+        state,
+        planning_grid_seconds=1800,
+        floor_headway_minutes=15.0,
+    )
+    bounded = shift_boundary_right_neighbors_v1(
+        state,
+        planning_grid_seconds=1800,
+        floor_headway_minutes=15.0,
+        max_trip_count_delta=1,
+    )
+
+    assert {item.state.trip_count_vector for item in exhaustive} == {(6, 8), (7, 7), (8, 6)}
+    assert bounded == ()
+
+
 def test_one_trip_movement_both_directions() -> None:
     state = _state()
     left_to_right = move_one_trip_left_to_right_neighbors_v1(state, floor_headway_minutes=30.0)
@@ -930,7 +987,7 @@ def test_large_service_shock_generates_smoothing_moves() -> None:
     assert ServicePlanMoveV1.SHIFT_BOUNDARY_LEFT in moves
 
 
-def test_fleet_exceeded_feedback_generates_targeted_neighbors() -> None:
+def test_pure_fleet_feedback_generates_one_step_family_without_split() -> None:
     feedback = (FeedbackEvidenceV1(FLEET_LIMIT_EXCEEDED, "pair", magnitude=1),)
     neighbors = generate_targeted_neighbors_v1(
         _state(first_count=5, second_count=5),
@@ -938,9 +995,72 @@ def test_fleet_exceeded_feedback_generates_targeted_neighbors() -> None:
         planning_grid_seconds=900,
         floor_headway_minutes=30.0,
     )
-    moves = {item.move for item in neighbors if item.priority == 0}
-    assert ServicePlanMoveV1.SHIFT_BOUNDARY_LEFT in moves
-    assert ServicePlanMoveV1.MOVE_ONE_TRIP_RIGHT_TO_LEFT in moves
+    moves = {item.move for item in neighbors}
+    assert ServicePlanMoveV1.SPLIT_REGIME not in moves
+    assert {
+        ServicePlanMoveV1.MERGE_ADJACENT,
+        ServicePlanMoveV1.SHIFT_BOUNDARY_LEFT,
+        ServicePlanMoveV1.SHIFT_BOUNDARY_RIGHT,
+        ServicePlanMoveV1.MOVE_ONE_TRIP_LEFT_TO_RIGHT,
+        ServicePlanMoveV1.MOVE_ONE_TRIP_RIGHT_TO_LEFT,
+    } <= moves
+    shifted = [
+        item
+        for item in neighbors
+        if item.move
+        in {ServicePlanMoveV1.SHIFT_BOUNDARY_LEFT, ServicePlanMoveV1.SHIFT_BOUNDARY_RIGHT}
+    ]
+    assert shifted
+    assert all(abs(item.state.trip_count_vector[0] - 5) <= 1 for item in shifted)
+
+
+@pytest.mark.parametrize("regime_count", (1, 2, 4, 7))
+def test_pure_fleet_feedback_obeys_structural_child_bound(regime_count: int) -> None:
+    planning_grid_seconds = 900
+    state = ServicePlanStateV1(
+        route_id="X",
+        direction="outbound",
+        fixed_first_departure=0,
+        fixed_last_departure=regime_count * planning_grid_seconds - 60,
+        service_regimes=tuple(
+            ServiceRegimeDecisionV1(
+                index * planning_grid_seconds,
+                (index + 1) * planning_grid_seconds,
+                5,
+            )
+            for index in range(regime_count)
+        ),
+        seed_id=f"BOUND-{regime_count}",
+    )
+
+    neighbors = generate_targeted_neighbors_v1(
+        state,
+        feedback=(FeedbackEvidenceV1(FLEET_LIMIT_EXCEEDED, "pair", magnitude=1),),
+        planning_grid_seconds=planning_grid_seconds,
+        floor_headway_minutes=None,
+    )
+
+    assert len(neighbors) <= 9 * (regime_count - 1) + 2
+    assert all(item.move != ServicePlanMoveV1.SPLIT_REGIME for item in neighbors)
+
+
+def test_mixed_fleet_feedback_keeps_global_split_semantics() -> None:
+    neighbors = generate_targeted_neighbors_v1(
+        _state(first_count=5, second_count=5),
+        feedback=(
+            FeedbackEvidenceV1(FLEET_LIMIT_EXCEEDED, "pair", magnitude=1),
+            FeedbackEvidenceV1(
+                DEMAND_UNDERSERVED_INTERVAL,
+                "outbound",
+                interval_start=0,
+                interval_end=1800,
+            ),
+        ),
+        planning_grid_seconds=900,
+        floor_headway_minutes=30.0,
+    )
+
+    assert any(item.move == ServicePlanMoveV1.SPLIT_REGIME for item in neighbors)
 
 
 def test_repeated_fleet_feedback_expands_each_semantic_parent_once(monkeypatch) -> None:

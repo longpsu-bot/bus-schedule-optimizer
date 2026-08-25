@@ -93,7 +93,7 @@ The only state transitions are:
 - `TAIL_RELEASE_ONE`
 
 Splits enumerate every grid-aligned boundary and every structurally feasible integer split.
-Boundary shifts move exactly one planning bucket and enumerate every structurally feasible
+Generic boundary shifts move exactly one planning bucket and enumerate every structurally feasible
 redistribution of the two affected regimes. Every regime retains at least two trips and every move
 preserves the authoritative direction total. The generic helpers remain backward compatible with
 callers that intentionally provide a headway floor, but this coordinator passes no global floor.
@@ -103,20 +103,32 @@ request that boundary's merge. Frequency-jump feedback touches only the adjacent
 regimes. Demand under/over feedback touches regimes overlapping the diagnosed interval and their
 immediate donors. A canonical response boundary inside a ServiceRegime targets that regime's local
 split and adjacent revision opportunities; an existing ServicePlan boundary targets only its two
-adjacent regimes. Tail feedback remains tail-local, while fleet feedback remains globally
-informative because feasibility is cross-directional. Fingerprint deduplication and deterministic
-ordering are unchanged, and localization does not increase the neighbor bound.
+adjacent regimes. Tail feedback remains tail-local. Pure fleet feedback is cross-directional exact
+operational evidence, so it may revise every existing boundary, but it does not identify a missing
+demand boundary, a new service state, or a region requiring subdivision. It therefore uses merges,
+one-grid boundary shifts, one-trip transfers, and one-trip tail moves, but never creates a new
+ServiceRegime with `SPLIT_REGIME`. A fleet boundary shift permits only feasible left-regime counts
+equal to the parent's count minus one, unchanged, or plus one; it does not fall back to exhaustive
+redistribution. Demand-response and other localized ServicePlan evidence retain their split
+authority, including a split at a diagnosed canonical DemandRegime boundary. Fingerprint
+deduplication and deterministic ordering are unchanged.
+
+For `N` ServiceRegimes, the pure-fleet family has a semantic upper bound before fingerprint
+deduplication of `9 * (N - 1) + 2`: per boundary, at most one merge, three left-shift allocations,
+three right-shift allocations, and one transfer in each direction, plus at most two tail moves.
+This is a consequence of the one-step actions, not a truncation limit.
 
 Within one coordinator search, a semantic ServicePlan parent receives the global
-`FLEET_LIMIT_EXCEEDED` revision family at most once when an enqueue request contains only fleet
-feedback. Independently evaluated infeasible exact pairs still count as separate feedback events,
+`FLEET_LIMIT_EXCEEDED` one-step revision family at most once when an enqueue request contains only
+fleet feedback. Independently evaluated infeasible exact pairs still count as separate feedback events,
 while fleet expansion requests, executions, and skips are reported separately. Mixed or non-fleet
 feedback remains unaffected. The cache is intentionally keyed by the semantic ServicePlan
 fingerprint rather than compilation, pair, history, or fleet-excess magnitude. If bounded-queue
 admission rejects a generated child, later pair multiplicity does not regenerate that unchanged
 child for another admission attempt. This changes bounded search-control semantics and may change
-the explored frontier; it does not change queue priority, search budgets, or the fleet neighbor
-operator family.
+the explored frontier. F2 changes the pure-fleet operator family, but it does not change generic or
+non-fleet operators, queue priority, D1 queue identity, search budgets, Pareto semantics, the
+compiler, or the exact fleet validator.
 
 ## Compilation frontier
 
