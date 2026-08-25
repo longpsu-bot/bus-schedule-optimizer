@@ -27,6 +27,7 @@ from bus_schedule_engine.contracts_v1.closed_loop_service_protection import (
 )
 from bus_schedule_engine.contracts_v1.service_plan_state import (
     ServicePlanMoveV1,
+    ServicePlanNeighborV1,
     ServicePlanStateV1,
     ServiceRegimeDecisionV1,
     merge_adjacent_neighbors_v1,
@@ -113,6 +114,22 @@ def _authority(
         fixed_first_departure=0,
         fixed_last_departure=fixed_last,
         authority_source="test",
+    )
+
+
+def _neighbor(
+    state: ServicePlanStateV1,
+    *,
+    evidence_code: str | None,
+    priority: int = 0,
+    move: ServicePlanMoveV1 = ServicePlanMoveV1.MOVE_ONE_TRIP_LEFT_TO_RIGHT,
+) -> ServicePlanNeighborV1:
+    return ServicePlanNeighborV1(
+        move=move,
+        affected_index=0,
+        priority=priority,
+        evidence_code=evidence_code,
+        state=state,
     )
 
 
@@ -211,6 +228,143 @@ def test_bounded_open_queue_pop_order_is_priority_then_fingerprint() -> None:
     assert queue.heap == []
 
 
+def test_seed_response_anchor_then_ordinary_lane_order() -> None:
+    context = _context()
+    seed = _state(first_count=4, second_count=4, seed="SEED")
+    response = _neighbor(
+        _state(first_count=3, second_count=5, seed="RESPONSE"),
+        evidence_code=DEMAND_RESPONSE_DIRECTION_MISMATCH,
+    )
+    ordinary = _neighbor(
+        _state(first_count=5, second_count=3, seed="ORDINARY"),
+        evidence_code=DEMAND_UNDERSERVED_INTERVAL,
+    )
+    queue = coordinator._BoundedOpenQueue(limit=3)
+    assert queue.push(
+        seed, coordinator._queue_priority(seed, operator_priority=0, context=context)
+    )[0]
+    assert queue.push(
+        response.state,
+        coordinator._queue_priority(response.state, operator_priority=1, context=context),
+    )[0]
+    assert queue.push(
+        ordinary.state,
+        coordinator._ordinary_neighbor_queue_priority(ordinary, context=context),
+    )[0]
+
+    assert [queue.pop()[0] for _ in range(3)] == [seed, response.state, ordinary.state]
+
+
+def test_search_evaluates_seed_then_response_anchor_then_ordinary_neighbor(
+    monkeypatch,
+) -> None:
+    seed = _state(seed="SEED")
+    response_state = _response_child(
+        seed,
+        evidence_code=DEMAND_RESPONSE_DIRECTION_MISMATCH,
+        first_count=3,
+        second_count=5,
+    )
+    ordinary_state = _response_child(
+        seed,
+        evidence_code=DEMAND_UNDERSERVED_INTERVAL,
+        first_count=5,
+        second_count=3,
+    )
+    real_evaluate = coordinator.evaluate_actual_service_v1
+    evaluated: list[ServicePlanStateV1] = []
+    evaluation_count = 0
+
+    def compiler(state, **_kwargs):
+        evaluated.append(state)
+        return SimpleNamespace(variants=_compile(state, limit=1).variants, failure=None)
+
+    def seed_response_only(candidate, **kwargs):
+        nonlocal evaluation_count
+        metrics, _ = real_evaluate(candidate, **kwargs)
+        feedback = (
+            _response_feedback(candidate.compilation.direction) if evaluation_count == 0 else ()
+        )
+        evaluation_count += 1
+        return metrics, feedback
+
+    def two_lanes(_state, *, feedback, **_kwargs):
+        if not feedback:
+            return ()
+        return (
+            _neighbor(
+                response_state,
+                evidence_code=DEMAND_RESPONSE_DIRECTION_MISMATCH,
+            ),
+            _neighbor(ordinary_state, evidence_code=DEMAND_UNDERSERVED_INTERVAL),
+        )
+
+    monkeypatch.setattr(coordinator, "evaluate_actual_service_v1", seed_response_only)
+    monkeypatch.setattr(coordinator, "generate_targeted_neighbors_v1", two_lanes)
+    result = search_route_service_plans_v1(
+        context=_context(),
+        seeds=(seed,),
+        budget=CoordinatorSearchBudgetV1(3, 8, 1, 4, 4),
+        compiler=compiler,
+    )
+
+    assert evaluated == [seed, response_state, ordinary_state]
+    assert result.statistics.response_feedback_anchors_evaluated == 1
+
+
+def test_ordinary_lane_offset_preserves_relative_semantic_order() -> None:
+    context = _context()
+    neighbors = (
+        _neighbor(_state(first_count=3, second_count=5), evidence_code=None, priority=0),
+        _neighbor(_state(first_count=5, second_count=3), evidence_code=None, priority=0),
+        _neighbor(_state(first_count=6, second_count=2), evidence_code=None, priority=2),
+    )
+    before = sorted(
+        neighbors,
+        key=lambda item: coordinator._queue_priority(
+            item.state,
+            operator_priority=item.priority + 1,
+            context=context,
+        ),
+    )
+    after = sorted(
+        neighbors,
+        key=lambda item: coordinator._ordinary_neighbor_queue_priority(item, context=context),
+    )
+
+    assert after == before
+
+
+def test_best_response_anchor_uses_ordinary_queue_quality_not_generator_position() -> None:
+    context = _context()
+    worse = _neighbor(
+        _state(first_count=6, second_count=2, seed="WORSE"),
+        evidence_code=DEMAND_RESPONSE_DIRECTION_MISMATCH,
+    )
+    best = _neighbor(
+        _state(first_count=4, second_count=4, seed="BEST"),
+        evidence_code=DEMAND_RESPONSE_DIRECTION_MISMATCH,
+    )
+    middle = _neighbor(
+        _state(first_count=5, second_count=3, seed="MIDDLE"),
+        evidence_code=DEMAND_RESPONSE_DIRECTION_MISMATCH,
+    )
+    candidates = (worse, middle, best)
+
+    selected = coordinator._select_response_feedback_anchor(
+        candidates,
+        seen=set(),
+        context=context,
+    )
+    expected = min(
+        candidates,
+        key=lambda item: coordinator._ordinary_neighbor_queue_priority(item, context=context),
+    )
+
+    assert selected is expected
+    assert selected is not candidates[0]
+
+
 def _context(
     *,
     fleet_ceiling: int = 20,
@@ -283,6 +437,184 @@ def _compile(state: ServicePlanStateV1, limit: int = 8):
         endpoint_authority=_authority(state.direction, fixed_last=state.fixed_last_departure),
         compile_frontier_limit=limit,
     )
+
+
+def _response_feedback(direction: str) -> tuple[FeedbackEvidenceV1, ...]:
+    return (
+        FeedbackEvidenceV1(
+            DEMAND_RESPONSE_DIRECTION_MISMATCH,
+            direction,
+            boundary_time=1800,
+        ),
+    )
+
+
+def _response_child(
+    parent: ServicePlanStateV1,
+    *,
+    evidence_code: str,
+    first_count: int,
+    second_count: int,
+) -> ServicePlanStateV1:
+    return dataclasses.replace(
+        parent,
+        service_regimes=(
+            dataclasses.replace(parent.service_regimes[0], trip_count=first_count),
+            dataclasses.replace(parent.service_regimes[1], trip_count=second_count),
+        ),
+        parent_fingerprint=service_plan_fingerprint_v1(parent),
+        operation=ServicePlanMoveV1.MOVE_ONE_TRIP_LEFT_TO_RIGHT.value,
+        operation_evidence=evidence_code,
+    )
+
+
+def _run_lane_search(monkeypatch, *, promotion: bool = False):
+    original_queue = coordinator._BoundedOpenQueue
+    real_evaluate = coordinator.evaluate_actual_service_v1
+    queue_log: list[tuple[str, str | None, int, bool, int | None]] = []
+    popped: list[ServicePlanStateV1] = []
+    compiled: list[ServicePlanStateV1] = []
+
+    class RecordingQueue:
+        def __init__(self, limit: int) -> None:
+            self.inner = original_queue(limit)
+
+        def push(self, state, priority):
+            result = self.inner.push(state, priority)
+            active = self.inner.active.get(service_plan_fingerprint_v1(state))
+            queue_log.append(
+                (
+                    state.direction,
+                    state.operation_evidence,
+                    priority[0],
+                    result[0],
+                    None if active is None else active[1],
+                )
+            )
+            return result
+
+        def pop(self):
+            value = self.inner.pop()
+            if value is not None:
+                popped.append(value[0])
+            return value
+
+        def __bool__(self):
+            return bool(self.inner)
+
+    def compiler(state, **_kwargs):
+        compiled.append(state)
+        return SimpleNamespace(variants=_compile(state, limit=1).variants, failure=None)
+
+    def response_on_every_evaluation(candidate, **kwargs):
+        metrics, _ = real_evaluate(candidate, **kwargs)
+        return metrics, _response_feedback(candidate.compilation.direction)
+
+    def scripted_neighbors(state, *, feedback, **_kwargs):
+        if not feedback or feedback[0].code != DEMAND_RESPONSE_DIRECTION_MISMATCH:
+            return ()
+        first, second = state.trip_count_vector
+        if first <= 2:
+            return ()
+        response_state = _response_child(
+            state,
+            evidence_code=DEMAND_RESPONSE_DIRECTION_MISMATCH,
+            first_count=first - 1,
+            second_count=second + 1,
+        )
+        response = _neighbor(
+            response_state,
+            evidence_code=DEMAND_RESPONSE_DIRECTION_MISMATCH,
+        )
+        if not promotion or state.operation is not None:
+            return (response,)
+        ordinary_state = dataclasses.replace(
+            response_state,
+            operation_evidence=FLEET_LIMIT_EXCEEDED,
+        )
+        ordinary = _neighbor(ordinary_state, evidence_code=FLEET_LIMIT_EXCEEDED)
+        return ordinary, response
+
+    monkeypatch.setattr(coordinator, "_BoundedOpenQueue", RecordingQueue)
+    monkeypatch.setattr(coordinator, "evaluate_actual_service_v1", response_on_every_evaluation)
+    monkeypatch.setattr(coordinator, "generate_targeted_neighbors_v1", scripted_neighbors)
+    seeds = (
+        _state("outbound", seed="OUT"),
+        *(() if promotion else (_state("inbound", seed="IN"),)),
+    )
+    result = search_route_service_plans_v1(
+        context=_context(),
+        seeds=seeds,
+        budget=CoordinatorSearchBudgetV1(6, 32, 1, 8, 8),
+        compiler=compiler,
+    )
+    return result, queue_log, popped, compiled
+
+
+def test_one_response_anchor_per_direction_and_later_response_children_are_ordinary(
+    monkeypatch,
+) -> None:
+    result, queue_log, _, _ = _run_lane_search(monkeypatch)
+    special = [
+        row for row in queue_log if row[1] == DEMAND_RESPONSE_DIRECTION_MISMATCH and row[2] == 1
+    ]
+    later = [
+        row for row in queue_log if row[1] == DEMAND_RESPONSE_DIRECTION_MISMATCH and row[2] >= 2
+    ]
+
+    assert [row[0] for row in special] == ["outbound", "inbound"]
+    assert {row[0] for row in later} == {"outbound", "inbound"}
+    assert len(special) == result.statistics.response_feedback_anchors_enqueued == 2
+    assert result.statistics.response_feedback_anchor_candidates == 2
+    assert result.statistics.response_feedback_anchors_evaluated == 2
+    assert result.statistics.response_feedback_anchors_enqueued <= 2
+
+
+def test_active_ordinary_child_is_promoted_with_new_ticket_and_response_history(
+    monkeypatch,
+) -> None:
+    result, queue_log, popped, compiled = _run_lane_search(monkeypatch, promotion=True)
+    child_pushes = [row for row in queue_log if row[1] is not None][:2]
+
+    assert [row[2] for row in child_pushes] == [2, 1]
+    assert all(row[3] for row in child_pushes)
+    assert child_pushes[1][4] > child_pushes[0][4]
+    assert popped[1].operation_evidence == DEMAND_RESPONSE_DIRECTION_MISMATCH
+    assert compiled[1].operation_evidence == DEMAND_RESPONSE_DIRECTION_MISMATCH
+    assert len(popped) == len({service_plan_fingerprint_v1(state) for state in popped})
+    history = result.revision_examples[ServicePlanMoveV1.MOVE_ONE_TRIP_LEFT_TO_RIGHT.value]
+    assert any(DEMAND_RESPONSE_DIRECTION_MISMATCH in item for item in history)
+    assert result.statistics.response_feedback_anchor_candidates == 1
+    assert result.statistics.response_feedback_anchors_enqueued == 1
+    assert result.statistics.response_feedback_anchors_evaluated == 1
+
+
+def test_response_anchor_search_is_deterministic(monkeypatch) -> None:
+    signatures = []
+    for _ in range(2):
+        with monkeypatch.context() as patch:
+            result, queue_log, popped, _ = _run_lane_search(patch)
+        signatures.append(
+            (
+                result.status,
+                dataclasses.asdict(result.statistics),
+                tuple(
+                    service_plan_fingerprint_v1(state)
+                    for state in popped
+                    if state.operation_evidence == DEMAND_RESPONSE_DIRECTION_MISMATCH
+                ),
+                result.evaluated_state_fingerprints,
+                dict(result.feedback_code_counts),
+                tuple(item.pair_fingerprint for item in result.pareto_frontier),
+                queue_log,
+            )
+        )
+
+    assert signatures[0] == signatures[1]
+
+
+def test_default_coordinator_budgets_remain_frozen() -> None:
+    assert dataclasses.astuple(DEFAULT_COORDINATOR_SEARCH_BUDGET_V1) == (24, 512, 4, 24, 512)
 
 
 def _run_scripted_pair_feedback_search(monkeypatch, pair_feedback_script):

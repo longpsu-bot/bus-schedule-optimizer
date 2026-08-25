@@ -1,0 +1,1194 @@
+{
+  "evidence_profile": "pr62_f3_response_queue_fairness_v1",
+  "f2_artifact": {
+    "committed_head_sha": "473afa9e542b38936be69e3f7463df8649c0ef58",
+    "path": "docs/engine/evidence/PR62_F2_FLEET_NEIGHBORHOOD_NARROWING.json",
+    "sha256": "2044cf8e1fcbe14376bed6768d20ff959d99537f5e8ec6bfd64a59c7f719a524",
+    "size_bytes": 19711
+  },
+  "pilot_inputs": {
+    "generated_artifact_root": "bus-schedule-optimizer-main-run",
+    "read_only_untracked_inputs_committed": false,
+    "route_workbook_basenames": {
+      "10": "Engine_Input_MST_10_V3_MultiPeriod_Mar-Jul_2026.xlsx",
+      "6": "Engine_Input_MST_6_V3_MultiPeriod_Mar-Jul_2026.xlsx"
+    }
+  },
+  "post_f3_decision": {
+    "classification": "RESPONSE_FAIRNESS_SUFFICIENT",
+    "search_controller_adequate_for_final_timetable_selection": true,
+    "settlement_classification": "SETTLEMENT_NOT_CURRENTLY_NEEDED"
+  },
+  "production_change_statement": {
+    "compiler_changed": false,
+    "d1_queue_identity_changed": false,
+    "demand_response_diagnosis_changed": false,
+    "f1_idempotence_changed": false,
+    "f2_fleet_family_changed": false,
+    "fleet_validator_changed": false,
+    "pareto_changed": false,
+    "production_search_controller_semantics_changed": true,
+    "queue_ordering_change_scope": "bounded response-anchor lane only",
+    "queue_ordering_changed": true,
+    "search_budgets_changed": false,
+    "settlement_added": false
+  },
+  "queue_lane_semantics": {
+    "anchor_selection": "minimum eligible unseen response child under its ordinary semantic queue key",
+    "lane_0": "seed states",
+    "lane_1": "at most one selected DEMAND_RESPONSE_DIRECTION_MISMATCH anchor per direction",
+    "lane_2_plus": "ordinary revision children at neighbor.priority + 2",
+    "maximum_special_anchors_per_route": 2,
+    "ordinary_relative_quality_order": [
+      "operator priority",
+      "precompile demand mismatch",
+      "ServiceRegime count",
+      "trip-count vector",
+      "boundaries",
+      "direction",
+      "semantic fingerprint"
+    ]
+  },
+  "required_starting_sha": "473afa9e542b38936be69e3f7463df8649c0ef58",
+  "routes": {
+    "10": {
+      "determinism": {
+        "compared_fields": [
+          "status",
+          "statistics",
+          "evaluated_state_fingerprints",
+          "directional_archive_fingerprints",
+          "pareto_pair_fingerprints",
+          "metrics",
+          "feedback_code_counts",
+          "revision_examples",
+          "serialized_frontier_fingerprint",
+          "queue_at_stop",
+          "compile_failures",
+          "generation_by_code",
+          "response_anchor_fingerprints"
+        ],
+        "passed": true,
+        "signature_sha256": "7b34465b5dceb573e7500aecd363874143df8723ebc6f716196408468c7ae3ba"
+      },
+      "f2": {
+        "frontier": {
+          "metric_ranges": {
+            "demand_response_direction_accuracy": {
+              "maximum": 1.0,
+              "minimum": 0.11965811965811966
+            },
+            "demand_weighted_expected_passenger_wait_minutes": {
+              "maximum": 10.064759999058358,
+              "minimum": 9.537104608551676
+            },
+            "fleet_required": {
+              "maximum": 13,
+              "minimum": 11
+            },
+            "observed_demand_mismatch": {
+              "maximum": 0.014004741204219927,
+              "minimum": 0.007901129936465988
+            }
+          },
+          "pareto_size": 124,
+          "representative": {
+            "actual_service_regime_count": 12,
+            "demand_weighted_expected_passenger_wait_minutes": 9.537104608551676,
+            "fleet_required": 12,
+            "inbound_service_regimes": [
+              {
+                "first_departure": 17100,
+                "last_departure": 25080,
+                "trip_count": 8,
+                "uniform_headway_minutes": 19
+              },
+              {
+                "first_departure": 26280,
+                "last_departure": 55080,
+                "trip_count": 25,
+                "uniform_headway_minutes": 20
+              },
+              {
+                "first_departure": 56100,
+                "last_departure": 62220,
+                "trip_count": 7,
+                "uniform_headway_minutes": 17
+              },
+              {
+                "first_departure": 63240,
+                "last_departure": 70800,
+                "trip_count": 7,
+                "uniform_headway_minutes": 21
+              },
+              {
+                "first_departure": 72000,
+                "last_departure": 75600,
+                "trip_count": 4,
+                "uniform_headway_minutes": 20
+              }
+            ],
+            "meaningful_demand_differentiation": true,
+            "minimum_directional_frequency_ratio": 1.2352941176470587,
+            "observed_demand_mismatch": 0.011870927003400686,
+            "outbound_service_regimes": [
+              {
+                "first_departure": 18000,
+                "last_departure": 23100,
+                "trip_count": 6,
+                "uniform_headway_minutes": 17
+              },
+              {
+                "first_departure": 24120,
+                "last_departure": 28440,
+                "trip_count": 5,
+                "uniform_headway_minutes": 18
+              },
+              {
+                "first_departure": 29520,
+                "last_departure": 42720,
+                "trip_count": 12,
+                "uniform_headway_minutes": 20
+              },
+              {
+                "first_departure": 43860,
+                "last_departure": 55260,
+                "trip_count": 11,
+                "uniform_headway_minutes": 19
+              },
+              {
+                "first_departure": 56280,
+                "last_departure": 62400,
+                "trip_count": 7,
+                "uniform_headway_minutes": 17
+              },
+              {
+                "first_departure": 63420,
+                "last_departure": 67380,
+                "trip_count": 4,
+                "uniform_headway_minutes": 22
+              },
+              {
+                "first_departure": 68700,
+                "last_departure": 75600,
+                "trip_count": 6,
+                "uniform_headway_minutes": 23
+              }
+            ],
+            "pair_fingerprint": "e8daa851f95a2eee08d6e6ccf6524adfbd5a0187932dcf35cb90f257f9d0043b",
+            "sustained_clean_service_regimes": true
+          }
+        },
+        "search": {
+          "duplicate_states_skipped": 710,
+          "fleet_children_by_move": {
+            "MERGE_ADJACENT": 143,
+            "MOVE_ONE_TRIP_LEFT_TO_RIGHT": 139,
+            "MOVE_ONE_TRIP_RIGHT_TO_LEFT": 132,
+            "SHIFT_BOUNDARY_LEFT": 406,
+            "SHIFT_BOUNDARY_RIGHT": 406,
+            "SPLIT_REGIME": 0,
+            "TAIL_ABSORB_ONE": 0,
+            "TAIL_RELEASE_ONE": 0
+          },
+          "fleet_children_share_of_generated": 0.1525634644101543,
+          "fleet_feedback_event_count": 973,
+          "fleet_feedback_expansion_requests": 1946,
+          "fleet_feedback_expansions_executed": 23,
+          "fleet_feedback_expansions_skipped": 1923,
+          "fleet_feedback_generated_children": 1226,
+          "fleet_neighbors_per_executed_parent": {
+            "executed_parent_count": 23,
+            "maximum": 68,
+            "median": 59,
+            "minimum": 36,
+            "total": 1226
+          },
+          "fleet_validations_run": 1392,
+          "generation_to_evaluation_ratio": 334.8333333333333,
+          "open_queue_at_stop": 512,
+          "pareto_size": 124,
+          "response_mismatch": {
+            "evaluated_descendants": 8,
+            "feasible_pair_participation": 103,
+            "final_pareto_ancestry": 28,
+            "generated_child_states": 279,
+            "pair_participation": 672,
+            "retained_directional_compilations": 13
+          },
+          "states_evaluated": 24,
+          "states_generated": 8036,
+          "states_pruned": 6790,
+          "status": "SEARCH_BUDGET_EXHAUSTED"
+        }
+      },
+      "f3": {
+        "clean_boundary_blocker_count": 0,
+        "final_directional_archive_sizes": {
+          "inbound": 24,
+          "outbound": 24
+        },
+        "frontier": {
+          "metric_ranges": {
+            "demand_response_direction_accuracy": {
+              "maximum": 1.0,
+              "minimum": 0.11965811965811966
+            },
+            "demand_weighted_expected_passenger_wait_minutes": {
+              "maximum": 9.932414290982994,
+              "minimum": 9.537104608551676
+            },
+            "fleet_required": {
+              "maximum": 13,
+              "minimum": 11
+            },
+            "observed_demand_mismatch": {
+              "maximum": 0.014004741204219927,
+              "minimum": 0.008305939383517763
+            }
+          },
+          "pareto_size": 129,
+          "representative": {
+            "credible_clean_route_6_candidate": true,
+            "inbound_service_regimes": [
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-01"
+                ],
+                "departures": [
+                  17100,
+                  18240,
+                  19380,
+                  20520,
+                  21660,
+                  22800,
+                  23940,
+                  25080
+                ],
+                "direction": "inbound",
+                "first_departure": 17100,
+                "last_departure": 25080,
+                "service_regime_id": "SERVICE-INBOUND-01",
+                "trip_count": 8,
+                "uniform_headway_minutes": 19
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-02"
+                ],
+                "departures": [
+                  26280,
+                  27480,
+                  28680,
+                  29880,
+                  31080,
+                  32280,
+                  33480,
+                  34680,
+                  35880,
+                  37080,
+                  38280,
+                  39480,
+                  40680,
+                  41880,
+                  43080,
+                  44280,
+                  45480,
+                  46680,
+                  47880,
+                  49080,
+                  50280,
+                  51480,
+                  52680,
+                  53880,
+                  55080
+                ],
+                "direction": "inbound",
+                "first_departure": 26280,
+                "last_departure": 55080,
+                "service_regime_id": "SERVICE-INBOUND-02",
+                "trip_count": 25,
+                "uniform_headway_minutes": 20
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-03"
+                ],
+                "departures": [
+                  56100,
+                  57120,
+                  58140,
+                  59160,
+                  60180,
+                  61200,
+                  62220
+                ],
+                "direction": "inbound",
+                "first_departure": 56100,
+                "last_departure": 62220,
+                "service_regime_id": "SERVICE-INBOUND-03",
+                "trip_count": 7,
+                "uniform_headway_minutes": 17
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-04"
+                ],
+                "departures": [
+                  63240,
+                  64500,
+                  65760,
+                  67020,
+                  68280,
+                  69540,
+                  70800
+                ],
+                "direction": "inbound",
+                "first_departure": 63240,
+                "last_departure": 70800,
+                "service_regime_id": "SERVICE-INBOUND-04",
+                "trip_count": 7,
+                "uniform_headway_minutes": 21
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-05"
+                ],
+                "departures": [
+                  72000,
+                  73200,
+                  74400,
+                  75600
+                ],
+                "direction": "inbound",
+                "first_departure": 72000,
+                "last_departure": 75600,
+                "service_regime_id": "SERVICE-INBOUND-05",
+                "trip_count": 4,
+                "uniform_headway_minutes": 20
+              }
+            ],
+            "metrics": {
+              "actual_service_regime_count": 12,
+              "demand_weighted_expected_passenger_wait_minutes": 9.537104608551676,
+              "fleet_required": 12,
+              "max_excess_terminal_wait": 58,
+              "max_frequency_jump": 0.2578291093020998,
+              "moved_trips_vs_b": 16,
+              "observed_demand_mismatch": 0.011870927003400686,
+              "total_excess_terminal_wait": 2257,
+              "total_frequency_variation": 1.1012302125904478
+            },
+            "outbound_service_regimes": [
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-01"
+                ],
+                "departures": [
+                  18000,
+                  19020,
+                  20040,
+                  21060,
+                  22080,
+                  23100
+                ],
+                "direction": "outbound",
+                "first_departure": 18000,
+                "last_departure": 23100,
+                "service_regime_id": "SERVICE-OUTBOUND-01",
+                "trip_count": 6,
+                "uniform_headway_minutes": 17
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-02"
+                ],
+                "departures": [
+                  24120,
+                  25200,
+                  26280,
+                  27360,
+                  28440
+                ],
+                "direction": "outbound",
+                "first_departure": 24120,
+                "last_departure": 28440,
+                "service_regime_id": "SERVICE-OUTBOUND-02",
+                "trip_count": 5,
+                "uniform_headway_minutes": 18
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-03",
+                  "PLAN-OUTBOUND-04"
+                ],
+                "departures": [
+                  29520,
+                  30720,
+                  31920,
+                  33120,
+                  34320,
+                  35520,
+                  36720,
+                  37920,
+                  39120,
+                  40320,
+                  41520,
+                  42720
+                ],
+                "direction": "outbound",
+                "first_departure": 29520,
+                "last_departure": 42720,
+                "service_regime_id": "SERVICE-OUTBOUND-03",
+                "trip_count": 12,
+                "uniform_headway_minutes": 20
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-05"
+                ],
+                "departures": [
+                  43860,
+                  45000,
+                  46140,
+                  47280,
+                  48420,
+                  49560,
+                  50700,
+                  51840,
+                  52980,
+                  54120,
+                  55260
+                ],
+                "direction": "outbound",
+                "first_departure": 43860,
+                "last_departure": 55260,
+                "service_regime_id": "SERVICE-OUTBOUND-04",
+                "trip_count": 11,
+                "uniform_headway_minutes": 19
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-06"
+                ],
+                "departures": [
+                  56280,
+                  57300,
+                  58320,
+                  59340,
+                  60360,
+                  61380,
+                  62400
+                ],
+                "direction": "outbound",
+                "first_departure": 56280,
+                "last_departure": 62400,
+                "service_regime_id": "SERVICE-OUTBOUND-05",
+                "trip_count": 7,
+                "uniform_headway_minutes": 17
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-07"
+                ],
+                "departures": [
+                  63420,
+                  64740,
+                  66060,
+                  67380
+                ],
+                "direction": "outbound",
+                "first_departure": 63420,
+                "last_departure": 67380,
+                "service_regime_id": "SERVICE-OUTBOUND-06",
+                "trip_count": 4,
+                "uniform_headway_minutes": 22
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-08"
+                ],
+                "departures": [
+                  68700,
+                  70080,
+                  71460,
+                  72840,
+                  74220,
+                  75600
+                ],
+                "direction": "outbound",
+                "first_departure": 68700,
+                "last_departure": 75600,
+                "service_regime_id": "SERVICE-OUTBOUND-07",
+                "trip_count": 6,
+                "uniform_headway_minutes": 23
+              }
+            ],
+            "pair_fingerprint": "e8daa851f95a2eee08d6e6ccf6524adfbd5a0187932dcf35cb90f257f9d0043b",
+            "selection": "minimum exact passenger wait among structurally non-isolated, demand-differentiated Pareto pairs when available; otherwise minimum exact passenger wait"
+          }
+        },
+        "response_mismatch": {
+          "anchor_candidate_count": 2,
+          "anchor_fingerprints_by_direction": {
+            "inbound": "cb5da85b36d4d6438cd1cf0e4775207fcdb919d1cf821ff92648bc7ed3755728",
+            "outbound": "2bb7c519eee0e600b21c074274a86cbd84be5e40f98bdf84630294352ab86488"
+          },
+          "anchors_enqueued": 2,
+          "anchors_evaluated": 2,
+          "emitted_count": 59,
+          "evaluated_descendants": 7,
+          "feasible_pair_participation": 155,
+          "final_pareto_ancestry": 38,
+          "generated_child_states": 279,
+          "retained_directional_compilations": 13
+        },
+        "search_statistics": {
+          "budget_exhausted": true,
+          "compile_variants_evaluated": 88,
+          "duplicate_states_skipped": 683,
+          "fleet_feedback_expansion_requests": 1798,
+          "fleet_feedback_expansions_executed": 23,
+          "fleet_feedback_expansions_skipped": 1775,
+          "fleet_validations_run": 1352,
+          "protected_compile_variants_rejected": 0,
+          "response_feedback_anchor_candidates": 2,
+          "response_feedback_anchors_enqueued": 2,
+          "response_feedback_anchors_evaluated": 2,
+          "search_iterations": 24,
+          "states_evaluated": 24,
+          "states_generated": 8469,
+          "states_pruned": 7250
+        },
+        "settlement_classification": "SETTLEMENT_NOT_CURRENTLY_NEEDED",
+        "status": "SEARCH_BUDGET_EXHAUSTED"
+      },
+      "route_id": "10"
+    },
+    "6": {
+      "determinism": {
+        "compared_fields": [
+          "status",
+          "statistics",
+          "evaluated_state_fingerprints",
+          "directional_archive_fingerprints",
+          "pareto_pair_fingerprints",
+          "metrics",
+          "feedback_code_counts",
+          "revision_examples",
+          "serialized_frontier_fingerprint",
+          "queue_at_stop",
+          "compile_failures",
+          "generation_by_code",
+          "response_anchor_fingerprints"
+        ],
+        "passed": true,
+        "signature_sha256": "96823d042bccca5ceb611ceacc47850200326ed43b2c73f756053cf3f7dd676f"
+      },
+      "f2": {
+        "frontier": {
+          "metric_ranges": {
+            "demand_response_direction_accuracy": {
+              "maximum": 1.0,
+              "minimum": 0.5673352435530086
+            },
+            "demand_weighted_expected_passenger_wait_minutes": {
+              "maximum": 6.237120455185592,
+              "minimum": 6.043783393326659
+            },
+            "fleet_required": {
+              "maximum": 20,
+              "minimum": 14
+            },
+            "observed_demand_mismatch": {
+              "maximum": 0.015650510405009692,
+              "minimum": 0.00620534956155345
+            }
+          },
+          "pareto_size": 130,
+          "representative": {
+            "actual_service_regime_count": 15,
+            "demand_weighted_expected_passenger_wait_minutes": 6.043783393326659,
+            "fleet_required": 19,
+            "inbound_service_regimes": [
+              {
+                "first_departure": 17700,
+                "last_departure": 21540,
+                "trip_count": 5,
+                "uniform_headway_minutes": 16
+              },
+              {
+                "first_departure": 22080,
+                "last_departure": 26940,
+                "trip_count": 10,
+                "uniform_headway_minutes": 9
+              },
+              {
+                "first_departure": 27480,
+                "last_departure": 37560,
+                "trip_count": 13,
+                "uniform_headway_minutes": 14
+              },
+              {
+                "first_departure": 38160,
+                "last_departure": 42960,
+                "trip_count": 9,
+                "uniform_headway_minutes": 10
+              },
+              {
+                "first_departure": 43560,
+                "last_departure": 57060,
+                "trip_count": 16,
+                "uniform_headway_minutes": 15
+              },
+              {
+                "first_departure": 57600,
+                "last_departure": 62460,
+                "trip_count": 10,
+                "uniform_headway_minutes": 9
+              },
+              {
+                "first_departure": 63000,
+                "last_departure": 75600,
+                "trip_count": 15,
+                "uniform_headway_minutes": 15
+              }
+            ],
+            "meaningful_demand_differentiation": true,
+            "minimum_directional_frequency_ratio": 1.777777777777778,
+            "observed_demand_mismatch": 0.007197180311487441,
+            "outbound_service_regimes": [
+              {
+                "first_departure": 17700,
+                "last_departure": 21540,
+                "trip_count": 5,
+                "uniform_headway_minutes": 16
+              },
+              {
+                "first_departure": 22140,
+                "last_departure": 26940,
+                "trip_count": 9,
+                "uniform_headway_minutes": 10
+              },
+              {
+                "first_departure": 27540,
+                "last_departure": 37620,
+                "trip_count": 13,
+                "uniform_headway_minutes": 14
+              },
+              {
+                "first_departure": 38220,
+                "last_departure": 43020,
+                "trip_count": 9,
+                "uniform_headway_minutes": 10
+              },
+              {
+                "first_departure": 43620,
+                "last_departure": 57120,
+                "trip_count": 16,
+                "uniform_headway_minutes": 15
+              },
+              {
+                "first_departure": 58020,
+                "last_departure": 62820,
+                "trip_count": 11,
+                "uniform_headway_minutes": 8
+              },
+              {
+                "first_departure": 63300,
+                "last_departure": 67500,
+                "trip_count": 6,
+                "uniform_headway_minutes": 14
+              },
+              {
+                "first_departure": 68400,
+                "last_departure": 75600,
+                "trip_count": 9,
+                "uniform_headway_minutes": 15
+              }
+            ],
+            "pair_fingerprint": "b6712e5e1a552fa75fbfe042454b7d0568e4cd06b265b7d38d8760358dfb4063",
+            "sustained_clean_service_regimes": true
+          }
+        },
+        "search": {
+          "duplicate_states_skipped": 670,
+          "fleet_children_by_move": {
+            "MERGE_ADJACENT": 208,
+            "MOVE_ONE_TRIP_LEFT_TO_RIGHT": 189,
+            "MOVE_ONE_TRIP_RIGHT_TO_LEFT": 190,
+            "SHIFT_BOUNDARY_LEFT": 510,
+            "SHIFT_BOUNDARY_RIGHT": 518,
+            "SPLIT_REGIME": 0,
+            "TAIL_ABSORB_ONE": 0,
+            "TAIL_RELEASE_ONE": 0
+          },
+          "fleet_children_share_of_generated": 0.18683479870430356,
+          "fleet_feedback_event_count": 1372,
+          "fleet_feedback_expansion_requests": 2744,
+          "fleet_feedback_expansions_executed": 23,
+          "fleet_feedback_expansions_skipped": 2721,
+          "fleet_feedback_generated_children": 1615,
+          "fleet_neighbors_per_executed_parent": {
+            "executed_parent_count": 23,
+            "maximum": 87,
+            "median": 63,
+            "minimum": 60,
+            "total": 1615
+          },
+          "fleet_validations_run": 1728,
+          "generation_to_evaluation_ratio": 360.1666666666667,
+          "open_queue_at_stop": 512,
+          "pareto_size": 130,
+          "response_mismatch": {
+            "evaluated_descendants": 0,
+            "feasible_pair_participation": 0,
+            "final_pareto_ancestry": 0,
+            "generated_child_states": 262,
+            "pair_participation": 0,
+            "retained_directional_compilations": 0
+          },
+          "states_evaluated": 24,
+          "states_generated": 8644,
+          "states_pruned": 7438,
+          "status": "SEARCH_BUDGET_EXHAUSTED"
+        }
+      },
+      "f3": {
+        "clean_boundary_blocker_count": 0,
+        "final_directional_archive_sizes": {
+          "inbound": 24,
+          "outbound": 24
+        },
+        "frontier": {
+          "metric_ranges": {
+            "demand_response_direction_accuracy": {
+              "maximum": 1.0,
+              "minimum": 0.5673352435530086
+            },
+            "demand_weighted_expected_passenger_wait_minutes": {
+              "maximum": 6.217911989725442,
+              "minimum": 6.043783393326659
+            },
+            "fleet_required": {
+              "maximum": 20,
+              "minimum": 14
+            },
+            "observed_demand_mismatch": {
+              "maximum": 0.015650510405009692,
+              "minimum": 0.005873133103972177
+            }
+          },
+          "pareto_size": 140,
+          "representative": {
+            "credible_clean_route_6_candidate": true,
+            "inbound_service_regimes": [
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-01"
+                ],
+                "departures": [
+                  17700,
+                  18660,
+                  19620,
+                  20580,
+                  21540
+                ],
+                "direction": "inbound",
+                "first_departure": 17700,
+                "last_departure": 21540,
+                "service_regime_id": "SERVICE-INBOUND-01",
+                "trip_count": 5,
+                "uniform_headway_minutes": 16
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-02"
+                ],
+                "departures": [
+                  22080,
+                  22620,
+                  23160,
+                  23700,
+                  24240,
+                  24780,
+                  25320,
+                  25860,
+                  26400,
+                  26940
+                ],
+                "direction": "inbound",
+                "first_departure": 22080,
+                "last_departure": 26940,
+                "service_regime_id": "SERVICE-INBOUND-02",
+                "trip_count": 10,
+                "uniform_headway_minutes": 9
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-03"
+                ],
+                "departures": [
+                  27480,
+                  28320,
+                  29160,
+                  30000,
+                  30840,
+                  31680,
+                  32520,
+                  33360,
+                  34200,
+                  35040,
+                  35880,
+                  36720,
+                  37560
+                ],
+                "direction": "inbound",
+                "first_departure": 27480,
+                "last_departure": 37560,
+                "service_regime_id": "SERVICE-INBOUND-03",
+                "trip_count": 13,
+                "uniform_headway_minutes": 14
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-04"
+                ],
+                "departures": [
+                  38160,
+                  38760,
+                  39360,
+                  39960,
+                  40560,
+                  41160,
+                  41760,
+                  42360,
+                  42960
+                ],
+                "direction": "inbound",
+                "first_departure": 38160,
+                "last_departure": 42960,
+                "service_regime_id": "SERVICE-INBOUND-04",
+                "trip_count": 9,
+                "uniform_headway_minutes": 10
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-05"
+                ],
+                "departures": [
+                  43560,
+                  44460,
+                  45360,
+                  46260,
+                  47160,
+                  48060,
+                  48960,
+                  49860,
+                  50760,
+                  51660,
+                  52560,
+                  53460,
+                  54360,
+                  55260,
+                  56160,
+                  57060
+                ],
+                "direction": "inbound",
+                "first_departure": 43560,
+                "last_departure": 57060,
+                "service_regime_id": "SERVICE-INBOUND-05",
+                "trip_count": 16,
+                "uniform_headway_minutes": 15
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-06"
+                ],
+                "departures": [
+                  57600,
+                  58140,
+                  58680,
+                  59220,
+                  59760,
+                  60300,
+                  60840,
+                  61380,
+                  61920,
+                  62460
+                ],
+                "direction": "inbound",
+                "first_departure": 57600,
+                "last_departure": 62460,
+                "service_regime_id": "SERVICE-INBOUND-06",
+                "trip_count": 10,
+                "uniform_headway_minutes": 9
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-07",
+                  "PLAN-INBOUND-08"
+                ],
+                "departures": [
+                  63000,
+                  63900,
+                  64800,
+                  65700,
+                  66600,
+                  67500,
+                  68400,
+                  69300,
+                  70200,
+                  71100,
+                  72000,
+                  72900,
+                  73800,
+                  74700,
+                  75600
+                ],
+                "direction": "inbound",
+                "first_departure": 63000,
+                "last_departure": 75600,
+                "service_regime_id": "SERVICE-INBOUND-07",
+                "trip_count": 15,
+                "uniform_headway_minutes": 15
+              }
+            ],
+            "metrics": {
+              "actual_service_regime_count": 15,
+              "demand_weighted_expected_passenger_wait_minutes": 6.043783393326659,
+              "fleet_required": 19,
+              "max_excess_terminal_wait": 88,
+              "max_frequency_jump": 0.6286086594223741,
+              "moved_trips_vs_b": 8,
+              "observed_demand_mismatch": 0.007197180311487441,
+              "total_excess_terminal_wait": 4283,
+              "total_frequency_variation": 5.586416018885035
+            },
+            "outbound_service_regimes": [
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-01"
+                ],
+                "departures": [
+                  17700,
+                  18660,
+                  19620,
+                  20580,
+                  21540
+                ],
+                "direction": "outbound",
+                "first_departure": 17700,
+                "last_departure": 21540,
+                "service_regime_id": "SERVICE-OUTBOUND-01",
+                "trip_count": 5,
+                "uniform_headway_minutes": 16
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-02"
+                ],
+                "departures": [
+                  22140,
+                  22740,
+                  23340,
+                  23940,
+                  24540,
+                  25140,
+                  25740,
+                  26340,
+                  26940
+                ],
+                "direction": "outbound",
+                "first_departure": 22140,
+                "last_departure": 26940,
+                "service_regime_id": "SERVICE-OUTBOUND-02",
+                "trip_count": 9,
+                "uniform_headway_minutes": 10
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-03"
+                ],
+                "departures": [
+                  27540,
+                  28380,
+                  29220,
+                  30060,
+                  30900,
+                  31740,
+                  32580,
+                  33420,
+                  34260,
+                  35100,
+                  35940,
+                  36780,
+                  37620
+                ],
+                "direction": "outbound",
+                "first_departure": 27540,
+                "last_departure": 37620,
+                "service_regime_id": "SERVICE-OUTBOUND-03",
+                "trip_count": 13,
+                "uniform_headway_minutes": 14
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-04"
+                ],
+                "departures": [
+                  38220,
+                  38820,
+                  39420,
+                  40020,
+                  40620,
+                  41220,
+                  41820,
+                  42420,
+                  43020
+                ],
+                "direction": "outbound",
+                "first_departure": 38220,
+                "last_departure": 43020,
+                "service_regime_id": "SERVICE-OUTBOUND-04",
+                "trip_count": 9,
+                "uniform_headway_minutes": 10
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-05"
+                ],
+                "departures": [
+                  43620,
+                  44520,
+                  45420,
+                  46320,
+                  47220,
+                  48120,
+                  49020,
+                  49920,
+                  50820,
+                  51720,
+                  52620,
+                  53520,
+                  54420,
+                  55320,
+                  56220,
+                  57120
+                ],
+                "direction": "outbound",
+                "first_departure": 43620,
+                "last_departure": 57120,
+                "service_regime_id": "SERVICE-OUTBOUND-05",
+                "trip_count": 16,
+                "uniform_headway_minutes": 15
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-06"
+                ],
+                "departures": [
+                  58020,
+                  58500,
+                  58980,
+                  59460,
+                  59940,
+                  60420,
+                  60900,
+                  61380,
+                  61860,
+                  62340,
+                  62820
+                ],
+                "direction": "outbound",
+                "first_departure": 58020,
+                "last_departure": 62820,
+                "service_regime_id": "SERVICE-OUTBOUND-06",
+                "trip_count": 11,
+                "uniform_headway_minutes": 8
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-07"
+                ],
+                "departures": [
+                  63300,
+                  64140,
+                  64980,
+                  65820,
+                  66660,
+                  67500
+                ],
+                "direction": "outbound",
+                "first_departure": 63300,
+                "last_departure": 67500,
+                "service_regime_id": "SERVICE-OUTBOUND-07",
+                "trip_count": 6,
+                "uniform_headway_minutes": 14
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-08"
+                ],
+                "departures": [
+                  68400,
+                  69300,
+                  70200,
+                  71100,
+                  72000,
+                  72900,
+                  73800,
+                  74700,
+                  75600
+                ],
+                "direction": "outbound",
+                "first_departure": 68400,
+                "last_departure": 75600,
+                "service_regime_id": "SERVICE-OUTBOUND-08",
+                "trip_count": 9,
+                "uniform_headway_minutes": 15
+              }
+            ],
+            "pair_fingerprint": "b6712e5e1a552fa75fbfe042454b7d0568e4cd06b265b7d38d8760358dfb4063",
+            "selection": "minimum exact passenger wait among structurally non-isolated, demand-differentiated Pareto pairs when available; otherwise minimum exact passenger wait"
+          }
+        },
+        "response_mismatch": {
+          "anchor_candidate_count": 2,
+          "anchor_fingerprints_by_direction": {
+            "inbound": "0cfffc458e27e6a7b6c3c6727a9bc839eca2457561f789dd789070fa7318623f",
+            "outbound": "3ebd1a34013acd7cd49351287c5c676a0c8a7da4811380ccf6111182ff5714a2"
+          },
+          "anchors_enqueued": 2,
+          "anchors_evaluated": 2,
+          "emitted_count": 45,
+          "evaluated_descendants": 13,
+          "feasible_pair_participation": 120,
+          "final_pareto_ancestry": 25,
+          "generated_child_states": 263,
+          "retained_directional_compilations": 20
+        },
+        "search_statistics": {
+          "budget_exhausted": true,
+          "compile_variants_evaluated": 96,
+          "duplicate_states_skipped": 634,
+          "fleet_feedback_expansion_requests": 2642,
+          "fleet_feedback_expansions_executed": 23,
+          "fleet_feedback_expansions_skipped": 2619,
+          "fleet_validations_run": 1704,
+          "protected_compile_variants_rejected": 0,
+          "response_feedback_anchor_candidates": 2,
+          "response_feedback_anchors_enqueued": 2,
+          "response_feedback_anchors_evaluated": 2,
+          "search_iterations": 24,
+          "states_evaluated": 24,
+          "states_generated": 8400,
+          "states_pruned": 7230
+        },
+        "settlement_classification": "SETTLEMENT_NOT_CURRENTLY_NEEDED",
+        "status": "SEARCH_BUDGET_EXHAUSTED"
+      },
+      "route_id": "6"
+    }
+  }
+}

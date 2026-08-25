@@ -186,6 +186,7 @@ class SearchAudit:
         self.archives: dict[str, list[Any]] = {"outbound": [], "inbound": []}
         self.compile_failures: dict[str, dict[str, Any]] = {}
         self.feasible_pairs: dict[str, Any] = {}
+        self.response_anchor_fingerprints: dict[str, str] = {}
 
     def ancestry_codes(self, state: ServicePlanStateV1) -> tuple[str, ...]:
         codes: list[str] = []
@@ -245,13 +246,23 @@ def _instrument_search(audit: SearchAudit):
             audit.queue = self
 
         def push(self, state: ServicePlanStateV1, priority: tuple[Any, ...]):
-            return self.inner.push(state, priority)
+            result = self.inner.push(state, priority)
+            if (
+                result[0]
+                and priority[0] == 1
+                and state.operation_evidence == DEMAND_RESPONSE_DIRECTION_MISMATCH
+            ):
+                audit.response_anchor_fingerprints[state.direction] = service_plan_fingerprint_v1(
+                    state
+                )
+                audit.all_states[service_plan_fingerprint_v1(state)] = state
+            return result
 
         def pop(self):
             value = self.inner.pop()
             if value is not None:
                 audit.popped_states.append(value[0])
-                audit.all_states.setdefault(service_plan_fingerprint_v1(value[0]), value[0])
+                audit.all_states[service_plan_fingerprint_v1(value[0])] = value[0]
             return value
 
         def __bool__(self) -> bool:
@@ -360,6 +371,7 @@ def _result_signature(result: Any, audit: SearchAudit, prior: Mapping[str, Any])
         "queue_at_stop": audit.queue_snapshot(),
         "compile_failures": list(audit.compile_failures.values()),
         "generation_by_code": dict(sorted(audit.generated_by_code.items())),
+        "response_anchor_fingerprints": dict(sorted(audit.response_anchor_fingerprints.items())),
     }
 
 
@@ -896,6 +908,9 @@ def _route_payload(
             / max(result.statistics.states_generated, 1),
             "generated_states_by_major_feedback_lineage": dict(
                 sorted(audit.generated_by_code.items())
+            ),
+            "response_feedback_anchor_fingerprints": dict(
+                sorted(audit.response_anchor_fingerprints.items())
             ),
             "highest_generation_parents": generation_by_parent,
         },

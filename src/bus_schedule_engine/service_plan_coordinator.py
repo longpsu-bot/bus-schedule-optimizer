@@ -97,6 +97,9 @@ class CoordinatorSearchStatisticsV1:
     fleet_feedback_expansion_requests: int = 0
     fleet_feedback_expansions_executed: int = 0
     fleet_feedback_expansions_skipped: int = 0
+    response_feedback_anchor_candidates: int = 0
+    response_feedback_anchors_enqueued: int = 0
+    response_feedback_anchors_evaluated: int = 0
     search_iterations: int = 0
     budget_exhausted: bool = False
 
@@ -1444,6 +1447,41 @@ def _queue_priority(
     )
 
 
+def _ordinary_neighbor_queue_priority(
+    neighbor: ServicePlanNeighborV1,
+    *,
+    context: RouteCoordinatorContextV1,
+) -> tuple[Any, ...]:
+    """Return the unchanged ordinary revision order in its lane-2 offset."""
+
+    return _queue_priority(
+        neighbor.state,
+        operator_priority=neighbor.priority + 2,
+        context=context,
+    )
+
+
+def _select_response_feedback_anchor(
+    neighbors: Sequence[ServicePlanNeighborV1],
+    *,
+    seen: set[str],
+    context: RouteCoordinatorContextV1,
+) -> ServicePlanNeighborV1 | None:
+    """Choose the best unseen response child by its ordinary semantic quality."""
+
+    eligible = (
+        neighbor
+        for neighbor in neighbors
+        if neighbor.evidence_code == DEMAND_RESPONSE_DIRECTION_MISMATCH
+        and service_plan_fingerprint_v1(neighbor.state) not in seen
+    )
+    return min(
+        eligible,
+        key=lambda neighbor: _ordinary_neighbor_queue_priority(neighbor, context=context),
+        default=None,
+    )
+
+
 def search_route_service_plans_v1(
     *,
     context: RouteCoordinatorContextV1,
@@ -1473,6 +1511,8 @@ def search_route_service_plans_v1(
     seen: set[str] = set()
     pair_seen: set[str] = set()
     expanded_fleet_feedback_parents: set[str] = set()
+    response_feedback_anchor_reserved: set[str] = set()
+    response_feedback_anchor_fingerprints: set[str] = set()
     history_by_state: dict[str, tuple[str, ...]] = {}
     archive: dict[str, list[DirectionalCompilationCandidateV1]] = {
         "outbound": [],
@@ -1520,6 +1560,14 @@ def search_route_service_plans_v1(
             planning_grid_seconds=context.planning_grid_seconds,
             floor_headway_minutes=None,
         )
+        response_anchor = None
+        if parent.direction not in response_feedback_anchor_reserved:
+            response_anchor = _select_response_feedback_anchor(
+                neighbors,
+                seen=seen,
+                context=context,
+            )
+            stats.response_feedback_anchor_candidates += int(response_anchor is not None)
         for neighbor in neighbors:
             stats.states_generated += 1
             child = neighbor.state
@@ -1527,10 +1575,11 @@ def search_route_service_plans_v1(
             if fingerprint in seen:
                 stats.duplicate_states_skipped += 1
                 continue
-            priority = _queue_priority(
-                child,
-                operator_priority=neighbor.priority + 1,
-                context=context,
+            is_response_anchor = neighbor is response_anchor
+            priority = (
+                _queue_priority(child, operator_priority=1, context=context)
+                if is_response_anchor
+                else _ordinary_neighbor_queue_priority(neighbor, context=context)
             )
             accepted, pruned, removed = queue.push(child, priority)
             if accepted:
@@ -1540,6 +1589,10 @@ def search_route_service_plans_v1(
                 )
                 if removed is not None:
                     history_by_state.pop(removed, None)
+                if is_response_anchor:
+                    response_feedback_anchor_reserved.add(parent.direction)
+                    response_feedback_anchor_fingerprints.add(fingerprint)
+                    stats.response_feedback_anchors_enqueued += 1
             else:
                 stats.duplicate_states_skipped += int(not pruned)
             stats.states_pruned += int(pruned)
@@ -1556,6 +1609,9 @@ def search_route_service_plans_v1(
             continue
         seen.add(fingerprint)
         stats.states_evaluated += 1
+        stats.response_feedback_anchors_evaluated += int(
+            fingerprint in response_feedback_anchor_fingerprints
+        )
         history = history_by_state.get(fingerprint, (f"Seed {state.seed_id}",))
         errors = validate_service_plan_state_v1(
             state,
