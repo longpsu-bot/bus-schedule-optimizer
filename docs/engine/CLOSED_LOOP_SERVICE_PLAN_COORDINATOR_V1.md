@@ -12,7 +12,7 @@ DAILY_VALIDATED DemandRegime evidence (immutable)
   -> frozen ServicePlanStateV1 (boundaries + integer counts)
   -> bounded CleanCompileFrontierV1
   -> exact-timestamp protected-window validation, when evidence-bound authority exists
-  -> actual compiled-service metrics and structured feedback
+  -> actual compiled-service metrics, rhythm diagnostics, and tail-ordering eligibility
   -> unchanged exact-timetable fleet validator for every retained pair
   -> explicit finite neighbors
   -> feasible operating-pair Pareto frontier
@@ -77,7 +77,9 @@ Ordinary unprotected service remains exposed to demand mismatch, `max_frequency_
 `total_frequency_variation`, tail fit, exact directional totals, fixed endpoints, fleet, and
 waiting metrics. Continuity remains an objective rather than a new hard maximum jump, and demand
 does not map one-to-one to frequency. The final unprotected tail has no universal maximum headway
-inherited from Scenario B.
+inherited from Scenario B. It must, however, be at least as slow as every earlier actual
+ServiceRegime unless strictly higher immutable demand or binding translated protected-service
+authority justifies a shorter tail headway.
 
 ## Finite neighborhood
 
@@ -112,6 +114,12 @@ equal to the parent's count minus one, unchanged, or plus one; it does not fall 
 redistribution. Demand-response and other localized ServicePlan evidence retain their split
 authority, including a split at a diagnosed canonical DemandRegime boundary. Fingerprint
 deduplication and deterministic ordering are unchanged.
+
+`TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION` has its own deliberately small repair family:
+`TAIL_RELEASE_ONE`, plus `SHIFT_BOUNDARY_LEFT` at the final planning boundary by exactly one grid
+step with `max_trip_count_delta=1`. It creates no split, global shift, global transfer, or
+multi-trip neighborhood. Repeated evaluated generations may progressively release further tail
+trips, with the normal state fingerprint remaining authoritative.
 
 For `N` ServiceRegimes, the pure-fleet family has a semantic upper bound before fingerprint
 deduplication of `9 * (N - 1) + 2`: per boundary, at most one merge, three left-shift allocations,
@@ -189,6 +197,48 @@ under/over feedback likewise requires adding/removing one trip share to reduce t
 These checks establish discrete actionability only; the normal compile/evaluate loop remains the
 authority on whether a local ServicePlan move is feasible.
 
+### Slowest-tail ordering
+
+Tail ordering is evaluated after exact compilation and protection validation, never in the
+compiler or ServicePlan validator. Each actual compiled ServiceRegime inherits the exact
+contiguous union of `demand_regime_slices` carrying its `service_regime_id`, clipped to
+`[fixed_first_departure, fixed_last_departure)`. Missing, ambiguous, non-contiguous, mismatched, or
+empty provenance fails closed. Immutable piecewise demand is integrated exactly over each support:
+
+```text
+demand_rate_per_hour = integrated_demand_mass / support_duration_hours
+```
+
+For every earlier regime with a headway longer than the tail, immutable demand justifies the
+inversion only when the tail demand rate is strictly greater, using numerical epsilon only. Equal
+demand does not justify it, and all offending earlier regimes must be justified. A translated
+protection exception requires an accepted exact protection witness that binds an internal tail
+gap and whose explicit maximum-headway authority is below the offending longer headway. Temporal
+overlap alone is not authority. The assessment records all offenders and any exact protection
+witnesses.
+
+The deterministic classifications are `TAIL_IS_SLOWEST`,
+`TAIL_SHORTER_DEMAND_JUSTIFIED`, `TAIL_SHORTER_PROTECTION_JUSTIFIED`,
+`TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION`, and
+`SINGLE_REGIME_NO_TAIL_ORDERING_CONFLICT`. The invalid classification rejects that directional
+compilation before archive retention and exact fleet pairing, increments
+`tail_ordering_compilations_rejected`, and still emits structured repair feedback. Existing
+`TAIL_OVER_SERVICE` and `TAIL_UNDER_SERVICE` demand-share feedback remains independent.
+
+### Rhythm simplicity
+
+Rhythm metrics use actual compiled ServiceRegimes only. A sustained rhythm has at least two
+internal gaps (`trip_count >= 3`). The principal vocabulary metric is the sorted distinct set of
+uniform headways among sustained regimes; repeated occurrences do not increase its count. A
+two-trip regime contributes one internal gap and is retained as a separate single-gap residual
+diagnostic rather than rejected or counted as sustained.
+
+The diagnostic effective palette uses tolerance ±1 whole minute. It finds the minimum tuple of
+representatives selected from the actual sustained levels that covers every sustained exact level.
+Equal-cardinality palettes minimize total internal-gap-weighted absolute deviation and then use the
+lexicographically smaller representative tuple. No coverage percentage excludes a level, and this
+effective palette is not a Pareto objective.
+
 ## Pairing and Pareto rule
 
 Outbound and inbound modes are independent. Every new directional compilation is paired with the
@@ -207,14 +257,17 @@ Fleet-feasible pairs are nondominated over:
 1. observed-demand mismatch;
 2. demand-weighted expected passenger wait, combined across directions by active demand mass;
 3. actual ServiceRegime count;
-4. maximum frequency jump;
-5. total frequency variation;
-6. moved trips versus exact Scenario B;
-7. fleet required;
-8. total excess terminal wait.
+4. total directional sustained-headway-level count;
+5. maximum frequency jump;
+6. total frequency variation;
+7. moved trips versus exact Scenario B;
+8. fleet required;
+9. total excess terminal wait.
 
-Gamma, rank correlation, peak/low ratio, direction accuracy, and sqrt-response deviation are not
-additional Pareto dimensions in V1.
+Effective palette count, single-gap count, raw transition count, Gamma, rank correlation,
+peak/low ratio, direction accuracy, and sqrt-response deviation are not additional Pareto
+dimensions. Pair diagnostics also expose the maximum directional sustained-level count, total
+effective-palette count, and total single-gap regime count.
 
 No weighted scalar objective selects a timetable.
 

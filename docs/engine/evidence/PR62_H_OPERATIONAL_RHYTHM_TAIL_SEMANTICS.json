@@ -1,0 +1,1565 @@
+{
+  "PR62_G_PRODUCT_REQUIRES_RECERTIFICATION_AFTER_H": true,
+  "deterministic_signatures": {
+    "route_10_coordinator_report.json": "b8ce2134936c98dd0f59861f3451f52db426369c81ddfb78b587de93407db715",
+    "route_10_coordinator_report.md": "376df2236502530d1510cbca39fe8995ec8b509831c2169578111add54190f5c",
+    "route_6_coordinator_report.json": "f0034bd42796a5df739152bdb17b028b6f473f26c706972d69fe75f7d40ce3d0",
+    "route_6_coordinator_report.md": "a4855bf1328718cdec5654c04bed8c98ccd5b7dceb2586e5135b890f7da25156"
+  },
+  "effective_palette": "minimum actual sustained representative levels covering every sustained level within +/-1 minute; gap-weighted deviation then lexicographic tie-break",
+  "human_final": {
+    "directions": {
+      "inbound": {
+        "departure_count": 78,
+        "headway_run_count": 8,
+        "rhythm_simplicity": {
+          "actual_service_regime_count": 8,
+          "effective_headway_palette": [
+            8,
+            15
+          ],
+          "effective_headway_palette_count": 2,
+          "effective_palette_tolerance_minutes": 1,
+          "gaps_by_headway": [
+            [
+              8,
+              27
+            ],
+            [
+              14,
+              1
+            ],
+            [
+              15,
+              49
+            ]
+          ],
+          "headway_transition_count": 7,
+          "service_minutes_by_headway": [
+            [
+              8,
+              216
+            ],
+            [
+              14,
+              14
+            ],
+            [
+              15,
+              735
+            ]
+          ],
+          "single_gap_headway_levels": [
+            14
+          ],
+          "single_gap_regime_count": 1,
+          "sustained_headway_level_count": 2,
+          "sustained_headway_levels": [
+            8,
+            15
+          ],
+          "sustained_service_regime_count": 7
+        },
+        "support_semantics": "exact contiguous equal-headway run spans; expert benchmark has no ServicePlan slices",
+        "tail_ordering": {
+          "classification": "TAIL_IS_SLOWEST",
+          "demand_justified": false,
+          "direction": "inbound",
+          "eligible": true,
+          "max_non_tail_headway_minutes": 15,
+          "offending_regime_count": 0,
+          "offending_regimes": [],
+          "protection_justified": false,
+          "protection_witnesses": [],
+          "service_regime_demand_evidence": [
+            {
+              "demand_rate_per_hour": 105.63660130718954,
+              "integrated_demand_mass": 132.04575163398692,
+              "service_regime_id": "HUMAN-INBOUND-01",
+              "support_duration_hours": 1.25,
+              "support_end": 22200,
+              "support_start": 17700
+            },
+            {
+              "demand_rate_per_hour": 229.66530501089326,
+              "integrated_demand_mass": 367.46448801742923,
+              "service_regime_id": "HUMAN-INBOUND-02",
+              "support_duration_hours": 1.6,
+              "support_end": 27960,
+              "support_start": 22200
+            },
+            {
+              "demand_rate_per_hour": 132.40207809619574,
+              "integrated_demand_mass": 430.30675381263615,
+              "service_regime_id": "HUMAN-INBOUND-03",
+              "support_duration_hours": 3.25,
+              "support_end": 39660,
+              "support_start": 27960
+            },
+            {
+              "demand_rate_per_hour": 184.26715686274508,
+              "integrated_demand_mass": 147.41372549019607,
+              "service_regime_id": "HUMAN-INBOUND-04",
+              "support_duration_hours": 0.8,
+              "support_end": 42540,
+              "support_start": 39660
+            },
+            {
+              "demand_rate_per_hour": 117.36075868255797,
+              "integrated_demand_mass": 498.7832244008714,
+              "service_regime_id": "HUMAN-INBOUND-05",
+              "support_duration_hours": 4.25,
+              "support_end": 57840,
+              "support_start": 42540
+            },
+            {
+              "demand_rate_per_hour": 244.0087145969499,
+              "integrated_demand_mass": 292.81045751633985,
+              "service_regime_id": "HUMAN-INBOUND-06",
+              "support_duration_hours": 1.2,
+              "support_end": 62160,
+              "support_start": 57840
+            },
+            {
+              "demand_rate_per_hour": 199.5294117647059,
+              "integrated_demand_mass": 46.556862745098044,
+              "service_regime_id": "HUMAN-INBOUND-07",
+              "support_duration_hours": 0.23333333333333334,
+              "support_end": 63000,
+              "support_start": 62160
+            },
+            {
+              "demand_rate_per_hour": 48.69654528478058,
+              "integrated_demand_mass": 170.43790849673204,
+              "service_regime_id": "HUMAN-INBOUND-08",
+              "support_duration_hours": 3.5,
+              "support_end": 75600,
+              "support_start": 63000
+            }
+          ],
+          "tail_demand_rate_per_hour": 48.69654528478058,
+          "tail_headway_minutes": 15,
+          "tail_service_regime_id": "HUMAN-INBOUND-08",
+          "tail_slowest_margin_minutes": 0
+        }
+      },
+      "outbound": {
+        "departure_count": 78,
+        "headway_run_count": 9,
+        "rhythm_simplicity": {
+          "actual_service_regime_count": 9,
+          "effective_headway_palette": [
+            8,
+            10,
+            15
+          ],
+          "effective_headway_palette_count": 3,
+          "effective_palette_tolerance_minutes": 1,
+          "gaps_by_headway": [
+            [
+              8,
+              20
+            ],
+            [
+              10,
+              10
+            ],
+            [
+              15,
+              47
+            ]
+          ],
+          "headway_transition_count": 8,
+          "service_minutes_by_headway": [
+            [
+              8,
+              160
+            ],
+            [
+              10,
+              100
+            ],
+            [
+              15,
+              705
+            ]
+          ],
+          "single_gap_headway_levels": [],
+          "single_gap_regime_count": 0,
+          "sustained_headway_level_count": 3,
+          "sustained_headway_levels": [
+            8,
+            10,
+            15
+          ],
+          "sustained_service_regime_count": 9
+        },
+        "support_semantics": "exact contiguous equal-headway run spans; expert benchmark has no ServicePlan slices",
+        "tail_ordering": {
+          "classification": "TAIL_IS_SLOWEST",
+          "demand_justified": false,
+          "direction": "outbound",
+          "eligible": true,
+          "max_non_tail_headway_minutes": 15,
+          "offending_regime_count": 0,
+          "offending_regimes": [],
+          "protection_justified": false,
+          "protection_witnesses": [],
+          "service_regime_demand_evidence": [
+            {
+              "demand_rate_per_hour": 55.59912854030501,
+              "integrated_demand_mass": 27.799564270152505,
+              "service_regime_id": "HUMAN-OUTBOUND-01",
+              "support_duration_hours": 0.5,
+              "support_end": 19500,
+              "support_start": 17700
+            },
+            {
+              "demand_rate_per_hour": 135.90958605664488,
+              "integrated_demand_mass": 135.90958605664488,
+              "service_regime_id": "HUMAN-OUTBOUND-02",
+              "support_duration_hours": 1.0,
+              "support_end": 23100,
+              "support_start": 19500
+            },
+            {
+              "demand_rate_per_hour": 191.11165577342044,
+              "integrated_demand_mass": 76.44466230936818,
+              "service_regime_id": "HUMAN-OUTBOUND-03",
+              "support_duration_hours": 0.4,
+              "support_end": 24540,
+              "support_start": 23100
+            },
+            {
+              "demand_rate_per_hour": 122.40691721132897,
+              "integrated_demand_mass": 489.6276688453159,
+              "service_regime_id": "HUMAN-OUTBOUND-04",
+              "support_duration_hours": 4.0,
+              "support_end": 38940,
+              "support_start": 24540
+            },
+            {
+              "demand_rate_per_hour": 170.76633986928104,
+              "integrated_demand_mass": 159.38191721132898,
+              "service_regime_id": "HUMAN-OUTBOUND-05",
+              "support_duration_hours": 0.9333333333333333,
+              "support_end": 42300,
+              "support_start": 38940
+            },
+            {
+              "demand_rate_per_hour": 101.87908496732027,
+              "integrated_demand_mass": 407.51633986928107,
+              "service_regime_id": "HUMAN-OUTBOUND-06",
+              "support_duration_hours": 4.0,
+              "support_end": 56700,
+              "support_start": 42300
+            },
+            {
+              "demand_rate_per_hour": 212.53349673202612,
+              "integrated_demand_mass": 283.3779956427015,
+              "service_regime_id": "HUMAN-OUTBOUND-07",
+              "support_duration_hours": 1.3333333333333333,
+              "support_end": 61500,
+              "support_start": 56700
+            },
+            {
+              "demand_rate_per_hour": 206.81535947712416,
+              "integrated_demand_mass": 137.87690631808277,
+              "service_regime_id": "HUMAN-OUTBOUND-08",
+              "support_duration_hours": 0.6666666666666666,
+              "support_end": 63900,
+              "support_start": 61500
+            },
+            {
+              "demand_rate_per_hour": 73.16540975364504,
+              "integrated_demand_mass": 237.78758169934636,
+              "service_regime_id": "HUMAN-OUTBOUND-09",
+              "support_duration_hours": 3.25,
+              "support_end": 75600,
+              "support_start": 63900
+            }
+          ],
+          "tail_demand_rate_per_hour": 73.16540975364504,
+          "tail_headway_minutes": 15,
+          "tail_service_regime_id": "HUMAN-OUTBOUND-09",
+          "tail_slowest_margin_minutes": 0
+        }
+      }
+    },
+    "exact_departure_source": "committed C0 audited parse of the supplied workbook, bound to the same SHA-256",
+    "pair_metrics": {
+      "fleet": 19,
+      "mismatch": 0.006802072537692931,
+      "service_regime_count": 17,
+      "sustained_headway_level_count": 5,
+      "wait_minutes": 6.150963374648091
+    },
+    "workbook_path": "private\\Route_6_Current_ExternalAI_HumanFinal.xlsx",
+    "workbook_sha256": "c2038b31c5a3f6a3ee2377ce2067542cc718a7d1907722efa3ab45a536bdd14a",
+    "workbook_sha_match": true
+  },
+  "materiality_selection_policy_added": false,
+  "product_status": "PR62_G_PRODUCT_REQUIRES_RECERTIFICATION_AFTER_H",
+  "production_semantic_changes": {
+    "compiler_changed": false,
+    "compiler_path_score_changed": false,
+    "demand_mismatch_changed": false,
+    "f1_fleet_idempotence_changed": false,
+    "f2_fleet_neighborhood_changed": false,
+    "f3_response_fairness_changed": false,
+    "final_xlsx_regenerated": false,
+    "fleet_validator_changed": false,
+    "passenger_wait_changed": false,
+    "production_search_semantics_changed": true,
+    "protection_semantics_changed": false,
+    "queue_generic_priority_changed": false,
+    "rhythm_simplicity_added_to_pareto": true,
+    "search_budgets_changed": false,
+    "settlement_added": false,
+    "tail_eligibility_changed": true
+  },
+  "profile": "pr62_h_operational_rhythm_tail_semantics_v1",
+  "rhythm_metric": "sorted distinct actual uniform headways among ServiceRegimes with trip_count >= 3",
+  "routes": {
+    "10": {
+      "g_pair_fingerprint": "e8daa851f95a2eee08d6e6ccf6524adfbd5a0187932dcf35cb90f257f9d0043b",
+      "g_pair_h_eligible": false,
+      "g_rhythm_simplicity": {
+        "inbound": {
+          "actual_service_regime_count": 5,
+          "effective_headway_palette": [
+            17,
+            20
+          ],
+          "effective_headway_palette_count": 2,
+          "effective_palette_tolerance_minutes": 1,
+          "gaps_by_headway": [
+            [
+              17,
+              6
+            ],
+            [
+              19,
+              7
+            ],
+            [
+              20,
+              27
+            ],
+            [
+              21,
+              6
+            ]
+          ],
+          "headway_transition_count": 4,
+          "service_minutes_by_headway": [
+            [
+              17,
+              102
+            ],
+            [
+              19,
+              133
+            ],
+            [
+              20,
+              540
+            ],
+            [
+              21,
+              126
+            ]
+          ],
+          "single_gap_headway_levels": [],
+          "single_gap_regime_count": 0,
+          "sustained_headway_level_count": 4,
+          "sustained_headway_levels": [
+            17,
+            19,
+            20,
+            21
+          ],
+          "sustained_service_regime_count": 5
+        },
+        "outbound": {
+          "actual_service_regime_count": 7,
+          "effective_headway_palette": [
+            17,
+            20,
+            23
+          ],
+          "effective_headway_palette_count": 3,
+          "effective_palette_tolerance_minutes": 1,
+          "gaps_by_headway": [
+            [
+              17,
+              11
+            ],
+            [
+              18,
+              4
+            ],
+            [
+              19,
+              10
+            ],
+            [
+              20,
+              11
+            ],
+            [
+              22,
+              3
+            ],
+            [
+              23,
+              5
+            ]
+          ],
+          "headway_transition_count": 6,
+          "service_minutes_by_headway": [
+            [
+              17,
+              187
+            ],
+            [
+              18,
+              72
+            ],
+            [
+              19,
+              190
+            ],
+            [
+              20,
+              220
+            ],
+            [
+              22,
+              66
+            ],
+            [
+              23,
+              115
+            ]
+          ],
+          "single_gap_headway_levels": [],
+          "single_gap_regime_count": 0,
+          "sustained_headway_level_count": 6,
+          "sustained_headway_levels": [
+            17,
+            18,
+            19,
+            20,
+            22,
+            23
+          ],
+          "sustained_service_regime_count": 7
+        }
+      },
+      "g_tail_assessment": {
+        "inbound": {
+          "classification": "TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION",
+          "demand_justified": false,
+          "direction": "inbound",
+          "eligible": false,
+          "max_non_tail_headway_minutes": 21,
+          "offending_regime_count": 1,
+          "offending_regimes": [
+            {
+              "demand_rate_minus_tail": 25.938562091503265,
+              "demand_rate_per_hour": 58.29803921568627,
+              "headway_excess_over_tail_minutes": 1,
+              "headway_minutes": 21,
+              "service_regime_id": "SERVICE-INBOUND-04",
+              "support_end": 72000,
+              "support_start": 63000
+            }
+          ],
+          "protection_justified": false,
+          "protection_witnesses": [],
+          "service_regime_demand_evidence": [
+            {
+              "demand_rate_per_hour": 110.03340595497458,
+              "integrated_demand_mass": 247.5751633986928,
+              "service_regime_id": "SERVICE-INBOUND-01",
+              "support_duration_hours": 2.25,
+              "support_end": 25200,
+              "support_start": 17100
+            },
+            {
+              "demand_rate_per_hour": 73.21107266435985,
+              "integrated_demand_mass": 622.2941176470587,
+              "service_regime_id": "SERVICE-INBOUND-02",
+              "support_duration_hours": 8.5,
+              "support_end": 55800,
+              "support_start": 25200
+            },
+            {
+              "demand_rate_per_hour": 121.62418300653594,
+              "integrated_demand_mass": 243.2483660130719,
+              "service_regime_id": "SERVICE-INBOUND-03",
+              "support_duration_hours": 2.0,
+              "support_end": 63000,
+              "support_start": 55800
+            },
+            {
+              "demand_rate_per_hour": 58.29803921568627,
+              "integrated_demand_mass": 145.7450980392157,
+              "service_regime_id": "SERVICE-INBOUND-04",
+              "support_duration_hours": 2.5,
+              "support_end": 72000,
+              "support_start": 63000
+            },
+            {
+              "demand_rate_per_hour": 32.35947712418301,
+              "integrated_demand_mass": 32.35947712418301,
+              "service_regime_id": "SERVICE-INBOUND-05",
+              "support_duration_hours": 1.0,
+              "support_end": 75600,
+              "support_start": 72000
+            }
+          ],
+          "tail_demand_rate_per_hour": 32.35947712418301,
+          "tail_headway_minutes": 20,
+          "tail_service_regime_id": "SERVICE-INBOUND-05",
+          "tail_slowest_margin_minutes": -1
+        },
+        "outbound": {
+          "classification": "TAIL_IS_SLOWEST",
+          "demand_justified": false,
+          "direction": "outbound",
+          "eligible": true,
+          "max_non_tail_headway_minutes": 22,
+          "offending_regime_count": 0,
+          "offending_regimes": [],
+          "protection_justified": false,
+          "protection_witnesses": [],
+          "service_regime_demand_evidence": [
+            {
+              "demand_rate_per_hour": 100.1132897603486,
+              "integrated_demand_mass": 150.16993464052288,
+              "service_regime_id": "SERVICE-OUTBOUND-01",
+              "support_duration_hours": 1.5,
+              "support_end": 23400,
+              "support_start": 18000
+            },
+            {
+              "demand_rate_per_hour": 135.49455337690634,
+              "integrated_demand_mass": 203.2418300653595,
+              "service_regime_id": "SERVICE-OUTBOUND-02",
+              "support_duration_hours": 1.5,
+              "support_end": 28800,
+              "support_start": 23400
+            },
+            {
+              "demand_rate_per_hour": 97.98529411764706,
+              "integrated_demand_mass": 391.94117647058823,
+              "service_regime_id": "SERVICE-OUTBOUND-03",
+              "support_duration_hours": 4.0,
+              "support_end": 43200,
+              "support_start": 28800
+            },
+            {
+              "demand_rate_per_hour": 85.68627450980394,
+              "integrated_demand_mass": 299.90196078431376,
+              "service_regime_id": "SERVICE-OUTBOUND-04",
+              "support_duration_hours": 3.5,
+              "support_end": 55800,
+              "support_start": 43200
+            },
+            {
+              "demand_rate_per_hour": 131.29411764705884,
+              "integrated_demand_mass": 262.5882352941177,
+              "service_regime_id": "SERVICE-OUTBOUND-05",
+              "support_duration_hours": 2.0,
+              "support_end": 63000,
+              "support_start": 55800
+            },
+            {
+              "demand_rate_per_hour": 72.81917211328977,
+              "integrated_demand_mass": 109.22875816993465,
+              "service_regime_id": "SERVICE-OUTBOUND-06",
+              "support_duration_hours": 1.5,
+              "support_end": 68400,
+              "support_start": 63000
+            },
+            {
+              "demand_rate_per_hour": 34.05555555555556,
+              "integrated_demand_mass": 68.11111111111111,
+              "service_regime_id": "SERVICE-OUTBOUND-07",
+              "support_duration_hours": 2.0,
+              "support_end": 75600,
+              "support_start": 68400
+            }
+          ],
+          "tail_demand_rate_per_hour": 34.05555555555556,
+          "tail_headway_minutes": 23,
+          "tail_service_regime_id": "SERVICE-OUTBOUND-07",
+          "tail_slowest_margin_minutes": 1
+        }
+      },
+      "h_search": {
+        "H_REVIEW_REPRESENTATIVE": {
+          "effective_palette_count": 9,
+          "fingerprint": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+          "fleet": 13,
+          "inbound_effective_palette": [
+            13,
+            15,
+            20,
+            22,
+            30
+          ],
+          "inbound_sustained_palette": [
+            13,
+            15,
+            20,
+            22,
+            30
+          ],
+          "mismatch": 0.009244498851670911,
+          "outbound_effective_palette": [
+            14,
+            19,
+            20,
+            23
+          ],
+          "outbound_sustained_palette": [
+            14,
+            18,
+            19,
+            20,
+            21,
+            23
+          ],
+          "roles": [
+            "H_REVIEW_REPRESENTATIVE"
+          ],
+          "service_regime_count": 12,
+          "source": "H_PARETO",
+          "sustained_headway_level_count": 11,
+          "tail": {
+            "inbound": {
+              "classification": "TAIL_IS_SLOWEST",
+              "tail_headway_minutes": 30,
+              "tail_slowest_margin_minutes": 8
+            },
+            "outbound": {
+              "classification": "TAIL_IS_SLOWEST",
+              "tail_headway_minutes": 23,
+              "tail_slowest_margin_minutes": 2
+            }
+          },
+          "wait_minutes": 9.579767336017012
+        },
+        "pareto_size": 11,
+        "ranges": {
+          "effective_palette_count": [
+            5,
+            9
+          ],
+          "fleet": [
+            11,
+            13
+          ],
+          "mismatch": [
+            0.008393103418565044,
+            0.012524369948702048
+          ],
+          "service_regime_count": [
+            11,
+            16
+          ],
+          "sustained_headway_level_count": [
+            8,
+            13
+          ],
+          "wait_minutes": [
+            9.579767336017012,
+            9.807655861327559
+          ]
+        },
+        "route_id": "10",
+        "search_budget": {
+          "max_compile_frontier_per_state": 4,
+          "max_directional_compilations": 24,
+          "max_open_states": 512,
+          "max_pair_frontier": 512,
+          "max_service_plan_evaluations": 24
+        },
+        "search_statistics": {
+          "budget_exhausted": true,
+          "compile_variants_evaluated": 88,
+          "duplicate_states_skipped": 371,
+          "fleet_feedback_expansion_requests": 248,
+          "fleet_feedback_expansions_executed": 11,
+          "fleet_feedback_expansions_skipped": 237,
+          "fleet_validations_run": 135,
+          "protected_compile_variants_rejected": 0,
+          "response_feedback_anchor_candidates": 2,
+          "response_feedback_anchors_enqueued": 2,
+          "response_feedback_anchors_evaluated": 2,
+          "search_iterations": 24,
+          "states_evaluated": 24,
+          "states_generated": 7864,
+          "states_pruned": 6957,
+          "tail_ordering_compilations_rejected": 56
+        },
+        "simplicity_tradeoff_frontier": [
+          {
+            "effective_palette_count": 9,
+            "fingerprint": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+            "fleet": 13,
+            "inbound_effective_palette": [
+              13,
+              15,
+              20,
+              22,
+              30
+            ],
+            "inbound_sustained_palette": [
+              13,
+              15,
+              20,
+              22,
+              30
+            ],
+            "mismatch": 0.009244498851670911,
+            "outbound_effective_palette": [
+              14,
+              19,
+              20,
+              23
+            ],
+            "outbound_sustained_palette": [
+              14,
+              18,
+              19,
+              20,
+              21,
+              23
+            ],
+            "roles": [
+              "MINIMUM_WAIT"
+            ],
+            "service_regime_count": 12,
+            "source": "H_PARETO",
+            "sustained_headway_level_count": 11,
+            "tail": {
+              "inbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 30,
+                "tail_slowest_margin_minutes": 8
+              },
+              "outbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 23,
+                "tail_slowest_margin_minutes": 2
+              }
+            },
+            "wait_minutes": 9.579767336017012
+          },
+          {
+            "effective_palette_count": 6,
+            "fingerprint": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "fleet": 12,
+            "inbound_effective_palette": [
+              19,
+              29
+            ],
+            "inbound_sustained_palette": [
+              19,
+              20,
+              29
+            ],
+            "mismatch": 0.011758617635110654,
+            "outbound_effective_palette": [
+              18,
+              20,
+              22,
+              24
+            ],
+            "outbound_sustained_palette": [
+              17,
+              18,
+              20,
+              22,
+              24
+            ],
+            "roles": [
+              "MINIMUM_SUSTAINED_PALETTE"
+            ],
+            "service_regime_count": 11,
+            "source": "H_PARETO",
+            "sustained_headway_level_count": 8,
+            "tail": {
+              "inbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 29,
+                "tail_slowest_margin_minutes": 9
+              },
+              "outbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 24,
+                "tail_slowest_margin_minutes": 2
+              }
+            },
+            "wait_minutes": 9.620536971209305
+          },
+          {
+            "effective_palette_count": 5,
+            "fingerprint": "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+            "fleet": 11,
+            "inbound_effective_palette": [
+              19,
+              29
+            ],
+            "inbound_sustained_palette": [
+              19,
+              20,
+              29
+            ],
+            "mismatch": 0.012013640351117972,
+            "outbound_effective_palette": [
+              17,
+              20,
+              23
+            ],
+            "outbound_sustained_palette": [
+              17,
+              18,
+              19,
+              20,
+              22,
+              23
+            ],
+            "roles": [
+              "MINIMUM_FLEET"
+            ],
+            "service_regime_count": 11,
+            "source": "H_PARETO",
+            "sustained_headway_level_count": 9,
+            "tail": {
+              "inbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 29,
+                "tail_slowest_margin_minutes": 9
+              },
+              "outbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 23,
+                "tail_slowest_margin_minutes": 1
+              }
+            },
+            "wait_minutes": 9.613877680736364
+          },
+          {
+            "effective_palette_count": 8,
+            "fingerprint": "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb",
+            "fleet": 13,
+            "inbound_effective_palette": [
+              12,
+              14,
+              21,
+              30
+            ],
+            "inbound_sustained_palette": [
+              12,
+              14,
+              15,
+              20,
+              21,
+              22,
+              30
+            ],
+            "mismatch": 0.008393103418565044,
+            "outbound_effective_palette": [
+              14,
+              19,
+              20,
+              23
+            ],
+            "outbound_sustained_palette": [
+              14,
+              18,
+              19,
+              20,
+              21,
+              23
+            ],
+            "roles": [
+              "MINIMUM_MISMATCH"
+            ],
+            "service_regime_count": 15,
+            "source": "H_PARETO",
+            "sustained_headway_level_count": 13,
+            "tail": {
+              "inbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 45,
+                "tail_slowest_margin_minutes": 15
+              },
+              "outbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 23,
+                "tail_slowest_margin_minutes": 2
+              }
+            },
+            "wait_minutes": 9.640133634658694
+          }
+        ],
+        "status": "SEARCH_BUDGET_EXHAUSTED",
+        "tail_classification_counts_unique_pareto_directions": {
+          "TAIL_IS_SLOWEST": 12
+        }
+      },
+      "raw_simplicity_deltas": {
+        "h_review_minus_simpler_h_min_palette": {
+          "delta_expected_wait_seconds_per_passenger": -2.446178111537556,
+          "delta_fleet": 1,
+          "delta_mismatch": -0.002514118783439743,
+          "delta_service_regime_count": 1,
+          "delta_sustained_headway_level_count": 3
+        }
+      },
+      "rhythm_classification": "RHYTHM_SIMPLICITY_MATERIAL_TRADEOFF",
+      "tail_rule_classification": "TAIL_RULE_EFFECTIVE"
+    },
+    "6": {
+      "g_pair_fingerprint": "b6712e5e1a552fa75fbfe042454b7d0568e4cd06b265b7d38d8760358dfb4063",
+      "g_pair_h_eligible": false,
+      "g_rhythm_simplicity": {
+        "inbound": {
+          "actual_service_regime_count": 7,
+          "effective_headway_palette": [
+            9,
+            15
+          ],
+          "effective_headway_palette_count": 2,
+          "effective_palette_tolerance_minutes": 1,
+          "gaps_by_headway": [
+            [
+              9,
+              18
+            ],
+            [
+              10,
+              8
+            ],
+            [
+              14,
+              12
+            ],
+            [
+              15,
+              29
+            ],
+            [
+              16,
+              4
+            ]
+          ],
+          "headway_transition_count": 6,
+          "service_minutes_by_headway": [
+            [
+              9,
+              162
+            ],
+            [
+              10,
+              80
+            ],
+            [
+              14,
+              168
+            ],
+            [
+              15,
+              435
+            ],
+            [
+              16,
+              64
+            ]
+          ],
+          "single_gap_headway_levels": [],
+          "single_gap_regime_count": 0,
+          "sustained_headway_level_count": 5,
+          "sustained_headway_levels": [
+            9,
+            10,
+            14,
+            15,
+            16
+          ],
+          "sustained_service_regime_count": 7
+        },
+        "outbound": {
+          "actual_service_regime_count": 8,
+          "effective_headway_palette": [
+            8,
+            10,
+            15
+          ],
+          "effective_headway_palette_count": 3,
+          "effective_palette_tolerance_minutes": 1,
+          "gaps_by_headway": [
+            [
+              8,
+              10
+            ],
+            [
+              10,
+              16
+            ],
+            [
+              14,
+              17
+            ],
+            [
+              15,
+              23
+            ],
+            [
+              16,
+              4
+            ]
+          ],
+          "headway_transition_count": 7,
+          "service_minutes_by_headway": [
+            [
+              8,
+              80
+            ],
+            [
+              10,
+              160
+            ],
+            [
+              14,
+              238
+            ],
+            [
+              15,
+              345
+            ],
+            [
+              16,
+              64
+            ]
+          ],
+          "single_gap_headway_levels": [],
+          "single_gap_regime_count": 0,
+          "sustained_headway_level_count": 5,
+          "sustained_headway_levels": [
+            8,
+            10,
+            14,
+            15,
+            16
+          ],
+          "sustained_service_regime_count": 8
+        }
+      },
+      "g_tail_assessment": {
+        "inbound": {
+          "classification": "TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION",
+          "demand_justified": false,
+          "direction": "inbound",
+          "eligible": false,
+          "max_non_tail_headway_minutes": 16,
+          "offending_regime_count": 1,
+          "offending_regimes": [
+            {
+              "demand_rate_minus_tail": 48.252675429146024,
+              "demand_rate_per_hour": 96.94922071392661,
+              "headway_excess_over_tail_minutes": 1,
+              "headway_minutes": 16,
+              "service_regime_id": "SERVICE-INBOUND-01",
+              "support_end": 21600,
+              "support_start": 17700
+            }
+          ],
+          "protection_justified": false,
+          "protection_witnesses": [],
+          "service_regime_demand_evidence": [
+            {
+              "demand_rate_per_hour": 96.94922071392661,
+              "integrated_demand_mass": 105.02832244008715,
+              "service_regime_id": "SERVICE-INBOUND-01",
+              "support_duration_hours": 1.0833333333333333,
+              "support_end": 21600,
+              "support_start": 17700
+            },
+            {
+              "demand_rate_per_hour": 233.06318082788673,
+              "integrated_demand_mass": 349.5947712418301,
+              "service_regime_id": "SERVICE-INBOUND-02",
+              "support_duration_hours": 1.5,
+              "support_end": 27000,
+              "support_start": 21600
+            },
+            {
+              "demand_rate_per_hour": 130.041394335512,
+              "integrated_demand_mass": 390.124183006536,
+              "service_regime_id": "SERVICE-INBOUND-03",
+              "support_duration_hours": 3.0,
+              "support_end": 37800,
+              "support_start": 27000
+            },
+            {
+              "demand_rate_per_hour": 176.5751633986928,
+              "integrated_demand_mass": 264.8627450980392,
+              "service_regime_id": "SERVICE-INBOUND-04",
+              "support_duration_hours": 1.5,
+              "support_end": 43200,
+              "support_start": 37800
+            },
+            {
+              "demand_rate_per_hour": 113.16176470588235,
+              "integrated_demand_mass": 452.6470588235294,
+              "service_regime_id": "SERVICE-INBOUND-05",
+              "support_duration_hours": 4.0,
+              "support_end": 57600,
+              "support_start": 43200
+            },
+            {
+              "demand_rate_per_hour": 235.41612200435728,
+              "integrated_demand_mass": 353.12418300653593,
+              "service_regime_id": "SERVICE-INBOUND-06",
+              "support_duration_hours": 1.5,
+              "support_end": 63000,
+              "support_start": 57600
+            },
+            {
+              "demand_rate_per_hour": 48.69654528478058,
+              "integrated_demand_mass": 170.43790849673204,
+              "service_regime_id": "SERVICE-INBOUND-07",
+              "support_duration_hours": 3.5,
+              "support_end": 75600,
+              "support_start": 63000
+            }
+          ],
+          "tail_demand_rate_per_hour": 48.69654528478058,
+          "tail_headway_minutes": 15,
+          "tail_service_regime_id": "SERVICE-INBOUND-07",
+          "tail_slowest_margin_minutes": -1
+        },
+        "outbound": {
+          "classification": "TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION",
+          "demand_justified": false,
+          "direction": "outbound",
+          "eligible": false,
+          "max_non_tail_headway_minutes": 16,
+          "offending_regime_count": 1,
+          "offending_regimes": [
+            {
+              "demand_rate_minus_tail": 35.414529914529915,
+              "demand_rate_per_hour": 88.67269984917044,
+              "headway_excess_over_tail_minutes": 1,
+              "headway_minutes": 16,
+              "service_regime_id": "SERVICE-OUTBOUND-01",
+              "support_end": 21600,
+              "support_start": 17700
+            }
+          ],
+          "protection_justified": false,
+          "protection_witnesses": [],
+          "service_regime_demand_evidence": [
+            {
+              "demand_rate_per_hour": 88.67269984917044,
+              "integrated_demand_mass": 96.06209150326796,
+              "service_regime_id": "SERVICE-OUTBOUND-01",
+              "support_duration_hours": 1.0833333333333333,
+              "support_end": 21600,
+              "support_start": 17700
+            },
+            {
+              "demand_rate_per_hour": 173.4771241830065,
+              "integrated_demand_mass": 260.2156862745098,
+              "service_regime_id": "SERVICE-OUTBOUND-02",
+              "support_duration_hours": 1.5,
+              "support_end": 27000,
+              "support_start": 21600
+            },
+            {
+              "demand_rate_per_hour": 107.97385620915033,
+              "integrated_demand_mass": 323.921568627451,
+              "service_regime_id": "SERVICE-OUTBOUND-03",
+              "support_duration_hours": 3.0,
+              "support_end": 37800,
+              "support_start": 27000
+            },
+            {
+              "demand_rate_per_hour": 160.30065359477123,
+              "integrated_demand_mass": 240.45098039215685,
+              "service_regime_id": "SERVICE-OUTBOUND-04",
+              "support_duration_hours": 1.5,
+              "support_end": 43200,
+              "support_start": 37800
+            },
+            {
+              "demand_rate_per_hour": 102.83006535947712,
+              "integrated_demand_mass": 411.32026143790847,
+              "service_regime_id": "SERVICE-OUTBOUND-05",
+              "support_duration_hours": 4.0,
+              "support_end": 57600,
+              "support_start": 43200
+            },
+            {
+              "demand_rate_per_hour": 234.00435729847493,
+              "integrated_demand_mass": 351.0065359477124,
+              "service_regime_id": "SERVICE-OUTBOUND-06",
+              "support_duration_hours": 1.5,
+              "support_end": 63000,
+              "support_start": 57600
+            },
+            {
+              "demand_rate_per_hour": 110.81917211328975,
+              "integrated_demand_mass": 166.22875816993462,
+              "service_regime_id": "SERVICE-OUTBOUND-07",
+              "support_duration_hours": 1.5,
+              "support_end": 68400,
+              "support_start": 63000
+            },
+            {
+              "demand_rate_per_hour": 53.25816993464053,
+              "integrated_demand_mass": 106.51633986928105,
+              "service_regime_id": "SERVICE-OUTBOUND-08",
+              "support_duration_hours": 2.0,
+              "support_end": 75600,
+              "support_start": 68400
+            }
+          ],
+          "tail_demand_rate_per_hour": 53.25816993464053,
+          "tail_headway_minutes": 15,
+          "tail_service_regime_id": "SERVICE-OUTBOUND-08",
+          "tail_slowest_margin_minutes": -1
+        }
+      },
+      "h_search": {
+        "H_REVIEW_REPRESENTATIVE": {
+          "effective_palette_count": 4,
+          "fingerprint": "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+          "fleet": 18,
+          "inbound_effective_palette": [
+            9,
+            15
+          ],
+          "inbound_sustained_palette": [
+            8,
+            9,
+            14,
+            15
+          ],
+          "mismatch": 0.008149760259092994,
+          "outbound_effective_palette": [
+            9,
+            14
+          ],
+          "outbound_sustained_palette": [
+            9,
+            10,
+            13,
+            14,
+            15
+          ],
+          "roles": [
+            "H_REVIEW_REPRESENTATIVE"
+          ],
+          "service_regime_count": 15,
+          "source": "H_PARETO",
+          "sustained_headway_level_count": 9,
+          "tail": {
+            "inbound": {
+              "classification": "TAIL_IS_SLOWEST",
+              "tail_headway_minutes": 15,
+              "tail_slowest_margin_minutes": 0
+            },
+            "outbound": {
+              "classification": "TAIL_IS_SLOWEST",
+              "tail_headway_minutes": 15,
+              "tail_slowest_margin_minutes": 0
+            }
+          },
+          "wait_minutes": 6.073427220303305
+        },
+        "pareto_size": 46,
+        "ranges": {
+          "effective_palette_count": [
+            4,
+            8
+          ],
+          "fleet": [
+            14,
+            20
+          ],
+          "mismatch": [
+            0.006368300470867757,
+            0.015650510405009692
+          ],
+          "service_regime_count": [
+            10,
+            20
+          ],
+          "sustained_headway_level_count": [
+            6,
+            12
+          ],
+          "wait_minutes": [
+            6.073427220303305,
+            6.217911989725442
+          ]
+        },
+        "route_id": "6",
+        "search_budget": {
+          "max_compile_frontier_per_state": 4,
+          "max_directional_compilations": 24,
+          "max_open_states": 512,
+          "max_pair_frontier": 512,
+          "max_service_plan_evaluations": 24
+        },
+        "search_statistics": {
+          "budget_exhausted": true,
+          "compile_variants_evaluated": 96,
+          "duplicate_states_skipped": 428,
+          "fleet_feedback_expansion_requests": 114,
+          "fleet_feedback_expansions_executed": 15,
+          "fleet_feedback_expansions_skipped": 99,
+          "fleet_validations_run": 140,
+          "protected_compile_variants_rejected": 0,
+          "response_feedback_anchor_candidates": 2,
+          "response_feedback_anchors_enqueued": 2,
+          "response_feedback_anchors_evaluated": 2,
+          "search_iterations": 24,
+          "states_evaluated": 24,
+          "states_generated": 7884,
+          "states_pruned": 6920,
+          "tail_ordering_compilations_rejected": 68
+        },
+        "simplicity_tradeoff_frontier": [
+          {
+            "effective_palette_count": 4,
+            "fingerprint": "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+            "fleet": 18,
+            "inbound_effective_palette": [
+              9,
+              15
+            ],
+            "inbound_sustained_palette": [
+              8,
+              9,
+              14,
+              15
+            ],
+            "mismatch": 0.008149760259092994,
+            "outbound_effective_palette": [
+              9,
+              14
+            ],
+            "outbound_sustained_palette": [
+              9,
+              10,
+              13,
+              14,
+              15
+            ],
+            "roles": [
+              "MINIMUM_WAIT"
+            ],
+            "service_regime_count": 15,
+            "source": "H_PARETO",
+            "sustained_headway_level_count": 9,
+            "tail": {
+              "inbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 15,
+                "tail_slowest_margin_minutes": 0
+              },
+              "outbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 15,
+                "tail_slowest_margin_minutes": 0
+              }
+            },
+            "wait_minutes": 6.073427220303305
+          },
+          {
+            "effective_palette_count": 5,
+            "fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+            "fleet": 18,
+            "inbound_effective_palette": [
+              8,
+              11,
+              15
+            ],
+            "inbound_sustained_palette": [
+              8,
+              11,
+              15
+            ],
+            "mismatch": 0.00951140355301779,
+            "outbound_effective_palette": [
+              11,
+              13
+            ],
+            "outbound_sustained_palette": [
+              11,
+              13,
+              14
+            ],
+            "roles": [
+              "MINIMUM_SUSTAINED_PALETTE"
+            ],
+            "service_regime_count": 12,
+            "source": "H_PARETO",
+            "sustained_headway_level_count": 6,
+            "tail": {
+              "inbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 15,
+                "tail_slowest_margin_minutes": 0
+              },
+              "outbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 14,
+                "tail_slowest_margin_minutes": 1
+              }
+            },
+            "wait_minutes": 6.127911976248842
+          },
+          {
+            "effective_palette_count": 4,
+            "fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+            "fleet": 14,
+            "inbound_effective_palette": [
+              12,
+              15
+            ],
+            "inbound_sustained_palette": [
+              11,
+              12,
+              13,
+              15
+            ],
+            "mismatch": 0.013530214232610385,
+            "outbound_effective_palette": [
+              12,
+              15
+            ],
+            "outbound_sustained_palette": [
+              11,
+              12,
+              13,
+              15
+            ],
+            "roles": [
+              "MINIMUM_FLEET"
+            ],
+            "service_regime_count": 16,
+            "source": "H_PARETO",
+            "sustained_headway_level_count": 8,
+            "tail": {
+              "inbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 15,
+                "tail_slowest_margin_minutes": 2
+              },
+              "outbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 15,
+                "tail_slowest_margin_minutes": 2
+              }
+            },
+            "wait_minutes": 6.1174686904923945
+          },
+          {
+            "effective_palette_count": 7,
+            "fingerprint": "d9812afa9dca31e7b88665c73568a6cf4bccdf93136ca0d8ddcfbcdacd439b89",
+            "fleet": 20,
+            "inbound_effective_palette": [
+              9,
+              14
+            ],
+            "inbound_sustained_palette": [
+              9,
+              10,
+              13,
+              14,
+              15
+            ],
+            "mismatch": 0.006368300470867757,
+            "outbound_effective_palette": [
+              7,
+              10,
+              12,
+              15,
+              18
+            ],
+            "outbound_sustained_palette": [
+              7,
+              9,
+              10,
+              12,
+              15,
+              18,
+              19
+            ],
+            "roles": [
+              "MINIMUM_MISMATCH"
+            ],
+            "service_regime_count": 20,
+            "source": "H_PARETO",
+            "sustained_headway_level_count": 12,
+            "tail": {
+              "inbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 15,
+                "tail_slowest_margin_minutes": 0
+              },
+              "outbound": {
+                "classification": "TAIL_IS_SLOWEST",
+                "tail_headway_minutes": 30,
+                "tail_slowest_margin_minutes": 0
+              }
+            },
+            "wait_minutes": 6.144048262394766
+          }
+        ],
+        "status": "SEARCH_BUDGET_EXHAUSTED",
+        "tail_classification_counts_unique_pareto_directions": {
+          "TAIL_IS_SLOWEST": 18
+        }
+      },
+      "raw_simplicity_deltas": {
+        "g_final_minus_human_final": {
+          "delta_expected_wait_seconds_per_passenger": -6.430798879285948,
+          "delta_fleet": 0,
+          "delta_mismatch": 0.0003951077737945098,
+          "delta_service_regime_count": -2,
+          "delta_sustained_headway_level_count": 5
+        },
+        "h_review_minus_human_final": {
+          "delta_expected_wait_seconds_per_passenger": -4.652169260687167,
+          "delta_fleet": -1,
+          "delta_mismatch": 0.0013476877214000631,
+          "delta_service_regime_count": -2,
+          "delta_sustained_headway_level_count": 4
+        },
+        "h_review_minus_simpler_h_min_palette": {
+          "delta_expected_wait_seconds_per_passenger": -3.2690853567322087,
+          "delta_fleet": 0,
+          "delta_mismatch": -0.0013616432939247951,
+          "delta_service_regime_count": 3,
+          "delta_sustained_headway_level_count": 3
+        }
+      },
+      "rhythm_classification": "RHYTHM_SIMPLICITY_MATERIAL_TRADEOFF",
+      "tail_rule_classification": "TAIL_RULE_EFFECTIVE"
+    }
+  },
+  "starting_g_commit_sha": "bb8a53cfb433a8a6ae89771f96da54f4fc005164",
+  "subsequent_materiality_selection_milestone_justified": true,
+  "tail_rule": "final actual ServiceRegime headway >= every prior actual ServiceRegime headway, unless strictly higher immutable tail demand or binding translated protection justifies every inversion"
+}

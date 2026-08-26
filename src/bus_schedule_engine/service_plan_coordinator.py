@@ -25,6 +25,7 @@ from .contracts_v1.closed_loop_service_protection import (
     INVALID_TRANSLATED_PROTECTION_AUTHORITY,
     ClosedLoopServiceProtectionAuthorityV1,
     ClosedLoopServiceProtectionAuthorityValidationV1,
+    ClosedLoopServiceProtectionValidationV1,
     ClosedLoopServiceProtectionViolationV1,
     _validate_trusted_closed_loop_service_protection_v1,
     validate_closed_loop_service_protection_authority_v1,
@@ -60,6 +61,7 @@ FLEET_LIMIT_EXCEEDED = "FLEET_LIMIT_EXCEEDED"
 LARGEST_SERVICE_FREQUENCY_JUMP = "LARGEST_SERVICE_FREQUENCY_JUMP"
 TAIL_OVER_SERVICE = "TAIL_OVER_SERVICE"
 TAIL_UNDER_SERVICE = "TAIL_UNDER_SERVICE"
+TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION = "TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION"
 DEMAND_UNDERSERVED_INTERVAL = "DEMAND_UNDERSERVED_INTERVAL"
 DEMAND_OVERSERVED_INTERVAL = "DEMAND_OVERSERVED_INTERVAL"
 FIXED_ENDPOINT_CONFLICT = "FIXED_ENDPOINT_CONFLICT"
@@ -93,6 +95,7 @@ class CoordinatorSearchStatisticsV1:
     states_pruned: int = 0
     compile_variants_evaluated: int = 0
     protected_compile_variants_rejected: int = 0
+    tail_ordering_compilations_rejected: int = 0
     fleet_validations_run: int = 0
     fleet_feedback_expansion_requests: int = 0
     fleet_feedback_expansions_executed: int = 0
@@ -195,6 +198,78 @@ class FeedbackEvidenceV1:
     observed_service_direction: str | None = None
     sqrt_expected_delta_log_service: float | None = None
     sqrt_response_residual: float | None = None
+    tail_service_regime_id: str | None = None
+    tail_headway_minutes: int | None = None
+    max_offending_headway_minutes: int | None = None
+    tail_demand_rate_per_hour: float | None = None
+    strongest_offending_service_regime_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TailOrderingOffendingRegimeV1:
+    service_regime_id: str
+    headway_minutes: int
+    support_start: int
+    support_end: int
+    demand_rate_per_hour: float
+    headway_excess_over_tail_minutes: int
+    demand_rate_minus_tail: float
+
+
+@dataclass(frozen=True, slots=True)
+class TailOrderingProtectionWitnessV1:
+    source_protected_regime_id: str
+    protected_window_start: int
+    protected_window_end: int
+    maximum_headway_minutes: int
+    minimum_trip_count: int
+    witness_start_departure: int
+    witness_end_departure: int
+    justified_offending_headways: tuple[int, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ActualServiceRegimeDemandEvidenceV1:
+    service_regime_id: str
+    support_start: int
+    support_end: int
+    support_duration_hours: float
+    integrated_demand_mass: float
+    demand_rate_per_hour: float
+
+
+@dataclass(frozen=True, slots=True)
+class TailOrderingAssessmentV1:
+    direction: str
+    tail_service_regime_id: str
+    tail_headway_minutes: int
+    tail_demand_rate_per_hour: float
+    max_non_tail_headway_minutes: int
+    tail_slowest_margin_minutes: int
+    offending_regime_count: int
+    offending_regimes: tuple[TailOrderingOffendingRegimeV1, ...]
+    service_regime_demand_evidence: tuple[ActualServiceRegimeDemandEvidenceV1, ...]
+    demand_justified: bool
+    protection_justified: bool
+    protection_witnesses: tuple[TailOrderingProtectionWitnessV1, ...]
+    eligible: bool
+    classification: str
+
+
+@dataclass(frozen=True, slots=True)
+class RhythmSimplicityMetricsV1:
+    actual_service_regime_count: int
+    headway_transition_count: int
+    sustained_service_regime_count: int
+    sustained_headway_levels: tuple[int, ...]
+    sustained_headway_level_count: int
+    single_gap_regime_count: int
+    single_gap_headway_levels: tuple[int, ...]
+    effective_palette_tolerance_minutes: int
+    effective_headway_palette: tuple[int, ...]
+    effective_headway_palette_count: int
+    gaps_by_headway: tuple[tuple[int, int], ...]
+    service_minutes_by_headway: tuple[tuple[int, int], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,6 +298,8 @@ class ActualServiceMetricsV1:
     demand_response_transition_count: int
     demand_response_aligned_transition_count: int
     sqrt_seed_response_deviation: float | None
+    rhythm_simplicity: RhythmSimplicityMetricsV1
+    tail_ordering: TailOrderingAssessmentV1
 
 
 @dataclass(frozen=True, slots=True)
@@ -246,6 +323,10 @@ class OperatingPairMetricsV1:
     fleet_required: int
     total_excess_terminal_wait: int
     max_excess_terminal_wait: int
+    total_directional_sustained_headway_level_count: int = 0
+    max_directional_sustained_headway_level_count: int = 0
+    total_directional_effective_palette_count: int = 0
+    total_single_gap_regime_count: int = 0
 
     @property
     def pareto_vector(self) -> tuple[float | int, ...]:
@@ -253,6 +334,7 @@ class OperatingPairMetricsV1:
             self.observed_demand_mismatch,
             self.demand_weighted_expected_passenger_wait_minutes,
             self.actual_service_regime_count,
+            self.total_directional_sustained_headway_level_count,
             self.max_frequency_jump,
             self.total_frequency_variation,
             self.moved_trips_vs_b,
@@ -539,12 +621,369 @@ def demand_response_diagnostics_v1(
     )
 
 
+def _minimum_effective_headway_palette_v1(
+    levels: Sequence[int],
+    gap_weights: Mapping[int, int],
+    *,
+    tolerance_minutes: int = 1,
+) -> tuple[int, ...]:
+    """Return the exact minimum all-level palette with deterministic tie-breaking."""
+
+    exact = tuple(sorted(set(levels)))
+    if not exact:
+        return ()
+    if tolerance_minutes != 1:
+        raise ValueError("V1 effective palette tolerance must be exactly one minute")
+    best: tuple[int, int, tuple[int, ...]] | None = None
+
+    def visit(palette: tuple[int, ...]) -> None:
+        nonlocal best
+        if best is not None and len(palette) > best[0]:
+            return
+        uncovered = next(
+            (
+                level
+                for level in exact
+                if not any(
+                    abs(level - representative) <= tolerance_minutes for representative in palette
+                )
+            ),
+            None,
+        )
+        if uncovered is None:
+            deviation = sum(
+                gap_weights[level] * min(abs(level - representative) for representative in palette)
+                for level in exact
+            )
+            key = (len(palette), deviation, palette)
+            if best is None or key < best:
+                best = key
+            return
+        lower_bound = palette[-1] + 1 if palette else exact[0]
+        for representative in (
+            level
+            for level in exact
+            if lower_bound <= level and abs(level - uncovered) <= tolerance_minutes
+        ):
+            visit((*palette, representative))
+
+    visit(())
+    if best is None:  # pragma: no cover - every integer level has a feasible representative
+        raise ValueError("sustained headway palette is not coverable")
+    return best[2]
+
+
+def rhythm_simplicity_metrics_v1(compilation: Any) -> RhythmSimplicityMetricsV1:
+    """Measure actual repeated headway vocabulary without transition pseudo-gaps."""
+
+    services = tuple(compilation.service_regimes)
+    sustained = tuple(item for item in services if item.trip_count >= 3)
+    single_gap = tuple(item for item in services if item.trip_count == 2)
+    gap_counts: Counter[int] = Counter()
+    service_minutes: Counter[int] = Counter()
+    for service in services:
+        gap_counts[service.uniform_headway_minutes] += service.trip_count - 1
+        service_minutes[service.uniform_headway_minutes] += (
+            service.last_departure - service.first_departure
+        ) // 60
+    sustained_gap_weights: Counter[int] = Counter()
+    for service in sustained:
+        sustained_gap_weights[service.uniform_headway_minutes] += service.trip_count - 1
+    levels = tuple(sorted(sustained_gap_weights))
+    effective = _minimum_effective_headway_palette_v1(levels, sustained_gap_weights)
+    return RhythmSimplicityMetricsV1(
+        actual_service_regime_count=len(services),
+        headway_transition_count=max(0, len(services) - 1),
+        sustained_service_regime_count=len(sustained),
+        sustained_headway_levels=levels,
+        sustained_headway_level_count=len(levels),
+        single_gap_regime_count=len(single_gap),
+        single_gap_headway_levels=tuple(
+            sorted({item.uniform_headway_minutes for item in single_gap})
+        ),
+        effective_palette_tolerance_minutes=1,
+        effective_headway_palette=effective,
+        effective_headway_palette_count=len(effective),
+        gaps_by_headway=tuple(sorted(gap_counts.items())),
+        service_minutes_by_headway=tuple(sorted(service_minutes.items())),
+    )
+
+
+def _actual_service_supports_v1(compilation: Any) -> dict[str, tuple[int, int]]:
+    """Map actual regimes to clipped authoritative planning-slice support."""
+
+    services = tuple(compilation.service_regimes)
+    service_ids = tuple(item.service_regime_id for item in services)
+    if len(service_ids) != len(set(service_ids)):
+        raise ValueError("actual ServiceRegime provenance is ambiguous: duplicate IDs")
+    slices_by_service: dict[str, list[Any]] = {service_id: [] for service_id in service_ids}
+    demand_ids: set[str] = set()
+    for item in compilation.demand_regime_slices:
+        if item.service_regime_id not in slices_by_service:
+            raise ValueError("DemandRegime slice references an unknown actual ServiceRegime")
+        if item.demand_regime_id in demand_ids:
+            raise ValueError("DemandRegime slice provenance is ambiguous: duplicate demand ID")
+        demand_ids.add(item.demand_regime_id)
+        slices_by_service[item.service_regime_id].append(item)
+    supports: dict[str, tuple[int, int]] = {}
+    active_start = compilation.endpoint_authority.fixed_first_departure
+    active_end = compilation.endpoint_authority.fixed_last_departure
+    for service in services:
+        slices = tuple(
+            sorted(
+                slices_by_service[service.service_regime_id],
+                key=lambda item: (
+                    item.demand_regime_start,
+                    item.demand_regime_end,
+                    item.demand_regime_id,
+                ),
+            )
+        )
+        if not slices:
+            raise ValueError("actual ServiceRegime has no authoritative planning-slice support")
+        if any(
+            item.demand_regime_start >= item.demand_regime_end
+            or item.uniform_headway_minutes != service.uniform_headway_minutes
+            for item in slices
+        ):
+            raise ValueError("actual ServiceRegime slice provenance is inconsistent")
+        if any(
+            left.demand_regime_end != right.demand_regime_start
+            for left, right in zip(slices, slices[1:], strict=False)
+        ):
+            raise ValueError("actual ServiceRegime planning support is not one contiguous union")
+        support_start = max(active_start, slices[0].demand_regime_start)
+        support_end = min(active_end, slices[-1].demand_regime_end)
+        if support_end <= support_start:
+            raise ValueError("actual ServiceRegime has empty active planning support")
+        supports[service.service_regime_id] = (support_start, support_end)
+    return supports
+
+
+def _integrated_demand_rate_v1(
+    demand_buckets: Sequence[DemandBucketEvidenceV1],
+    *,
+    direction: str,
+    support_start: int,
+    support_end: int,
+) -> tuple[float, float]:
+    ordered = tuple(sorted(demand_buckets, key=lambda item: (item.start, item.end)))
+    cursor = support_start
+    mass = 0.0
+    for bucket in ordered:
+        if bucket.direction != direction:
+            raise ValueError("immutable demand buckets do not match compilation direction")
+        start = max(support_start, bucket.start)
+        end = min(support_end, bucket.end)
+        if end <= start:
+            continue
+        if start != cursor:
+            raise ValueError("immutable demand buckets do not uniquely cover regime support")
+        mass += bucket.observed_demand * (end - start) / (bucket.end - bucket.start)
+        cursor = end
+    if cursor != support_end:
+        raise ValueError("immutable demand buckets do not completely cover regime support")
+    duration_hours = (support_end - support_start) / 3600
+    return mass, mass / duration_hours
+
+
+def _tail_protection_witnesses_v1(
+    compilation: Any,
+    *,
+    tail_support: tuple[int, int],
+    offending_headways: Sequence[int],
+    protection_authority: ClosedLoopServiceProtectionAuthorityV1 | None,
+    protection_validation: ClosedLoopServiceProtectionValidationV1 | None,
+) -> tuple[TailOrderingProtectionWitnessV1, ...]:
+    if protection_authority is None or protection_validation is None:
+        return ()
+    if not protection_validation.passed:
+        return ()
+    tail = compilation.service_regimes[-1]
+    internal_tail_gaps = tuple(zip(tail.departures, tail.departures[1:], strict=False))
+    windows = {
+        (item.direction, item.source_regime_id): item for item in protection_authority.windows
+    }
+    result: list[TailOrderingProtectionWitnessV1] = []
+    for witness in protection_validation.witnesses:
+        window = windows.get((witness.direction, witness.source_regime_id))
+        if window is None or witness.direction != compilation.direction:
+            continue
+        binds_tail = any(
+            left >= tail_support[0]
+            and right <= tail_support[1]
+            and witness.start_departure <= left
+            and right <= witness.end_departure
+            for left, right in internal_tail_gaps
+        )
+        if not binds_tail:
+            continue
+        justified = tuple(
+            sorted(
+                {
+                    headway
+                    for headway in offending_headways
+                    if headway > window.maximum_headway_minutes
+                }
+            )
+        )
+        if justified:
+            result.append(
+                TailOrderingProtectionWitnessV1(
+                    source_protected_regime_id=window.source_regime_id,
+                    protected_window_start=window.protected_window_start,
+                    protected_window_end=window.protected_window_end,
+                    maximum_headway_minutes=window.maximum_headway_minutes,
+                    minimum_trip_count=window.minimum_trip_count,
+                    witness_start_departure=witness.start_departure,
+                    witness_end_departure=witness.end_departure,
+                    justified_offending_headways=justified,
+                )
+            )
+    return tuple(
+        sorted(
+            result,
+            key=lambda item: (
+                item.protected_window_start,
+                item.protected_window_end,
+                item.source_protected_regime_id,
+            ),
+        )
+    )
+
+
+def assess_tail_ordering_v1(
+    compilation: Any,
+    demand_buckets: Sequence[DemandBucketEvidenceV1],
+    *,
+    protection_authority: ClosedLoopServiceProtectionAuthorityV1 | None = None,
+    protection_validation: ClosedLoopServiceProtectionValidationV1 | None = None,
+) -> TailOrderingAssessmentV1:
+    services = tuple(compilation.service_regimes)
+    if not services:
+        raise ValueError("tail ordering requires at least one actual ServiceRegime")
+    supports = _actual_service_supports_v1(compilation)
+    demand_rates: dict[str, float] = {}
+    demand_evidence: list[ActualServiceRegimeDemandEvidenceV1] = []
+    for service in services:
+        support_start, support_end = supports[service.service_regime_id]
+        mass, rate = _integrated_demand_rate_v1(
+            demand_buckets,
+            direction=compilation.direction,
+            support_start=support_start,
+            support_end=support_end,
+        )
+        demand_rates[service.service_regime_id] = rate
+        demand_evidence.append(
+            ActualServiceRegimeDemandEvidenceV1(
+                service_regime_id=service.service_regime_id,
+                support_start=support_start,
+                support_end=support_end,
+                support_duration_hours=(support_end - support_start) / 3600,
+                integrated_demand_mass=mass,
+                demand_rate_per_hour=rate,
+            )
+        )
+    tail = services[-1]
+    tail_rate = demand_rates[tail.service_regime_id]
+    if len(services) == 1:
+        return TailOrderingAssessmentV1(
+            direction=compilation.direction,
+            tail_service_regime_id=tail.service_regime_id,
+            tail_headway_minutes=tail.uniform_headway_minutes,
+            tail_demand_rate_per_hour=tail_rate,
+            max_non_tail_headway_minutes=tail.uniform_headway_minutes,
+            tail_slowest_margin_minutes=0,
+            offending_regime_count=0,
+            offending_regimes=(),
+            service_regime_demand_evidence=tuple(demand_evidence),
+            demand_justified=False,
+            protection_justified=False,
+            protection_witnesses=(),
+            eligible=True,
+            classification="SINGLE_REGIME_NO_TAIL_ORDERING_CONFLICT",
+        )
+    max_non_tail = max(item.uniform_headway_minutes for item in services[:-1])
+    offenders = tuple(
+        TailOrderingOffendingRegimeV1(
+            service_regime_id=service.service_regime_id,
+            headway_minutes=service.uniform_headway_minutes,
+            support_start=supports[service.service_regime_id][0],
+            support_end=supports[service.service_regime_id][1],
+            demand_rate_per_hour=demand_rates[service.service_regime_id],
+            headway_excess_over_tail_minutes=(
+                service.uniform_headway_minutes - tail.uniform_headway_minutes
+            ),
+            demand_rate_minus_tail=(demand_rates[service.service_regime_id] - tail_rate),
+        )
+        for service in services[:-1]
+        if service.uniform_headway_minutes > tail.uniform_headway_minutes
+    )
+    if not offenders:
+        classification = "TAIL_IS_SLOWEST"
+        demand_justified = False
+        protection_justified = False
+        witnesses: tuple[TailOrderingProtectionWitnessV1, ...] = ()
+        eligible = True
+    else:
+        demand_covered = {
+            item.service_regime_id
+            for item in offenders
+            if tail_rate > item.demand_rate_per_hour + NUMERICAL_EPSILON
+        }
+        witnesses = _tail_protection_witnesses_v1(
+            compilation,
+            tail_support=supports[tail.service_regime_id],
+            offending_headways=tuple(item.headway_minutes for item in offenders),
+            protection_authority=protection_authority,
+            protection_validation=protection_validation,
+        )
+        protected_covered = {
+            item.service_regime_id
+            for item in offenders
+            if any(
+                item.headway_minutes in witness.justified_offending_headways
+                for witness in witnesses
+            )
+        }
+        offender_ids = {item.service_regime_id for item in offenders}
+        demand_justified = demand_covered == offender_ids
+        protection_justified = (
+            bool(witnesses) and (demand_covered | protected_covered) == offender_ids
+        )
+        eligible = demand_justified or protection_justified
+        if demand_justified:
+            classification = "TAIL_SHORTER_DEMAND_JUSTIFIED"
+        elif protection_justified:
+            classification = "TAIL_SHORTER_PROTECTION_JUSTIFIED"
+        else:
+            classification = TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION
+    return TailOrderingAssessmentV1(
+        direction=compilation.direction,
+        tail_service_regime_id=tail.service_regime_id,
+        tail_headway_minutes=tail.uniform_headway_minutes,
+        tail_demand_rate_per_hour=tail_rate,
+        max_non_tail_headway_minutes=max_non_tail,
+        tail_slowest_margin_minutes=tail.uniform_headway_minutes - max_non_tail,
+        offending_regime_count=len(offenders),
+        offending_regimes=offenders,
+        service_regime_demand_evidence=tuple(demand_evidence),
+        demand_justified=demand_justified,
+        protection_justified=protection_justified,
+        protection_witnesses=witnesses,
+        eligible=eligible,
+        classification=classification,
+    )
+
+
 def evaluate_actual_service_v1(
     candidate: CleanCompileVariantV1,
     *,
     demand_buckets: Sequence[DemandBucketEvidenceV1],
     scenario_b_departures: Sequence[int],
     demand_response_regimes: Sequence[DemandResponseRegimeEvidenceV1] | None = None,
+    protection_authority: ClosedLoopServiceProtectionAuthorityV1 | None = None,
+    protection_validation: ClosedLoopServiceProtectionValidationV1 | None = None,
 ) -> tuple[ActualServiceMetricsV1, tuple[FeedbackEvidenceV1, ...]]:
     """Evaluate the exact compiled timestamps against immutable demand buckets."""
 
@@ -585,6 +1024,13 @@ def evaluate_actual_service_v1(
     tail_service_share = tail.trip_count / total_trips
     tail_demand_share = _tail_demand_share(demand_buckets, tail_start=tail.first_departure)
     tail_debt = tail_demand_share - tail_service_share
+    rhythm_simplicity = rhythm_simplicity_metrics_v1(compilation)
+    tail_ordering = assess_tail_ordering_v1(
+        compilation,
+        demand_buckets,
+        protection_authority=protection_authority,
+        protection_validation=protection_validation,
+    )
     (
         expected_wait,
         maximum_bucket_wait,
@@ -627,6 +1073,8 @@ def evaluate_actual_service_v1(
         demand_response_transition_count=response_transition_count,
         demand_response_aligned_transition_count=response_aligned_count,
         sqrt_seed_response_deviation=sqrt_response_deviation,
+        rhythm_simplicity=rhythm_simplicity,
+        tail_ordering=tail_ordering,
     )
     feedback: list[FeedbackEvidenceV1] = []
     for index, diagnostic in enumerate(compilation.boundary_diagnostics):
@@ -698,6 +1146,38 @@ def evaluate_actual_service_v1(
                 interval_end=demand_buckets[-1].end,
                 magnitude=abs(tail_debt),
                 detail="Signed tail demand share minus compiled tail service share.",
+            )
+        )
+    if not tail_ordering.eligible:
+        strongest = min(
+            tail_ordering.offending_regimes,
+            key=lambda item: (
+                -item.headway_excess_over_tail_minutes,
+                -item.demand_rate_per_hour,
+                item.support_start,
+                item.service_regime_id,
+            ),
+        )
+        feedback.append(
+            FeedbackEvidenceV1(
+                code=TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION,
+                direction=compilation.direction,
+                regime_index=len(services) - 1,
+                interval_start=tail_ordering.offending_regimes[0].support_start,
+                interval_end=tail_ordering.offending_regimes[-1].support_end,
+                magnitude=float(
+                    tail_ordering.max_non_tail_headway_minutes - tail_ordering.tail_headway_minutes
+                ),
+                detail=(
+                    "Final actual sustained ServiceRegime runs more frequently than an "
+                    "earlier equal-or-higher-demand regime without binding protected-service "
+                    "authority."
+                ),
+                tail_service_regime_id=tail_ordering.tail_service_regime_id,
+                tail_headway_minutes=tail_ordering.tail_headway_minutes,
+                max_offending_headway_minutes=(tail_ordering.max_non_tail_headway_minutes),
+                tail_demand_rate_per_hour=tail_ordering.tail_demand_rate_per_hour,
+                strongest_offending_service_regime_id=strongest.service_regime_id,
             )
         )
     defects = tuple(item for item in response_transitions if not item.direction_aligned)
@@ -878,6 +1358,22 @@ def evaluate_operating_pair_v1(
         fleet_required=int(validation.fleet_requirement),
         total_excess_terminal_wait=sum(excess_waits),
         max_excess_terminal_wait=max(excess_waits, default=0),
+        total_directional_sustained_headway_level_count=(
+            outbound.metrics.rhythm_simplicity.sustained_headway_level_count
+            + inbound.metrics.rhythm_simplicity.sustained_headway_level_count
+        ),
+        max_directional_sustained_headway_level_count=max(
+            outbound.metrics.rhythm_simplicity.sustained_headway_level_count,
+            inbound.metrics.rhythm_simplicity.sustained_headway_level_count,
+        ),
+        total_directional_effective_palette_count=(
+            outbound.metrics.rhythm_simplicity.effective_headway_palette_count
+            + inbound.metrics.rhythm_simplicity.effective_headway_palette_count
+        ),
+        total_single_gap_regime_count=(
+            outbound.metrics.rhythm_simplicity.single_gap_regime_count
+            + inbound.metrics.rhythm_simplicity.single_gap_regime_count
+        ),
     )
     pair_id = _pair_fingerprint(outbound, inbound)
     history = (
@@ -1211,6 +1707,27 @@ def generate_targeted_neighbors_v1(
                         pair_indices=adjacent_pairs,
                         split_boundaries=(boundary,),
                     )
+        elif evidence.code == TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION:
+            add(
+                tail_release_one_neighbors_v1(
+                    state,
+                    floor_headway_minutes=floor_headway_minutes,
+                    evidence_code=evidence.code,
+                    priority=0,
+                )
+            )
+            if len(state.service_regimes) >= 2:
+                add(
+                    shift_boundary_left_neighbors_v1(
+                        state,
+                        planning_grid_seconds=planning_grid_seconds,
+                        floor_headway_minutes=floor_headway_minutes,
+                        evidence_code=evidence.code,
+                        priority=0,
+                        affected_indices=(len(state.service_regimes) - 2,),
+                        max_trip_count_delta=1,
+                    )
+                )
         elif evidence.code == TAIL_UNDER_SERVICE:
             add(
                 tail_absorb_one_neighbors_v1(
@@ -1692,9 +2209,14 @@ def search_route_service_plans_v1(
                     if context.demand_response_regimes is None
                     else context.demand_response_regimes[state.direction]
                 ),
+                protection_authority=context.service_protection_authority,
+                protection_validation=protection,
             )
             feedback_counts.update(item.code for item in feedback)
             direction_feedback.extend(feedback)
+            if not metrics.tail_ordering.eligible:
+                stats.tail_ordering_compilations_rejected += 1
+                continue
             record = DirectionalCompilationCandidateV1(
                 state=state,
                 state_fingerprint=fingerprint,
@@ -2408,11 +2930,23 @@ def route_result_payload_v1(
                 "canonical DemandRegimes"
             ),
             "terminal_wait": "sum/max(connection_layover - authoritative_minimum_layover)",
+            "sustained_headway_levels": (
+                "sorted distinct actual uniform headways for ServiceRegimes with trip_count >= 3"
+            ),
+            "effective_headway_palette": (
+                "minimum integer representatives covering every sustained level within +/-1 "
+                "minute; gap-weighted deviation then lexicographic tie-break"
+            ),
+            "tail_ordering": (
+                "tail headway must be >= every prior actual sustained headway unless strictly "
+                "higher immutable tail demand or binding translated protection proves the inversion"
+            ),
         },
         "pareto_dimensions": [
             "observed_demand_mismatch",
             "demand_weighted_expected_passenger_wait_minutes",
             "actual_service_regime_count",
+            "total_directional_sustained_headway_level_count",
             "max_frequency_jump",
             "total_frequency_variation",
             "moved_trips_vs_b",
@@ -2426,6 +2960,7 @@ def route_result_payload_v1(
             LARGEST_SERVICE_FREQUENCY_JUMP,
             TAIL_OVER_SERVICE,
             TAIL_UNDER_SERVICE,
+            TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION,
             DEMAND_UNDERSERVED_INTERVAL,
             DEMAND_OVERSERVED_INTERVAL,
             DEMAND_RESPONSE_DIRECTION_MISMATCH,
@@ -2458,6 +2993,10 @@ def route_result_payload_v1(
             ],
             TAIL_OVER_SERVICE: ["TAIL_RELEASE_ONE"],
             TAIL_UNDER_SERVICE: ["TAIL_ABSORB_ONE"],
+            TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION: [
+                "TAIL_RELEASE_ONE",
+                "final-boundary SHIFT_BOUNDARY_LEFT (one grid; max trip delta 1)",
+            ],
             DEMAND_UNDERSERVED_INTERVAL: [
                 "localized split, shift, and one-trip moves around the diagnosed interval"
             ],
@@ -2558,6 +3097,13 @@ __all__ = [
     "SERVICE_PLAN_COORDINATOR_PROFILE_V1",
     "TAIL_OVER_SERVICE",
     "TAIL_UNDER_SERVICE",
+    "TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION",
+    "ActualServiceRegimeDemandEvidenceV1",
+    "TailOrderingAssessmentV1",
+    "TailOrderingOffendingRegimeV1",
+    "TailOrderingProtectionWitnessV1",
+    "RhythmSimplicityMetricsV1",
+    "assess_tail_ordering_v1",
     "build_initial_service_plan_seeds_v1",
     "demand_response_diagnostics_v1",
     "dominates_operating_pair_v1",
@@ -2565,6 +3111,7 @@ __all__ = [
     "evaluate_operating_pair_v1",
     "expected_passenger_wait_metrics_v1",
     "generate_targeted_neighbors_v1",
+    "rhythm_simplicity_metrics_v1",
     "load_canonical_demand_response_regimes_v1",
     "load_route_coordinator_inputs_v1",
     "route_result_payload_v1",

@@ -439,6 +439,19 @@ def _compile(state: ServicePlanStateV1, limit: int = 8):
     )
 
 
+def _tail_eligible_for_isolated_regression(metrics):
+    """Keep pre-H control-flow tests focused on their named invariant."""
+
+    return dataclasses.replace(
+        metrics,
+        tail_ordering=dataclasses.replace(
+            metrics.tail_ordering,
+            eligible=True,
+            classification="TAIL_IS_SLOWEST",
+        ),
+    )
+
+
 def _response_feedback(direction: str) -> tuple[FeedbackEvidenceV1, ...]:
     return (
         FeedbackEvidenceV1(
@@ -508,7 +521,9 @@ def _run_lane_search(monkeypatch, *, promotion: bool = False):
 
     def response_on_every_evaluation(candidate, **kwargs):
         metrics, _ = real_evaluate(candidate, **kwargs)
-        return metrics, _response_feedback(candidate.compilation.direction)
+        return _tail_eligible_for_isolated_regression(metrics), _response_feedback(
+            candidate.compilation.direction
+        )
 
     def scripted_neighbors(state, *, feedback, **_kwargs):
         if not feedback or feedback[0].code != DEMAND_RESPONSE_DIRECTION_MISMATCH:
@@ -630,7 +645,7 @@ def _run_scripted_pair_feedback_search(monkeypatch, pair_feedback_script):
 
     def without_direction_feedback(candidate, **kwargs):
         metrics, _ = evaluate_actual_service_v1(candidate, **kwargs)
-        return metrics, ()
+        return _tail_eligible_for_isolated_regression(metrics), ()
 
     def scripted_pair_feedback(_outbound, _inbound, *, context):
         nonlocal pair_call_index
@@ -1218,6 +1233,15 @@ def test_phase_distinct_directional_candidate_reaches_exact_fleet_validation(
 
     exact_validations: dict[tuple[int, ...], tuple[str, int | None]] = {}
     exact_validator = coordinator.validate_fleet_combination_v1
+    real_evaluate = coordinator.evaluate_actual_service_v1
+
+    def tail_eligible_evaluate(candidate, **kwargs):
+        metrics, feedback = real_evaluate(candidate, **kwargs)
+        return _tail_eligible_for_isolated_regression(metrics), tuple(
+            item
+            for item in feedback
+            if item.code != coordinator.TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION
+        )
 
     def recording_validator(**kwargs):
         validation = exact_validator(**kwargs)
@@ -1228,6 +1252,7 @@ def test_phase_distinct_directional_candidate_reaches_exact_fleet_validation(
         return validation
 
     monkeypatch.setattr(coordinator, "validate_fleet_combination_v1", recording_validator)
+    monkeypatch.setattr(coordinator, "evaluate_actual_service_v1", tail_eligible_evaluate)
     result = search_route_service_plans_v1(
         context=_context(fleet_ceiling=3, runtime_minutes=15),
         seeds=(outbound_state, inbound_state),
@@ -1942,22 +1967,24 @@ def test_local_pilot_context_loads_canonical_response_evidence_and_compiles_smok
 ) -> None:
     workspace = Path(__file__).resolve().parents[1]
     artifact_root = workspace
-    demand_path = (
-        artifact_root
-        / "outputs"
-        / "demand_regime_model_selection"
-        / f"route_{route_id}_demand_regimes.json"
-    )
-    if not demand_path.is_file():
-        artifact_root = workspace / "bus-schedule-optimizer-main-run"
-        demand_path = (
-            artifact_root
+
+    def required_paths(root: Path) -> tuple[Path, ...]:
+        return (
+            root
             / "outputs"
             / "demand_regime_model_selection"
-            / f"route_{route_id}_demand_regimes.json"
+            / f"route_{route_id}_demand_regimes.json",
+            root
+            / "outputs"
+            / "demand_regime_trip_allocation"
+            / f"route_{route_id}_demand_regime_trip_allocations.json",
+            root / "outputs" / "end_tail_settlement_v3" / "end_tail_settlement_pilot_report.json",
         )
+
+    if not all(path.is_file() for path in required_paths(artifact_root)):
+        artifact_root = workspace / "bus-schedule-optimizer-main-run"
     workbook = workspace / workbook_name
-    if not demand_path.is_file() or not workbook.is_file():
+    if not all(path.is_file() for path in required_paths(artifact_root)) or not workbook.is_file():
         pytest.skip("optional frozen pilot artifacts or route workbook are unavailable")
     context, seeds = load_route_coordinator_inputs_v1(
         repo_root=artifact_root, route_id=route_id, workbook_path=workbook
