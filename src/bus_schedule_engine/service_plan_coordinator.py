@@ -290,6 +290,8 @@ class ActualServiceMetricsV1:
     bucket_service_shares: tuple[float, ...]
     demand_weighted_expected_passenger_wait_minutes: float
     maximum_bucket_expected_wait_minutes: float
+    p90_bucket_expected_wait_minutes: float
+    tail_maximum_bucket_expected_wait_minutes: float | None
     per_bucket_expected_wait_minutes: tuple[float | None, ...]
     active_demand_mass: float
     demand_response_regime_projections: tuple[DemandResponseRegimeProjectionV1, ...]
@@ -323,6 +325,8 @@ class OperatingPairMetricsV1:
     fleet_required: int
     total_excess_terminal_wait: int
     max_excess_terminal_wait: int
+    maximum_bucket_expected_wait_minutes: float = 0.0
+    maximum_directional_p90_bucket_wait_minutes: float = 0.0
     total_directional_sustained_headway_level_count: int = 0
     max_directional_sustained_headway_level_count: int = 0
     total_directional_effective_palette_count: int = 0
@@ -333,6 +337,7 @@ class OperatingPairMetricsV1:
         return (
             self.observed_demand_mismatch,
             self.demand_weighted_expected_passenger_wait_minutes,
+            self.maximum_bucket_expected_wait_minutes,
             self.actual_service_regime_count,
             self.total_directional_sustained_headway_level_count,
             self.max_frequency_jump,
@@ -482,6 +487,50 @@ def expected_passenger_wait_metrics_v1(
     if not active_bucket_waits:
         raise ValueError("active demand buckets must contain expected-wait evidence")
     return expected_wait, max(active_bucket_waits), tuple(per_bucket), total_mass
+
+
+def bucket_wait_access_diagnostics_v1(
+    *,
+    per_bucket_expected_wait_minutes: Sequence[float | None],
+    demand_buckets: Sequence[DemandBucketEvidenceV1],
+    active_span_start: int,
+    active_span_end: int,
+    tail_support_start: int,
+    tail_support_end: int,
+) -> tuple[float, float | None]:
+    """Return nearest-rank P90 and exact-bucket tail access diagnostics."""
+
+    if len(per_bucket_expected_wait_minutes) != len(demand_buckets):
+        raise ValueError("bucket waits and immutable demand buckets must align")
+    if active_span_end <= active_span_start:
+        raise ValueError("active service span must have positive duration")
+    if tail_support_end <= tail_support_start:
+        raise ValueError("tail support must have positive duration")
+    active: list[tuple[DemandBucketEvidenceV1, float]] = []
+    for bucket, wait in zip(demand_buckets, per_bucket_expected_wait_minutes, strict=True):
+        if wait is None:
+            continue
+        active_start = max(active_span_start, bucket.start)
+        active_end = min(active_span_end, bucket.end)
+        if active_end <= active_start:
+            continue
+        active.append((bucket, wait))
+    if not active:
+        raise ValueError("active demand buckets must contain expected-wait evidence")
+    ordered_waits = sorted(wait for _bucket, wait in active)
+    nearest_rank = math.ceil(0.90 * len(ordered_waits))
+    p90 = ordered_waits[nearest_rank - 1]
+    tail_waits = tuple(
+        wait
+        for bucket, wait in active
+        if _overlap(
+            max(active_span_start, bucket.start),
+            min(active_span_end, bucket.end),
+            tail_support_start,
+            tail_support_end,
+        )
+    )
+    return p90, (max(tail_waits) if tail_waits else None)
 
 
 def _effective_service_frequency_per_hour_v1(
@@ -1037,6 +1086,19 @@ def evaluate_actual_service_v1(
         per_bucket_wait,
         active_demand_mass,
     ) = expected_passenger_wait_metrics_v1(compilation.exact_departures, demand_buckets)
+    tail_evidence = next(
+        item
+        for item in tail_ordering.service_regime_demand_evidence
+        if item.service_regime_id == tail.service_regime_id
+    )
+    p90_bucket_wait, tail_maximum_bucket_wait = bucket_wait_access_diagnostics_v1(
+        per_bucket_expected_wait_minutes=per_bucket_wait,
+        demand_buckets=demand_buckets,
+        active_span_start=compilation.exact_departures[0],
+        active_span_end=compilation.exact_departures[-1],
+        tail_support_start=tail_evidence.support_start,
+        tail_support_end=tail_evidence.support_end,
+    )
     (
         response_projections,
         response_transitions,
@@ -1065,6 +1127,8 @@ def evaluate_actual_service_v1(
         bucket_service_shares=service_shares,
         demand_weighted_expected_passenger_wait_minutes=expected_wait,
         maximum_bucket_expected_wait_minutes=maximum_bucket_wait,
+        p90_bucket_expected_wait_minutes=p90_bucket_wait,
+        tail_maximum_bucket_expected_wait_minutes=tail_maximum_bucket_wait,
         per_bucket_expected_wait_minutes=per_bucket_wait,
         active_demand_mass=active_demand_mass,
         demand_response_regime_projections=response_projections,
@@ -1343,6 +1407,14 @@ def evaluate_operating_pair_v1(
             outbound.metrics.observed_demand_mismatch + inbound.metrics.observed_demand_mismatch
         ),
         demand_weighted_expected_passenger_wait_minutes=pair_expected_wait,
+        maximum_bucket_expected_wait_minutes=max(
+            outbound.metrics.maximum_bucket_expected_wait_minutes,
+            inbound.metrics.maximum_bucket_expected_wait_minutes,
+        ),
+        maximum_directional_p90_bucket_wait_minutes=max(
+            outbound.metrics.p90_bucket_expected_wait_minutes,
+            inbound.metrics.p90_bucket_expected_wait_minutes,
+        ),
         actual_service_regime_count=(
             outbound.metrics.actual_service_regime_count
             + inbound.metrics.actual_service_regime_count
@@ -2925,6 +2997,16 @@ def route_result_payload_v1(
                 "exact integral of next-departure wait under "
                 f"{UNIFORM_WITHIN_DEMAND_BUCKET_ASSUMPTION}"
             ),
+            "maximum_bucket_expected_wait_minutes": (
+                "maximum existing exact expected wait among non-null active demand buckets"
+            ),
+            "p90_bucket_expected_wait_minutes": (
+                "nearest-rank P90 of ordered non-null active bucket expected waits"
+            ),
+            "tail_maximum_bucket_expected_wait_minutes": (
+                "maximum existing exact bucket expected wait whose active interval overlaps "
+                "final actual ServiceRegime support; null when no active demand bucket overlaps"
+            ),
             "demand_response_projection": (
                 "overlap-weighted integral of exact interdeparture frequency on immutable "
                 "canonical DemandRegimes"
@@ -2945,6 +3027,7 @@ def route_result_payload_v1(
         "pareto_dimensions": [
             "observed_demand_mismatch",
             "demand_weighted_expected_passenger_wait_minutes",
+            "maximum_bucket_expected_wait_minutes",
             "actual_service_regime_count",
             "total_directional_sustained_headway_level_count",
             "max_frequency_jump",
@@ -3105,6 +3188,7 @@ __all__ = [
     "RhythmSimplicityMetricsV1",
     "assess_tail_ordering_v1",
     "build_initial_service_plan_seeds_v1",
+    "bucket_wait_access_diagnostics_v1",
     "demand_response_diagnostics_v1",
     "dominates_operating_pair_v1",
     "evaluate_actual_service_v1",

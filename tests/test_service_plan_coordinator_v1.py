@@ -680,7 +680,29 @@ def _run_scripted_pair_feedback_search(monkeypatch, pair_feedback_script):
 
 
 def _pair(pair_id: str, values: tuple[float | int, ...]) -> OperatingPairCandidateV1:
-    metrics = OperatingPairMetricsV1(*values, max_excess_terminal_wait=0)
+    (
+        mismatch,
+        average_wait,
+        regime_count,
+        maximum_jump,
+        total_variation,
+        moved_trips,
+        fleet_required,
+        total_excess_wait,
+    ) = values
+    metrics = OperatingPairMetricsV1(
+        observed_demand_mismatch=float(mismatch),
+        demand_weighted_expected_passenger_wait_minutes=float(average_wait),
+        maximum_bucket_expected_wait_minutes=10.0,
+        maximum_directional_p90_bucket_wait_minutes=10.0,
+        actual_service_regime_count=int(regime_count),
+        max_frequency_jump=float(maximum_jump),
+        total_frequency_variation=float(total_variation),
+        moved_trips_vs_b=int(moved_trips),
+        fleet_required=int(fleet_required),
+        total_excess_terminal_wait=int(total_excess_wait),
+        max_excess_terminal_wait=0,
+    )
     return OperatingPairCandidateV1(
         pair_fingerprint=pair_id,
         outbound=None,  # type: ignore[arg-type]
@@ -1677,6 +1699,172 @@ def test_pair_expected_wait_is_weighted_by_directional_active_demand_mass() -> N
     assert pair is not None
     assert pair.metrics.demand_weighted_expected_passenger_wait_minutes == pytest.approx(8.5)
     assert pair.metrics.demand_weighted_expected_passenger_wait_minutes != pytest.approx(7.0)
+
+
+def test_pair_maximum_bucket_wait_is_directional_maximum() -> None:
+    outbound_state = _state("outbound")
+    inbound_state = _state("inbound")
+    outbound = _directional_record(outbound_state, _compile(outbound_state, limit=1).variants[0])
+    inbound = _directional_record(inbound_state, _compile(inbound_state, limit=1).variants[0])
+    outbound = dataclasses.replace(
+        outbound,
+        metrics=dataclasses.replace(
+            outbound.metrics,
+            maximum_bucket_expected_wait_minutes=12.0,
+            p90_bucket_expected_wait_minutes=11.0,
+        ),
+    )
+    inbound = dataclasses.replace(
+        inbound,
+        metrics=dataclasses.replace(
+            inbound.metrics,
+            maximum_bucket_expected_wait_minutes=17.5,
+            p90_bucket_expected_wait_minutes=14.0,
+        ),
+    )
+
+    pair, feedback = evaluate_operating_pair_v1(outbound, inbound, context=_context())
+
+    assert feedback == ()
+    assert pair is not None
+    assert pair.metrics.maximum_bucket_expected_wait_minutes == pytest.approx(17.5)
+    assert pair.metrics.maximum_directional_p90_bucket_wait_minutes == pytest.approx(14.0)
+
+
+def _access_pair(pair_id: str, metrics: OperatingPairMetricsV1) -> OperatingPairCandidateV1:
+    return OperatingPairCandidateV1(
+        pair_fingerprint=pair_id,
+        outbound=None,  # type: ignore[arg-type]
+        inbound=None,  # type: ignore[arg-type]
+        metrics=metrics,
+        fleet_ceiling=4,
+        minimum_connection_layover_minutes=5,
+        feedback=(),
+        history=(),
+    )
+
+
+def test_maximum_bucket_wait_is_the_only_new_pareto_dimension() -> None:
+    common = dict(
+        observed_demand_mismatch=1.0,
+        demand_weighted_expected_passenger_wait_minutes=5.0,
+        actual_service_regime_count=4,
+        max_frequency_jump=1.0,
+        total_frequency_variation=1.0,
+        moved_trips_vs_b=1,
+        fleet_required=4,
+        total_excess_terminal_wait=1,
+        max_excess_terminal_wait=1,
+        total_directional_sustained_headway_level_count=3,
+    )
+    better = _access_pair(
+        "better-access",
+        OperatingPairMetricsV1(
+            **common,
+            maximum_bucket_expected_wait_minutes=15.0,
+            maximum_directional_p90_bucket_wait_minutes=99.0,
+        ),
+    )
+    worse = _access_pair(
+        "worse-access",
+        OperatingPairMetricsV1(
+            **common,
+            maximum_bucket_expected_wait_minutes=20.0,
+            maximum_directional_p90_bucket_wait_minutes=1.0,
+        ),
+    )
+
+    assert len(better.metrics.pareto_vector) == 10
+    assert dominates_operating_pair_v1(better, worse)
+
+
+def test_average_wait_and_maximum_bucket_wait_remain_a_pareto_tradeoff() -> None:
+    common = dict(
+        observed_demand_mismatch=1.0,
+        actual_service_regime_count=4,
+        max_frequency_jump=1.0,
+        total_frequency_variation=1.0,
+        moved_trips_vs_b=1,
+        fleet_required=4,
+        total_excess_terminal_wait=1,
+        max_excess_terminal_wait=1,
+        total_directional_sustained_headway_level_count=3,
+        maximum_directional_p90_bucket_wait_minutes=12.0,
+    )
+    average_best = _access_pair(
+        "average-best",
+        OperatingPairMetricsV1(
+            **common,
+            demand_weighted_expected_passenger_wait_minutes=5.0,
+            maximum_bucket_expected_wait_minutes=20.0,
+        ),
+    )
+    access_best = _access_pair(
+        "access-best",
+        OperatingPairMetricsV1(
+            **common,
+            demand_weighted_expected_passenger_wait_minutes=6.0,
+            maximum_bucket_expected_wait_minutes=15.0,
+        ),
+    )
+
+    assert not dominates_operating_pair_v1(average_best, access_best)
+    assert not dominates_operating_pair_v1(access_best, average_best)
+
+
+def test_bucket_wait_diagnostics_use_only_non_null_active_bucket_waits() -> None:
+    buckets = tuple(
+        DemandBucketEvidenceV1("outbound", index * 600, (index + 1) * 600, 1.0)
+        for index in range(13)
+    )
+    waits = (None, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 100.0, None)
+
+    p90, tail_maximum = coordinator.bucket_wait_access_diagnostics_v1(
+        per_bucket_expected_wait_minutes=waits,
+        demand_buckets=buckets,
+        active_span_start=600,
+        active_span_end=7200,
+        tail_support_start=6600,
+        tail_support_end=7200,
+    )
+
+    assert p90 == pytest.approx(10.0)
+    assert tail_maximum == pytest.approx(100.0)
+
+
+def test_tail_bucket_wait_uses_existing_values_for_partial_and_full_overlaps() -> None:
+    buckets = (
+        DemandBucketEvidenceV1("outbound", 0, 1800, 10.0),
+        DemandBucketEvidenceV1("outbound", 1800, 3600, 10.0),
+        DemandBucketEvidenceV1("outbound", 3600, 5400, 10.0),
+    )
+
+    _p90, tail_maximum = coordinator.bucket_wait_access_diagnostics_v1(
+        per_bucket_expected_wait_minutes=(4.0, 7.5, 5.0),
+        demand_buckets=buckets,
+        active_span_start=0,
+        active_span_end=5400,
+        tail_support_start=3300,
+        tail_support_end=5400,
+    )
+
+    assert tail_maximum == pytest.approx(7.5)
+
+
+def test_tail_bucket_wait_is_null_without_active_demand_bucket_overlap() -> None:
+    _p90, tail_maximum = coordinator.bucket_wait_access_diagnostics_v1(
+        per_bucket_expected_wait_minutes=(5.0, None),
+        demand_buckets=(
+            DemandBucketEvidenceV1("outbound", 0, 1800, 10.0),
+            DemandBucketEvidenceV1("outbound", 1800, 3600, 0.0),
+        ),
+        active_span_start=0,
+        active_span_end=3600,
+        tail_support_start=1800,
+        tail_support_end=3600,
+    )
+
+    assert tail_maximum is None
 
 
 @pytest.mark.parametrize(

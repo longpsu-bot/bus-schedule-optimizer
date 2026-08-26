@@ -176,6 +176,18 @@ departure span. The evaluator reports demand-weighted expected wait, maximum buc
 the deterministic per-bucket tuple, and active demand mass. It does not approximate wait as
 ServiceRegime headway divided by two.
 
+Demand-weighted expected passenger wait answers, “What does the average passenger experience?”
+Maximum bucket expected wait answers, “What is the worst scheduled passenger-access interval in
+the service day?” Low-demand periods, particularly final tails, therefore remain visible even when
+they carry little weight in the average. Directional P90 is the deterministic nearest-rank value at
+rank `ceil(0.90 * n)` in the ordered non-null active bucket waits. Pair P90 is the maximum of the two
+directional P90 values; it is not pooled or demand-weighted and is diagnostic only.
+
+Tail maximum bucket wait reuses those same exact per-bucket results. It takes the maximum for active
+immutable-demand buckets whose active intervals overlap the exact final compiled ServiceRegime
+support. It creates no pseudo-bucket and makes no `headway / 2` approximation. If no active demand
+bucket overlaps that support, the diagnostic is null; no demand is fabricated.
+
 Exact interdeparture frequency is also projected by temporal overlap onto every canonical
 DemandRegime, independently of ServiceRegime boundaries. Adjacent canonical regimes expose
 `delta_log_demand`, `delta_log_service`, demand/service direction, direction alignment, the
@@ -256,18 +268,21 @@ Fleet-feasible pairs are nondominated over:
 
 1. observed-demand mismatch;
 2. demand-weighted expected passenger wait, combined across directions by active demand mass;
-3. actual ServiceRegime count;
-4. total directional sustained-headway-level count;
-5. maximum frequency jump;
-6. total frequency variation;
-7. moved trips versus exact Scenario B;
-8. fleet required;
-9. total excess terminal wait.
+3. maximum bucket expected passenger wait, the maximum of the two directional values;
+4. actual ServiceRegime count;
+5. total directional sustained-headway-level count;
+6. maximum frequency jump;
+7. total frequency variation;
+8. moved trips versus exact Scenario B;
+9. fleet required;
+10. total excess terminal wait.
 
 Effective palette count, single-gap count, raw transition count, Gamma, rank correlation,
 peak/low ratio, direction accuracy, and sqrt-response deviation are not additional Pareto
 dimensions. Pair diagnostics also expose the maximum directional sustained-level count, total
-effective-palette count, and total single-gap regime count.
+effective-palette count, total single-gap regime count, and maximum directional P90 bucket wait.
+P90 and tail-specific wait are not Pareto dimensions. No hard headway or maximum-wait threshold is
+created; the H slowest-tail eligibility rule remains unchanged.
 
 No weighted scalar objective selects a timetable.
 
