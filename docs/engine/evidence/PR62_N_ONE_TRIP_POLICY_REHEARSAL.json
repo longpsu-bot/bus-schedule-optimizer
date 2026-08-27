@@ -1,0 +1,581 @@
+{
+  "M1_commit_SHA": "1902ac4e4b4d523d81a5a3d6d527c91fc8077b54",
+  "READY_FOR_FINAL_XLSX_RECERTIFICATION": false,
+  "READY_FOR_ONE_TRIP_POLICY_FREEZE": true,
+  "TE_MATERIALITY_BAND_TRIPS": 1.0,
+  "cross_route_classification": "ONE_TRIP_POLICY_REHEARSAL_SUPPORTED",
+  "deterministic_render": true,
+  "metric_roles": {
+    "SSE_tolerance_created": false,
+    "full_rank_concordance_required": false,
+    "observed_demand_mismatch": "authoritative production demand-fit anchor metric",
+    "pair_trip_equivalent_error": "review-only operational materiality diagnostic",
+    "scalar_blend": false
+  },
+  "one_trip_semantics": "A 1.0 trip-equivalent concession means service-share allocation differs from the TE-best allocation by no more than one equivalent directional trip of service mass across the pair. It is an operational quantum, not a literal fractional trip or a timetable edit.",
+  "policy_stages": [
+    "HARD_OPERATIONAL_FEASIBILITY",
+    "DIRECTIONAL_SCENARIO_B_MAX_ACCESS_SAFEGUARD",
+    "DEMAND_FIT_ANCHOR_CONSISTENCY",
+    "ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+    "RHYTHM_SIMPLICITY",
+    "FLEET_EFFICIENCY"
+  ],
+  "production_guards": {
+    "10_D_Pareto_changed": false,
+    "SSE_semantics_changed": false,
+    "TE_semantics_changed": false,
+    "access_guardrail_changed": false,
+    "budgets_changed": false,
+    "compiler_changed": false,
+    "coordinator_search_changed": false,
+    "final_XLSX_regenerated": false,
+    "fleet_validator_changed": false,
+    "one_trip_threshold_added_to_production_selector": false,
+    "one_trip_threshold_used_in_rehearsal": true,
+    "private_workbook_committed": false,
+    "private_workbook_opened": false,
+    "production_L_selector_changed": false,
+    "queue_changed": false,
+    "rhythm_semantics_changed": false,
+    "settlement_added": false,
+    "tail_eligibility_changed": false
+  },
+  "profile": "PR62-N_ONE_TRIP_TE_MATERIALITY_POLICY_REHEARSAL",
+  "routes": {
+    "10": {
+      "BEST_FLEET_WITHIN_MATERIALITY_SET": [
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "BEST_RHYTHM_WITHIN_MATERIALITY_SET": [
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "M1_in_band_pairwise_rank_disagreement_count": 0,
+      "TE_anchor": 16.95720006567536,
+      "access_exclusions": {
+        "candidates": [
+          {
+            "candidate_inbound_maximum_bucket_expected_wait_minutes": 15.000000000000002,
+            "excluded_by_access_guardrail": true,
+            "fingerprint": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+            "inbound_tail_headway_minutes": 30,
+            "materiality_classification": "ACCESS_EXCLUDED_NOT_MATERIALITY_EVALUATED",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 14.166666666666666
+          },
+          {
+            "candidate_inbound_maximum_bucket_expected_wait_minutes": 22.500000000000004,
+            "excluded_by_access_guardrail": true,
+            "fingerprint": "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb",
+            "inbound_tail_headway_minutes": 45,
+            "materiality_classification": "ACCESS_EXCLUDED_NOT_MATERIALITY_EVALUATED",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 14.166666666666666
+          },
+          {
+            "candidate_inbound_maximum_bucket_expected_wait_minutes": 27.0,
+            "excluded_by_access_guardrail": true,
+            "fingerprint": "025353e2311d8508d1984a34d4acb2ee9e7228a16af1a69bb97ff5b649e77934",
+            "inbound_tail_headway_minutes": 48,
+            "materiality_classification": "ACCESS_EXCLUDED_NOT_MATERIALITY_EVALUATED",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 14.166666666666666
+          },
+          {
+            "candidate_inbound_maximum_bucket_expected_wait_minutes": 34.2,
+            "excluded_by_access_guardrail": true,
+            "fingerprint": "8fcacf72ae51cf31e351f29f367f0094fac654ea85bd0f3a29470502a0939d62",
+            "inbound_tail_headway_minutes": 54,
+            "materiality_classification": "ACCESS_EXCLUDED_NOT_MATERIALITY_EVALUATED",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 14.166666666666666
+          }
+        ],
+        "classification": "ACCESS_EXCLUDED_BEFORE_MATERIALITY",
+        "policy_effect": "TE tolerance cannot rescue schedules excluded by access."
+      },
+      "classification": "ONE_TRIP_BAND_SELECTS_SIMPLER_ALTERNATIVE",
+      "common_demand_fit_anchor": {
+        "SSE": 0.00936973709558608,
+        "SSE_rank": 1,
+        "TE": 16.95720006567536,
+        "TE_rank": 1,
+        "average_wait_minutes": 9.59257954911054,
+        "delta_TE": 0.0,
+        "directional_maximum_bucket_wait_minutes": {
+          "inbound": 13.366666666666669,
+          "outbound": 12.900000000000002
+        },
+        "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "fleet_efficiency_tuple": [
+          13,
+          2432,
+          71
+        ],
+        "maximum_directional_p90_bucket_wait_minutes": 12.599999999999998,
+        "rhythm_simplicity_tuple": [
+          11,
+          12,
+          7,
+          0
+        ],
+        "tail_headways": {
+          "inbound": 24,
+          "outbound": 23
+        }
+      },
+      "in_band_pairwise_rank_disagreement_count": 0,
+      "in_band_selection_deterministic": true,
+      "lower_rank_disagreement_policy": "SSE establishes the common best-demand-fit anchor; TE fixes the operational materiality envelope; rhythm and then fleet select inside that envelope. SSE and TE are not treated as interchangeable rankings.",
+      "materiality_set": [
+        {
+          "SSE": 0.00936973709558608,
+          "SSE_rank": 1,
+          "TE": 16.95720006567536,
+          "TE_rank": 1,
+          "average_wait_minutes": 9.59257954911054,
+          "delta_TE": 0.0,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 13.366666666666669,
+            "outbound": 12.900000000000002
+          },
+          "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "fleet_efficiency_tuple": [
+            13,
+            2432,
+            71
+          ],
+          "maximum_directional_p90_bucket_wait_minutes": 12.599999999999998,
+          "rhythm_simplicity_tuple": [
+            11,
+            12,
+            7,
+            0
+          ],
+          "tail_headways": {
+            "inbound": 24,
+            "outbound": 23
+          }
+        },
+        {
+          "SSE": 0.010728881378053444,
+          "SSE_rank": 3,
+          "TE": 17.669451511448948,
+          "TE_rank": 2,
+          "average_wait_minutes": 9.636890463523153,
+          "delta_TE": 0.7122514457735889,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 14.066666666666666,
+            "outbound": 12.900000000000002
+          },
+          "fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "fleet_efficiency_tuple": [
+            12,
+            1683,
+            71
+          ],
+          "maximum_directional_p90_bucket_wait_minutes": 11.333333333333334,
+          "rhythm_simplicity_tuple": [
+            9,
+            11,
+            6,
+            0
+          ],
+          "tail_headways": {
+            "inbound": 29,
+            "outbound": 23
+          }
+        }
+      ],
+      "materiality_set_size": 2,
+      "policy_health": "REHEARSAL_POLICY_COHERENT_SIMPLICITY_GAIN",
+      "rhythm_simpler_candidates_in_band": [
+        {
+          "SSE": 0.010728881378053444,
+          "SSE_rank": 3,
+          "TE": 17.669451511448948,
+          "TE_rank": 2,
+          "average_wait_minutes": 9.636890463523153,
+          "delta_TE": 0.7122514457735889,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 14.066666666666666,
+            "outbound": 12.900000000000002
+          },
+          "fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "fleet_efficiency_tuple": [
+            12,
+            1683,
+            71
+          ],
+          "maximum_directional_p90_bucket_wait_minutes": 11.333333333333334,
+          "rhythm_simplicity_tuple": [
+            9,
+            11,
+            6,
+            0
+          ],
+          "tail_headways": {
+            "inbound": 29,
+            "outbound": 23
+          }
+        }
+      ],
+      "rhythm_simpler_than_anchor_in_band": true,
+      "route_id": "10",
+      "selected": {
+        "SSE": 0.010728881378053444,
+        "SSE_rank": 3,
+        "TE": 17.669451511448948,
+        "TE_rank": 2,
+        "average_wait_minutes": 9.636890463523153,
+        "delta_TE": 0.7122514457735889,
+        "directional_maximum_bucket_wait_minutes": {
+          "inbound": 14.066666666666666,
+          "outbound": 12.900000000000002
+        },
+        "fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+        "fleet_efficiency_tuple": [
+          12,
+          1683,
+          71
+        ],
+        "maximum_directional_p90_bucket_wait_minutes": 11.333333333333334,
+        "rhythm_simplicity_tuple": [
+          9,
+          11,
+          6,
+          0
+        ],
+        "tail_headways": {
+          "inbound": 29,
+          "outbound": 23
+        }
+      },
+      "selected_vs_anchor_tradeoff": {
+        "average_wait_delta_minutes": 0.04431091441261259,
+        "average_wait_delta_seconds_per_passenger": 2.6586548647567554,
+        "delta_SSE": 0.0013591442824673634,
+        "delta_TE": 0.7122514457735889,
+        "directional_max_access_delta_minutes": {
+          "inbound": 0.6999999999999975,
+          "outbound": 0.0
+        },
+        "fleet_required_delta": -1,
+        "max_excess_terminal_wait_delta": 0,
+        "maximum_directional_p90_delta_minutes": -1.266666666666664,
+        "rhythm_tuple_anchor": [
+          11,
+          12,
+          7,
+          0
+        ],
+        "rhythm_tuple_selected": [
+          9,
+          11,
+          6,
+          0
+        ],
+        "tail_headway_delta_minutes": {
+          "inbound": 5,
+          "outbound": 0
+        },
+        "total_excess_terminal_wait_delta": -749
+      },
+      "selection_detail_classification": null,
+      "stage_counts": {
+        "best_fleet_within_materiality_set": 1,
+        "best_rhythm_within_materiality_set": 1,
+        "demand_fit_anchor_consistent": 1,
+        "demand_fit_materiality_set": 2,
+        "directional_access_safe": 7,
+        "hard_operational_feasible": 7,
+        "input_candidates": 7
+      },
+      "top_anchor_concordant": true
+    },
+    "6": {
+      "BEST_FLEET_WITHIN_MATERIALITY_SET": [
+        "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+      ],
+      "BEST_RHYTHM_WITHIN_MATERIALITY_SET": [
+        "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+      ],
+      "M1_in_band_pairwise_rank_disagreement_count": 2,
+      "TE_anchor": 20.923773759043776,
+      "classification": "ONE_TRIP_BAND_SELECTS_ANCHOR",
+      "common_demand_fit_anchor": {
+        "SSE": 0.006691496954029265,
+        "SSE_rank": 1,
+        "TE": 20.923773759043776,
+        "TE_rank": 1,
+        "average_wait_minutes": 6.087639155987586,
+        "delta_TE": 0.0,
+        "directional_maximum_bucket_wait_minutes": {
+          "inbound": 12.5,
+          "outbound": 10.5
+        },
+        "fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+        "fleet_efficiency_tuple": [
+          20,
+          5219,
+          75
+        ],
+        "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+        "rhythm_simplicity_tuple": [
+          8,
+          14,
+          6,
+          0
+        ],
+        "tail_headways": {
+          "inbound": 15,
+          "outbound": 15
+        }
+      },
+      "human_final_context": {
+        "Human_Final_TE": 19.892406776130983,
+        "Human_Final_tail_headways": {
+          "inbound": 15,
+          "outbound": 15
+        },
+        "SSE_relationship": "anchor_better",
+        "anchor_TE": 20.923773759043776,
+        "anchor_minus_human_final": {
+          "allocation_move_distance_trips": 6,
+          "average_wait_minutes": -0.06332421866050542,
+          "effective_palette_count": 1,
+          "fleet_required": 1,
+          "observed_demand_mismatch": -0.00011057558366366592,
+          "pair_trip_equivalent_error": 1.0313669829127932,
+          "sustained_headway_level_count": 3
+        },
+        "classification": "POST_SEARCH_EXPERT_BENCHMARK",
+        "fleet_relationship": "anchor_requires_one_more_vehicle",
+        "rhythm_relationship": "anchor_more_complex_on_frozen_first_component",
+        "selection_eligible": false,
+        "wait_relationship": "anchor_has_lower_average_wait"
+      },
+      "in_band_pairwise_rank_disagreement_count": 2,
+      "in_band_selection_deterministic": true,
+      "lower_rank_disagreement_policy": "SSE establishes the common best-demand-fit anchor; TE fixes the operational materiality envelope; rhythm and then fleet select inside that envelope. SSE and TE are not treated as interchangeable rankings.",
+      "materiality_set": [
+        {
+          "SSE": 0.006691496954029265,
+          "SSE_rank": 1,
+          "TE": 20.923773759043776,
+          "TE_rank": 1,
+          "average_wait_minutes": 6.087639155987586,
+          "delta_TE": 0.0,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 12.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+          "fleet_efficiency_tuple": [
+            20,
+            5219,
+            75
+          ],
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "rhythm_simplicity_tuple": [
+            8,
+            14,
+            6,
+            0
+          ],
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "SSE": 0.007624455465555494,
+          "SSE_rank": 3,
+          "TE": 21.018437782669324,
+          "TE_rank": 2,
+          "average_wait_minutes": 6.082724563930964,
+          "delta_TE": 0.0946640236255476,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 10.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+          "fleet_efficiency_tuple": [
+            19,
+            4159,
+            71
+          ],
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "rhythm_simplicity_tuple": [
+            10,
+            15,
+            5,
+            0
+          ],
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "SSE": 0.007844748788009408,
+          "SSE_rank": 4,
+          "TE": 21.409068471613054,
+          "TE_rank": 3,
+          "average_wait_minutes": 6.074348103236137,
+          "delta_TE": 0.4852947125692779,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 11.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "fleet_efficiency_tuple": [
+            19,
+            4778,
+            75
+          ],
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "rhythm_simplicity_tuple": [
+            9,
+            14,
+            5,
+            0
+          ],
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "SSE": 0.006996508425112851,
+          "SSE_rank": 2,
+          "TE": 21.653274998981715,
+          "TE_rank": 4,
+          "average_wait_minutes": 6.086718273054754,
+          "delta_TE": 0.7295012399379388,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 12.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+          "fleet_efficiency_tuple": [
+            19,
+            5042,
+            84
+          ],
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "rhythm_simplicity_tuple": [
+            8,
+            15,
+            5,
+            0
+          ],
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "SSE": 0.00792946693663908,
+          "SSE_rank": 5,
+          "TE": 21.747939022607262,
+          "TE_rank": 5,
+          "average_wait_minutes": 6.081803680998132,
+          "delta_TE": 0.8241652635634864,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 10.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+          "fleet_efficiency_tuple": [
+            18,
+            4312,
+            60
+          ],
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "rhythm_simplicity_tuple": [
+            10,
+            16,
+            4,
+            0
+          ],
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        }
+      ],
+      "materiality_set_size": 5,
+      "policy_health": "REHEARSAL_POLICY_COHERENT_BUT_COMPLEX_ANCHOR_RETAINED",
+      "rhythm_simpler_candidates_in_band": [],
+      "rhythm_simpler_than_anchor_in_band": false,
+      "route_id": "6",
+      "selected": {
+        "SSE": 0.006691496954029265,
+        "SSE_rank": 1,
+        "TE": 20.923773759043776,
+        "TE_rank": 1,
+        "average_wait_minutes": 6.087639155987586,
+        "delta_TE": 0.0,
+        "directional_maximum_bucket_wait_minutes": {
+          "inbound": 12.5,
+          "outbound": 10.5
+        },
+        "fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+        "fleet_efficiency_tuple": [
+          20,
+          5219,
+          75
+        ],
+        "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+        "rhythm_simplicity_tuple": [
+          8,
+          14,
+          6,
+          0
+        ],
+        "tail_headways": {
+          "inbound": 15,
+          "outbound": 15
+        }
+      },
+      "selection_detail_classification": null,
+      "stage_counts": {
+        "best_fleet_within_materiality_set": 1,
+        "best_rhythm_within_materiality_set": 1,
+        "demand_fit_anchor_consistent": 1,
+        "demand_fit_materiality_set": 5,
+        "directional_access_safe": 41,
+        "hard_operational_feasible": 41,
+        "input_candidates": 41
+      },
+      "top_anchor_concordant": true
+    }
+  },
+  "upstream_evidence_artifacts": {
+    "docs/engine/evidence/PR62_L_DOMAIN_PRIORITY_SELECTOR.json": {
+      "sha256": "91925a47e27abdcf524c73b38c33cd446559b887a32f6708f624eacc3e62b843",
+      "size_bytes": 450425
+    },
+    "docs/engine/evidence/PR62_L_DOMAIN_PRIORITY_SELECTOR.md": {
+      "sha256": "a1106de9c6d0f33d56de8eb8c71433edbaed4ba5e86ec79d1c6fece597e013f0",
+      "size_bytes": 4623
+    },
+    "docs/engine/evidence/PR62_M1_RANK_CONCORDANCE_CLARIFICATION.json": {
+      "sha256": "fcb77df73cc5bdf39738a7e81300456870938cab489144fbe2f59a414fbffcda",
+      "size_bytes": 99878
+    },
+    "docs/engine/evidence/PR62_M1_RANK_CONCORDANCE_CLARIFICATION.md": {
+      "sha256": "ba9e989643a96dbee2079e104913355ca8b8184892ee4ca9599b9c3f89024cbf",
+      "size_bytes": 6815
+    },
+    "docs/engine/evidence/PR62_M_DISCRETE_DEMAND_FIT_MATERIALITY.json": {
+      "sha256": "f9c5438c3d4b0b871b8fc1ec24a9dcd3a392efd76e85e7ab9ec385532c98c0c9",
+      "size_bytes": 525934
+    },
+    "docs/engine/evidence/PR62_M_DISCRETE_DEMAND_FIT_MATERIALITY.md": {
+      "sha256": "b580540645bd3c941d2e14425b67f2c2773bc684a9e28836407df21f8030a309",
+      "size_bytes": 5828
+    }
+  }
+}
