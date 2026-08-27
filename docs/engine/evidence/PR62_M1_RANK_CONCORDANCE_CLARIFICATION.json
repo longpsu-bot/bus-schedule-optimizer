@@ -1,0 +1,2208 @@
+{
+  "M_artifact_immutability": true,
+  "M_artifacts": {
+    "docs/engine/evidence/PR62_M_DISCRETE_DEMAND_FIT_MATERIALITY.json": {
+      "immutable": true,
+      "sha256": "f9c5438c3d4b0b871b8fc1ec24a9dcd3a392efd76e85e7ab9ec385532c98c0c9",
+      "size_bytes": 525934
+    },
+    "docs/engine/evidence/PR62_M_DISCRETE_DEMAND_FIT_MATERIALITY.md": {
+      "immutable": true,
+      "sha256": "b580540645bd3c941d2e14425b67f2c2773bc684a9e28836407df21f8030a309",
+      "size_bytes": 5828
+    }
+  },
+  "M_commit_SHA": "3d6ebb9c4126aca833f5d7ddce12e2fa4755442a",
+  "candidate_universe": "routes.<route>.access_safe_candidates from committed PR62-M only",
+  "concordance_distinction": {
+    "FULL-RANK_CONCORDANCE": "No epsilon-qualified unordered candidate pair reverses SSE versus TE order.",
+    "M_history": "PR62-M remains historical evidence; its classification was too coarse for lower-rank concordance analysis.",
+    "TOP-RANK_CONCORDANCE": "SSE_BEST equals TE_BEST."
+  },
+  "cross_route_classification": "MATERIALITY_PATH_VARIATION_REQUIRES_POLICY_REVIEW",
+  "deterministic_render": {
+    "rendered_twice_byte_identical": true
+  },
+  "formulas": {
+    "SSE": "observed_demand_mismatch; lower is better",
+    "TE": "pair_trip_equivalent_error; lower is better",
+    "numerical_epsilon": 1e-12,
+    "pairwise_disagreement": "abs(deltas) > NUMERICAL_EPSILON and sign(sse_delta) != sign(te_delta)",
+    "possible_pair_count": "n * (n - 1) / 2",
+    "review_order": "rhythm simplicity tuple, fleet efficiency tuple, fingerprint for exact metric tie",
+    "sse_delta": "SSE(A) - SSE(B)",
+    "te_delta": "TE(A) - TE(B)"
+  },
+  "human_final_route_6_context": {
+    "Human_Final_TE": 19.892406776130983,
+    "classification": "POST_SEARCH_EXPERT_BENCHMARK",
+    "ranking_note": "Human Final is outside the selectable universe and cannot create candidate-ranking discordance.",
+    "selected_TE": 20.923773759043776,
+    "selected_minus_Human_Final_SSE": -0.00011057558366366592,
+    "selected_minus_Human_Final_rhythm": {
+      "effective_palette_count": 1,
+      "sustained_headway_level_count": 3
+    },
+    "selection_eligible": false
+  },
+  "one_trip_materiality_discussion_can_proceed": false,
+  "one_trip_threshold_implemented": false,
+  "production_guards": {
+    "10-D Pareto changed": "NO",
+    "Access guardrail changed": "NO",
+    "Budgets changed": "NO",
+    "Compiler changed": "NO",
+    "Coordinator search changed": "NO",
+    "Final XLSX regenerated": "NO",
+    "Fleet validator changed": "NO",
+    "L selector changed": "NO",
+    "M artifacts modified": "NO",
+    "One-trip threshold added": "NO",
+    "Private workbook committed": "NO",
+    "Private workbook opened": "NO",
+    "Queue changed": "NO",
+    "Rhythm semantics changed": "NO",
+    "SSE mismatch semantics changed": "NO",
+    "Settlement added": "NO",
+    "TE semantics changed": "NO",
+    "Tail eligibility changed": "NO"
+  },
+  "profile": "demand_fit_rank_concordance_clarification_v1",
+  "route_classifications": {
+    "10": "TOP_CONCORDANT_FIRST_SIMPLICITY_CONFLICT",
+    "6": "TOP_CONCORDANT_FIRST_SIMPLICITY_CONFLICT"
+  },
+  "routes": {
+    "10": {
+      "NEXT_BEST_SSE": {
+        "SSE": 0.010613576150656733,
+        "TE": 17.995211037710533,
+        "average_wait_minutes": 9.593949402449837,
+        "delta_SSE_vs_best": 0.001243839055070653,
+        "delta_TE_vs_best": 1.038010972035174,
+        "fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+        "fleet_efficiency_tuple": [
+          13,
+          2447,
+          71
+        ],
+        "fleet_required": 13,
+        "maximum_access_minutes": 12.900000000000002,
+        "rhythm_simplicity_tuple": [
+          10,
+          12,
+          6,
+          0
+        ]
+      },
+      "SSE_BEST": {
+        "SSE": 0.00936973709558608,
+        "TE": 16.95720006567536,
+        "average_wait_minutes": 9.59257954911054,
+        "delta_SSE_vs_best": 0.0,
+        "delta_TE_vs_best": 0.0,
+        "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "fleet_efficiency_tuple": [
+          13,
+          2432,
+          71
+        ],
+        "fleet_required": 13,
+        "maximum_access_minutes": 13.366666666666669,
+        "rhythm_simplicity_tuple": [
+          11,
+          12,
+          7,
+          0
+        ]
+      },
+      "SSE_breakpoint_path": [
+        {
+          "delta_SSE": 0.0,
+          "envelope_candidate_count": 1,
+          "preferred_fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "preferred_fleet_efficiency_tuple": [
+            13,
+            2432,
+            71
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            11,
+            12,
+            7,
+            0
+          ]
+        },
+        {
+          "delta_SSE": 0.001243839055070653,
+          "envelope_candidate_count": 2,
+          "preferred_fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "preferred_fleet_efficiency_tuple": [
+            13,
+            2447,
+            71
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            10,
+            12,
+            6,
+            0
+          ]
+        },
+        {
+          "delta_SSE": 0.0013591442824673634,
+          "envelope_candidate_count": 3,
+          "preferred_fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "preferred_fleet_efficiency_tuple": [
+            12,
+            1683,
+            71
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            9,
+            11,
+            6,
+            0
+          ]
+        },
+        {
+          "delta_SSE": 0.0019476306385189709,
+          "envelope_candidate_count": 4,
+          "preferred_fingerprint": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "preferred_fleet_efficiency_tuple": [
+            13,
+            2207,
+            81
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            8,
+            12,
+            6,
+            0
+          ]
+        },
+        {
+          "delta_SSE": 0.002388880539524574,
+          "envelope_candidate_count": 5,
+          "preferred_fingerprint": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+          "preferred_fleet_efficiency_tuple": [
+            12,
+            1592,
+            71
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            8,
+            11,
+            6,
+            0
+          ]
+        }
+      ],
+      "TE_BEST": {
+        "SSE": 0.00936973709558608,
+        "TE": 16.95720006567536,
+        "average_wait_minutes": 9.59257954911054,
+        "delta_SSE_vs_best": 0.0,
+        "delta_TE_vs_best": 0.0,
+        "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "fleet_efficiency_tuple": [
+          13,
+          2432,
+          71
+        ],
+        "fleet_required": 13,
+        "maximum_access_minutes": 13.366666666666669,
+        "rhythm_simplicity_tuple": [
+          11,
+          12,
+          7,
+          0
+        ]
+      },
+      "TE_breakpoint_path": [
+        {
+          "delta_TE": 0.0,
+          "envelope_candidate_count": 1,
+          "preferred_fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "preferred_fleet_efficiency_tuple": [
+            13,
+            2432,
+            71
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            11,
+            12,
+            7,
+            0
+          ]
+        },
+        {
+          "delta_TE": 0.7122514457735889,
+          "envelope_candidate_count": 2,
+          "preferred_fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "preferred_fleet_efficiency_tuple": [
+            12,
+            1683,
+            71
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            9,
+            11,
+            6,
+            0
+          ]
+        },
+        {
+          "delta_TE": 1.188629261157665,
+          "envelope_candidate_count": 4,
+          "preferred_fingerprint": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "preferred_fleet_efficiency_tuple": [
+            13,
+            2207,
+            81
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            8,
+            12,
+            6,
+            0
+          ]
+        },
+        {
+          "delta_TE": 1.6962358139586584,
+          "envelope_candidate_count": 6,
+          "preferred_fingerprint": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+          "preferred_fleet_efficiency_tuple": [
+            12,
+            1592,
+            71
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            8,
+            11,
+            6,
+            0
+          ]
+        }
+      ],
+      "TE_path_exactly_reproduces_M": true,
+      "candidate_count": 7,
+      "classification": "TOP_CONCORDANT_FIRST_SIMPLICITY_CONFLICT",
+      "decision_relevant_disagreement_count": 2,
+      "decision_roles": {
+        "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3": [
+          "FOCUSED_ROLE_CANDIDATE",
+          "MINIMUM_FLEET"
+        ],
+        "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16": [
+          "FOCUSED_ROLE_CANDIDATE",
+          "MINIMUM_SUSTAINED_PALETTE"
+        ],
+        "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede": [
+          "SSE_BREAKPOINT_PREFERRED",
+          "TE_BREAKPOINT_PREFERRED"
+        ],
+        "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0": [
+          "FIRST_SSE_SIMPLER_WITNESS",
+          "FOCUSED_ROLE_CANDIDATE",
+          "NEXT_BEST_SSE",
+          "SSE_BREAKPOINT_PREFERRED"
+        ],
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c": [
+          "FOCUSED_ROLE_CANDIDATE",
+          "L_SELECTED",
+          "MINIMUM_AVERAGE_WAIT",
+          "SSE_BEST",
+          "SSE_BREAKPOINT_PREFERRED",
+          "TE_BEST",
+          "TE_BREAKPOINT_PREFERRED"
+        ],
+        "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7": [
+          "SSE_BREAKPOINT_PREFERRED",
+          "TE_BREAKPOINT_PREFERRED"
+        ],
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24": [
+          "FIRST_TE_SIMPLER_WITNESS",
+          "SSE_BREAKPOINT_PREFERRED",
+          "TE_BREAKPOINT_PREFERRED"
+        ]
+      },
+      "first_SSE_simpler_witness": {
+        "SSE": 0.010613576150656733,
+        "TE": 17.995211037710533,
+        "average_wait_minutes": 9.593949402449837,
+        "delta_SSE_vs_best": 0.001243839055070653,
+        "delta_TE_vs_best": 1.038010972035174,
+        "fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+        "fleet_efficiency_tuple": [
+          13,
+          2447,
+          71
+        ],
+        "fleet_required": 13,
+        "maximum_access_minutes": 12.900000000000002,
+        "rhythm_simplicity_tuple": [
+          10,
+          12,
+          6,
+          0
+        ]
+      },
+      "first_TE_simpler_witness": {
+        "SSE": 0.010728881378053444,
+        "TE": 17.669451511448948,
+        "average_wait_minutes": 9.636890463523153,
+        "delta_SSE_vs_best": 0.0013591442824673634,
+        "delta_TE_vs_best": 0.7122514457735889,
+        "fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+        "fleet_efficiency_tuple": [
+          12,
+          1683,
+          71
+        ],
+        "fleet_required": 12,
+        "maximum_access_minutes": 14.066666666666666,
+        "rhythm_simplicity_tuple": [
+          9,
+          11,
+          6,
+          0
+        ]
+      },
+      "first_simpler_comparison": {
+        "SSE_fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+        "TE_fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+        "same_candidate": false
+      },
+      "full_rank_concordant": false,
+      "interpretation": {
+        "TE_and_SSE_path_sequences_differ": true,
+        "alters_first_simpler_candidate": true,
+        "alters_one_TE_review_preferred_candidate": false,
+        "any_disagreement_alters_SSE_BEST_vs_TE_BEST": false,
+        "any_disagreement_involves_L_SELECTED": false,
+        "disagreement_concentration_basis": "Count whose two candidates both lie beyond the exact first-TE-simpler breakpoint; no arbitrary threshold is used.",
+        "disagreement_entirely_inside_one_TE_envelope": false,
+        "disagreement_involves_first_TE_simpler": true,
+        "disagreement_involves_next_best_SSE": true,
+        "disagreement_involves_selected": false,
+        "disagreements_entirely_beyond_first_TE_simpler_breakpoint": 1,
+        "exact_disagreement_pairs": [
+          [
+            "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+            "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede"
+          ],
+          [
+            "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+          ]
+        ],
+        "first_TE_and_SSE_simpler_same": false,
+        "preferred_path_differing_positions": [
+          {
+            "SSE": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "TE": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+            "position": 2
+          },
+          {
+            "SSE": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+            "TE": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "position": 3
+          },
+          {
+            "SSE": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "TE": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "position": 4
+          },
+          {
+            "SSE": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "TE": null,
+            "position": 5
+          }
+        ],
+        "sub_one_trip_simplicity_result_robust": true
+      },
+      "materiality_path_effect_disagreement_count": 2,
+      "one_TE_envelope_audit": {
+        "candidates": [
+          {
+            "SSE": 0.00936973709558608,
+            "SSE_rank": 1,
+            "TE": 16.95720006567536,
+            "TE_rank": 1,
+            "delta_TE_vs_best": 0.0,
+            "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "fleet_efficiency_tuple": [
+              13,
+              2432,
+              71
+            ],
+            "rhythm_simplicity_tuple": [
+              11,
+              12,
+              7,
+              0
+            ]
+          },
+          {
+            "SSE": 0.010728881378053444,
+            "SSE_rank": 3,
+            "TE": 17.669451511448948,
+            "TE_rank": 2,
+            "delta_TE_vs_best": 0.7122514457735889,
+            "fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+            "fleet_efficiency_tuple": [
+              12,
+              1683,
+              71
+            ],
+            "rhythm_simplicity_tuple": [
+              9,
+              11,
+              6,
+              0
+            ]
+          }
+        ],
+        "diagnostic_only": true,
+        "pairwise_disagreement_count": 0,
+        "pairwise_disagreements": [],
+        "rank_disagreement_changes_review_preferred_candidate": false,
+        "reason": "The fixed <=1 TE envelope is reviewed by rhythm, fleet, then fingerprint; SSE/TE rank order does not change that deterministic choice.",
+        "review_preferred_fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+        "threshold_TE": 1.0
+      },
+      "pairwise_disagreement_count": 2,
+      "pairwise_disagreement_rate": 0.09523809523809523,
+      "pairwise_disagreements": [
+        {
+          "SSE_a": 0.012013640351117972,
+          "SSE_b": 0.011758617635110654,
+          "SSE_delta_a_minus_b": 0.00025502271600731825,
+          "SSE_preferred_fingerprint": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+          "TE_a": 18.414536038394637,
+          "TE_b": 18.653435879634017,
+          "TE_delta_a_minus_b": -0.23889984123938035,
+          "TE_preferred_fingerprint": "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+          "candidate_a_fingerprint": "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+          "candidate_b_fingerprint": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths; changes a focused comparison's SSE-versus-TE ordering interpretation",
+          "relevance_tags": [
+            "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010613576150656733,
+          "SSE_b": 0.010728881378053444,
+          "SSE_delta_a_minus_b": -0.00011530522739671041,
+          "SSE_preferred_fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "TE_a": 17.995211037710533,
+          "TE_b": 17.669451511448948,
+          "TE_delta_a_minus_b": 0.3257595262615851,
+          "TE_preferred_fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "candidate_a_fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "candidate_b_fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "changes first simpler witness; participates in differing breakpoint preferred paths; changes a focused comparison's SSE-versus-TE ordering interpretation",
+          "relevance_tags": [
+            "INVOLVES_NEXT_BEST_SSE",
+            "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "INVOLVES_FIRST_SIMPLER_WITNESS",
+            "DECISION_RELEVANT"
+          ]
+        }
+      ],
+      "path_comparison": {
+        "SSE_preferred_fingerprint_sequence": [
+          "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede"
+        ],
+        "TE_preferred_fingerprint_sequence": [
+          "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede"
+        ],
+        "differing_positions": [
+          {
+            "SSE": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "TE": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+            "position": 2
+          },
+          {
+            "SSE": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+            "TE": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "position": 3
+          },
+          {
+            "SSE": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "TE": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "position": 4
+          },
+          {
+            "SSE": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "TE": null,
+            "position": 5
+          }
+        ],
+        "exact_sequence_identical": false,
+        "final_preferred_candidate_SSE": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+        "final_preferred_candidate_TE": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+        "first_preferred_change_from_best_SSE": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+        "first_preferred_change_from_best_TE": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+        "preferred_path_overlap_count": 4,
+        "preferred_path_union_count": 5,
+        "same_best_candidate": true,
+        "same_final_preferred_candidate": true,
+        "same_first_preferred_change_candidate": false
+      },
+      "possible_pair_count": 21,
+      "same_best_candidate": true,
+      "top_rank_concordant": true
+    },
+    "6": {
+      "NEXT_BEST_SSE": {
+        "SSE": 0.006996508425112851,
+        "TE": 21.653274998981715,
+        "average_wait_minutes": 6.086718273054754,
+        "delta_SSE_vs_best": 0.0003050114710835862,
+        "delta_TE_vs_best": 0.7295012399379388,
+        "fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+        "fleet_efficiency_tuple": [
+          19,
+          5042,
+          84
+        ],
+        "fleet_required": 19,
+        "maximum_access_minutes": 12.5,
+        "rhythm_simplicity_tuple": [
+          8,
+          15,
+          5,
+          0
+        ]
+      },
+      "SSE_BEST": {
+        "SSE": 0.006691496954029265,
+        "TE": 20.923773759043776,
+        "average_wait_minutes": 6.087639155987586,
+        "delta_SSE_vs_best": 0.0,
+        "delta_TE_vs_best": 0.0,
+        "fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+        "fleet_efficiency_tuple": [
+          20,
+          5219,
+          75
+        ],
+        "fleet_required": 20,
+        "maximum_access_minutes": 12.5,
+        "rhythm_simplicity_tuple": [
+          8,
+          14,
+          6,
+          0
+        ]
+      },
+      "SSE_breakpoint_path": [
+        {
+          "delta_SSE": 0.0,
+          "envelope_candidate_count": 1,
+          "preferred_fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+          "preferred_fleet_efficiency_tuple": [
+            20,
+            5219,
+            75
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            8,
+            14,
+            6,
+            0
+          ]
+        },
+        {
+          "delta_SSE": 0.002225015218095844,
+          "envelope_candidate_count": 7,
+          "preferred_fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "preferred_fleet_efficiency_tuple": [
+            18,
+            4912,
+            62
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            8,
+            13,
+            6,
+            0
+          ]
+        },
+        {
+          "delta_SSE": 0.0026524393197146483,
+          "envelope_candidate_count": 9,
+          "preferred_fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "preferred_fleet_efficiency_tuple": [
+            18,
+            4305,
+            61
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            7,
+            15,
+            5,
+            0
+          ]
+        },
+        {
+          "delta_SSE": 0.002819906598988524,
+          "envelope_candidate_count": 10,
+          "preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "preferred_fleet_efficiency_tuple": [
+            18,
+            4967,
+            65
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            6,
+            12,
+            5,
+            0
+          ]
+        },
+        {
+          "delta_SSE": 0.006604509972198606,
+          "envelope_candidate_count": 33,
+          "preferred_fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "preferred_fleet_efficiency_tuple": [
+            14,
+            1810,
+            23
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            6,
+            10,
+            4,
+            0
+          ]
+        }
+      ],
+      "TE_BEST": {
+        "SSE": 0.006691496954029265,
+        "TE": 20.923773759043776,
+        "average_wait_minutes": 6.087639155987586,
+        "delta_SSE_vs_best": 0.0,
+        "delta_TE_vs_best": 0.0,
+        "fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+        "fleet_efficiency_tuple": [
+          20,
+          5219,
+          75
+        ],
+        "fleet_required": 20,
+        "maximum_access_minutes": 12.5,
+        "rhythm_simplicity_tuple": [
+          8,
+          14,
+          6,
+          0
+        ]
+      },
+      "TE_breakpoint_path": [
+        {
+          "delta_TE": 0.0,
+          "envelope_candidate_count": 1,
+          "preferred_fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+          "preferred_fleet_efficiency_tuple": [
+            20,
+            5219,
+            75
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            8,
+            14,
+            6,
+            0
+          ]
+        },
+        {
+          "delta_TE": 3.3538000450886543,
+          "envelope_candidate_count": 10,
+          "preferred_fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "preferred_fleet_efficiency_tuple": [
+            18,
+            4305,
+            61
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            7,
+            15,
+            5,
+            0
+          ]
+        },
+        {
+          "delta_TE": 3.809880661778685,
+          "envelope_candidate_count": 15,
+          "preferred_fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "preferred_fleet_efficiency_tuple": [
+            20,
+            4065,
+            94
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            7,
+            12,
+            6,
+            0
+          ]
+        },
+        {
+          "delta_TE": 4.2958279735303115,
+          "envelope_candidate_count": 21,
+          "preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "preferred_fleet_efficiency_tuple": [
+            18,
+            4967,
+            65
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            6,
+            12,
+            5,
+            0
+          ]
+        },
+        {
+          "delta_TE": 8.414764823726514,
+          "envelope_candidate_count": 37,
+          "preferred_fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "preferred_fleet_efficiency_tuple": [
+            14,
+            1810,
+            23
+          ],
+          "preferred_rhythm_simplicity_tuple": [
+            6,
+            10,
+            4,
+            0
+          ]
+        }
+      ],
+      "TE_path_exactly_reproduces_M": true,
+      "candidate_count": 41,
+      "classification": "TOP_CONCORDANT_FIRST_SIMPLICITY_CONFLICT",
+      "decision_relevant_disagreement_count": 29,
+      "decision_roles": {
+        "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8": [
+          "FOCUSED_ROLE_CANDIDATE",
+          "NEXT_BEST_SSE"
+        ],
+        "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402": [
+          "FIRST_SSE_SIMPLER_WITNESS",
+          "SSE_BREAKPOINT_PREFERRED"
+        ],
+        "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9": [
+          "TE_BREAKPOINT_PREFERRED"
+        ],
+        "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e": [
+          "FOCUSED_ROLE_CANDIDATE",
+          "MINIMUM_AVERAGE_WAIT"
+        ],
+        "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150": [
+          "FOCUSED_ROLE_CANDIDATE",
+          "MINIMUM_FLEET"
+        ],
+        "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc": [
+          "SSE_BREAKPOINT_PREFERRED",
+          "TE_BREAKPOINT_PREFERRED"
+        ],
+        "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b": [
+          "FOCUSED_ROLE_CANDIDATE",
+          "L_SELECTED",
+          "SSE_BEST",
+          "SSE_BREAKPOINT_PREFERRED",
+          "TE_BEST",
+          "TE_BREAKPOINT_PREFERRED"
+        ],
+        "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa": [
+          "FIRST_TE_SIMPLER_WITNESS",
+          "SSE_BREAKPOINT_PREFERRED",
+          "TE_BREAKPOINT_PREFERRED"
+        ],
+        "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb": [
+          "FOCUSED_ROLE_CANDIDATE",
+          "MINIMUM_SUSTAINED_PALETTE",
+          "SSE_BREAKPOINT_PREFERRED",
+          "TE_BREAKPOINT_PREFERRED"
+        ]
+      },
+      "first_SSE_simpler_witness": {
+        "SSE": 0.008916512172125109,
+        "TE": 24.340916729855508,
+        "average_wait_minutes": 6.109036921837077,
+        "delta_SSE_vs_best": 0.002225015218095844,
+        "delta_TE_vs_best": 3.4171429708117316,
+        "fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+        "fleet_efficiency_tuple": [
+          18,
+          4912,
+          62
+        ],
+        "fleet_required": 18,
+        "maximum_access_minutes": 12.5,
+        "rhythm_simplicity_tuple": [
+          8,
+          13,
+          6,
+          0
+        ]
+      },
+      "first_TE_simpler_witness": {
+        "SSE": 0.009343936273743914,
+        "TE": 24.27757380413243,
+        "average_wait_minutes": 6.104455255671291,
+        "delta_SSE_vs_best": 0.0026524393197146483,
+        "delta_TE_vs_best": 3.3538000450886543,
+        "fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+        "fleet_efficiency_tuple": [
+          18,
+          4305,
+          61
+        ],
+        "fleet_required": 18,
+        "maximum_access_minutes": 12.5,
+        "rhythm_simplicity_tuple": [
+          7,
+          15,
+          5,
+          0
+        ]
+      },
+      "first_simpler_comparison": {
+        "SSE_fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+        "TE_fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+        "same_candidate": false
+      },
+      "full_rank_concordant": false,
+      "interpretation": {
+        "TE_and_SSE_path_sequences_differ": true,
+        "any_disagreement_alters_SSE_BEST_vs_TE_BEST": false,
+        "any_disagreement_involves_L_SELECTED": false,
+        "at_least_one_TE_conclusion_structurally_meaningful": true,
+        "disagreement_concentration_basis": "Count whose two candidates both lie beyond the exact first-TE-simpler breakpoint; no arbitrary threshold is used.",
+        "disagreements_entirely_beyond_first_TE_simpler_breakpoint": 50,
+        "first_TE_and_SSE_simpler_same": false,
+        "preferred_path_differing_positions": [
+          {
+            "SSE": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+            "TE": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+            "position": 2
+          },
+          {
+            "SSE": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+            "TE": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+            "position": 3
+          }
+        ],
+        "structural_reason": "The exact TE path minimizes TE across every rhythm-simpler candidate and its first simpler breakpoint remains above one TE; the SSE path is reported independently without an invented SSE threshold."
+      },
+      "materiality_path_effect_disagreement_count": 23,
+      "one_TE_envelope_audit": {
+        "candidates": [
+          {
+            "SSE": 0.006691496954029265,
+            "SSE_rank": 1,
+            "TE": 20.923773759043776,
+            "TE_rank": 1,
+            "delta_TE_vs_best": 0.0,
+            "fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+            "fleet_efficiency_tuple": [
+              20,
+              5219,
+              75
+            ],
+            "rhythm_simplicity_tuple": [
+              8,
+              14,
+              6,
+              0
+            ]
+          },
+          {
+            "SSE": 0.007624455465555494,
+            "SSE_rank": 3,
+            "TE": 21.018437782669324,
+            "TE_rank": 2,
+            "delta_TE_vs_best": 0.0946640236255476,
+            "fingerprint": "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+            "fleet_efficiency_tuple": [
+              19,
+              4159,
+              71
+            ],
+            "rhythm_simplicity_tuple": [
+              10,
+              15,
+              5,
+              0
+            ]
+          },
+          {
+            "SSE": 0.007844748788009408,
+            "SSE_rank": 4,
+            "TE": 21.409068471613054,
+            "TE_rank": 3,
+            "delta_TE_vs_best": 0.4852947125692779,
+            "fingerprint": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+            "fleet_efficiency_tuple": [
+              19,
+              4778,
+              75
+            ],
+            "rhythm_simplicity_tuple": [
+              9,
+              14,
+              5,
+              0
+            ]
+          },
+          {
+            "SSE": 0.006996508425112851,
+            "SSE_rank": 2,
+            "TE": 21.653274998981715,
+            "TE_rank": 4,
+            "delta_TE_vs_best": 0.7295012399379388,
+            "fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+            "fleet_efficiency_tuple": [
+              19,
+              5042,
+              84
+            ],
+            "rhythm_simplicity_tuple": [
+              8,
+              15,
+              5,
+              0
+            ]
+          },
+          {
+            "SSE": 0.00792946693663908,
+            "SSE_rank": 5,
+            "TE": 21.747939022607262,
+            "TE_rank": 5,
+            "delta_TE_vs_best": 0.8241652635634864,
+            "fingerprint": "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+            "fleet_efficiency_tuple": [
+              18,
+              4312,
+              60
+            ],
+            "rhythm_simplicity_tuple": [
+              10,
+              16,
+              4,
+              0
+            ]
+          }
+        ],
+        "diagnostic_only": true,
+        "pairwise_disagreement_count": 2,
+        "pairwise_disagreements": [
+          {
+            "SSE_a": 0.007844748788009408,
+            "SSE_b": 0.006996508425112851,
+            "SSE_delta_a_minus_b": 0.0008482403628965567,
+            "SSE_preferred_fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+            "TE_a": 21.409068471613054,
+            "TE_b": 21.653274998981715,
+            "TE_delta_a_minus_b": -0.2442065273686609,
+            "TE_preferred_fingerprint": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+            "candidate_a_fingerprint": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+            "candidate_b_fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+            "relevance_tags": [
+              "INVOLVES_NEXT_BEST_SSE",
+              "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+              "BOTH_WITHIN_ONE_TE_OF_BEST",
+              "DECISION_RELEVANT"
+            ]
+          },
+          {
+            "SSE_a": 0.006996508425112851,
+            "SSE_b": 0.007624455465555494,
+            "SSE_delta_a_minus_b": -0.0006279470404426425,
+            "SSE_preferred_fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+            "TE_a": 21.653274998981715,
+            "TE_b": 21.018437782669324,
+            "TE_delta_a_minus_b": 0.6348372163123912,
+            "TE_preferred_fingerprint": "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+            "candidate_a_fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+            "candidate_b_fingerprint": "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+            "relevance_tags": [
+              "INVOLVES_NEXT_BEST_SSE",
+              "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+              "BOTH_WITHIN_ONE_TE_OF_BEST",
+              "DECISION_RELEVANT"
+            ]
+          }
+        ],
+        "rank_disagreement_changes_review_preferred_candidate": false,
+        "reason": "The fixed <=1 TE envelope is reviewed by rhythm, fleet, then fingerprint; SSE/TE rank order does not change that deterministic choice.",
+        "review_preferred_fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+        "threshold_TE": 1.0
+      },
+      "pairwise_disagreement_count": 61,
+      "pairwise_disagreement_rate": 0.07439024390243902,
+      "pairwise_disagreements": [
+        {
+          "SSE_a": 0.007844748788009408,
+          "SSE_b": 0.006996508425112851,
+          "SSE_delta_a_minus_b": 0.0008482403628965567,
+          "SSE_preferred_fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+          "TE_a": 21.409068471613054,
+          "TE_b": 21.653274998981715,
+          "TE_delta_a_minus_b": -0.2442065273686609,
+          "TE_preferred_fingerprint": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_a_fingerprint": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_b_fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "occurs inside the <=1 TE audit envelope without changing review order; changes a focused comparison's SSE-versus-TE ordering interpretation",
+          "relevance_tags": [
+            "INVOLVES_NEXT_BEST_SSE",
+            "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+            "BOTH_WITHIN_ONE_TE_OF_BEST",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.014405216915627458,
+          "SSE_b": 0.014373833136336233,
+          "SSE_delta_a_minus_b": 3.138377929122471e-05,
+          "SSE_preferred_fingerprint": "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+          "TE_a": 29.187521617555298,
+          "TE_b": 30.414592530016566,
+          "TE_delta_a_minus_b": -1.2270709124612686,
+          "TE_preferred_fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "candidate_a_fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "candidate_b_fingerprint": "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.014405216915627458,
+          "SSE_b": 0.013977792814008651,
+          "SSE_delta_a_minus_b": 0.0004274241016188063,
+          "SSE_preferred_fingerprint": "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+          "TE_a": 29.187521617555298,
+          "TE_b": 29.250864543278375,
+          "TE_delta_a_minus_b": -0.06334292572307731,
+          "TE_preferred_fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "candidate_a_fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "candidate_b_fingerprint": "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.014405216915627458,
+          "SSE_b": 0.013296006926227871,
+          "SSE_delta_a_minus_b": 0.0011092099893995865,
+          "SSE_preferred_fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "TE_a": 29.187521617555298,
+          "TE_b": 29.33853858277029,
+          "TE_delta_a_minus_b": -0.15101696521499264,
+          "TE_preferred_fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "candidate_a_fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "candidate_b_fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths; changes a focused comparison's SSE-versus-TE ordering interpretation",
+          "relevance_tags": [
+            "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.014405216915627458,
+          "SSE_b": 0.01379222684812618,
+          "SSE_delta_a_minus_b": 0.0006129900675012779,
+          "SSE_preferred_fingerprint": "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21",
+          "TE_a": 29.187521617555298,
+          "TE_b": 29.59765009707025,
+          "TE_delta_a_minus_b": -0.41012847951495246,
+          "TE_preferred_fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "candidate_a_fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "candidate_b_fingerprint": "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.011522188274652378,
+          "SSE_b": 0.011752777595912808,
+          "SSE_delta_a_minus_b": -0.0002305893212604295,
+          "SSE_preferred_fingerprint": "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+          "TE_a": 26.39031970344591,
+          "TE_b": 25.833721572466647,
+          "TE_delta_a_minus_b": 0.556598130979264,
+          "TE_preferred_fingerprint": "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+          "candidate_a_fingerprint": "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+          "candidate_b_fingerprint": "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010444362064544018,
+          "SSE_b": 0.010497188107724058,
+          "SSE_delta_a_minus_b": -5.2826043180040014e-05,
+          "SSE_preferred_fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "TE_a": 25.31426575619964,
+          "TE_b": 24.762868516701705,
+          "TE_delta_a_minus_b": 0.5513972394979341,
+          "TE_preferred_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "candidate_a_fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "candidate_b_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010444362064544018,
+          "SSE_b": 0.010471097888010745,
+          "SSE_delta_a_minus_b": -2.673582346672705e-05,
+          "SSE_preferred_fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "TE_a": 25.31426575619964,
+          "TE_b": 24.74997253452543,
+          "TE_delta_a_minus_b": 0.5642932216742089,
+          "TE_preferred_fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "candidate_a_fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "candidate_b_fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010444362064544018,
+          "SSE_b": 0.010476100327239347,
+          "SSE_delta_a_minus_b": -3.1738262695328937e-05,
+          "SSE_preferred_fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "TE_a": 25.31426575619964,
+          "TE_b": 25.04271060923998,
+          "TE_delta_a_minus_b": 0.27155514695965977,
+          "TE_preferred_fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "candidate_a_fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "candidate_b_fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010444362064544018,
+          "SSE_b": 0.010877774912895734,
+          "SSE_delta_a_minus_b": -0.00043341284835171634,
+          "SSE_preferred_fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "TE_a": 25.31426575619964,
+          "TE_b": 24.38738474654327,
+          "TE_delta_a_minus_b": 0.9268810096563698,
+          "TE_preferred_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_a_fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "candidate_b_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.006996508425112851,
+          "SSE_b": 0.007624455465555494,
+          "SSE_delta_a_minus_b": -0.0006279470404426425,
+          "SSE_preferred_fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+          "TE_a": 21.653274998981715,
+          "TE_b": 21.018437782669324,
+          "TE_delta_a_minus_b": 0.6348372163123912,
+          "TE_preferred_fingerprint": "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+          "candidate_a_fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+          "candidate_b_fingerprint": "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "occurs inside the <=1 TE audit envelope without changing review order; changes a focused comparison's SSE-versus-TE ordering interpretation",
+          "relevance_tags": [
+            "INVOLVES_NEXT_BEST_SSE",
+            "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+            "BOTH_WITHIN_ONE_TE_OF_BEST",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.008916512172125109,
+          "SSE_b": 0.009894494039029296,
+          "SSE_delta_a_minus_b": -0.0009779818669041866,
+          "SSE_preferred_fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "TE_a": 24.340916729855508,
+          "TE_b": 24.225768176293663,
+          "TE_delta_a_minus_b": 0.11514855356184484,
+          "TE_preferred_fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "candidate_a_fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "candidate_b_fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "INVOLVES_FIRST_SIMPLER_WITNESS",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.008916512172125109,
+          "SSE_b": 0.009792492232431609,
+          "SSE_delta_a_minus_b": -0.0008759800603064995,
+          "SSE_preferred_fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "TE_a": 24.340916729855508,
+          "TE_b": 23.916711987876145,
+          "TE_delta_a_minus_b": 0.42420474197936286,
+          "TE_preferred_fingerprint": "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+          "candidate_a_fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "candidate_b_fingerprint": "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "INVOLVES_FIRST_SIMPLER_WITNESS",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.008916512172125109,
+          "SSE_b": 0.009343936273743914,
+          "SSE_delta_a_minus_b": -0.00042742410161880455,
+          "SSE_preferred_fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "TE_a": 24.340916729855508,
+          "TE_b": 24.27757380413243,
+          "TE_delta_a_minus_b": 0.06334292572307731,
+          "TE_preferred_fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "candidate_a_fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "candidate_b_fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "changes first simpler witness; participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "INVOLVES_FIRST_SIMPLER_WITNESS",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.008916512172125109,
+          "SSE_b": 0.009230933008699621,
+          "SSE_delta_a_minus_b": -0.00031442083657451207,
+          "SSE_preferred_fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "TE_a": 24.340916729855508,
+          "TE_b": 23.139131657137618,
+          "TE_delta_a_minus_b": 1.2017850727178896,
+          "TE_preferred_fingerprint": "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+          "candidate_a_fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "candidate_b_fingerprint": "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "INVOLVES_FIRST_SIMPLER_WITNESS",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.012546933358743944,
+          "SSE_b": 0.01211950925712514,
+          "SSE_delta_a_minus_b": 0.00042742410161880455,
+          "SSE_preferred_fingerprint": "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+          "TE_a": 27.579568221382317,
+          "TE_b": 27.642911147105394,
+          "TE_delta_a_minus_b": -0.06334292572307731,
+          "TE_preferred_fingerprint": "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+          "candidate_a_fingerprint": "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+          "candidate_b_fingerprint": "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010276894785270142,
+          "SSE_b": 0.009849470683651338,
+          "SSE_delta_a_minus_b": 0.00042742410161880455,
+          "SSE_preferred_fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "TE_a": 24.372237827757978,
+          "TE_b": 24.435580753481055,
+          "TE_delta_a_minus_b": -0.06334292572307731,
+          "TE_preferred_fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "candidate_a_fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "candidate_b_fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010276894785270142,
+          "SSE_b": 0.010069764006105254,
+          "SSE_delta_a_minus_b": 0.00020713077916488867,
+          "SSE_preferred_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "TE_a": 24.372237827757978,
+          "TE_b": 24.826211442424782,
+          "TE_delta_a_minus_b": -0.4539736146668041,
+          "TE_preferred_fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "candidate_a_fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "candidate_b_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010276894785270142,
+          "SSE_b": 0.00951140355301779,
+          "SSE_delta_a_minus_b": 0.0007654912322523529,
+          "SSE_preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "TE_a": 24.372237827757978,
+          "TE_b": 25.219601732574088,
+          "TE_delta_a_minus_b": -0.8473639048161097,
+          "TE_preferred_fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "candidate_a_fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "candidate_b_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010276894785270142,
+          "SSE_b": 0.010199505510112882,
+          "SSE_delta_a_minus_b": 7.738927515726045e-05,
+          "SSE_preferred_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "TE_a": 24.372237827757978,
+          "TE_b": 24.9552694162316,
+          "TE_delta_a_minus_b": -0.5830315884736237,
+          "TE_preferred_fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "candidate_a_fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "candidate_b_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.014373833136336233,
+          "SSE_b": 0.014572684194901334,
+          "SSE_delta_a_minus_b": -0.00019885105856510057,
+          "SSE_preferred_fingerprint": "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+          "TE_a": 30.414592530016566,
+          "TE_b": 30.12954954599696,
+          "TE_delta_a_minus_b": 0.2850429840196078,
+          "TE_preferred_fingerprint": "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+          "candidate_a_fingerprint": "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+          "candidate_b_fingerprint": "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.013977792814008651,
+          "SSE_b": 0.013296006926227871,
+          "SSE_delta_a_minus_b": 0.0006817858877807802,
+          "SSE_preferred_fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "TE_a": 29.250864543278375,
+          "TE_b": 29.33853858277029,
+          "TE_delta_a_minus_b": -0.08767403949191532,
+          "TE_preferred_fingerprint": "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+          "candidate_a_fingerprint": "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+          "candidate_b_fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths; changes a focused comparison's SSE-versus-TE ordering interpretation",
+          "relevance_tags": [
+            "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.013977792814008651,
+          "SSE_b": 0.01379222684812618,
+          "SSE_delta_a_minus_b": 0.0001855659658824716,
+          "SSE_preferred_fingerprint": "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21",
+          "TE_a": 29.250864543278375,
+          "TE_b": 29.59765009707025,
+          "TE_delta_a_minus_b": -0.34678555379187515,
+          "TE_preferred_fingerprint": "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+          "candidate_a_fingerprint": "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+          "candidate_b_fingerprint": "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.01037409852064166,
+          "SSE_b": 0.010069764006105254,
+          "SSE_delta_a_minus_b": 0.0003043345145364064,
+          "SSE_preferred_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "TE_a": 24.73365442082246,
+          "TE_b": 24.826211442424782,
+          "TE_delta_a_minus_b": -0.09255702160232104,
+          "TE_preferred_fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "candidate_a_fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "candidate_b_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.01037409852064166,
+          "SSE_b": 0.00951140355301779,
+          "SSE_delta_a_minus_b": 0.0008626949676238706,
+          "SSE_preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "TE_a": 24.73365442082246,
+          "TE_b": 25.219601732574088,
+          "TE_delta_a_minus_b": -0.48594731175162664,
+          "TE_preferred_fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "candidate_a_fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "candidate_b_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.01037409852064166,
+          "SSE_b": 0.010877774912895734,
+          "SSE_delta_a_minus_b": -0.0005036763922540745,
+          "SSE_preferred_fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "TE_a": 24.73365442082246,
+          "TE_b": 24.38738474654327,
+          "TE_delta_a_minus_b": 0.346269674279192,
+          "TE_preferred_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_a_fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "candidate_b_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.01037409852064166,
+          "SSE_b": 0.010199505510112882,
+          "SSE_delta_a_minus_b": 0.00017459301052877817,
+          "SSE_preferred_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "TE_a": 24.73365442082246,
+          "TE_b": 24.9552694162316,
+          "TE_delta_a_minus_b": -0.22161499540914065,
+          "TE_preferred_fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "candidate_a_fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "candidate_b_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.012701115545335193,
+          "SSE_b": 0.013128539646953997,
+          "SSE_delta_a_minus_b": -0.00042742410161880455,
+          "SSE_preferred_fingerprint": "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+          "TE_a": 28.459853580051707,
+          "TE_b": 28.39651065432863,
+          "TE_delta_a_minus_b": 0.06334292572307731,
+          "TE_preferred_fingerprint": "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+          "candidate_a_fingerprint": "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+          "candidate_b_fingerprint": "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.012701115545335193,
+          "SSE_b": 0.013530214232610385,
+          "SSE_delta_a_minus_b": -0.000829098687275192,
+          "SSE_preferred_fingerprint": "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+          "TE_a": 28.459853580051707,
+          "TE_b": 27.741184791631923,
+          "TE_delta_a_minus_b": 0.7186687884197838,
+          "TE_preferred_fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "candidate_a_fingerprint": "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+          "candidate_b_fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "changes a focused comparison's SSE-versus-TE ordering interpretation",
+          "relevance_tags": [
+            "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.009894494039029296,
+          "SSE_b": 0.009849470683651338,
+          "SSE_delta_a_minus_b": 4.50233553779579e-05,
+          "SSE_preferred_fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "TE_a": 24.225768176293663,
+          "TE_b": 24.435580753481055,
+          "TE_delta_a_minus_b": -0.20981257718739244,
+          "TE_preferred_fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "candidate_a_fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "candidate_b_fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.009894494039029296,
+          "SSE_b": 0.00951140355301779,
+          "SSE_delta_a_minus_b": 0.0003830904860115062,
+          "SSE_preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "TE_a": 24.225768176293663,
+          "TE_b": 25.219601732574088,
+          "TE_delta_a_minus_b": -0.9938335562804248,
+          "TE_preferred_fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "candidate_a_fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "candidate_b_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.009894494039029296,
+          "SSE_b": 0.009343936273743914,
+          "SSE_delta_a_minus_b": 0.0005505577652853821,
+          "SSE_preferred_fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "TE_a": 24.225768176293663,
+          "TE_b": 24.27757380413243,
+          "TE_delta_a_minus_b": -0.05180562783876752,
+          "TE_preferred_fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "candidate_a_fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "candidate_b_fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "INVOLVES_FIRST_SIMPLER_WITNESS",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.009849470683651338,
+          "SSE_b": 0.00951140355301779,
+          "SSE_delta_a_minus_b": 0.0003380671306335483,
+          "SSE_preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "TE_a": 24.435580753481055,
+          "TE_b": 25.219601732574088,
+          "TE_delta_a_minus_b": -0.7840209790930324,
+          "TE_preferred_fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "candidate_a_fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "candidate_b_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.009849470683651338,
+          "SSE_b": 0.010877774912895734,
+          "SSE_delta_a_minus_b": -0.0010283042292443968,
+          "SSE_preferred_fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "TE_a": 24.435580753481055,
+          "TE_b": 24.38738474654327,
+          "TE_delta_a_minus_b": 0.04819600693778625,
+          "TE_preferred_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_a_fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "candidate_b_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.013128539646953997,
+          "SSE_b": 0.013530214232610385,
+          "SSE_delta_a_minus_b": -0.0004016745856563874,
+          "SSE_preferred_fingerprint": "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+          "TE_a": 28.39651065432863,
+          "TE_b": 27.741184791631923,
+          "TE_delta_a_minus_b": 0.6553258626967065,
+          "TE_preferred_fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "candidate_a_fingerprint": "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+          "candidate_b_fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "changes a focused comparison's SSE-versus-TE ordering interpretation",
+          "relevance_tags": [
+            "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.013128539646953997,
+          "SSE_b": 0.01271440063801782,
+          "SSE_delta_a_minus_b": 0.0004141390089361773,
+          "SSE_preferred_fingerprint": "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+          "TE_a": 28.39651065432863,
+          "TE_b": 28.521596149823978,
+          "TE_delta_a_minus_b": -0.1250854954953482,
+          "TE_preferred_fingerprint": "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+          "candidate_a_fingerprint": "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+          "candidate_b_fingerprint": "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.01369768151188426,
+          "SSE_b": 0.013296006926227871,
+          "SSE_delta_a_minus_b": 0.00040167458565638914,
+          "SSE_preferred_fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "TE_a": 28.683212720073584,
+          "TE_b": 29.33853858277029,
+          "TE_delta_a_minus_b": -0.6553258626967065,
+          "TE_preferred_fingerprint": "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+          "candidate_a_fingerprint": "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+          "candidate_b_fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths; changes a focused comparison's SSE-versus-TE ordering interpretation",
+          "relevance_tags": [
+            "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.013530214232610385,
+          "SSE_b": 0.01271440063801782,
+          "SSE_delta_a_minus_b": 0.0008158135945925647,
+          "SSE_preferred_fingerprint": "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+          "TE_a": 27.741184791631923,
+          "TE_b": 28.521596149823978,
+          "TE_delta_a_minus_b": -0.7804113581920546,
+          "TE_preferred_fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "candidate_a_fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "candidate_b_fingerprint": "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "changes a focused comparison's SSE-versus-TE ordering interpretation",
+          "relevance_tags": [
+            "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.013530214232610385,
+          "SSE_b": 0.013296006926227871,
+          "SSE_delta_a_minus_b": 0.00023420730638251328,
+          "SSE_preferred_fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "TE_a": 27.741184791631923,
+          "TE_b": 29.33853858277029,
+          "TE_delta_a_minus_b": -1.5973537911383673,
+          "TE_preferred_fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "candidate_a_fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "candidate_b_fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths; changes a focused comparison's SSE-versus-TE ordering interpretation",
+          "relevance_tags": [
+            "INVOLVES_FOCUSED_ROLE_CANDIDATE",
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010069764006105254,
+          "SSE_b": 0.010497188107724058,
+          "SSE_delta_a_minus_b": -0.00042742410161880455,
+          "SSE_preferred_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "TE_a": 24.826211442424782,
+          "TE_b": 24.762868516701705,
+          "TE_delta_a_minus_b": 0.06334292572307731,
+          "TE_preferred_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "candidate_a_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "candidate_b_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010069764006105254,
+          "SSE_b": 0.00951140355301779,
+          "SSE_delta_a_minus_b": 0.0005583604530874642,
+          "SSE_preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "TE_a": 24.826211442424782,
+          "TE_b": 25.219601732574088,
+          "TE_delta_a_minus_b": -0.3933902901493056,
+          "TE_preferred_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "candidate_a_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "candidate_b_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010069764006105254,
+          "SSE_b": 0.010471097888010745,
+          "SSE_delta_a_minus_b": -0.0004013338819054916,
+          "SSE_preferred_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "TE_a": 24.826211442424782,
+          "TE_b": 24.74997253452543,
+          "TE_delta_a_minus_b": 0.07623890789935217,
+          "TE_preferred_fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "candidate_a_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "candidate_b_fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010069764006105254,
+          "SSE_b": 0.010877774912895734,
+          "SSE_delta_a_minus_b": -0.0008080109067904809,
+          "SSE_preferred_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "TE_a": 24.826211442424782,
+          "TE_b": 24.38738474654327,
+          "TE_delta_a_minus_b": 0.438826695881513,
+          "TE_preferred_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_a_fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "candidate_b_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010497188107724058,
+          "SSE_b": 0.00951140355301779,
+          "SSE_delta_a_minus_b": 0.0009857845547062687,
+          "SSE_preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "TE_a": 24.762868516701705,
+          "TE_b": 25.219601732574088,
+          "TE_delta_a_minus_b": -0.4567332158723829,
+          "TE_preferred_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "candidate_a_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "candidate_b_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010497188107724058,
+          "SSE_b": 0.010476100327239347,
+          "SSE_delta_a_minus_b": 2.1087780484711077e-05,
+          "SSE_preferred_fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "TE_a": 24.762868516701705,
+          "TE_b": 25.04271060923998,
+          "TE_delta_a_minus_b": -0.2798420925382743,
+          "TE_preferred_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "candidate_a_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "candidate_b_fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010497188107724058,
+          "SSE_b": 0.010877774912895734,
+          "SSE_delta_a_minus_b": -0.0003805868051716763,
+          "SSE_preferred_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "TE_a": 24.762868516701705,
+          "TE_b": 24.38738474654327,
+          "TE_delta_a_minus_b": 0.3754837701584357,
+          "TE_preferred_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_a_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "candidate_b_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010497188107724058,
+          "SSE_b": 0.010199505510112882,
+          "SSE_delta_a_minus_b": 0.0002976825976111763,
+          "SSE_preferred_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "TE_a": 24.762868516701705,
+          "TE_b": 24.9552694162316,
+          "TE_delta_a_minus_b": -0.19240089952989692,
+          "TE_preferred_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "candidate_a_fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "candidate_b_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.00951140355301779,
+          "SSE_b": 0.009792492232431609,
+          "SSE_delta_a_minus_b": -0.0002810886794138191,
+          "SSE_preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "TE_a": 25.219601732574088,
+          "TE_b": 23.916711987876145,
+          "TE_delta_a_minus_b": 1.3028897446979428,
+          "TE_preferred_fingerprint": "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+          "candidate_a_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "candidate_b_fingerprint": "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.00951140355301779,
+          "SSE_b": 0.010471097888010745,
+          "SSE_delta_a_minus_b": -0.0009596943349929558,
+          "SSE_preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "TE_a": 25.219601732574088,
+          "TE_b": 24.74997253452543,
+          "TE_delta_a_minus_b": 0.46962919804865777,
+          "TE_preferred_fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "candidate_a_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "candidate_b_fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.00951140355301779,
+          "SSE_b": 0.010476100327239347,
+          "SSE_delta_a_minus_b": -0.0009646967742215577,
+          "SSE_preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "TE_a": 25.219601732574088,
+          "TE_b": 25.04271060923998,
+          "TE_delta_a_minus_b": 0.1768911233341086,
+          "TE_preferred_fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "candidate_a_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "candidate_b_fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.00951140355301779,
+          "SSE_b": 0.010877774912895734,
+          "SSE_delta_a_minus_b": -0.001366371359877945,
+          "SSE_preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "TE_a": 25.219601732574088,
+          "TE_b": 24.38738474654327,
+          "TE_delta_a_minus_b": 0.8322169860308186,
+          "TE_preferred_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_a_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "candidate_b_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.00951140355301779,
+          "SSE_b": 0.010199505510112882,
+          "SSE_delta_a_minus_b": -0.0006881019570950924,
+          "SSE_preferred_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "TE_a": 25.219601732574088,
+          "TE_b": 24.9552694162316,
+          "TE_delta_a_minus_b": 0.264332316342486,
+          "TE_preferred_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "candidate_a_fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "candidate_b_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.009792492232431609,
+          "SSE_b": 0.009343936273743914,
+          "SSE_delta_a_minus_b": 0.000448555958687695,
+          "SSE_preferred_fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "TE_a": 23.916711987876145,
+          "TE_b": 24.27757380413243,
+          "TE_delta_a_minus_b": -0.36086181625628555,
+          "TE_preferred_fingerprint": "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+          "candidate_a_fingerprint": "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+          "candidate_b_fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "materiality_path_effect": true,
+          "materiality_path_effect_reason": "participates in differing breakpoint preferred paths",
+          "relevance_tags": [
+            "INVOLVES_TE_BREAKPOINT_PREFERRED",
+            "INVOLVES_SSE_BREAKPOINT_PREFERRED",
+            "INVOLVES_FIRST_SIMPLER_WITNESS",
+            "DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.011752777595912808,
+          "SSE_b": 0.01058922976312615,
+          "SSE_delta_a_minus_b": 0.0011635478327866582,
+          "SSE_preferred_fingerprint": "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+          "TE_a": 25.833721572466647,
+          "TE_b": 26.295655679820364,
+          "TE_delta_a_minus_b": -0.4619341073537164,
+          "TE_preferred_fingerprint": "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+          "candidate_a_fingerprint": "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+          "candidate_b_fingerprint": "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010471097888010745,
+          "SSE_b": 0.010877774912895734,
+          "SSE_delta_a_minus_b": -0.0004066770248849893,
+          "SSE_preferred_fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "TE_a": 24.74997253452543,
+          "TE_b": 24.38738474654327,
+          "TE_delta_a_minus_b": 0.36258778798216085,
+          "TE_preferred_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_a_fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "candidate_b_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010471097888010745,
+          "SSE_b": 0.010199505510112882,
+          "SSE_delta_a_minus_b": 0.00027159237789786336,
+          "SSE_preferred_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "TE_a": 24.74997253452543,
+          "TE_b": 24.9552694162316,
+          "TE_delta_a_minus_b": -0.20529688170617177,
+          "TE_preferred_fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "candidate_a_fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "candidate_b_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010664655386997932,
+          "SSE_b": 0.01058922976312615,
+          "SSE_delta_a_minus_b": 7.542562387178285e-05,
+          "SSE_preferred_fingerprint": "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+          "TE_a": 25.704896445143362,
+          "TE_b": 26.295655679820364,
+          "TE_delta_a_minus_b": -0.5907592346770016,
+          "TE_preferred_fingerprint": "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+          "candidate_a_fingerprint": "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+          "candidate_b_fingerprint": "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010664655386997932,
+          "SSE_b": 0.010877774912895734,
+          "SSE_delta_a_minus_b": -0.0002131195258978022,
+          "SSE_preferred_fingerprint": "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+          "TE_a": 25.704896445143362,
+          "TE_b": 24.38738474654327,
+          "TE_delta_a_minus_b": 1.317511698600093,
+          "TE_preferred_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_a_fingerprint": "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+          "candidate_b_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010476100327239347,
+          "SSE_b": 0.010877774912895734,
+          "SSE_delta_a_minus_b": -0.0004016745856563874,
+          "SSE_preferred_fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "TE_a": 25.04271060923998,
+          "TE_b": 24.38738474654327,
+          "TE_delta_a_minus_b": 0.65532586269671,
+          "TE_preferred_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_a_fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "candidate_b_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.01058922976312615,
+          "SSE_b": 0.010877774912895734,
+          "SSE_delta_a_minus_b": -0.00028854514976958505,
+          "SSE_preferred_fingerprint": "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+          "TE_a": 26.295655679820364,
+          "TE_b": 24.38738474654327,
+          "TE_delta_a_minus_b": 1.9082709332770946,
+          "TE_preferred_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_a_fingerprint": "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+          "candidate_b_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        },
+        {
+          "SSE_a": 0.010877774912895734,
+          "SSE_b": 0.010199505510112882,
+          "SSE_delta_a_minus_b": 0.0006782694027828527,
+          "SSE_preferred_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "TE_a": 24.38738474654327,
+          "TE_b": 24.9552694162316,
+          "TE_delta_a_minus_b": -0.5678846696883326,
+          "TE_preferred_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_a_fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "candidate_b_fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "materiality_path_effect": false,
+          "materiality_path_effect_reason": "lower-rank ordering only; no audited path role is altered",
+          "relevance_tags": [
+            "NON_DECISION_RELEVANT"
+          ]
+        }
+      ],
+      "path_comparison": {
+        "SSE_preferred_fingerprint_sequence": [
+          "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+          "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb"
+        ],
+        "TE_preferred_fingerprint_sequence": [
+          "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+          "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb"
+        ],
+        "differing_positions": [
+          {
+            "SSE": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+            "TE": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+            "position": 2
+          },
+          {
+            "SSE": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+            "TE": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+            "position": 3
+          }
+        ],
+        "exact_sequence_identical": false,
+        "final_preferred_candidate_SSE": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+        "final_preferred_candidate_TE": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+        "first_preferred_change_from_best_SSE": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+        "first_preferred_change_from_best_TE": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+        "preferred_path_overlap_count": 4,
+        "preferred_path_union_count": 6,
+        "same_best_candidate": true,
+        "same_final_preferred_candidate": true,
+        "same_first_preferred_change_candidate": false
+      },
+      "possible_pair_count": 820,
+      "same_best_candidate": true,
+      "top_rank_concordant": true
+    }
+  },
+  "semantic_clarification": "Same SSE/TE best candidate does not imply zero rank disagreement."
+}
