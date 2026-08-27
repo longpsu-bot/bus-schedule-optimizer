@@ -286,6 +286,43 @@ created; the H slowest-tail eligibility rule remains unchanged.
 
 No weighted scalar objective selects a timetable.
 
+## Domain-priority post-search selection (PR62-L)
+
+`OperationalSelectionPolicyV1` is an isolated post-search policy. It consumes the immutable exact
+operating pairs on the existing 10-dimensional Pareto frontier and does not replace or truncate
+`RouteCoordinatorResultV1.pareto_frontier`. The policy order is strict and lexicographic:
+
+1. `HARD_OPERATIONAL_FEASIBILITY`;
+2. `SCENARIO_B_MAX_ACCESS_NON_REGRESSION`;
+3. `OBSERVED_DEMAND_MISMATCH`;
+4. `RHYTHM_SIMPLICITY`;
+5. `FLEET_EFFICIENCY`.
+
+Hard feasibility independently revalidates fixed directional trip totals and endpoints,
+whole-minute strictly increasing departures, exact uniform ServiceRegimes, clean-boundary
+compilation, translated protection, demand-justified tail eligibility, authoritative runtime and
+minimum layover, exact minimum-fleet path cover, fleet ceiling, exact connections, and compiler
+provenance. Failure is non-selectable; no later metric can compensate.
+
+Fleet feasibility and fleet efficiency are distinct. Fleet feasibility is the mandatory exact
+runtime/layover/path-cover/ceiling gate. Fleet efficiency is only the final preference among pairs
+already surviving feasibility, passenger access, demand fit, and rhythm; its tuple is fleet
+required, total excess terminal wait, then maximum excess terminal wait. These concepts are never
+combined into a score.
+
+The only Scenario-B passenger gate compares each direction separately: candidate maximum active-
+bucket expected wait must be no greater than the same-direction Scenario-B value plus numerical
+epsilon. Pair maximum, mean wait, mismatch, P90, one-SE, and percentage-of-days rules cannot stand
+in for this directional check. An empty survivor set is reported as
+`ACCESS_GUARDRAIL_TOO_RESTRICTIVE` and is not relaxed automatically.
+
+Among access-safe candidates, only production `observed_demand_mismatch` determines the strict
+best-demand-fit set. If a numerical-epsilon tie remains, rhythm uses total directional sustained
+headway-level count, actual ServiceRegime count, total directional effective-palette count, then
+total single-gap regime count. If still tied, fleet efficiency applies. Pair fingerprint is used
+only when all policy metrics remain metrically equivalent, as a deterministic identity tie-break.
+Every stage exposes retained fingerprints and explicit rejection reasons.
+
 ## Deterministic safeguards
 
 The V1 defaults are 24 state evaluations per route, 512 OPEN states, 4 compilations per state,
