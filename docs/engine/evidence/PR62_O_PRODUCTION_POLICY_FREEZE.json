@@ -1,0 +1,3340 @@
+{
+  "N_commit_SHA": "c956284102eb307e10068c1128151943da5246d7",
+  "N_evidence_lock": {
+    "json": {
+      "bytes": 20224,
+      "sha256": "6e15939240963171e80e20b95a4d728df8ec6ccecb3f0b6b192135fb56ad371b"
+    },
+    "markdown": {
+      "bytes": 5927,
+      "sha256": "bf4d4b9a9d92f3b640b2c15b3d42ba42ed47e9ad350bf39aadf10d4203f5ce4b"
+    }
+  },
+  "READY_FOR_FINAL_XLSX_RECERTIFICATION": true,
+  "V1_historical_selector": {
+    "changed": false,
+    "git_blob_sha1": "1fc1097356a3db732f093ebf25dac0810a1791a7",
+    "profile": "domain_priority_operational_selector_v1",
+    "semantics": "historical strict-SSE-first selector retained for evidence/backward compatibility",
+    "sha256": "5f10bf7130c20898a3e537fc8f7b73e990335f92ccb7913c41e50a308809e415"
+  },
+  "V2_current_production_selector": {
+    "TE_formula": {
+      "authority": "ActualServiceMetricsV1 bucket counts/demand shares/service shares",
+      "directional_TE": "directional_total_trips * directional_TV",
+      "directional_TV": "0.5 * sum(abs(service_share_b - demand_share_b))",
+      "directions_averaged": false,
+      "pair_TE": "outbound_TE + inbound_TE"
+    },
+    "anchor_fail_closed": {
+      "conflict": "DEMAND_FIT_ANCHOR_CONFLICT",
+      "no_V1_fallback": true,
+      "non_unique": "DEMAND_FIT_ANCHOR_NOT_UNIQUE",
+      "same_fingerprint_required": true,
+      "unique_SSE_best_required": true,
+      "unique_TE_best_required": true
+    },
+    "numerical_epsilon": 1e-12,
+    "one_trip_semantics": "A 1.0 trip-equivalent concession is an operational service-allocation quantum representing equivalent service mass displaced across demand buckets; it is not a fractional physical trip, timetable-edit count, trip movement instruction, or replacement for SSE.",
+    "pair_fingerprint_is_quality_objective": false,
+    "priority_order": [
+      "HARD_OPERATIONAL_FEASIBILITY",
+      "SCENARIO_B_MAX_ACCESS_NON_REGRESSION",
+      "COMMON_SSE_TE_DEMAND_FIT_ANCHOR",
+      "ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+      "RHYTHM_SIMPLICITY",
+      "FLEET_EFFICIENCY"
+    ],
+    "profile": "one_trip_te_materiality_operational_selector_v2",
+    "te_materiality_band_trips": 1.0,
+    "weighted_score": false
+  },
+  "blockers": [],
+  "candidate_universe": {
+    "full_10_D_Pareto_unchanged": true,
+    "search_budget": {
+      "max_compile_frontier_per_state": 4,
+      "max_directional_compilations": 24,
+      "max_open_states": 512,
+      "max_pair_frontier": 512,
+      "max_service_plan_evaluations": 24
+    },
+    "search_run_count_per_route": 1,
+    "selector_role": "post-search consumer",
+    "source": "exact current post-H/I immutable 10-D Pareto frontier"
+  },
+  "cross_route_classification": "ONE_TRIP_PRODUCTION_POLICY_FROZEN",
+  "deterministic_render": true,
+  "milestone": "PR62-O",
+  "next_milestone": "PR62-P_FINAL_XLSX_RECERTIFICATION",
+  "production_guards": {
+    "10_D_Pareto_semantics_changed": false,
+    "F1_F2_F3_changed": false,
+    "SSE_semantics_changed": false,
+    "V1_selector_semantics_changed": false,
+    "V2_selector_added_and_frozen": true,
+    "access_safeguard_changed": false,
+    "compiler_changed": false,
+    "compiler_path_score_changed": false,
+    "coordinator_search_semantics_changed": false,
+    "final_XLSX_regenerated": false,
+    "fleet_validator_changed": false,
+    "passenger_wait_semantics_changed": false,
+    "private_workbook_committed": false,
+    "private_workbook_opened": false,
+    "protection_changed": false,
+    "queue_changed": false,
+    "rhythm_metrics_changed": false,
+    "search_budgets_changed": false,
+    "settlement_added": false,
+    "tail_eligibility_changed": false
+  },
+  "routes": {
+    "10": {
+      "SSE_BEST_SET": [
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c"
+      ],
+      "TE_BEST_SET": [
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c"
+      ],
+      "access_exclusions": {
+        "candidates": [
+          {
+            "directional_maximum_bucket_wait_minutes": {
+              "inbound": 27.0,
+              "outbound": 12.900000000000002
+            },
+            "fingerprint": "025353e2311d8508d1984a34d4acb2ee9e7228a16af1a69bb97ff5b649e77934",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "tail_headways": {
+              "inbound": 48,
+              "outbound": 23
+            }
+          },
+          {
+            "directional_maximum_bucket_wait_minutes": {
+              "inbound": 15.000000000000002,
+              "outbound": 12.900000000000002
+            },
+            "fingerprint": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "tail_headways": {
+              "inbound": 30,
+              "outbound": 23
+            }
+          },
+          {
+            "directional_maximum_bucket_wait_minutes": {
+              "inbound": 34.2,
+              "outbound": 12.900000000000002
+            },
+            "fingerprint": "8fcacf72ae51cf31e351f29f367f0094fac654ea85bd0f3a29470502a0939d62",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "tail_headways": {
+              "inbound": 54,
+              "outbound": 23
+            }
+          },
+          {
+            "directional_maximum_bucket_wait_minutes": {
+              "inbound": 22.500000000000004,
+              "outbound": 12.900000000000002
+            },
+            "fingerprint": "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "tail_headways": {
+              "inbound": 45,
+              "outbound": 23
+            }
+          }
+        ],
+        "classification": "ACCESS_EXCLUDED_BEFORE_MATERIALITY"
+      },
+      "candidate_audit": [
+        {
+          "average_wait_minutes": 9.743222062666257,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 27.0,
+            "outbound": 12.900000000000002
+          },
+          "fingerprint": "025353e2311d8508d1984a34d4acb2ee9e7228a16af1a69bb97ff5b649e77934",
+          "fleet_efficiency_tuple": [
+            13,
+            2815,
+            89
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 7.0756555493939635,
+          "maximum_directional_p90_bucket_wait_minutes": 14.999999999999998,
+          "observed_demand_mismatch": 0.008417599021585266,
+          "outbound_trip_equivalent_error": 8.802373558505908,
+          "pair_trip_equivalent_error": 15.87802910789987,
+          "rhythm_simplicity_tuple": [
+            12,
+            16,
+            8,
+            2
+          ],
+          "scenario_b_directional_max_access_safe": false,
+          "tail_headways": {
+            "inbound": 48,
+            "outbound": 23
+          }
+        },
+        {
+          "average_wait_minutes": 9.613877680736364,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 14.066666666666666,
+            "outbound": 12.900000000000002
+          },
+          "fingerprint": "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+          "fleet_efficiency_tuple": [
+            11,
+            1855,
+            52
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 8.86707795294304,
+          "maximum_directional_p90_bucket_wait_minutes": 11.333333333333334,
+          "observed_demand_mismatch": 0.012013640351117972,
+          "outbound_trip_equivalent_error": 9.547458085451595,
+          "pair_trip_equivalent_error": 18.414536038394637,
+          "rhythm_simplicity_tuple": [
+            9,
+            11,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 29,
+            "outbound": 23
+          }
+        },
+        {
+          "average_wait_minutes": 9.579767336017012,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 15.000000000000002,
+            "outbound": 12.900000000000002
+          },
+          "fingerprint": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+          "fleet_efficiency_tuple": [
+            13,
+            2369,
+            71
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 8.049314742929573,
+          "maximum_directional_p90_bucket_wait_minutes": 12.6,
+          "observed_demand_mismatch": 0.009244498851670911,
+          "outbound_trip_equivalent_error": 8.802373558505908,
+          "pair_trip_equivalent_error": 16.85168830143548,
+          "rhythm_simplicity_tuple": [
+            11,
+            12,
+            9,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": false,
+          "tail_headways": {
+            "inbound": 30,
+            "outbound": 23
+          }
+        },
+        {
+          "average_wait_minutes": 9.661526636691072,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 14.066666666666666,
+            "outbound": 12.866666666666667
+          },
+          "fingerprint": "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+          "fleet_efficiency_tuple": [
+            12,
+            2713,
+            49
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 8.86707795294304,
+          "maximum_directional_p90_bucket_wait_minutes": 11.666666666666666,
+          "observed_demand_mismatch": 0.012524369948702048,
+          "outbound_trip_equivalent_error": 10.614102653570368,
+          "pair_trip_equivalent_error": 19.48118060651341,
+          "rhythm_simplicity_tuple": [
+            8,
+            11,
+            6,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 29,
+            "outbound": 22
+          }
+        },
+        {
+          "average_wait_minutes": 9.807655861327559,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 34.2,
+            "outbound": 12.900000000000002
+          },
+          "fingerprint": "8fcacf72ae51cf31e351f29f367f0094fac654ea85bd0f3a29470502a0939d62",
+          "fleet_efficiency_tuple": [
+            13,
+            2799,
+            89
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 7.830502851936941,
+          "maximum_directional_p90_bucket_wait_minutes": 15.000000000000002,
+          "observed_demand_mismatch": 0.009043013569881016,
+          "outbound_trip_equivalent_error": 8.802373558505908,
+          "pair_trip_equivalent_error": 16.632876410442847,
+          "rhythm_simplicity_tuple": [
+            12,
+            14,
+            8,
+            1
+          ],
+          "scenario_b_directional_max_access_safe": false,
+          "tail_headways": {
+            "inbound": 54,
+            "outbound": 23
+          }
+        },
+        {
+          "average_wait_minutes": 9.620536971209305,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 14.066666666666666,
+            "outbound": 13.800000000000002
+          },
+          "fingerprint": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+          "fleet_efficiency_tuple": [
+            12,
+            1592,
+            71
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 8.86707795294304,
+          "maximum_directional_p90_bucket_wait_minutes": 11.4,
+          "observed_demand_mismatch": 0.011758617635110654,
+          "outbound_trip_equivalent_error": 9.786357926690975,
+          "pair_trip_equivalent_error": 18.653435879634017,
+          "rhythm_simplicity_tuple": [
+            8,
+            11,
+            6,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 29,
+            "outbound": 24
+          }
+        },
+        {
+          "average_wait_minutes": 9.593949402449837,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 12.9,
+            "outbound": 12.900000000000002
+          },
+          "fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "fleet_efficiency_tuple": [
+            13,
+            2447,
+            71
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 9.192837479204625,
+          "maximum_directional_p90_bucket_wait_minutes": 12.400000000000002,
+          "observed_demand_mismatch": 0.010613576150656733,
+          "outbound_trip_equivalent_error": 8.802373558505908,
+          "pair_trip_equivalent_error": 17.995211037710533,
+          "rhythm_simplicity_tuple": [
+            10,
+            12,
+            6,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 23,
+            "outbound": 23
+          }
+        },
+        {
+          "average_wait_minutes": 9.59257954911054,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 13.366666666666669,
+            "outbound": 12.900000000000002
+          },
+          "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "fleet_efficiency_tuple": [
+            13,
+            2432,
+            71
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 8.154826507169451,
+          "maximum_directional_p90_bucket_wait_minutes": 12.599999999999998,
+          "observed_demand_mismatch": 0.00936973709558608,
+          "outbound_trip_equivalent_error": 8.802373558505908,
+          "pair_trip_equivalent_error": 16.95720006567536,
+          "rhythm_simplicity_tuple": [
+            11,
+            12,
+            7,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 24,
+            "outbound": 23
+          }
+        },
+        {
+          "average_wait_minutes": 9.683303593147988,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 14.066666666666666,
+            "outbound": 13.800000000000002
+          },
+          "fingerprint": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "fleet_efficiency_tuple": [
+            13,
+            2207,
+            81
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 8.86707795294304,
+          "maximum_directional_p90_bucket_wait_minutes": 12.6,
+          "observed_demand_mismatch": 0.011317367734105051,
+          "outbound_trip_equivalent_error": 9.278751373889984,
+          "pair_trip_equivalent_error": 18.145829326833024,
+          "rhythm_simplicity_tuple": [
+            8,
+            12,
+            6,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 29,
+            "outbound": 24
+          }
+        },
+        {
+          "average_wait_minutes": 9.640133634658694,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 22.500000000000004,
+            "outbound": 12.900000000000002
+          },
+          "fingerprint": "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb",
+          "fleet_efficiency_tuple": [
+            13,
+            2902,
+            89
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 6.862572288679394,
+          "maximum_directional_p90_bucket_wait_minutes": 14.999999999999998,
+          "observed_demand_mismatch": 0.008393103418565044,
+          "outbound_trip_equivalent_error": 8.802373558505908,
+          "pair_trip_equivalent_error": 15.664945847185301,
+          "rhythm_simplicity_tuple": [
+            13,
+            15,
+            8,
+            1
+          ],
+          "scenario_b_directional_max_access_safe": false,
+          "tail_headways": {
+            "inbound": 45,
+            "outbound": 23
+          }
+        },
+        {
+          "average_wait_minutes": 9.636890463523153,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 14.066666666666666,
+            "outbound": 12.900000000000002
+          },
+          "fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "fleet_efficiency_tuple": [
+            12,
+            1683,
+            71
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 8.86707795294304,
+          "maximum_directional_p90_bucket_wait_minutes": 11.333333333333334,
+          "observed_demand_mismatch": 0.010728881378053444,
+          "outbound_trip_equivalent_error": 8.802373558505908,
+          "pair_trip_equivalent_error": 17.669451511448948,
+          "rhythm_simplicity_tuple": [
+            9,
+            11,
+            6,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 29,
+            "outbound": 23
+          }
+        }
+      ],
+      "common_anchor": {
+        "average_wait_minutes": 9.59257954911054,
+        "directional_maximum_bucket_wait_minutes": {
+          "inbound": 13.366666666666669,
+          "outbound": 12.900000000000002
+        },
+        "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "fleet_efficiency_tuple": [
+          13,
+          2432,
+          71
+        ],
+        "hard_feasibility_reasons": [],
+        "hard_operational_feasible": true,
+        "inbound_trip_equivalent_error": 8.154826507169451,
+        "maximum_directional_p90_bucket_wait_minutes": 12.599999999999998,
+        "observed_demand_mismatch": 0.00936973709558608,
+        "outbound_trip_equivalent_error": 8.802373558505908,
+        "pair_trip_equivalent_error": 16.95720006567536,
+        "rhythm_simplicity_tuple": [
+          11,
+          12,
+          7,
+          0
+        ],
+        "scenario_b_directional_max_access_safe": true,
+        "tail_headways": {
+          "inbound": 24,
+          "outbound": 23
+        }
+      },
+      "materiality_set_fingerprints": [
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "pareto_count": 11,
+      "pareto_dimension_count": 10,
+      "pareto_fingerprints": [
+        "025353e2311d8508d1984a34d4acb2ee9e7228a16af1a69bb97ff5b649e77934",
+        "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+        "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+        "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+        "8fcacf72ae51cf31e351f29f367f0094fac654ea85bd0f3a29470502a0939d62",
+        "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+        "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+        "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb",
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "route_id": "10",
+      "scenario_b_directional_maximum_wait_minutes": {
+        "inbound": 14.166666666666666,
+        "outbound": 14.166666666666668
+      },
+      "search_budget": {
+        "max_compile_frontier_per_state": 4,
+        "max_directional_compilations": 24,
+        "max_open_states": 512,
+        "max_pair_frontier": 512,
+        "max_service_plan_evaluations": 24
+      },
+      "search_statistics": {
+        "budget_exhausted": true,
+        "compile_variants_evaluated": 88,
+        "duplicate_states_skipped": 371,
+        "fleet_feedback_expansion_requests": 248,
+        "fleet_feedback_expansions_executed": 11,
+        "fleet_feedback_expansions_skipped": 237,
+        "fleet_validations_run": 135,
+        "protected_compile_variants_rejected": 0,
+        "response_feedback_anchor_candidates": 2,
+        "response_feedback_anchors_enqueued": 2,
+        "response_feedback_anchors_evaluated": 2,
+        "search_iterations": 24,
+        "states_evaluated": 24,
+        "states_generated": 7864,
+        "states_pruned": 6957,
+        "tail_ordering_compilations_rejected": 56
+      },
+      "search_status": "SEARCH_BUDGET_EXHAUSTED",
+      "selected": {
+        "average_wait_minutes": 9.636890463523153,
+        "directional_maximum_bucket_wait_minutes": {
+          "inbound": 14.066666666666666,
+          "outbound": 12.900000000000002
+        },
+        "fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+        "fleet_efficiency_tuple": [
+          12,
+          1683,
+          71
+        ],
+        "hard_feasibility_reasons": [],
+        "hard_operational_feasible": true,
+        "inbound_trip_equivalent_error": 8.86707795294304,
+        "maximum_directional_p90_bucket_wait_minutes": 11.333333333333334,
+        "observed_demand_mismatch": 0.010728881378053444,
+        "outbound_trip_equivalent_error": 8.802373558505908,
+        "pair_trip_equivalent_error": 17.669451511448948,
+        "rhythm_simplicity_tuple": [
+          9,
+          11,
+          6,
+          0
+        ],
+        "scenario_b_directional_max_access_safe": true,
+        "tail_headways": {
+          "inbound": 29,
+          "outbound": 23
+        }
+      },
+      "selected_vs_anchor_tradeoff": {
+        "average_wait_delta_minutes": 0.04431091441261259,
+        "average_wait_delta_seconds_per_passenger": 2.6586548647567554,
+        "delta_SSE": 0.0013591442824673634,
+        "delta_TE": 0.7122514457735889,
+        "directional_max_access_delta_minutes": {
+          "inbound": 0.6999999999999975,
+          "outbound": 0.0
+        },
+        "fleet_required_delta": -1,
+        "max_excess_terminal_wait_delta": 0,
+        "maximum_directional_p90_delta_minutes": -1.266666666666664,
+        "rhythm_tuple_change": {
+          "anchor": [
+            11,
+            12,
+            7,
+            0
+          ],
+          "selected": [
+            9,
+            11,
+            6,
+            0
+          ]
+        },
+        "tail_headway_change": {
+          "anchor": {
+            "inbound": 24,
+            "outbound": 23
+          },
+          "selected": {
+            "inbound": 29,
+            "outbound": 23
+          }
+        },
+        "total_excess_terminal_wait_delta": -749
+      },
+      "selection_result": {
+        "best_fleet_efficiency_count": 1,
+        "best_rhythm_count": 1,
+        "candidate_universe_count": 11,
+        "classification": "ONE_TRIP_MATERIALITY_SELECTS_SIMPLER_ALTERNATIVE",
+        "common_anchor_fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "common_anchor_sse": 0.00936973709558608,
+        "common_anchor_te": 16.95720006567536,
+        "hard_feasible_count": 11,
+        "materiality_band_trips": 1.0,
+        "materiality_set_count": 2,
+        "pair_fingerprint_is_quality_objective": false,
+        "passenger_access_safe_count": 7,
+        "profile": "one_trip_te_materiality_operational_selector_v2",
+        "rejected_candidates": [
+          {
+            "fingerprint": "025353e2311d8508d1984a34d4acb2ee9e7228a16af1a69bb97ff5b649e77934",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "relevant_metric_values": {
+              "candidate_inbound_maximum_bucket_expected_wait_minutes": 27.0,
+              "candidate_outbound_maximum_bucket_expected_wait_minutes": 12.900000000000002,
+              "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 14.166666666666666,
+              "scenario_b_outbound_maximum_bucket_expected_wait_minutes": 14.166666666666668
+            },
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "fingerprint": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "relevant_metric_values": {
+              "candidate_inbound_maximum_bucket_expected_wait_minutes": 15.000000000000002,
+              "candidate_outbound_maximum_bucket_expected_wait_minutes": 12.900000000000002,
+              "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 14.166666666666666,
+              "scenario_b_outbound_maximum_bucket_expected_wait_minutes": 14.166666666666668
+            },
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "fingerprint": "8fcacf72ae51cf31e351f29f367f0094fac654ea85bd0f3a29470502a0939d62",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "relevant_metric_values": {
+              "candidate_inbound_maximum_bucket_expected_wait_minutes": 34.2,
+              "candidate_outbound_maximum_bucket_expected_wait_minutes": 12.900000000000002,
+              "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 14.166666666666666,
+              "scenario_b_outbound_maximum_bucket_expected_wait_minutes": 14.166666666666668
+            },
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "fingerprint": "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb",
+            "reason": "INBOUND_MAX_ACCESS_REGRESSION",
+            "relevant_metric_values": {
+              "candidate_inbound_maximum_bucket_expected_wait_minutes": 22.500000000000004,
+              "candidate_outbound_maximum_bucket_expected_wait_minutes": 12.900000000000002,
+              "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 14.166666666666666,
+              "scenario_b_outbound_maximum_bucket_expected_wait_minutes": 14.166666666666668
+            },
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "fingerprint": "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 16.95720006567536,
+              "candidate_pair_trip_equivalent_error": 18.414536038394637,
+              "delta_trip_equivalent_error": 1.457335972719278,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 16.95720006567536,
+              "candidate_pair_trip_equivalent_error": 19.48118060651341,
+              "delta_trip_equivalent_error": 2.52398054083805,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 16.95720006567536,
+              "candidate_pair_trip_equivalent_error": 18.653435879634017,
+              "delta_trip_equivalent_error": 1.6962358139586584,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 16.95720006567536,
+              "candidate_pair_trip_equivalent_error": 17.995211037710533,
+              "delta_trip_equivalent_error": 1.038010972035174,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 16.95720006567536,
+              "candidate_pair_trip_equivalent_error": 18.145829326833024,
+              "delta_trip_equivalent_error": 1.188629261157665,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "reason": "NOT_IN_BEST_RHYTHM_SET",
+            "relevant_metric_values": {
+              "best_rhythm_simplicity_tuple": [
+                9,
+                11,
+                6,
+                0
+              ],
+              "rhythm_simplicity_tuple": [
+                11,
+                12,
+                7,
+                0
+              ]
+            },
+            "stage": "RHYTHM_SIMPLICITY"
+          }
+        ],
+        "route_id": "10",
+        "selected_delta_te_from_anchor": 0.7122514457735889,
+        "selected_is_anchor": false,
+        "selected_pair_fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+        "selected_stage": "RHYTHM_SIMPLICITY",
+        "sse_best_count": 1,
+        "stage_trace": [
+          {
+            "input_count": 11,
+            "retained_count": 11,
+            "retained_fingerprints": [
+              "025353e2311d8508d1984a34d4acb2ee9e7228a16af1a69bb97ff5b649e77934",
+              "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+              "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+              "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+              "8fcacf72ae51cf31e351f29f367f0094fac654ea85bd0f3a29470502a0939d62",
+              "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+              "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+              "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+              "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+              "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb",
+              "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+            ],
+            "stage": "HARD_OPERATIONAL_FEASIBILITY"
+          },
+          {
+            "input_count": 11,
+            "retained_count": 7,
+            "retained_fingerprints": [
+              "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+              "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+              "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+              "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+              "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+              "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+              "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+            ],
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "input_count": 7,
+            "retained_count": 7,
+            "retained_fingerprints": [
+              "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+              "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+              "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+              "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+              "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+              "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+              "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+            ],
+            "stage": "COMMON_SSE_TE_DEMAND_FIT_ANCHOR"
+          },
+          {
+            "input_count": 7,
+            "retained_count": 2,
+            "retained_fingerprints": [
+              "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+              "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+            ],
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "input_count": 2,
+            "retained_count": 1,
+            "retained_fingerprints": [
+              "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+            ],
+            "stage": "RHYTHM_SIMPLICITY"
+          },
+          {
+            "input_count": 1,
+            "retained_count": 1,
+            "retained_fingerprints": [
+              "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+            ],
+            "stage": "FLEET_EFFICIENCY"
+          }
+        ],
+        "te_best_count": 1,
+        "top_anchor_concordant": true
+      }
+    },
+    "6": {
+      "SSE_BEST_SET": [
+        "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+      ],
+      "TE_BEST_SET": [
+        "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+      ],
+      "access_exclusions": {
+        "candidates": [
+          {
+            "directional_maximum_bucket_wait_minutes": {
+              "inbound": 8.5,
+              "outbound": 13.5
+            },
+            "fingerprint": "347ce5d5190638937dc110a9eb16a5c49c4229fac2bb352c7ca2b5d704105784",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "tail_headways": {
+              "inbound": 14,
+              "outbound": 22
+            }
+          },
+          {
+            "directional_maximum_bucket_wait_minutes": {
+              "inbound": 11.5,
+              "outbound": 27.5
+            },
+            "fingerprint": "3b7b894e8417ac964228d0d717bfac726af28e449e1e4997b1a00557c95281e1",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "tail_headways": {
+              "inbound": 15,
+              "outbound": 30
+            }
+          },
+          {
+            "directional_maximum_bucket_wait_minutes": {
+              "inbound": 9.5,
+              "outbound": 13.5
+            },
+            "fingerprint": "6b6dd6f275ae729c6f42b1c12a4e500e5cbbc2fc8de101506f9e5637a84fd1a4",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "tail_headways": {
+              "inbound": 15,
+              "outbound": 22
+            }
+          },
+          {
+            "directional_maximum_bucket_wait_minutes": {
+              "inbound": 10.5,
+              "outbound": 27.5
+            },
+            "fingerprint": "d9812afa9dca31e7b88665c73568a6cf4bccdf93136ca0d8ddcfbcdacd439b89",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "tail_headways": {
+              "inbound": 15,
+              "outbound": 30
+            }
+          },
+          {
+            "directional_maximum_bucket_wait_minutes": {
+              "inbound": 10.5,
+              "outbound": 27.5
+            },
+            "fingerprint": "dcc72afbfe8d6d0564870bd5e9a49e0c0ef81c57e403127bfaf5936be30176f5",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "tail_headways": {
+              "inbound": 15,
+              "outbound": 30
+            }
+          },
+          {
+            "directional_maximum_bucket_wait_minutes": {
+              "inbound": 9.5,
+              "outbound": 27.5
+            },
+            "fingerprint": "f1c1d688b06e95c3d91b99f9018d8a6dd5edd33b3bd4d9516193069306d5ceb1",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "tail_headways": {
+              "inbound": 15,
+              "outbound": 30
+            }
+          }
+        ],
+        "classification": "ACCESS_EXCLUDED_BEFORE_MATERIALITY"
+      },
+      "candidate_audit": [
+        {
+          "average_wait_minutes": 6.074348103236137,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 11.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "fleet_efficiency_tuple": [
+            19,
+            4778,
+            75
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.464500991140417,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.007844748788009408,
+          "outbound_trip_equivalent_error": 8.944567480472635,
+          "pair_trip_equivalent_error": 21.409068471613054,
+          "rhythm_simplicity_tuple": [
+            9,
+            14,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.166343623614775,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "fleet_efficiency_tuple": [
+            14,
+            1768,
+            31
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.889154091994012,
+          "maximum_directional_p90_bucket_wait_minutes": 7.499999999999999,
+          "observed_demand_mismatch": 0.014405216915627458,
+          "outbound_trip_equivalent_error": 12.298367525561288,
+          "pair_trip_equivalent_error": 29.187521617555298,
+          "rhythm_simplicity_tuple": [
+            8,
+            14,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.081803680998132,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 10.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+          "fleet_efficiency_tuple": [
+            18,
+            4312,
+            60
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.07387030219669,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.00792946693663908,
+          "outbound_trip_equivalent_error": 9.674068720410572,
+          "pair_trip_equivalent_error": 21.747939022607262,
+          "rhythm_simplicity_tuple": [
+            10,
+            16,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.151109029725336,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 10.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+          "fleet_efficiency_tuple": [
+            17,
+            3596,
+            53
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.07387030219669,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.011522188274652378,
+          "outbound_trip_equivalent_error": 14.316449401249223,
+          "pair_trip_equivalent_error": 26.39031970344591,
+          "rhythm_simplicity_tuple": [
+            9,
+            14,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 14
+          }
+        },
+        {
+          "average_wait_minutes": 6.12299738419222,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 10.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "fleet_efficiency_tuple": [
+            16,
+            3109,
+            53
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.07387030219669,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.010444362064544018,
+          "outbound_trip_equivalent_error": 13.240395454002947,
+          "pair_trip_equivalent_error": 25.31426575619964,
+          "rhythm_simplicity_tuple": [
+            8,
+            13,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 14
+          }
+        },
+        {
+          "average_wait_minutes": 6.086718273054754,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 12.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+          "fleet_efficiency_tuple": [
+            19,
+            5042,
+            84
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 11.97920627857114,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.006996508425112851,
+          "outbound_trip_equivalent_error": 9.674068720410572,
+          "pair_trip_equivalent_error": 21.653274998981715,
+          "rhythm_simplicity_tuple": [
+            8,
+            15,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.109036921837077,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 12.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "fleet_efficiency_tuple": [
+            18,
+            4912,
+            62
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 11.97920627857114,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.008916512172125109,
+          "outbound_trip_equivalent_error": 12.361710451284365,
+          "pair_trip_equivalent_error": 24.340916729855508,
+          "rhythm_simplicity_tuple": [
+            8,
+            13,
+            6,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.119665807308899,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+          "fleet_efficiency_tuple": [
+            15,
+            2540,
+            45
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.28120069582103,
+          "maximum_directional_p90_bucket_wait_minutes": 7.5,
+          "observed_demand_mismatch": 0.012546933358743944,
+          "outbound_trip_equivalent_error": 12.298367525561288,
+          "pair_trip_equivalent_error": 27.579568221382317,
+          "rhythm_simplicity_tuple": [
+            9,
+            14,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.099540663614669,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 10.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "fleet_efficiency_tuple": [
+            16,
+            3298,
+            51
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.07387030219669,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.010276894785270142,
+          "outbound_trip_equivalent_error": 12.298367525561288,
+          "pair_trip_equivalent_error": 24.372237827757978,
+          "rhythm_simplicity_tuple": [
+            9,
+            16,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.195995752176134,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+          "fleet_efficiency_tuple": [
+            15,
+            2014,
+            37
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.098143128767344,
+          "maximum_directional_p90_bucket_wait_minutes": 6.966666666666667,
+          "observed_demand_mismatch": 0.014373833136336233,
+          "outbound_trip_equivalent_error": 14.316449401249223,
+          "pair_trip_equivalent_error": 30.414592530016566,
+          "rhythm_simplicity_tuple": [
+            7,
+            11,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 14
+          }
+        },
+        {
+          "average_wait_minutes": 6.162082269243572,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 13.5
+          },
+          "fingerprint": "347ce5d5190638937dc110a9eb16a5c49c4229fac2bb352c7ca2b5d704105784",
+          "fleet_efficiency_tuple": [
+            20,
+            3264,
+            104
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.098143128767344,
+          "maximum_directional_p90_bucket_wait_minutes": 9.133333333333333,
+          "observed_demand_mismatch": 0.0096512732985096,
+          "outbound_trip_equivalent_error": 7.63012054583792,
+          "pair_trip_equivalent_error": 23.728263674605266,
+          "rhythm_simplicity_tuple": [
+            9,
+            14,
+            7,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": false,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 22
+          }
+        },
+        {
+          "average_wait_minutes": 6.17092528978056,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+          "fleet_efficiency_tuple": [
+            14,
+            1767,
+            31
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.889154091994012,
+          "maximum_directional_p90_bucket_wait_minutes": 7.499999999999999,
+          "observed_demand_mismatch": 0.013977792814008651,
+          "outbound_trip_equivalent_error": 12.361710451284365,
+          "pair_trip_equivalent_error": 29.250864543278375,
+          "rhythm_simplicity_tuple": [
+            9,
+            12,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.13567180169994,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 11.5,
+            "outbound": 27.5
+          },
+          "fingerprint": "3b7b894e8417ac964228d0d717bfac726af28e449e1e4997b1a00557c95281e1",
+          "fleet_efficiency_tuple": [
+            20,
+            5447,
+            115
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.464500991140417,
+          "maximum_directional_p90_bucket_wait_minutes": 10.166666666666666,
+          "observed_demand_mismatch": 0.006588593793321672,
+          "outbound_trip_equivalent_error": 6.10830559497129,
+          "pair_trip_equivalent_error": 18.572806586111707,
+          "rhythm_simplicity_tuple": [
+            11,
+            19,
+            7,
+            3
+          ],
+          "scenario_b_directional_max_access_safe": false,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 30
+          }
+        },
+        {
+          "average_wait_minutes": 6.196751034665854,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 12.5
+          },
+          "fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "fleet_efficiency_tuple": [
+            20,
+            4065,
+            94
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.098143128767344,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.01037409852064166,
+          "outbound_trip_equivalent_error": 8.635511292055115,
+          "pair_trip_equivalent_error": 24.73365442082246,
+          "rhythm_simplicity_tuple": [
+            7,
+            12,
+            6,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.149009052231253,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+          "fleet_efficiency_tuple": [
+            15,
+            2593,
+            45
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.098143128767344,
+          "maximum_directional_p90_bucket_wait_minutes": 7.499999999999999,
+          "observed_demand_mismatch": 0.012701115545335193,
+          "outbound_trip_equivalent_error": 12.361710451284365,
+          "pair_trip_equivalent_error": 28.459853580051707,
+          "rhythm_simplicity_tuple": [
+            8,
+            11,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.073427220303305,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 11.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+          "fleet_efficiency_tuple": [
+            18,
+            4590,
+            71
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.464500991140417,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.008149760259092994,
+          "outbound_trip_equivalent_error": 9.674068720410572,
+          "pair_trip_equivalent_error": 22.13856971155099,
+          "rhythm_simplicity_tuple": [
+            9,
+            15,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.102849707625194,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "fleet_efficiency_tuple": [
+            18,
+            3665,
+            60
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.28120069582103,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.009894494039029296,
+          "outbound_trip_equivalent_error": 8.944567480472635,
+          "pair_trip_equivalent_error": 24.225768176293663,
+          "rhythm_simplicity_tuple": [
+            10,
+            13,
+            6,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.104122329780454,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 10.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "fleet_efficiency_tuple": [
+            16,
+            3311,
+            52
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.07387030219669,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.009849470683651338,
+          "outbound_trip_equivalent_error": 12.361710451284365,
+          "pair_trip_equivalent_error": 24.435580753481055,
+          "rhythm_simplicity_tuple": [
+            10,
+            14,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.137320690487005,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 13.5
+          },
+          "fingerprint": "6b6dd6f275ae729c6f42b1c12a4e500e5cbbc2fc8de101506f9e5637a84fd1a4",
+          "fleet_efficiency_tuple": [
+            20,
+            3792,
+            104
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.28120069582103,
+          "maximum_directional_p90_bucket_wait_minutes": 9.133333333333333,
+          "observed_demand_mismatch": 0.009069667010299548,
+          "outbound_trip_equivalent_error": 7.63012054583792,
+          "pair_trip_equivalent_error": 22.91132124165895,
+          "rhythm_simplicity_tuple": [
+            11,
+            15,
+            8,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": false,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 22
+          }
+        },
+        {
+          "average_wait_minutes": 6.144427386065467,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+          "fleet_efficiency_tuple": [
+            15,
+            2594,
+            45
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.098143128767344,
+          "maximum_directional_p90_bucket_wait_minutes": 7.499999999999999,
+          "observed_demand_mismatch": 0.013128539646953997,
+          "outbound_trip_equivalent_error": 12.298367525561288,
+          "pair_trip_equivalent_error": 28.39651065432863,
+          "rhythm_simplicity_tuple": [
+            7,
+            13,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.082724563930964,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 10.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+          "fleet_efficiency_tuple": [
+            19,
+            4159,
+            71
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.07387030219669,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.007624455465555494,
+          "outbound_trip_equivalent_error": 8.944567480472635,
+          "pair_trip_equivalent_error": 21.018437782669324,
+          "rhythm_simplicity_tuple": [
+            10,
+            15,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.140925411069947,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+          "fleet_efficiency_tuple": [
+            15,
+            2594,
+            45
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.442817266070636,
+          "maximum_directional_p90_bucket_wait_minutes": 7.5,
+          "observed_demand_mismatch": 0.01369768151188426,
+          "outbound_trip_equivalent_error": 13.240395454002947,
+          "pair_trip_equivalent_error": 28.683212720073584,
+          "rhythm_simplicity_tuple": [
+            7,
+            13,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 14
+          }
+        },
+        {
+          "average_wait_minutes": 6.1174686904923945,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "fleet_efficiency_tuple": [
+            14,
+            1728,
+            30
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.442817266070636,
+          "maximum_directional_p90_bucket_wait_minutes": 7.5,
+          "observed_demand_mismatch": 0.013530214232610385,
+          "outbound_trip_equivalent_error": 12.298367525561288,
+          "pair_trip_equivalent_error": 27.741184791631923,
+          "rhythm_simplicity_tuple": [
+            8,
+            16,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.095745869085627,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 11.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "fleet_efficiency_tuple": [
+            18,
+            4904,
+            73
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.464500991140417,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.010069764006105254,
+          "outbound_trip_equivalent_error": 12.361710451284365,
+          "pair_trip_equivalent_error": 24.826211442424782,
+          "rhythm_simplicity_tuple": [
+            9,
+            13,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.143122527886451,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+          "fleet_efficiency_tuple": [
+            15,
+            2593,
+            45
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.28120069582103,
+          "maximum_directional_p90_bucket_wait_minutes": 7.5,
+          "observed_demand_mismatch": 0.01271440063801782,
+          "outbound_trip_equivalent_error": 13.240395454002947,
+          "pair_trip_equivalent_error": 28.521596149823978,
+          "rhythm_simplicity_tuple": [
+            8,
+            11,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 14
+          }
+        },
+        {
+          "average_wait_minutes": 6.091164202919842,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 11.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "fleet_efficiency_tuple": [
+            17,
+            4114,
+            59
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.464500991140417,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.010497188107724058,
+          "outbound_trip_equivalent_error": 12.298367525561288,
+          "pair_trip_equivalent_error": 24.762868516701705,
+          "rhythm_simplicity_tuple": [
+            8,
+            15,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.127911976248842,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 12.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "fleet_efficiency_tuple": [
+            18,
+            4967,
+            65
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 11.97920627857114,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.00951140355301779,
+          "outbound_trip_equivalent_error": 13.240395454002947,
+          "pair_trip_equivalent_error": 25.219601732574088,
+          "rhythm_simplicity_tuple": [
+            6,
+            12,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 14
+          }
+        },
+        {
+          "average_wait_minutes": 6.171989455909286,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 12.5
+          },
+          "fingerprint": "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+          "fleet_efficiency_tuple": [
+            20,
+            4571,
+            90
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.28120069582103,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.009792492232431609,
+          "outbound_trip_equivalent_error": 8.635511292055115,
+          "pair_trip_equivalent_error": 23.916711987876145,
+          "rhythm_simplicity_tuple": [
+            9,
+            13,
+            7,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.1486066409982385,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+          "fleet_efficiency_tuple": [
+            17,
+            3596,
+            53
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.889154091994012,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.012057789066996394,
+          "outbound_trip_equivalent_error": 9.674068720410572,
+          "pair_trip_equivalent_error": 26.563222812404582,
+          "rhythm_simplicity_tuple": [
+            9,
+            14,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.14952752393107,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+          "fleet_efficiency_tuple": [
+            17,
+            3265,
+            65
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.889154091994012,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.011752777595912808,
+          "outbound_trip_equivalent_error": 8.944567480472635,
+          "pair_trip_equivalent_error": 25.833721572466647,
+          "rhythm_simplicity_tuple": [
+            9,
+            13,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.087639155987586,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 12.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+          "fleet_efficiency_tuple": [
+            20,
+            5219,
+            75
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 11.97920627857114,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.006691496954029265,
+          "outbound_trip_equivalent_error": 8.944567480472635,
+          "pair_trip_equivalent_error": 20.923773759043776,
+          "rhythm_simplicity_tuple": [
+            8,
+            14,
+            6,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.104455255671291,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 12.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "fleet_efficiency_tuple": [
+            18,
+            4305,
+            61
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 11.97920627857114,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.009343936273743914,
+          "outbound_trip_equivalent_error": 12.298367525561288,
+          "pair_trip_equivalent_error": 24.27757380413243,
+          "rhythm_simplicity_tuple": [
+            7,
+            15,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.160761886023016,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "fleet_efficiency_tuple": [
+            19,
+            2949,
+            80
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.098143128767344,
+          "maximum_directional_p90_bucket_wait_minutes": 8.466666666666665,
+          "observed_demand_mismatch": 0.010471097888010745,
+          "outbound_trip_equivalent_error": 8.651829405758086,
+          "pair_trip_equivalent_error": 24.74997253452543,
+          "rhythm_simplicity_tuple": [
+            11,
+            14,
+            7,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 19
+          }
+        },
+        {
+          "average_wait_minutes": 6.114620923497393,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 11.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+          "fleet_efficiency_tuple": [
+            18,
+            4682,
+            74
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.464500991140417,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.010664655386997932,
+          "outbound_trip_equivalent_error": 13.240395454002947,
+          "pair_trip_equivalent_error": 25.704896445143362,
+          "rhythm_simplicity_tuple": [
+            7,
+            12,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 14
+          }
+        },
+        {
+          "average_wait_minutes": 6.217911989725442,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+          "fleet_efficiency_tuple": [
+            14,
+            1808,
+            23
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.889154091994012,
+          "maximum_directional_p90_bucket_wait_minutes": 6.866666666666666,
+          "observed_demand_mismatch": 0.015650510405009692,
+          "outbound_trip_equivalent_error": 14.316449401249223,
+          "pair_trip_equivalent_error": 31.205603493243235,
+          "rhythm_simplicity_tuple": [
+            8,
+            12,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 14
+          }
+        },
+        {
+          "average_wait_minutes": 6.127611286381762,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "fleet_efficiency_tuple": [
+            18,
+            3156,
+            65
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.098143128767344,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.010476100327239347,
+          "outbound_trip_equivalent_error": 8.944567480472635,
+          "pair_trip_equivalent_error": 25.04271060923998,
+          "rhythm_simplicity_tuple": [
+            8,
+            12,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.156023621781958,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 12.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+          "fleet_efficiency_tuple": [
+            18,
+            4358,
+            65
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 11.97920627857114,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.01058922976312615,
+          "outbound_trip_equivalent_error": 14.316449401249223,
+          "pair_trip_equivalent_error": 26.295655679820364,
+          "rhythm_simplicity_tuple": [
+            7,
+            13,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 14
+          }
+        },
+        {
+          "average_wait_minutes": 6.10065259080869,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "fleet_efficiency_tuple": [
+            18,
+            3645,
+            60
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.442817266070636,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.010877774912895734,
+          "outbound_trip_equivalent_error": 8.944567480472635,
+          "pair_trip_equivalent_error": 24.38738474654327,
+          "rhythm_simplicity_tuple": [
+            9,
+            15,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.167884106643018,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "fleet_efficiency_tuple": [
+            14,
+            1810,
+            23
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.098143128767344,
+          "maximum_directional_p90_bucket_wait_minutes": 6.966666666666667,
+          "observed_demand_mismatch": 0.013296006926227871,
+          "outbound_trip_equivalent_error": 13.240395454002947,
+          "pair_trip_equivalent_error": 29.33853858277029,
+          "rhythm_simplicity_tuple": [
+            6,
+            10,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 14
+          }
+        },
+        {
+          "average_wait_minutes": 6.124247473474685,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 9.5
+          },
+          "fingerprint": "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+          "fleet_efficiency_tuple": [
+            16,
+            3352,
+            45
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.28120069582103,
+          "maximum_directional_p90_bucket_wait_minutes": 7.5,
+          "observed_demand_mismatch": 0.01211950925712514,
+          "outbound_trip_equivalent_error": 12.361710451284365,
+          "pair_trip_equivalent_error": 27.642911147105394,
+          "rhythm_simplicity_tuple": [
+            10,
+            12,
+            6,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.144048262394766,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 10.5,
+            "outbound": 27.5
+          },
+          "fingerprint": "d9812afa9dca31e7b88665c73568a6cf4bccdf93136ca0d8ddcfbcdacd439b89",
+          "fleet_efficiency_tuple": [
+            20,
+            4017,
+            102
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.07387030219669,
+          "maximum_directional_p90_bucket_wait_minutes": 10.166666666666666,
+          "observed_demand_mismatch": 0.006368300470867757,
+          "outbound_trip_equivalent_error": 6.10830559497129,
+          "pair_trip_equivalent_error": 18.18217589716798,
+          "rhythm_simplicity_tuple": [
+            12,
+            20,
+            7,
+            3
+          ],
+          "scenario_b_directional_max_access_safe": false,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 30
+          }
+        },
+        {
+          "average_wait_minutes": 6.140482300509283,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 10.5,
+            "outbound": 27.5
+          },
+          "fingerprint": "dcc72afbfe8d6d0564870bd5e9a49e0c0ef81c57e403127bfaf5936be30176f5",
+          "fleet_efficiency_tuple": [
+            20,
+            4019,
+            99
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 12.07387030219669,
+          "maximum_directional_p90_bucket_wait_minutes": 11.666666666666666,
+          "observed_demand_mismatch": 0.006756875564045871,
+          "outbound_trip_equivalent_error": 7.1313339610380995,
+          "pair_trip_equivalent_error": 19.20520426323479,
+          "rhythm_simplicity_tuple": [
+            12,
+            20,
+            8,
+            3
+          ],
+          "scenario_b_directional_max_access_safe": false,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 30
+          }
+        },
+        {
+          "average_wait_minutes": 6.19926905624728,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 11.5
+          },
+          "fingerprint": "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+          "fleet_efficiency_tuple": [
+            20,
+            3960,
+            108
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.28120069582103,
+          "maximum_directional_p90_bucket_wait_minutes": 9.133333333333333,
+          "observed_demand_mismatch": 0.009230933008699621,
+          "outbound_trip_equivalent_error": 7.8579309613165895,
+          "pair_trip_equivalent_error": 23.139131657137618,
+          "rhythm_simplicity_tuple": [
+            13,
+            15,
+            8,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 19
+          }
+        },
+        {
+          "average_wait_minutes": 6.101928824692363,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 10.5
+          },
+          "fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "fleet_efficiency_tuple": [
+            16,
+            3311,
+            52
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.28120069582103,
+          "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+          "observed_demand_mismatch": 0.010199505510112882,
+          "outbound_trip_equivalent_error": 9.674068720410572,
+          "pair_trip_equivalent_error": 24.9552694162316,
+          "rhythm_simplicity_tuple": [
+            10,
+            14,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        {
+          "average_wait_minutes": 6.161976289272493,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 27.5
+          },
+          "fingerprint": "f1c1d688b06e95c3d91b99f9018d8a6dd5edd33b3bd4d9516193069306d5ceb1",
+          "fleet_efficiency_tuple": [
+            20,
+            3805,
+            102
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.442817266070636,
+          "maximum_directional_p90_bucket_wait_minutes": 10.166666666666666,
+          "observed_demand_mismatch": 0.009621619918207999,
+          "outbound_trip_equivalent_error": 6.10830559497129,
+          "pair_trip_equivalent_error": 21.551122861041925,
+          "rhythm_simplicity_tuple": [
+            11,
+            20,
+            7,
+            3
+          ],
+          "scenario_b_directional_max_access_safe": false,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 30
+          }
+        },
+        {
+          "average_wait_minutes": 6.189800344192326,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 8.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+          "fleet_efficiency_tuple": [
+            15,
+            2014,
+            37
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 16.889154091994012,
+          "maximum_directional_p90_bucket_wait_minutes": 6.966666666666667,
+          "observed_demand_mismatch": 0.014572684194901334,
+          "outbound_trip_equivalent_error": 13.240395454002947,
+          "pair_trip_equivalent_error": 30.12954954599696,
+          "rhythm_simplicity_tuple": [
+            7,
+            11,
+            4,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 14,
+            "outbound": 14
+          }
+        },
+        {
+          "average_wait_minutes": 6.171234173419567,
+          "directional_maximum_bucket_wait_minutes": {
+            "inbound": 9.5,
+            "outbound": 8.5
+          },
+          "fingerprint": "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21",
+          "fleet_efficiency_tuple": [
+            14,
+            1767,
+            31
+          ],
+          "hard_feasibility_reasons": [],
+          "hard_operational_feasible": true,
+          "inbound_trip_equivalent_error": 15.28120069582103,
+          "maximum_directional_p90_bucket_wait_minutes": 7.5,
+          "observed_demand_mismatch": 0.01379222684812618,
+          "outbound_trip_equivalent_error": 14.316449401249223,
+          "pair_trip_equivalent_error": 29.59765009707025,
+          "rhythm_simplicity_tuple": [
+            9,
+            12,
+            5,
+            0
+          ],
+          "scenario_b_directional_max_access_safe": true,
+          "tail_headways": {
+            "inbound": 15,
+            "outbound": 14
+          }
+        }
+      ],
+      "common_anchor": {
+        "average_wait_minutes": 6.087639155987586,
+        "directional_maximum_bucket_wait_minutes": {
+          "inbound": 12.5,
+          "outbound": 10.5
+        },
+        "fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+        "fleet_efficiency_tuple": [
+          20,
+          5219,
+          75
+        ],
+        "hard_feasibility_reasons": [],
+        "hard_operational_feasible": true,
+        "inbound_trip_equivalent_error": 11.97920627857114,
+        "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+        "observed_demand_mismatch": 0.006691496954029265,
+        "outbound_trip_equivalent_error": 8.944567480472635,
+        "pair_trip_equivalent_error": 20.923773759043776,
+        "rhythm_simplicity_tuple": [
+          8,
+          14,
+          6,
+          0
+        ],
+        "scenario_b_directional_max_access_safe": true,
+        "tail_headways": {
+          "inbound": 15,
+          "outbound": 15
+        }
+      },
+      "materiality_set_fingerprints": [
+        "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+        "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+        "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+        "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+        "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+      ],
+      "pareto_count": 47,
+      "pareto_dimension_count": 10,
+      "pareto_fingerprints": [
+        "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+        "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+        "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+        "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+        "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+        "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+        "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+        "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+        "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+        "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+        "347ce5d5190638937dc110a9eb16a5c49c4229fac2bb352c7ca2b5d704105784",
+        "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+        "3b7b894e8417ac964228d0d717bfac726af28e449e1e4997b1a00557c95281e1",
+        "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+        "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+        "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+        "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+        "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+        "6b6dd6f275ae729c6f42b1c12a4e500e5cbbc2fc8de101506f9e5637a84fd1a4",
+        "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+        "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+        "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+        "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+        "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+        "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+        "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+        "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+        "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+        "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+        "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+        "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+        "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+        "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+        "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+        "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+        "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+        "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+        "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+        "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+        "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+        "d9812afa9dca31e7b88665c73568a6cf4bccdf93136ca0d8ddcfbcdacd439b89",
+        "dcc72afbfe8d6d0564870bd5e9a49e0c0ef81c57e403127bfaf5936be30176f5",
+        "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+        "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+        "f1c1d688b06e95c3d91b99f9018d8a6dd5edd33b3bd4d9516193069306d5ceb1",
+        "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+        "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21"
+      ],
+      "route_id": "6",
+      "scenario_b_directional_maximum_wait_minutes": {
+        "inbound": 12.5,
+        "outbound": 12.5
+      },
+      "search_budget": {
+        "max_compile_frontier_per_state": 4,
+        "max_directional_compilations": 24,
+        "max_open_states": 512,
+        "max_pair_frontier": 512,
+        "max_service_plan_evaluations": 24
+      },
+      "search_statistics": {
+        "budget_exhausted": true,
+        "compile_variants_evaluated": 96,
+        "duplicate_states_skipped": 428,
+        "fleet_feedback_expansion_requests": 114,
+        "fleet_feedback_expansions_executed": 15,
+        "fleet_feedback_expansions_skipped": 99,
+        "fleet_validations_run": 140,
+        "protected_compile_variants_rejected": 0,
+        "response_feedback_anchor_candidates": 2,
+        "response_feedback_anchors_enqueued": 2,
+        "response_feedback_anchors_evaluated": 2,
+        "search_iterations": 24,
+        "states_evaluated": 24,
+        "states_generated": 7884,
+        "states_pruned": 6920,
+        "tail_ordering_compilations_rejected": 68
+      },
+      "search_status": "SEARCH_BUDGET_EXHAUSTED",
+      "selected": {
+        "average_wait_minutes": 6.087639155987586,
+        "directional_maximum_bucket_wait_minutes": {
+          "inbound": 12.5,
+          "outbound": 10.5
+        },
+        "fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+        "fleet_efficiency_tuple": [
+          20,
+          5219,
+          75
+        ],
+        "hard_feasibility_reasons": [],
+        "hard_operational_feasible": true,
+        "inbound_trip_equivalent_error": 11.97920627857114,
+        "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+        "observed_demand_mismatch": 0.006691496954029265,
+        "outbound_trip_equivalent_error": 8.944567480472635,
+        "pair_trip_equivalent_error": 20.923773759043776,
+        "rhythm_simplicity_tuple": [
+          8,
+          14,
+          6,
+          0
+        ],
+        "scenario_b_directional_max_access_safe": true,
+        "tail_headways": {
+          "inbound": 15,
+          "outbound": 15
+        }
+      },
+      "selected_vs_anchor_tradeoff": {
+        "average_wait_delta_minutes": 0.0,
+        "average_wait_delta_seconds_per_passenger": 0.0,
+        "delta_SSE": 0.0,
+        "delta_TE": 0.0,
+        "directional_max_access_delta_minutes": {
+          "inbound": 0.0,
+          "outbound": 0.0
+        },
+        "fleet_required_delta": 0,
+        "max_excess_terminal_wait_delta": 0,
+        "maximum_directional_p90_delta_minutes": 0.0,
+        "rhythm_tuple_change": {
+          "anchor": [
+            8,
+            14,
+            6,
+            0
+          ],
+          "selected": [
+            8,
+            14,
+            6,
+            0
+          ]
+        },
+        "tail_headway_change": {
+          "anchor": {
+            "inbound": 15,
+            "outbound": 15
+          },
+          "selected": {
+            "inbound": 15,
+            "outbound": 15
+          }
+        },
+        "total_excess_terminal_wait_delta": 0
+      },
+      "selection_result": {
+        "best_fleet_efficiency_count": 1,
+        "best_rhythm_count": 1,
+        "candidate_universe_count": 47,
+        "classification": "ONE_TRIP_MATERIALITY_SELECTS_ANCHOR",
+        "common_anchor_fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+        "common_anchor_sse": 0.006691496954029265,
+        "common_anchor_te": 20.923773759043776,
+        "hard_feasible_count": 47,
+        "materiality_band_trips": 1.0,
+        "materiality_set_count": 5,
+        "pair_fingerprint_is_quality_objective": false,
+        "passenger_access_safe_count": 41,
+        "profile": "one_trip_te_materiality_operational_selector_v2",
+        "rejected_candidates": [
+          {
+            "fingerprint": "347ce5d5190638937dc110a9eb16a5c49c4229fac2bb352c7ca2b5d704105784",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "relevant_metric_values": {
+              "candidate_inbound_maximum_bucket_expected_wait_minutes": 8.5,
+              "candidate_outbound_maximum_bucket_expected_wait_minutes": 13.5,
+              "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 12.5,
+              "scenario_b_outbound_maximum_bucket_expected_wait_minutes": 12.5
+            },
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "fingerprint": "3b7b894e8417ac964228d0d717bfac726af28e449e1e4997b1a00557c95281e1",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "relevant_metric_values": {
+              "candidate_inbound_maximum_bucket_expected_wait_minutes": 11.5,
+              "candidate_outbound_maximum_bucket_expected_wait_minutes": 27.5,
+              "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 12.5,
+              "scenario_b_outbound_maximum_bucket_expected_wait_minutes": 12.5
+            },
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "fingerprint": "6b6dd6f275ae729c6f42b1c12a4e500e5cbbc2fc8de101506f9e5637a84fd1a4",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "relevant_metric_values": {
+              "candidate_inbound_maximum_bucket_expected_wait_minutes": 9.5,
+              "candidate_outbound_maximum_bucket_expected_wait_minutes": 13.5,
+              "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 12.5,
+              "scenario_b_outbound_maximum_bucket_expected_wait_minutes": 12.5
+            },
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "fingerprint": "d9812afa9dca31e7b88665c73568a6cf4bccdf93136ca0d8ddcfbcdacd439b89",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "relevant_metric_values": {
+              "candidate_inbound_maximum_bucket_expected_wait_minutes": 10.5,
+              "candidate_outbound_maximum_bucket_expected_wait_minutes": 27.5,
+              "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 12.5,
+              "scenario_b_outbound_maximum_bucket_expected_wait_minutes": 12.5
+            },
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "fingerprint": "dcc72afbfe8d6d0564870bd5e9a49e0c0ef81c57e403127bfaf5936be30176f5",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "relevant_metric_values": {
+              "candidate_inbound_maximum_bucket_expected_wait_minutes": 10.5,
+              "candidate_outbound_maximum_bucket_expected_wait_minutes": 27.5,
+              "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 12.5,
+              "scenario_b_outbound_maximum_bucket_expected_wait_minutes": 12.5
+            },
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "fingerprint": "f1c1d688b06e95c3d91b99f9018d8a6dd5edd33b3bd4d9516193069306d5ceb1",
+            "reason": "OUTBOUND_MAX_ACCESS_REGRESSION",
+            "relevant_metric_values": {
+              "candidate_inbound_maximum_bucket_expected_wait_minutes": 9.5,
+              "candidate_outbound_maximum_bucket_expected_wait_minutes": 27.5,
+              "scenario_b_inbound_maximum_bucket_expected_wait_minutes": 12.5,
+              "scenario_b_outbound_maximum_bucket_expected_wait_minutes": 12.5
+            },
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 29.187521617555298,
+              "delta_trip_equivalent_error": 8.263747858511522,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 26.39031970344591,
+              "delta_trip_equivalent_error": 5.466545944402135,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 25.31426575619964,
+              "delta_trip_equivalent_error": 4.390491997155863,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 24.340916729855508,
+              "delta_trip_equivalent_error": 3.4171429708117316,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 27.579568221382317,
+              "delta_trip_equivalent_error": 6.655794462338541,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 24.372237827757978,
+              "delta_trip_equivalent_error": 3.448464068714202,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 30.414592530016566,
+              "delta_trip_equivalent_error": 9.49081877097279,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 29.250864543278375,
+              "delta_trip_equivalent_error": 8.3270907842346,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 24.73365442082246,
+              "delta_trip_equivalent_error": 3.809880661778685,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 28.459853580051707,
+              "delta_trip_equivalent_error": 7.536079821007931,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 22.13856971155099,
+              "delta_trip_equivalent_error": 1.2147959525072132,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 24.225768176293663,
+              "delta_trip_equivalent_error": 3.3019944172498867,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 24.435580753481055,
+              "delta_trip_equivalent_error": 3.511806994437279,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 28.39651065432863,
+              "delta_trip_equivalent_error": 7.472736895284854,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 28.683212720073584,
+              "delta_trip_equivalent_error": 7.759438961029808,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 27.741184791631923,
+              "delta_trip_equivalent_error": 6.817411032588147,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 24.826211442424782,
+              "delta_trip_equivalent_error": 3.902437683381006,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 28.521596149823978,
+              "delta_trip_equivalent_error": 7.597822390780202,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 24.762868516701705,
+              "delta_trip_equivalent_error": 3.8390947576579286,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 25.219601732574088,
+              "delta_trip_equivalent_error": 4.2958279735303115,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 23.916711987876145,
+              "delta_trip_equivalent_error": 2.9929382288323687,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 26.563222812404582,
+              "delta_trip_equivalent_error": 5.639449053360806,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 25.833721572466647,
+              "delta_trip_equivalent_error": 4.909947813422871,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 24.27757380413243,
+              "delta_trip_equivalent_error": 3.3538000450886543,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 24.74997253452543,
+              "delta_trip_equivalent_error": 3.8261987754816538,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 25.704896445143362,
+              "delta_trip_equivalent_error": 4.781122686099586,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 31.205603493243235,
+              "delta_trip_equivalent_error": 10.281829734199459,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 25.04271060923998,
+              "delta_trip_equivalent_error": 4.118936850196203,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 26.295655679820364,
+              "delta_trip_equivalent_error": 5.3718819207765875,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 24.38738474654327,
+              "delta_trip_equivalent_error": 3.463610987499493,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 29.33853858277029,
+              "delta_trip_equivalent_error": 8.414764823726514,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 27.642911147105394,
+              "delta_trip_equivalent_error": 6.719137388061618,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 23.139131657137618,
+              "delta_trip_equivalent_error": 2.215357898093842,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 24.9552694162316,
+              "delta_trip_equivalent_error": 4.0314956571878255,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 30.12954954599696,
+              "delta_trip_equivalent_error": 9.205775786953183,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21",
+            "reason": "OUTSIDE_ONE_TRIP_TE_MATERIALITY_ENVELOPE",
+            "relevant_metric_values": {
+              "anchor_pair_trip_equivalent_error": 20.923773759043776,
+              "candidate_pair_trip_equivalent_error": 29.59765009707025,
+              "delta_trip_equivalent_error": 8.673876338026474,
+              "materiality_band_trips": 1.0
+            },
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "fingerprint": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+            "reason": "NOT_IN_BEST_RHYTHM_SET",
+            "relevant_metric_values": {
+              "best_rhythm_simplicity_tuple": [
+                8,
+                14,
+                6,
+                0
+              ],
+              "rhythm_simplicity_tuple": [
+                9,
+                14,
+                5,
+                0
+              ]
+            },
+            "stage": "RHYTHM_SIMPLICITY"
+          },
+          {
+            "fingerprint": "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+            "reason": "NOT_IN_BEST_RHYTHM_SET",
+            "relevant_metric_values": {
+              "best_rhythm_simplicity_tuple": [
+                8,
+                14,
+                6,
+                0
+              ],
+              "rhythm_simplicity_tuple": [
+                10,
+                16,
+                4,
+                0
+              ]
+            },
+            "stage": "RHYTHM_SIMPLICITY"
+          },
+          {
+            "fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+            "reason": "NOT_IN_BEST_RHYTHM_SET",
+            "relevant_metric_values": {
+              "best_rhythm_simplicity_tuple": [
+                8,
+                14,
+                6,
+                0
+              ],
+              "rhythm_simplicity_tuple": [
+                8,
+                15,
+                5,
+                0
+              ]
+            },
+            "stage": "RHYTHM_SIMPLICITY"
+          },
+          {
+            "fingerprint": "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+            "reason": "NOT_IN_BEST_RHYTHM_SET",
+            "relevant_metric_values": {
+              "best_rhythm_simplicity_tuple": [
+                8,
+                14,
+                6,
+                0
+              ],
+              "rhythm_simplicity_tuple": [
+                10,
+                15,
+                5,
+                0
+              ]
+            },
+            "stage": "RHYTHM_SIMPLICITY"
+          }
+        ],
+        "route_id": "6",
+        "selected_delta_te_from_anchor": 0.0,
+        "selected_is_anchor": true,
+        "selected_pair_fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+        "selected_stage": "RHYTHM_SIMPLICITY",
+        "sse_best_count": 1,
+        "stage_trace": [
+          {
+            "input_count": 47,
+            "retained_count": 47,
+            "retained_fingerprints": [
+              "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+              "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+              "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+              "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+              "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+              "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+              "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+              "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+              "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+              "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+              "347ce5d5190638937dc110a9eb16a5c49c4229fac2bb352c7ca2b5d704105784",
+              "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+              "3b7b894e8417ac964228d0d717bfac726af28e449e1e4997b1a00557c95281e1",
+              "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+              "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+              "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+              "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+              "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+              "6b6dd6f275ae729c6f42b1c12a4e500e5cbbc2fc8de101506f9e5637a84fd1a4",
+              "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+              "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+              "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+              "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+              "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+              "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+              "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+              "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+              "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+              "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+              "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+              "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+              "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+              "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+              "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+              "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+              "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+              "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+              "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+              "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+              "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+              "d9812afa9dca31e7b88665c73568a6cf4bccdf93136ca0d8ddcfbcdacd439b89",
+              "dcc72afbfe8d6d0564870bd5e9a49e0c0ef81c57e403127bfaf5936be30176f5",
+              "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+              "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+              "f1c1d688b06e95c3d91b99f9018d8a6dd5edd33b3bd4d9516193069306d5ceb1",
+              "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+              "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21"
+            ],
+            "stage": "HARD_OPERATIONAL_FEASIBILITY"
+          },
+          {
+            "input_count": 47,
+            "retained_count": 41,
+            "retained_fingerprints": [
+              "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+              "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+              "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+              "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+              "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+              "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+              "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+              "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+              "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+              "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+              "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+              "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+              "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+              "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+              "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+              "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+              "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+              "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+              "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+              "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+              "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+              "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+              "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+              "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+              "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+              "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+              "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+              "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+              "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+              "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+              "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+              "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+              "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+              "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+              "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+              "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+              "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+              "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+              "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+              "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+              "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21"
+            ],
+            "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+          },
+          {
+            "input_count": 41,
+            "retained_count": 41,
+            "retained_fingerprints": [
+              "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+              "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+              "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+              "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+              "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+              "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+              "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+              "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+              "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+              "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+              "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+              "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+              "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+              "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+              "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+              "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+              "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+              "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+              "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+              "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+              "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+              "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+              "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+              "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+              "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+              "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+              "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+              "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+              "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+              "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+              "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+              "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+              "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+              "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+              "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+              "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+              "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+              "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+              "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+              "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+              "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21"
+            ],
+            "stage": "COMMON_SSE_TE_DEMAND_FIT_ANCHOR"
+          },
+          {
+            "input_count": 41,
+            "retained_count": 5,
+            "retained_fingerprints": [
+              "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+              "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+              "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+              "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+              "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+            ],
+            "stage": "ONE_TRIP_TE_MATERIALITY_ENVELOPE"
+          },
+          {
+            "input_count": 5,
+            "retained_count": 1,
+            "retained_fingerprints": [
+              "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+            ],
+            "stage": "RHYTHM_SIMPLICITY"
+          },
+          {
+            "input_count": 1,
+            "retained_count": 1,
+            "retained_fingerprints": [
+              "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+            ],
+            "stage": "FLEET_EFFICIENCY"
+          }
+        ],
+        "te_best_count": 1,
+        "top_anchor_concordant": true
+      }
+    }
+  }
+}
