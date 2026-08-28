@@ -78,7 +78,7 @@ def test_required_sheets_timetable_times_and_fleet_coverage() -> None:
     }
     for route_id in ("6", "10"):
         route = payload["routes"][route_id]
-        path = _ROOT / route["workbook"]["path"]
+        path = _ROOT / "outputs/final_pilot/archive/pr62_g" / Path(route["workbook"]["path"]).name
         workbook = load_workbook(path, data_only=False, keep_links=True)
         assert workbook.sheetnames == expected_sheets[route_id]
         assert not workbook._external_links
@@ -103,7 +103,10 @@ def test_required_sheets_timetable_times_and_fleet_coverage() -> None:
 
 def test_route6_layover_robustness_sheet_values() -> None:
     route = _payload()["routes"]["6"]
-    workbook = load_workbook(_ROOT / route["workbook"]["path"], data_only=False)
+    workbook = load_workbook(
+        _ROOT / "outputs/final_pilot/archive/pr62_g" / Path(route["workbook"]["path"]).name,
+        data_only=False,
+    )
     sheet = workbook["Layover_Robustness"]
     assert [sheet.cell(row=2, column=2).value, sheet.cell(row=2, column=3).value] == [70, 5]
     assert [sheet.cell(row=2, column=5).value, sheet.cell(row=2, column=6).value] == [19, 1]
@@ -119,7 +122,7 @@ def test_logical_fingerprints_and_evidence_render_are_deterministic() -> None:
     assert final.render_markdown(payload) == final.render_markdown(payload)
     for route_id in ("6", "10"):
         route = payload["routes"][route_id]
-        path = _ROOT / route["workbook"]["path"]
+        path = _ROOT / "outputs/final_pilot/archive/pr62_g" / Path(route["workbook"]["path"]).name
         assert (
             final.logical_workbook_fingerprint(path, route)
             == route["workbook"]["logical_fingerprint"]
