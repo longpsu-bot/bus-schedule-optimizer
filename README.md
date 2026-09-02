@@ -400,7 +400,111 @@ The opt-in local runner reads `PERIOD_CATALOG`, `SAN_LUONG_MULTI_PERIOD`, and
 See `docs/engine/V3_MULTI_PERIOD_LOCAL_RUNNER_V1.md` for validation, weighting, diagnostics,
 budget semantics, outputs, and the profile-sensitivity classification.
 
+### Review deterministic demand regimes without a timetable solver
+
+The demand-only review command consumes the same derived `DemandProfileV1`, builds the exact-K
+candidate frontier with deterministic dynamic programming, and stops before trip allocation or
+timetable generation:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_demand_regime_review.py `
+  --input "private/Engine_Input_MST_6_V3_MultiPeriod_Mar-Jul_2026.xlsx" `
+  --input "private/Engine_Input_MST_10_V3_MultiPeriod_Mar-Jul_2026.xlsx" `
+  --raw-demand "private/T06&T10_01012025_31072026.xlsx" `
+  --output-dir "outputs/demand-regime-review"
+```
+
+Each route produces deterministic JSON, a Markdown model-selection table, and a diagnostic HTML
+plot. When at least seven complete date-keyed daily profiles are supplied to the model-selector
+API, leave-one-day-out cross-validation chooses K directly with the one-standard-error rule and
+all eligible days determine the final fixed-K boundaries. Scenario B trip and headway statistics
+are descriptive overlays only and never enter segmentation or model selection.
+
+The optional raw-source adapter is intentionally specific to the labeled T06/T10 ticketing
+workbook. It preserves `Ngày`, maps direction only from the exact route-specific `Hướng đi` and
+`Đầu bến` evidence, uses `Giờ đi HT` with `Giờ đi KH` as the documented fallback, and sums trip
+`Tổng vé` into the existing 30-minute canonical grid. Multiple trips in one bucket are expected,
+not canonical duplicates. Empty buckets become observed zero only for dates whose complete trip
+manifest matches the source's deterministic modal daily trip count and contains no invalid,
+duplicate, or off-grid rows.
+
+The detector has no business regime-count ceiling. Its finite natural search limit is derived from
+the canonical bucket grid and the minimum regime duration, with exact duration checks preventing a
+partial final bucket from forming an undersized regime. For each feasible fixed K, candidate
+generation minimizes only:
+
+```text
+FitError(P_K) = normalized duration-weighted SSE(P_K)
+```
+
+Each fold aggregates training days bucket-wise, scales training and validation demand by the
+training aggregate's maximum positive demand, fits each exact K on training only, and evaluates
+the retained boundaries and training regime means on the held-out day. The predictive-best K has
+the lowest mean validation error. The selected K is the smallest whose mean is at most the best
+mean plus the best model's standard error. The legacy `complexity_penalty` result remains labeled
+as a diagnostic and cannot alter canonical CV selection or final boundaries.
+
+Daily eligibility requires exactly one finite non-negative observation for every canonical
+bucket. Missing buckets exclude the date and are never interpreted as zero. With fewer than seven
+eligible dates, the selector returns `INSUFFICIENT_REPEATED_DEMAND_OBSERVATIONS`, retains the
+full-data exact-K frontier for review, and publishes no authoritative selected K or final
+`RegimePlan`. The route 6 and route 10 V3 workbooks alone represent 153 source days through
+monthly `average_day` aggregates and therefore take the fail-closed path. Supplying the matching
+raw T06/T10 source provides the real date-keyed trip observations needed for authoritative CV.
+
+Demand regimes use half-open `[start, end)` intervals. A departure on a shared boundary belongs only
+to the later regime; neither boundary is a required departure. Future `RegimeTripAllocationV1`
+therefore defines `trip_count` as the number of departures in `[start, end)`, and nominal service
+headway as `regime_duration / trip_count` (`None` for zero trips), never
+`regime_duration / (trip_count - 1)`. See
+`docs/engine/DEMAND_REGIME_TRIP_COUNT_CONTRACT_V1.md` for compiler transition and service-floor
+implications.
+
+### Allocate trips over daily-validated demand regimes
+
+The bounded deterministic allocator consumes the frozen `DAILY_VALIDATED` plans and canonical
+Scenario B direction totals, then emits integer count candidates without generating departure
+timestamps:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_demand_regime_allocation_review.py `
+  "private/Engine_Input_MST_6_V3_MultiPeriod_Mar-Jul_2026.xlsx" `
+  "private/Engine_Input_MST_10_V3_MultiPeriod_Mar-Jul_2026.xlsx" `
+  --raw-demand "private/T06&T10_01012025_31072026.xlsx" `
+  --output-dir "outputs/demand_regime_trip_allocation"
+```
+
+`B_REFERENCE` remains separate. `C1_DEMAND_FIT` minimizes observed-demand mismatch,
+`C2_CONSERVATIVE` finds the smallest real improvement over B, and `C3_BALANCED` selects a
+parameter-free knee from the nondominated demand/movement frontier. The provisional
+`BASELINE_DERIVED_SERVICE_FLOOR` prevents any validated operating regime from becoming nominally
+worse than Scenario B's slowest current regime. Candidate rows expose integer-minute compile
+proxies and adjacent merge hints, but do not run service-regime regularization or the Schedule
+Compiler.
+
+A DemandRegime describes observed demand; a future ServiceRegime is an operational interval with
+one uniform headway. Their counts need not match. See
+`docs/engine/DETERMINISTIC_DEMAND_REGIME_TRIP_ALLOCATION_V1.md` for exact formulas, DP state,
+candidate tie-breaks, failure behavior, and the compiler boundary.
+
 ## Validate the repository
+
+### Review the closed-loop ServicePlan frontier
+
+The Route 6/10 coordinator keeps a bounded clean-compilation frontier for each integer
+ServicePlan, fleet-validates every retained exact timetable pair, scores the actual compiled
+service against immutable 30-minute demand evidence, and feeds structured evidence back into a
+finite deterministic neighborhood:
+
+```powershell
+..\.venv\Scripts\python.exe scripts\run_service_plan_coordinator_v1.py
+```
+
+The command writes route-specific JSON and Markdown reports under
+`outputs/service_plan_coordinator_v1/`. It is review-only and never promotes or overwrites a V2/V3
+timetable. See `docs/engine/CLOSED_LOOP_SERVICE_PLAN_COORDINATOR_V1.md` for state identity,
+compiler-frontier bounds, actual-service formulas, Pareto dimensions, feedback routing, and
+anti-loop guarantees.
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest

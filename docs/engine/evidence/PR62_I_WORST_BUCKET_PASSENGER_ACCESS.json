@@ -1,0 +1,1344 @@
+{
+  "H_commit_SHA": "fb77fc57be7da7756485b528801d8bd24c956d53",
+  "PR62_G_PRODUCT_REQUIRES_RECERTIFICATION_AFTER_H": true,
+  "deterministic_render": {
+    "pre_metadata_json_sha256": "11e4ecf30a317684936eaa4a9a3ff2a2932b4b5f25b0187ffe112abab7ac5c9f",
+    "pre_metadata_markdown_sha256": "8a6a80ca145c46e6751140a08cf5c1228b5c52cbc7bfe5382115480159611927",
+    "rendered_twice_byte_identical": true
+  },
+  "human_final_route_6": {
+    "accepted_sha_match": true,
+    "available": true,
+    "directions": {
+      "inbound": {
+        "active_demand_mass": 2085.81917211329,
+        "actual_headway_run_count": 8,
+        "average_wait_minutes": 6.090810546579193,
+        "effective_headway_palette": [
+          8,
+          15
+        ],
+        "maximum_bucket_wait_minutes": 12.5,
+        "observed_demand_mismatch": 0.0043823325829523445,
+        "p90_bucket_wait_minutes": 7.500000000000001,
+        "single_gap_headway_levels": [
+          14
+        ],
+        "sustained_headway_levels": [
+          8,
+          15
+        ],
+        "tail_headway_minutes": 15,
+        "tail_maximum_bucket_wait_minutes": 7.500000000000001
+      },
+      "outbound": {
+        "active_demand_mass": 1955.7222222222222,
+        "actual_headway_run_count": 9,
+        "average_wait_minutes": 6.2151176398179055,
+        "effective_headway_palette": [
+          8,
+          10,
+          15
+        ],
+        "maximum_bucket_wait_minutes": 12.5,
+        "observed_demand_mismatch": 0.002419739954740587,
+        "p90_bucket_wait_minutes": 7.500000000000001,
+        "single_gap_headway_levels": [],
+        "sustained_headway_levels": [
+          8,
+          10,
+          15
+        ],
+        "tail_headway_minutes": 15,
+        "tail_maximum_bucket_wait_minutes": 7.5
+      }
+    },
+    "pair": {
+      "average_wait_minutes": 6.150963374648091,
+      "fleet": 19,
+      "maximum_bucket_wait_minutes": 12.5,
+      "maximum_directional_p90_bucket_wait_minutes": 7.500000000000001,
+      "mismatch": 0.006802072537692931
+    },
+    "pareto_eligible": false,
+    "post_search_benchmark_only": true,
+    "sha256": "c2038b31c5a3f6a3ee2377ce2067542cc718a7d1907722efa3ab45a536bdd14a"
+  },
+  "metric_semantics": {
+    "average_wait_question": "What does the average passenger experience?",
+    "directional_p90": "nearest rank ceil(0.90*n) over ordered non-null active bucket waits",
+    "hard_headway_or_wait_threshold_added": false,
+    "maximum_bucket_wait": "max of outbound/inbound existing exact active-bucket maximum waits",
+    "maximum_bucket_wait_question": "What is the worst scheduled passenger-access interval in the service day?",
+    "pair_p90": "max(outbound directional P90, inbound directional P90)",
+    "tail_maximum_wait": "maximum existing exact wait for active immutable-demand buckets overlapping final actual ServiceRegime support; null when none overlap"
+  },
+  "pair_pareto_change": {
+    "dimension_count": 10,
+    "dimensions": [
+      "observed_demand_mismatch",
+      "demand_weighted_expected_passenger_wait_minutes",
+      "maximum_bucket_expected_wait_minutes",
+      "actual_service_regime_count",
+      "total_directional_sustained_headway_level_count",
+      "max_frequency_jump",
+      "total_frequency_variation",
+      "moved_trips_vs_b",
+      "fleet_required",
+      "total_excess_terminal_wait"
+    ],
+    "only_new_dimension": "maximum_bucket_expected_wait_minutes",
+    "p90_in_pareto": false,
+    "scalar_weight_added": false,
+    "tail_wait_in_pareto": false
+  },
+  "post_I_classification": "WORST_BUCKET_WAIT_MATERIAL_TO_FRONTIER",
+  "proceed_to_data_driven_materiality_selection": true,
+  "production_change_statement": {
+    "Average passenger wait changed": "NO",
+    "Compiler changed": "NO",
+    "Demand mismatch changed": "NO",
+    "Final XLSX regenerated": "NO",
+    "Fleet validator changed": "NO",
+    "Maximum bucket wait added to Pareto": "YES",
+    "Production Pareto semantics changed": "YES",
+    "Protection changed": "NO",
+    "Queue changed": "NO",
+    "Rhythm semantics changed from H": "NO",
+    "Search budgets changed": "NO",
+    "Settlement added": "NO",
+    "Tail eligibility changed from H": "NO"
+  },
+  "profile": "pr62_i_worst_bucket_passenger_access_v1",
+  "routes": {
+    "10": {
+      "H_pareto_removed_only_by_new_dimension": [],
+      "H_pareto_removed_only_by_new_dimension_count": 0,
+      "H_pareto_size": 11,
+      "I_pareto_size": 11,
+      "average_vs_access_tradeoff_count": 10,
+      "average_vs_access_tradeoff_witnesses": [
+        {
+          "candidate_a": "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+          "candidate_b": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be"
+        },
+        {
+          "candidate_a": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+          "candidate_b": "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16"
+        },
+        {
+          "candidate_a": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+          "candidate_b": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede"
+        },
+        {
+          "candidate_a": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+          "candidate_b": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0"
+        },
+        {
+          "candidate_a": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+          "candidate_b": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c"
+        },
+        {
+          "candidate_a": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+          "candidate_b": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7"
+        },
+        {
+          "candidate_a": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+          "candidate_b": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+        },
+        {
+          "candidate_a": "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+          "candidate_b": "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb"
+        },
+        {
+          "candidate_a": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "candidate_b": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c"
+        },
+        {
+          "candidate_a": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "candidate_b": "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb"
+        }
+      ],
+      "deterministic_signature": {
+        "evaluated_state_fingerprints": [
+          "0d78fbc487954cfb291331d8dce22ba07eedcacb44579fa61b6c8a68944ac4ea",
+          "242dfc19a9e09b8fbf91ffcc1be03b46e738a3f1fda01cc3f4adf341b817f8c1",
+          "2b1f58a7010f0391ec6a4b1aee60928449fe6f4a939105c6c94f309369e90199",
+          "2bb7c519eee0e600b21c074274a86cbd84be5e40f98bdf84630294352ab86488",
+          "56b2811302fee5fb1898ca0de8a9e5cfe5af8ea24818eddc9ddea442c6c97214",
+          "57fb17ee9a633c9af45da6d9743f96a4ea337f7d8ee114e755338487a0304633",
+          "5c368d1595c974f6646088bc524c6e3d110cfb26bd4acce77f75405f25f023e8",
+          "6941d2a9aecd2769d61fb2b5ee4c460650c0d0c7fe4f1cdbe1d3b1b54a087b0c",
+          "78e31bf9473230afddbe9a8bbebac55f4d93313a00f4af11fa853ed585a96965",
+          "7fb06c48b92b90d6cc76aadc26c7ffc4bc864f6692576c49417e6b8dda7461e3",
+          "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+          "98a907413f116917f028e62a258da74d768203d724f5715ea40139a182dd2c35",
+          "9a8b78aeb5c3b5f4284a91868cd82f1209da873395f62d12c0f2d940a2aecb6a",
+          "9b02726db02473726514ebd0fd4cbd6cc2de3da48c83361829605fca3aeb6d22",
+          "a0fab752efa9ec23667f38a6803819c7daa721ae4744ffd8beff367003ea174b",
+          "a7ed4c06c30668e48c2a633257c2519e03e57a36342fd6730b16c3ff45654cab",
+          "addef713d00b954ab9f4d891f735deca991257ad1c12909d67edb01160e69dd7",
+          "b4a7f7bdd19e1ec273edf8d2505bbada4e850b7dc21ee72dbccecd6b0f826b0a",
+          "bf950cec96d89efe284bf75098e9391d09bb1785b8b07302906b49007219a78c",
+          "c49da2d65ec3c661b0ce1542e964f0013faec9fdd39043a66bbdda7f2a486270",
+          "c8b36633df9b8ef93480b777a9f72e16ce6fd0561936670886400fda3de3b778",
+          "cb5da85b36d4d6438cd1cf0e4775207fcdb919d1cf821ff92648bc7ed3755728",
+          "e8bab7b7da59f7777fedc3ca36e45d791629c49698b9a91366a34b466572cd3b",
+          "fa6162630cc3d6f0f84e657786a78398d1c38d36b9963dd6de406dbc34fade60"
+        ],
+        "feasible_pair_fingerprint": "902eec2a1d40c4fcace9b3fd6a3320919065ef24e32fc2d4282fa3dd70a47f2b",
+        "feedback_code_counts": {
+          "DEMAND_OVERSERVED_INTERVAL": 88,
+          "DEMAND_RESPONSE_DIRECTION_MISMATCH": 59,
+          "DEMAND_UNDERSERVED_INTERVAL": 88,
+          "FLEET_LIMIT_EXCEEDED": 124,
+          "LARGEST_SERVICE_FREQUENCY_JUMP": 88,
+          "REDUNDANT_SERVICE_BOUNDARY": 16,
+          "TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION": 56,
+          "TAIL_OVER_SERVICE": 82
+        },
+        "h_pareto_fingerprints": [
+          "025353e2311d8508d1984a34d4acb2ee9e7228a16af1a69bb97ff5b649e77934",
+          "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+          "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+          "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+          "8fcacf72ae51cf31e351f29f367f0094fac654ea85bd0f3a29470502a0939d62",
+          "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+          "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb",
+          "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+        ],
+        "i_pareto_fingerprints": [
+          "025353e2311d8508d1984a34d4acb2ee9e7228a16af1a69bb97ff5b649e77934",
+          "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+          "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+          "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+          "8fcacf72ae51cf31e351f29f367f0094fac654ea85bd0f3a29470502a0939d62",
+          "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+          "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb",
+          "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+        ],
+        "statistics": {
+          "budget_exhausted": true,
+          "compile_variants_evaluated": 88,
+          "duplicate_states_skipped": 371,
+          "fleet_feedback_expansion_requests": 248,
+          "fleet_feedback_expansions_executed": 11,
+          "fleet_feedback_expansions_skipped": 237,
+          "fleet_validations_run": 135,
+          "protected_compile_variants_rejected": 0,
+          "response_feedback_anchor_candidates": 2,
+          "response_feedback_anchors_enqueued": 2,
+          "response_feedback_anchors_evaluated": 2,
+          "search_iterations": 24,
+          "states_evaluated": 24,
+          "states_generated": 7864,
+          "states_pruned": 6957,
+          "tail_ordering_compilations_rejected": 56
+        },
+        "status": "SEARCH_BUDGET_EXHAUSTED"
+      },
+      "inbound_tail_30_45_audit": {
+        "30": [
+          {
+            "average_wait": 9.579767336017012,
+            "dominated_by": [],
+            "effective_palette": 9,
+            "fingerprint": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+            "fleet": 13,
+            "inbound": {
+              "effective_headway_palette": [
+                13,
+                15,
+                20,
+                22,
+                30
+              ],
+              "maximum_bucket_expected_wait_minutes": 15.000000000000002,
+              "p90_bucket_expected_wait_minutes": 12.6,
+              "sustained_headway_levels": [
+                13,
+                15,
+                20,
+                22,
+                30
+              ],
+              "tail_headway_minutes": 30,
+              "tail_maximum_bucket_expected_wait_minutes": 15.000000000000002,
+              "tail_ordering_classification": "TAIL_IS_SLOWEST",
+              "tail_slowest_margin_minutes": 8
+            },
+            "max_wait": 15.000000000000002,
+            "maximum_frequency_jump": 0.5260930958967791,
+            "mismatch": 0.009244498851670911,
+            "moved_trips": 18,
+            "outbound": {
+              "effective_headway_palette": [
+                14,
+                19,
+                20,
+                23
+              ],
+              "maximum_bucket_expected_wait_minutes": 12.900000000000002,
+              "p90_bucket_expected_wait_minutes": 11.333333333333334,
+              "sustained_headway_levels": [
+                14,
+                18,
+                19,
+                20,
+                21,
+                23
+              ],
+              "tail_headway_minutes": 23,
+              "tail_maximum_bucket_expected_wait_minutes": 12.900000000000002,
+              "tail_ordering_classification": "TAIL_IS_SLOWEST",
+              "tail_slowest_margin_minutes": 2
+            },
+            "p90_wait": 12.6,
+            "retained_in_I": true,
+            "service_regimes": 12,
+            "sustained_levels": 11,
+            "total_excess_terminal_wait": 2369,
+            "total_frequency_variation": 2.747318825332542
+          }
+        ],
+        "45": [
+          {
+            "average_wait": 9.640133634658694,
+            "dominated_by": [],
+            "effective_palette": 8,
+            "fingerprint": "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb",
+            "fleet": 13,
+            "inbound": {
+              "effective_headway_palette": [
+                12,
+                14,
+                21,
+                30
+              ],
+              "maximum_bucket_expected_wait_minutes": 22.500000000000004,
+              "p90_bucket_expected_wait_minutes": 14.999999999999998,
+              "sustained_headway_levels": [
+                12,
+                14,
+                15,
+                20,
+                21,
+                22,
+                30
+              ],
+              "tail_headway_minutes": 45,
+              "tail_maximum_bucket_expected_wait_minutes": 22.500000000000004,
+              "tail_ordering_classification": "TAIL_IS_SLOWEST",
+              "tail_slowest_margin_minutes": 15
+            },
+            "max_wait": 22.500000000000004,
+            "maximum_frequency_jump": 0.7156200364120039,
+            "mismatch": 0.008393103418565044,
+            "moved_trips": 16,
+            "outbound": {
+              "effective_headway_palette": [
+                14,
+                19,
+                20,
+                23
+              ],
+              "maximum_bucket_expected_wait_minutes": 12.900000000000002,
+              "p90_bucket_expected_wait_minutes": 11.333333333333334,
+              "sustained_headway_levels": [
+                14,
+                18,
+                19,
+                20,
+                21,
+                23
+              ],
+              "tail_headway_minutes": 23,
+              "tail_maximum_bucket_expected_wait_minutes": 12.900000000000002,
+              "tail_ordering_classification": "TAIL_IS_SLOWEST",
+              "tail_slowest_margin_minutes": 2
+            },
+            "p90_wait": 14.999999999999998,
+            "retained_in_I": true,
+            "service_regimes": 15,
+            "sustained_levels": 13,
+            "total_excess_terminal_wait": 2902,
+            "total_frequency_variation": 4.002172076882409
+          }
+        ]
+      },
+      "ranges": {
+        "fleet": {
+          "H": [
+            11,
+            13
+          ],
+          "I": [
+            11,
+            13
+          ]
+        },
+        "maximum_bucket_wait_minutes": {
+          "H": [
+            12.900000000000002,
+            34.2
+          ],
+          "I": [
+            12.900000000000002,
+            34.2
+          ]
+        },
+        "mismatch": {
+          "H": [
+            0.008393103418565044,
+            0.012524369948702048
+          ],
+          "I": [
+            0.008393103418565044,
+            0.012524369948702048
+          ]
+        },
+        "p90_bucket_wait_minutes": {
+          "H": [
+            11.333333333333334,
+            15.000000000000002
+          ],
+          "I": [
+            11.333333333333334,
+            15.000000000000002
+          ]
+        },
+        "service_regime_count": {
+          "H": [
+            11,
+            16
+          ],
+          "I": [
+            11,
+            16
+          ]
+        },
+        "sustained_headway_level_count": {
+          "H": [
+            8,
+            13
+          ],
+          "I": [
+            8,
+            13
+          ]
+        },
+        "tail_headway_minutes": {
+          "H": [
+            22,
+            54
+          ],
+          "I": [
+            22,
+            54
+          ]
+        },
+        "wait_minutes": {
+          "H": [
+            9.579767336017012,
+            9.807655861327559
+          ],
+          "I": [
+            9.579767336017012,
+            9.807655861327559
+          ]
+        }
+      },
+      "review_roles": {
+        "MINIMUM_AVERAGE_WAIT": {
+          "average_wait": 9.579767336017012,
+          "effective_palette": 9,
+          "fingerprint": "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be",
+          "fleet": 13,
+          "inbound": {
+            "effective_headway_palette": [
+              13,
+              15,
+              20,
+              22,
+              30
+            ],
+            "maximum_bucket_expected_wait_minutes": 15.000000000000002,
+            "p90_bucket_expected_wait_minutes": 12.6,
+            "sustained_headway_levels": [
+              13,
+              15,
+              20,
+              22,
+              30
+            ],
+            "tail_headway_minutes": 30,
+            "tail_maximum_bucket_expected_wait_minutes": 15.000000000000002,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 8
+          },
+          "max_wait": 15.000000000000002,
+          "maximum_frequency_jump": 0.5260930958967791,
+          "mismatch": 0.009244498851670911,
+          "moved_trips": 18,
+          "outbound": {
+            "effective_headway_palette": [
+              14,
+              19,
+              20,
+              23
+            ],
+            "maximum_bucket_expected_wait_minutes": 12.900000000000002,
+            "p90_bucket_expected_wait_minutes": 11.333333333333334,
+            "sustained_headway_levels": [
+              14,
+              18,
+              19,
+              20,
+              21,
+              23
+            ],
+            "tail_headway_minutes": 23,
+            "tail_maximum_bucket_expected_wait_minutes": 12.900000000000002,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 2
+          },
+          "p90_wait": 12.6,
+          "service_regimes": 12,
+          "sustained_levels": 11,
+          "total_excess_terminal_wait": 2369,
+          "total_frequency_variation": 2.747318825332542
+        },
+        "MINIMUM_FLEET": {
+          "average_wait": 9.613877680736364,
+          "effective_palette": 5,
+          "fingerprint": "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+          "fleet": 11,
+          "inbound": {
+            "effective_headway_palette": [
+              19,
+              29
+            ],
+            "maximum_bucket_expected_wait_minutes": 14.066666666666666,
+            "p90_bucket_expected_wait_minutes": 11.333333333333334,
+            "sustained_headway_levels": [
+              19,
+              20,
+              29
+            ],
+            "tail_headway_minutes": 29,
+            "tail_maximum_bucket_expected_wait_minutes": 14.066666666666666,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 9
+          },
+          "max_wait": 14.066666666666666,
+          "maximum_frequency_jump": 0.42285685082003344,
+          "mismatch": 0.012013640351117972,
+          "moved_trips": 12,
+          "outbound": {
+            "effective_headway_palette": [
+              17,
+              20,
+              23
+            ],
+            "maximum_bucket_expected_wait_minutes": 12.900000000000002,
+            "p90_bucket_expected_wait_minutes": 11.000000000000002,
+            "sustained_headway_levels": [
+              17,
+              18,
+              19,
+              20,
+              22,
+              23
+            ],
+            "tail_headway_minutes": 23,
+            "tail_maximum_bucket_expected_wait_minutes": 12.900000000000002,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 1
+          },
+          "p90_wait": 11.333333333333334,
+          "service_regimes": 11,
+          "sustained_levels": 9,
+          "total_excess_terminal_wait": 1855,
+          "total_frequency_variation": 1.152762170463618
+        },
+        "MINIMUM_MAXIMUM_BUCKET_WAIT": {
+          "average_wait": 9.593949402449837,
+          "effective_palette": 6,
+          "fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "fleet": 13,
+          "inbound": {
+            "effective_headway_palette": [
+              14,
+              22
+            ],
+            "maximum_bucket_expected_wait_minutes": 12.9,
+            "p90_bucket_expected_wait_minutes": 12.400000000000002,
+            "sustained_headway_levels": [
+              14,
+              15,
+              22,
+              23
+            ],
+            "tail_headway_minutes": 23,
+            "tail_maximum_bucket_expected_wait_minutes": 12.9,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 1
+          },
+          "max_wait": 12.900000000000002,
+          "maximum_frequency_jump": 0.45198512374305727,
+          "mismatch": 0.010613576150656733,
+          "moved_trips": 16,
+          "outbound": {
+            "effective_headway_palette": [
+              14,
+              19,
+              20,
+              23
+            ],
+            "maximum_bucket_expected_wait_minutes": 12.900000000000002,
+            "p90_bucket_expected_wait_minutes": 11.333333333333334,
+            "sustained_headway_levels": [
+              14,
+              18,
+              19,
+              20,
+              21,
+              23
+            ],
+            "tail_headway_minutes": 23,
+            "tail_maximum_bucket_expected_wait_minutes": 12.900000000000002,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 2
+          },
+          "p90_wait": 12.400000000000002,
+          "service_regimes": 12,
+          "sustained_levels": 10,
+          "total_excess_terminal_wait": 2447,
+          "total_frequency_variation": 2.3333997152920922
+        },
+        "MINIMUM_MISMATCH": {
+          "average_wait": 9.640133634658694,
+          "effective_palette": 8,
+          "fingerprint": "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb",
+          "fleet": 13,
+          "inbound": {
+            "effective_headway_palette": [
+              12,
+              14,
+              21,
+              30
+            ],
+            "maximum_bucket_expected_wait_minutes": 22.500000000000004,
+            "p90_bucket_expected_wait_minutes": 14.999999999999998,
+            "sustained_headway_levels": [
+              12,
+              14,
+              15,
+              20,
+              21,
+              22,
+              30
+            ],
+            "tail_headway_minutes": 45,
+            "tail_maximum_bucket_expected_wait_minutes": 22.500000000000004,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 15
+          },
+          "max_wait": 22.500000000000004,
+          "maximum_frequency_jump": 0.7156200364120039,
+          "mismatch": 0.008393103418565044,
+          "moved_trips": 16,
+          "outbound": {
+            "effective_headway_palette": [
+              14,
+              19,
+              20,
+              23
+            ],
+            "maximum_bucket_expected_wait_minutes": 12.900000000000002,
+            "p90_bucket_expected_wait_minutes": 11.333333333333334,
+            "sustained_headway_levels": [
+              14,
+              18,
+              19,
+              20,
+              21,
+              23
+            ],
+            "tail_headway_minutes": 23,
+            "tail_maximum_bucket_expected_wait_minutes": 12.900000000000002,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 2
+          },
+          "p90_wait": 14.999999999999998,
+          "service_regimes": 15,
+          "sustained_levels": 13,
+          "total_excess_terminal_wait": 2902,
+          "total_frequency_variation": 4.002172076882409
+        },
+        "MINIMUM_SUSTAINED_PALETTE": {
+          "average_wait": 9.661526636691072,
+          "effective_palette": 6,
+          "fingerprint": "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+          "fleet": 12,
+          "inbound": {
+            "effective_headway_palette": [
+              19,
+              29
+            ],
+            "maximum_bucket_expected_wait_minutes": 14.066666666666666,
+            "p90_bucket_expected_wait_minutes": 11.333333333333334,
+            "sustained_headway_levels": [
+              19,
+              20,
+              29
+            ],
+            "tail_headway_minutes": 29,
+            "tail_maximum_bucket_expected_wait_minutes": 14.066666666666666,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 9
+          },
+          "max_wait": 14.066666666666666,
+          "maximum_frequency_jump": 0.42285685082003344,
+          "mismatch": 0.012524369948702048,
+          "moved_trips": 10,
+          "outbound": {
+            "effective_headway_palette": [
+              15,
+              17,
+              19,
+              22
+            ],
+            "maximum_bucket_expected_wait_minutes": 12.866666666666667,
+            "p90_bucket_expected_wait_minutes": 11.666666666666666,
+            "sustained_headway_levels": [
+              15,
+              17,
+              19,
+              20,
+              22
+            ],
+            "tail_headway_minutes": 22,
+            "tail_maximum_bucket_expected_wait_minutes": 11.933333333333335,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 0
+          },
+          "p90_wait": 11.666666666666666,
+          "service_regimes": 11,
+          "sustained_levels": 8,
+          "total_excess_terminal_wait": 2713,
+          "total_frequency_variation": 1.42409391045544
+        }
+      },
+      "route_id": "10",
+      "search_budget": {
+        "max_compile_frontier_per_state": 4,
+        "max_directional_compilations": 24,
+        "max_open_states": 512,
+        "max_pair_frontier": 512,
+        "max_service_plan_evaluations": 24
+      },
+      "search_statistics": {
+        "budget_exhausted": true,
+        "compile_variants_evaluated": 88,
+        "duplicate_states_skipped": 371,
+        "fleet_feedback_expansion_requests": 248,
+        "fleet_feedback_expansions_executed": 11,
+        "fleet_feedback_expansions_skipped": 237,
+        "fleet_validations_run": 135,
+        "protected_compile_variants_rejected": 0,
+        "response_feedback_anchor_candidates": 2,
+        "response_feedback_anchors_enqueued": 2,
+        "response_feedback_anchors_evaluated": 2,
+        "search_iterations": 24,
+        "states_evaluated": 24,
+        "states_generated": 7864,
+        "states_pruned": 6957,
+        "tail_ordering_compilations_rejected": 56
+      },
+      "status": "SEARCH_BUDGET_EXHAUSTED"
+    },
+    "6": {
+      "H_pareto_removed_only_by_new_dimension": [],
+      "H_pareto_removed_only_by_new_dimension_count": 0,
+      "H_pareto_size": 46,
+      "I_pareto_size": 47,
+      "average_vs_access_tradeoff_count": 545,
+      "average_vs_access_tradeoff_witnesses": [
+        {
+          "candidate_a": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_b": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc"
+        },
+        {
+          "candidate_a": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_b": "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6"
+        },
+        {
+          "candidate_a": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_b": "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39"
+        },
+        {
+          "candidate_a": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_b": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0"
+        },
+        {
+          "candidate_a": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_b": "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174"
+        },
+        {
+          "candidate_a": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_b": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb"
+        },
+        {
+          "candidate_a": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_b": "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593"
+        },
+        {
+          "candidate_a": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_b": "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35"
+        },
+        {
+          "candidate_a": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_b": "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472"
+        },
+        {
+          "candidate_a": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "candidate_b": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67"
+        }
+      ],
+      "deterministic_signature": {
+        "evaluated_state_fingerprints": [
+          "0abaae7ed46d456fc424e10c3567f777d2d9e3eebf37e7b448498cdf5d6f95f7",
+          "0cfffc458e27e6a7b6c3c6727a9bc839eca2457561f789dd789070fa7318623f",
+          "12dd9fea8923513549e90470f48d6a4a5ef9a66ae16d399159c056f7614bb772",
+          "345e7478aa10471cca393fbd16c6a68f8549f3e208d0ab038bab540fa40d8615",
+          "3c2faf19d888c32443b50b4cf8981b9016beda69b6dee81c96d38329c4b8eaa8",
+          "3e5f63df73fac10f27e85594fb481ae950e5f5343e373bbe0d9d69962dc1d667",
+          "3ebd1a34013acd7cd49351287c5c676a0c8a7da4811380ccf6111182ff5714a2",
+          "445b8d7ae83f98fb525ba55c285a86f90fd5fc8a656363fda3ee8d24e8145c1d",
+          "5808ce30d6aa93a7b59dfeea75e70777873a1d33b7c763f6c95c167dfa918cac",
+          "65eb763ecbeacc6c44ee42c7d09a25386f77f5f5f164d2664b714be2df0647f4",
+          "6cb2223035e5c899e45e34aacee21f0062d1f6dd6a95a47e0be5b1ce32c42490",
+          "70897be29a669ff4e75cc466488c86a8b44ff1d20fcb0c1619e4d23284206751",
+          "781ad974f26c33574f2c73882efb0bca12ffa2a6e153aaaeee8df3d6b01e0406",
+          "7e148ceb3dbe31506415e50ee570242eba08a7fa614a8bdc719cf228d54950d3",
+          "7eb52f0c29a483f0e1cd9c89b010f15df1ac1c5b29af1b234a897b9e5261492f",
+          "89a780e1d1b49f12dac52091584c8be19a104d46989cdd986ed43755c7a58ef4",
+          "8d4d68bd1b14bd0da9359613ed7da942e28cd0f76770a138ba5560b6534236eb",
+          "aac892c4f5546c77b337bbf1c1022fde28c74bbfd97240b8a82f58b06b096b92",
+          "e57c7986c5e6f2a2c2b504bd4ae136511f5e8922bdc0844a05464337c4ee1039",
+          "eea40f56accb6b685b8446ba4dec0174714805c6f3fb0f96e3b6cae2867dec6e",
+          "efbe59c339cd32633a102e7766e8da84bba1dc8b72229636bc2299dfd9491674",
+          "f7754e5dbd42f8621708e5cd7958ea67554f9839316febbd72932824f466c660",
+          "f96dc56d605a5eb00d1050088711f29ed3b84c6e2f26acdf9699c467c33647dd",
+          "fbd5df1ea784adc014585f2f0bfc305646673a40d4161973822863c52c55b6e8"
+        ],
+        "feasible_pair_fingerprint": "3d54491983953de67dac2790478e1654d339eeced98538bf23c246dc0fd4161a",
+        "feedback_code_counts": {
+          "DEMAND_OVERSERVED_INTERVAL": 96,
+          "DEMAND_RESPONSE_DIRECTION_MISMATCH": 45,
+          "DEMAND_UNDERSERVED_INTERVAL": 96,
+          "FLEET_LIMIT_EXCEEDED": 57,
+          "LARGEST_SERVICE_FREQUENCY_JUMP": 96,
+          "REDUNDANT_SERVICE_BOUNDARY": 40,
+          "TAIL_NOT_SLOWEST_WITHOUT_DEMAND_JUSTIFICATION": 68,
+          "TAIL_OVER_SERVICE": 96
+        },
+        "h_pareto_fingerprints": [
+          "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+          "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+          "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+          "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+          "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+          "347ce5d5190638937dc110a9eb16a5c49c4229fac2bb352c7ca2b5d704105784",
+          "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+          "3b7b894e8417ac964228d0d717bfac726af28e449e1e4997b1a00557c95281e1",
+          "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+          "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+          "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "6b6dd6f275ae729c6f42b1c12a4e500e5cbbc2fc8de101506f9e5637a84fd1a4",
+          "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+          "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+          "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+          "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+          "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+          "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+          "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+          "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+          "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+          "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+          "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+          "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+          "d9812afa9dca31e7b88665c73568a6cf4bccdf93136ca0d8ddcfbcdacd439b89",
+          "dcc72afbfe8d6d0564870bd5e9a49e0c0ef81c57e403127bfaf5936be30176f5",
+          "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "f1c1d688b06e95c3d91b99f9018d8a6dd5edd33b3bd4d9516193069306d5ceb1",
+          "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+          "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21"
+        ],
+        "i_pareto_fingerprints": [
+          "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+          "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+          "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+          "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+          "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+          "347ce5d5190638937dc110a9eb16a5c49c4229fac2bb352c7ca2b5d704105784",
+          "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+          "3b7b894e8417ac964228d0d717bfac726af28e449e1e4997b1a00557c95281e1",
+          "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+          "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+          "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "6b6dd6f275ae729c6f42b1c12a4e500e5cbbc2fc8de101506f9e5637a84fd1a4",
+          "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+          "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+          "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+          "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+          "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+          "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+          "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+          "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+          "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+          "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+          "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+          "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+          "d9812afa9dca31e7b88665c73568a6cf4bccdf93136ca0d8ddcfbcdacd439b89",
+          "dcc72afbfe8d6d0564870bd5e9a49e0c0ef81c57e403127bfaf5936be30176f5",
+          "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+          "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "f1c1d688b06e95c3d91b99f9018d8a6dd5edd33b3bd4d9516193069306d5ceb1",
+          "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+          "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21"
+        ],
+        "statistics": {
+          "budget_exhausted": true,
+          "compile_variants_evaluated": 96,
+          "duplicate_states_skipped": 428,
+          "fleet_feedback_expansion_requests": 114,
+          "fleet_feedback_expansions_executed": 15,
+          "fleet_feedback_expansions_skipped": 99,
+          "fleet_validations_run": 140,
+          "protected_compile_variants_rejected": 0,
+          "response_feedback_anchor_candidates": 2,
+          "response_feedback_anchors_enqueued": 2,
+          "response_feedback_anchors_evaluated": 2,
+          "search_iterations": 24,
+          "states_evaluated": 24,
+          "states_generated": 7884,
+          "states_pruned": 6920,
+          "tail_ordering_compilations_rejected": 68
+        },
+        "status": "SEARCH_BUDGET_EXHAUSTED"
+      },
+      "ranges": {
+        "fleet": {
+          "H": [
+            14,
+            20
+          ],
+          "I": [
+            14,
+            20
+          ]
+        },
+        "maximum_bucket_wait_minutes": {
+          "H": [
+            8.5,
+            27.5
+          ],
+          "I": [
+            8.5,
+            27.5
+          ]
+        },
+        "mismatch": {
+          "H": [
+            0.006368300470867757,
+            0.015650510405009692
+          ],
+          "I": [
+            0.006368300470867757,
+            0.015650510405009692
+          ]
+        },
+        "p90_bucket_wait_minutes": {
+          "H": [
+            6.866666666666666,
+            11.666666666666666
+          ],
+          "I": [
+            6.866666666666666,
+            11.666666666666666
+          ]
+        },
+        "service_regime_count": {
+          "H": [
+            10,
+            20
+          ],
+          "I": [
+            10,
+            20
+          ]
+        },
+        "sustained_headway_level_count": {
+          "H": [
+            6,
+            12
+          ],
+          "I": [
+            6,
+            13
+          ]
+        },
+        "tail_headway_minutes": {
+          "H": [
+            14,
+            30
+          ],
+          "I": [
+            14,
+            30
+          ]
+        },
+        "wait_minutes": {
+          "H": [
+            6.073427220303305,
+            6.217911989725442
+          ],
+          "I": [
+            6.073427220303305,
+            6.217911989725442
+          ]
+        }
+      },
+      "review_roles": {
+        "MINIMUM_AVERAGE_WAIT": {
+          "average_wait": 6.073427220303305,
+          "effective_palette": 4,
+          "fingerprint": "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+          "fleet": 18,
+          "inbound": {
+            "effective_headway_palette": [
+              9,
+              15
+            ],
+            "maximum_bucket_expected_wait_minutes": 11.5,
+            "p90_bucket_expected_wait_minutes": 7.500000000000001,
+            "sustained_headway_levels": [
+              8,
+              9,
+              14,
+              15
+            ],
+            "tail_headway_minutes": 15,
+            "tail_maximum_bucket_expected_wait_minutes": 7.500000000000001,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 0
+          },
+          "max_wait": 11.5,
+          "maximum_frequency_jump": 0.5596157879354228,
+          "mismatch": 0.008149760259092994,
+          "moved_trips": 7,
+          "outbound": {
+            "effective_headway_palette": [
+              9,
+              14
+            ],
+            "maximum_bucket_expected_wait_minutes": 10.5,
+            "p90_bucket_expected_wait_minutes": 7.500000000000001,
+            "sustained_headway_levels": [
+              9,
+              10,
+              13,
+              14,
+              15
+            ],
+            "tail_headway_minutes": 15,
+            "tail_maximum_bucket_expected_wait_minutes": 7.5,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 0
+          },
+          "p90_wait": 7.500000000000001,
+          "service_regimes": 15,
+          "sustained_levels": 9,
+          "total_excess_terminal_wait": 4590,
+          "total_frequency_variation": 5.666687324113573
+        },
+        "MINIMUM_FLEET": {
+          "average_wait": 6.166343623614775,
+          "effective_palette": 4,
+          "fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "fleet": 14,
+          "inbound": {
+            "effective_headway_palette": [
+              12,
+              13
+            ],
+            "maximum_bucket_expected_wait_minutes": 8.5,
+            "p90_bucket_expected_wait_minutes": 6.866666666666666,
+            "sustained_headway_levels": [
+              11,
+              12,
+              13,
+              14
+            ],
+            "tail_headway_minutes": 14,
+            "tail_maximum_bucket_expected_wait_minutes": 7.0,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 1
+          },
+          "max_wait": 9.5,
+          "maximum_frequency_jump": 0.2231435513142097,
+          "mismatch": 0.014405216915627458,
+          "moved_trips": 18,
+          "outbound": {
+            "effective_headway_palette": [
+              12,
+              15
+            ],
+            "maximum_bucket_expected_wait_minutes": 9.5,
+            "p90_bucket_expected_wait_minutes": 7.499999999999999,
+            "sustained_headway_levels": [
+              11,
+              12,
+              13,
+              15
+            ],
+            "tail_headway_minutes": 15,
+            "tail_maximum_bucket_expected_wait_minutes": 7.5,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 2
+          },
+          "p90_wait": 7.499999999999999,
+          "service_regimes": 14,
+          "sustained_levels": 8,
+          "total_excess_terminal_wait": 1768,
+          "total_frequency_variation": 1.2926073621308356
+        },
+        "MINIMUM_MAXIMUM_BUCKET_WAIT": {
+          "average_wait": 6.195995752176134,
+          "effective_palette": 4,
+          "fingerprint": "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+          "fleet": 15,
+          "inbound": {
+            "effective_headway_palette": [
+              11,
+              13
+            ],
+            "maximum_bucket_expected_wait_minutes": 8.5,
+            "p90_bucket_expected_wait_minutes": 6.966666666666667,
+            "sustained_headway_levels": [
+              11,
+              13,
+              14
+            ],
+            "tail_headway_minutes": 14,
+            "tail_maximum_bucket_expected_wait_minutes": 7.0,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 1
+          },
+          "max_wait": 8.5,
+          "maximum_frequency_jump": 0.16705408466316624,
+          "mismatch": 0.014373833136336233,
+          "moved_trips": 16,
+          "outbound": {
+            "effective_headway_palette": [
+              12,
+              13
+            ],
+            "maximum_bucket_expected_wait_minutes": 8.5,
+            "p90_bucket_expected_wait_minutes": 6.866666666666665,
+            "sustained_headway_levels": [
+              11,
+              12,
+              13,
+              14
+            ],
+            "tail_headway_minutes": 14,
+            "tail_maximum_bucket_expected_wait_minutes": 7.0,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 1
+          },
+          "p90_wait": 6.966666666666667,
+          "service_regimes": 11,
+          "sustained_levels": 7,
+          "total_excess_terminal_wait": 2014,
+          "total_frequency_variation": 0.9765176983071816
+        },
+        "MINIMUM_MISMATCH": {
+          "average_wait": 6.144048262394766,
+          "effective_palette": 7,
+          "fingerprint": "d9812afa9dca31e7b88665c73568a6cf4bccdf93136ca0d8ddcfbcdacd439b89",
+          "fleet": 20,
+          "inbound": {
+            "effective_headway_palette": [
+              9,
+              14
+            ],
+            "maximum_bucket_expected_wait_minutes": 10.5,
+            "p90_bucket_expected_wait_minutes": 7.500000000000001,
+            "sustained_headway_levels": [
+              9,
+              10,
+              13,
+              14,
+              15
+            ],
+            "tail_headway_minutes": 15,
+            "tail_maximum_bucket_expected_wait_minutes": 7.5,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 0
+          },
+          "max_wait": 27.5,
+          "maximum_frequency_jump": 0.6931471805599453,
+          "mismatch": 0.006368300470867757,
+          "moved_trips": 10,
+          "outbound": {
+            "effective_headway_palette": [
+              7,
+              10,
+              12,
+              15,
+              18
+            ],
+            "maximum_bucket_expected_wait_minutes": 27.5,
+            "p90_bucket_expected_wait_minutes": 10.166666666666666,
+            "sustained_headway_levels": [
+              7,
+              9,
+              10,
+              12,
+              15,
+              18,
+              19
+            ],
+            "tail_headway_minutes": 30,
+            "tail_maximum_bucket_expected_wait_minutes": 14.999999999999998,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 0
+          },
+          "p90_wait": 10.166666666666666,
+          "service_regimes": 20,
+          "sustained_levels": 12,
+          "total_excess_terminal_wait": 4017,
+          "total_frequency_variation": 7.680945167215619
+        },
+        "MINIMUM_SUSTAINED_PALETTE": {
+          "average_wait": 6.127911976248842,
+          "effective_palette": 5,
+          "fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "fleet": 18,
+          "inbound": {
+            "effective_headway_palette": [
+              8,
+              11,
+              15
+            ],
+            "maximum_bucket_expected_wait_minutes": 12.5,
+            "p90_bucket_expected_wait_minutes": 7.500000000000001,
+            "sustained_headway_levels": [
+              8,
+              11,
+              15
+            ],
+            "tail_headway_minutes": 15,
+            "tail_maximum_bucket_expected_wait_minutes": 7.500000000000001,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 0
+          },
+          "max_wait": 12.5,
+          "maximum_frequency_jump": 0.6286086594223742,
+          "mismatch": 0.00951140355301779,
+          "moved_trips": 11,
+          "outbound": {
+            "effective_headway_palette": [
+              11,
+              13
+            ],
+            "maximum_bucket_expected_wait_minutes": 8.5,
+            "p90_bucket_expected_wait_minutes": 6.966666666666667,
+            "sustained_headway_levels": [
+              11,
+              13,
+              14
+            ],
+            "tail_headway_minutes": 14,
+            "tail_maximum_bucket_expected_wait_minutes": 7.0,
+            "tail_ordering_classification": "TAIL_IS_SLOWEST",
+            "tail_slowest_margin_minutes": 1
+          },
+          "p90_wait": 7.500000000000001,
+          "service_regimes": 12,
+          "sustained_levels": 6,
+          "total_excess_terminal_wait": 4967,
+          "total_frequency_variation": 3.7100147204403964
+        }
+      },
+      "route_id": "6",
+      "search_budget": {
+        "max_compile_frontier_per_state": 4,
+        "max_directional_compilations": 24,
+        "max_open_states": 512,
+        "max_pair_frontier": 512,
+        "max_service_plan_evaluations": 24
+      },
+      "search_statistics": {
+        "budget_exhausted": true,
+        "compile_variants_evaluated": 96,
+        "duplicate_states_skipped": 428,
+        "fleet_feedback_expansion_requests": 114,
+        "fleet_feedback_expansions_executed": 15,
+        "fleet_feedback_expansions_skipped": 99,
+        "fleet_validations_run": 140,
+        "protected_compile_variants_rejected": 0,
+        "response_feedback_anchor_candidates": 2,
+        "response_feedback_anchors_enqueued": 2,
+        "response_feedback_anchors_evaluated": 2,
+        "search_iterations": 24,
+        "states_evaluated": 24,
+        "states_generated": 7884,
+        "states_pruned": 6920,
+        "tail_ordering_compilations_rejected": 68
+      },
+      "status": "SEARCH_BUDGET_EXHAUSTED"
+    }
+  }
+}

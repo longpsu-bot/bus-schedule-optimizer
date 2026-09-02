@@ -1,0 +1,2821 @@
+{
+  "READY_FOR_FINAL_PILOT_USE": false,
+  "READY_FOR_LOCAL_RHYTHM_SEARCH_INTEGRATION": true,
+  "READY_FOR_PR62_COMPLETION_REVIEW": false,
+  "S_authority_hashes": {
+    "json": {
+      "bytes": 268759,
+      "sha256": "e54ab2a5d366c3d76613a93e73fae0a722cd642f64dbc1f077618d51c6472c2a",
+      "unchanged": true
+    },
+    "markdown": {
+      "bytes": 4510,
+      "sha256": "bcfa140683be12a1441e149c9ad3155b4d9985f93a187d4930d17003b1e7b22f",
+      "unchanged": true
+    }
+  },
+  "bucket_exposure_corroboration": {
+    "role": "REVIEW_ONLY_CORROBORATION_NOT_V3_SELECTION",
+    "route_10_production_only": {
+      "legacy_calibration_count": 2,
+      "legacy_calibration_fingerprints": [
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "materiality_count": 5,
+      "materiality_fingerprints": [
+        "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+        "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "metric": "bucket_exposure_equivalent",
+      "preservation_bound": 2.2628191917926586,
+      "selected": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+      "selected_fleet_tuple": [
+        13,
+        2207,
+        81
+      ],
+      "selected_rhythm_tuple": [
+        8,
+        12,
+        6,
+        0
+      ]
+    },
+    "route_10_q_augmented": {
+      "legacy_calibration_count": 2,
+      "legacy_calibration_fingerprints": [
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "materiality_count": 6,
+      "materiality_fingerprints": [
+        "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+        "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+        "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "metric": "bucket_exposure_equivalent",
+      "preservation_bound": 2.2628191917926586,
+      "selected": "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+      "selected_fleet_tuple": [
+        12,
+        1716,
+        71
+      ],
+      "selected_rhythm_tuple": [
+        6,
+        6,
+        6,
+        0
+      ]
+    },
+    "route_6": {
+      "legacy_calibration_count": 5,
+      "legacy_calibration_fingerprints": [
+        "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+        "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+        "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+        "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+        "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+      ],
+      "materiality_count": 7,
+      "materiality_fingerprints": [
+        "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+        "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+        "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+        "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+        "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+        "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+        "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4"
+      ],
+      "metric": "bucket_exposure_equivalent",
+      "preservation_bound": 1.2119704346485456,
+      "selected": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+      "selected_fleet_tuple": [
+        20,
+        5219,
+        75
+      ],
+      "selected_rhythm_tuple": [
+        8,
+        14,
+        6,
+        0
+      ]
+    }
+  },
+  "calibration_semantics": {
+    "final_materiality": "ALL_ACCESS_SAFE_CANDIDATES_WITH_CONTINUOUS_DELTA_AT_MOST_ROUTE_LOCAL_BOUND_PLUS_EPSILON",
+    "legacy_te_calibration_band_trips": 1.0,
+    "role": "CALIBRATION_QUANTUM_ONLY_NOT_FINAL_V3_ELIGIBILITY_GATE",
+    "route_local_bound": "MAX_CONTINUOUS_DELTA_OF_LEGACY_TE_CALIBRATION_SET"
+  },
+  "classification": "PHASE_ROBUST_MATERIALITY_POLICY_V3_FROZEN",
+  "deterministic_render": true,
+  "immutable_file_locks": {
+    "docs/engine/evidence/PR62_S_PHASE_ROBUST_MATERIALITY_POLICY_EXPERIMENT.json": {
+      "bytes": 268759,
+      "sha256": "e54ab2a5d366c3d76613a93e73fae0a722cd642f64dbc1f077618d51c6472c2a",
+      "unchanged": true
+    },
+    "docs/engine/evidence/PR62_S_PHASE_ROBUST_MATERIALITY_POLICY_EXPERIMENT.md": {
+      "bytes": 4510,
+      "sha256": "bcfa140683be12a1441e149c9ad3155b4d9985f93a187d4930d17003b1e7b22f",
+      "unchanged": true
+    },
+    "outputs/final_pilot/Route_10_Final_Pilot_Timetable.xlsx": {
+      "bytes": 29943,
+      "sha256": "d84dd2e873d3ba30275463a5eff67277a22467839af0f0125e69160a891fc3db",
+      "unchanged": true
+    },
+    "outputs/final_pilot/Route_6_Final_Pilot_Timetable.xlsx": {
+      "bytes": 34890,
+      "sha256": "13454026722f996d8b06e5305b3b6ab2d57ea6126734f4deeb23c3e7dbafd02c",
+      "unchanged": true
+    },
+    "src/bus_schedule_engine/contracts_v1/clean_boundary_compiler.py": {
+      "bytes": 25857,
+      "sha256": "e36950284e7d2bea1f7ff15dc1bb016d360b8b3dd6ff3ce0299cfcbdb3952490",
+      "unchanged": true
+    },
+    "src/bus_schedule_engine/contracts_v1/fleet_assignment.py": {
+      "bytes": 4278,
+      "sha256": "ea222b7f3c4d46eb908b6a1df4b6f450128dff418f7a8e466192eab8b965f093",
+      "unchanged": true
+    },
+    "src/bus_schedule_engine/contracts_v1/operational_selection_policy.py": {
+      "bytes": 26639,
+      "sha256": "5f10bf7130c20898a3e537fc8f7b73e990335f92ccb7913c41e50a308809e415",
+      "unchanged": true
+    },
+    "src/bus_schedule_engine/contracts_v1/operational_selection_policy_v2.py": {
+      "bytes": 20711,
+      "sha256": "79a63d38dfde00f42af1f5a56cb67adb3280c3941b45cdb1f67fb65c67ea3181",
+      "unchanged": true
+    },
+    "src/bus_schedule_engine/service_plan_coordinator.py": {
+      "bytes": 135850,
+      "sha256": "99da83840f30d5ff7781b1525ec5202074641f1c01203ad46ddc42200a24bfc0",
+      "unchanged": true
+    }
+  },
+  "input_provenance": {
+    "authority": "COMMITTED_PR62_S_CANDIDATE_RECORDS",
+    "coordinator_replays_executed_by_T": 0,
+    "private_workbook_opened_by_T": false,
+    "production_searches_executed_by_T": 0
+  },
+  "intermediate_winner_comparison": {
+    "bucket_production_only_winner": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+    "continuous_production_only_winner": "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+    "intermediate_winners_identical": false,
+    "q_augmented_winners_converge_on_q": true
+  },
+  "metric_definition": {
+    "bucket_boundary_reassignment": false,
+    "demand_density": "NORMALIZED_OBSERVED_DEMAND_MASS_DIVIDED_BY_BUCKET_WIDTH",
+    "demand_support": "FINITE_ORDERED_CONTIGUOUS_NON_OVERLAPPING_POSITIVE_WIDTH_NON_NEGATIVE_DEMAND",
+    "directional_departures": "FINITE_STRICTLY_INCREASING_EXACT_TIMES",
+    "directional_equivalent": "DIRECTIONAL_TRIP_COUNT_TIMES_DIRECTIONAL_TV",
+    "directional_tv": "0.5_TIMES_INTEGRAL_ABSOLUTE_SERVICE_MINUS_DEMAND_DENSITY",
+    "discretization": false,
+    "integration": "EXACT_UNION_OF_DEMAND_BOUNDARIES_DEPARTURES_AND_DOMAIN_ENDPOINTS",
+    "minute_rounding": false,
+    "numerical_epsilon": 1e-12,
+    "pair_equivalent": "OUTBOUND_PLUS_INBOUND_EQUIVALENT",
+    "point_counting": false,
+    "service_density": "ONE_DIVIDED_BY_HEADWAY_AND_N_MINUS_ONE_ON_EACH_INTERDEPARTURE_INTERVAL"
+  },
+  "milestone": "PR62-T",
+  "next_milestone": "PR62-U_LOCAL_RHYTHM_CANONICALIZATION_SEARCH_INTEGRATION",
+  "no_universal_continuous_materiality_band": true,
+  "primary_materiality_metric": "continuous_exposure_equivalent",
+  "priority_order": [
+    "HARD_OPERATIONAL_FEASIBILITY",
+    "SCENARIO_B_MAX_ACCESS_NON_REGRESSION",
+    "COMMON_SSE_TE_DEMAND_FIT_ANCHOR",
+    "LEGACY_ONE_TRIP_TE_SEMANTIC_CALIBRATION",
+    "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE",
+    "RHYTHM_SIMPLICITY",
+    "FLEET_EFFICIENCY"
+  ],
+  "production_guards": {
+    "Access_changed": "NO",
+    "Active_production_selector_changed": "NO",
+    "Canonical_Route_10_XLSX_changed": "NO",
+    "Canonical_Route_6_XLSX_changed": "NO",
+    "Compiler_changed": "NO",
+    "Continuous_exposure_metric_promoted_to_V3_materiality": "YES",
+    "Coordinator_changed": "NO",
+    "Fleet_validator_changed": "NO",
+    "Micro_rhythm_hard_constraint_added": "NO",
+    "Pareto_changed": "NO",
+    "Private_workbook_committed": "NO",
+    "Private_workbook_opened": "NO",
+    "Protection_changed": "NO",
+    "Queue_changed": "NO",
+    "Rhythm_tuple_changed": "NO",
+    "Search_budget_changed": "NO",
+    "Search_changed": "NO",
+    "Settlement_or_residual_added": "NO",
+    "Tail_changed": "NO",
+    "V1_selector_changed": "NO",
+    "V2_selector_changed": "NO",
+    "V3_selector_added": "YES",
+    "XLSX_regenerated": "NO"
+  },
+  "q_production_boundary": {
+    "authority": "Q_CANONICAL_EXTERNAL_REVIEW_CANDIDATE",
+    "current_production_frontier_count": 7,
+    "fingerprint": "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+    "generated_by_current_production_search": false,
+    "q_augmented_review_universe_count": 8
+  },
+  "readiness": {
+    "READY_FOR_FINAL_PILOT_USE": false,
+    "READY_FOR_LOCAL_RHYTHM_SEARCH_INTEGRATION": true,
+    "READY_FOR_PR62_COMPLETION_REVIEW": false
+  },
+  "readiness_reason": "V3 policy is frozen, but Q is not generated by the current live search candidate universe and canonical XLSX files remain P/V2 products.",
+  "route_10_q_required_snapshot": {
+    "actual_service_regime_count": 6,
+    "authority": "Q_CANONICAL_EXTERNAL_REVIEW_CANDIDATE",
+    "continuous_exposure_delta_from_anchor": 1.5562442641156515,
+    "continuous_exposure_equivalent": 14.4617731310795,
+    "fingerprint": "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+    "fleet_tuple": [
+      12,
+      1716,
+      71
+    ],
+    "headways": {
+      "inbound": [
+        19,
+        24
+      ],
+      "outbound": [
+        20,
+        14,
+        18,
+        23
+      ]
+    },
+    "inside_continuous_materiality_set": true,
+    "inside_legacy_te_calibration_set": false,
+    "micro_rhythm_boundary_count": 0,
+    "production_SSE": 0.013965348263913453,
+    "production_TE": 20.327612830424492,
+    "production_TE_delta_from_anchor": 3.3704127647491333,
+    "rhythm_tuple": [
+      6,
+      6,
+      6,
+      0
+    ]
+  },
+  "route_results": {
+    "10_current_production": {
+      "anchor_continuous_exposure_equivalent": 12.905528866963849,
+      "best_fleet_efficiency_count": 1,
+      "best_rhythm_count": 1,
+      "candidate_metric_audit": [
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 1.6574191719002034,
+          "continuous_exposure_equivalent": 14.562948038864052,
+          "fingerprint": "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+          "fleet_tuple": [
+            11,
+            1855,
+            52
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 5,
+          "production_SSE": 0.012013640351117972,
+          "production_TE": 18.414536038394637,
+          "production_TE_delta_from_anchor": 1.457335972719278,
+          "rhythm_tuple": [
+            9,
+            11,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 1.9238739315509505,
+          "continuous_exposure_equivalent": 14.8294027985148,
+          "fingerprint": "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+          "fleet_tuple": [
+            12,
+            2713,
+            49
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 5,
+          "production_SSE": 0.012524369948702048,
+          "production_TE": 19.48118060651341,
+          "production_TE_delta_from_anchor": 2.52398054083805,
+          "rhythm_tuple": [
+            8,
+            11,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 2.0463582235374904,
+          "continuous_exposure_equivalent": 14.951887090501339,
+          "fingerprint": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+          "fleet_tuple": [
+            12,
+            1592,
+            71
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 5,
+          "production_SSE": 0.011758617635110654,
+          "production_TE": 18.653435879634017,
+          "production_TE_delta_from_anchor": 1.6962358139586584,
+          "rhythm_tuple": [
+            8,
+            11,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 0.3918230056112346,
+          "continuous_exposure_equivalent": 13.297351872575083,
+          "fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "fleet_tuple": [
+            13,
+            2447,
+            71
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 4,
+          "production_SSE": 0.010613576150656733,
+          "production_TE": 17.995211037710533,
+          "production_TE_delta_from_anchor": 1.038010972035174,
+          "rhythm_tuple": [
+            10,
+            12,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 0.0,
+          "continuous_exposure_equivalent": 12.905528866963849,
+          "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "fleet_tuple": [
+            13,
+            2432,
+            71
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": true,
+          "micro_rhythm_boundary_count": 4,
+          "production_SSE": 0.00936973709558608,
+          "production_TE": 16.95720006567536,
+          "production_TE_delta_from_anchor": 0.0,
+          "rhythm_tuple": [
+            11,
+            12,
+            7,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 1.6743197551466054,
+          "continuous_exposure_equivalent": 14.579848622110454,
+          "fingerprint": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "fleet_tuple": [
+            13,
+            2207,
+            81
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 4,
+          "production_SSE": 0.011317367734105051,
+          "production_TE": 18.145829326833024,
+          "production_TE_delta_from_anchor": 1.188629261157665,
+          "rhythm_tuple": [
+            8,
+            12,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 1.9858806668778222,
+          "continuous_exposure_equivalent": 14.89140953384167,
+          "fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "fleet_tuple": [
+            12,
+            1683,
+            71
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": true,
+          "micro_rhythm_boundary_count": 5,
+          "production_SSE": 0.010728881378053444,
+          "production_TE": 17.669451511448948,
+          "production_TE_delta_from_anchor": 0.7122514457735889,
+          "rhythm_tuple": [
+            9,
+            11,
+            6,
+            0
+          ]
+        }
+      ],
+      "candidate_universe_count": 7,
+      "classification": "PHASE_ROBUST_MATERIALITY_SELECTS_TRANSLATED_ALTERNATIVE",
+      "common_anchor_fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+      "common_anchor_sse": 0.00936973709558608,
+      "common_anchor_te": 16.95720006567536,
+      "continuous_preservation_bound": 1.9858806668778222,
+      "hard_feasible_count": 7,
+      "legacy_calibration_fingerprints": [
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "legacy_calibration_set_count": 2,
+      "legacy_te_calibration_band_trips": 1.0,
+      "pair_fingerprint_is_quality_objective": false,
+      "passenger_access_safe_count": 7,
+      "phase_robust_materiality_fingerprints": [
+        "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+        "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+        "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "phase_robust_materiality_set_count": 6,
+      "priority_order": [
+        "HARD_OPERATIONAL_FEASIBILITY",
+        "SCENARIO_B_MAX_ACCESS_NON_REGRESSION",
+        "COMMON_SSE_TE_DEMAND_FIT_ANCHOR",
+        "LEGACY_ONE_TRIP_TE_SEMANTIC_CALIBRATION",
+        "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE",
+        "RHYTHM_SIMPLICITY",
+        "FLEET_EFFICIENCY"
+      ],
+      "profile": "legacy_calibrated_continuous_exposure_operational_selector_v3",
+      "rejected_candidates": [
+        {
+          "fingerprint": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 12.905528866963849,
+            "candidate_pair_continuous_exposure_equivalent": 14.951887090501339,
+            "continuous_preservation_bound": 1.9858806668778222,
+            "delta_continuous_exposure_from_anchor": 2.0463582235374904
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              8,
+              11,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              9,
+              11,
+              5,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              8,
+              11,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              10,
+              12,
+              6,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              8,
+              11,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              11,
+              12,
+              7,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              8,
+              11,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              8,
+              12,
+              6,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              8,
+              11,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              9,
+              11,
+              6,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        }
+      ],
+      "route_id": "10",
+      "scenario_b_access_safe_universe_reconstruction": {
+        "authority": "COMMITTED_PR62_S_ACCESS_SAFE_CANDIDATE_UNIVERSE",
+        "directional_maxima_used_to_preserve_prefiltered_universe": {
+          "inbound": 14.066666666666666,
+          "outbound": 13.800000000000002
+        }
+      },
+      "selected_delta_continuous_from_anchor": 1.9238739315509505,
+      "selected_delta_te_from_anchor": 2.52398054083805,
+      "selected_inside_legacy_te_calibration_set": false,
+      "selected_is_anchor": false,
+      "selected_pair_fingerprint": "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+      "selected_stage": "RHYTHM_SIMPLICITY",
+      "sse_best_count": 1,
+      "stage_trace": [
+        {
+          "input_count": 7,
+          "retained_count": 7,
+          "retained_fingerprints": [
+            "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+            "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+            "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+          ],
+          "stage": "HARD_OPERATIONAL_FEASIBILITY"
+        },
+        {
+          "input_count": 7,
+          "retained_count": 7,
+          "retained_fingerprints": [
+            "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+            "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+            "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+          ],
+          "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+        },
+        {
+          "input_count": 7,
+          "retained_count": 7,
+          "retained_fingerprints": [
+            "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+            "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+            "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+          ],
+          "stage": "COMMON_SSE_TE_DEMAND_FIT_ANCHOR"
+        },
+        {
+          "input_count": 7,
+          "retained_count": 2,
+          "retained_fingerprints": [
+            "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+          ],
+          "stage": "LEGACY_ONE_TRIP_TE_SEMANTIC_CALIBRATION"
+        },
+        {
+          "input_count": 7,
+          "retained_count": 6,
+          "retained_fingerprints": [
+            "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+            "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+            "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+          ],
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "input_count": 6,
+          "retained_count": 1,
+          "retained_fingerprints": [
+            "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16"
+          ],
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "input_count": 1,
+          "retained_count": 1,
+          "retained_fingerprints": [
+            "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16"
+          ],
+          "stage": "FLEET_EFFICIENCY"
+        }
+      ],
+      "te_best_count": 1
+    },
+    "10_q_augmented_review": {
+      "anchor_continuous_exposure_equivalent": 12.905528866963849,
+      "best_fleet_efficiency_count": 1,
+      "best_rhythm_count": 1,
+      "candidate_metric_audit": [
+        {
+          "authority": "Q_CANONICAL_EXTERNAL_REVIEW_CANDIDATE",
+          "continuous_exposure_delta_from_anchor": 1.5562442641156515,
+          "continuous_exposure_equivalent": 14.4617731310795,
+          "fingerprint": "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+          "fleet_tuple": [
+            12,
+            1716,
+            71
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 0,
+          "production_SSE": 0.013965348263913453,
+          "production_TE": 20.327612830424492,
+          "production_TE_delta_from_anchor": 3.3704127647491333,
+          "rhythm_tuple": [
+            6,
+            6,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 1.6574191719002034,
+          "continuous_exposure_equivalent": 14.562948038864052,
+          "fingerprint": "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+          "fleet_tuple": [
+            11,
+            1855,
+            52
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 5,
+          "production_SSE": 0.012013640351117972,
+          "production_TE": 18.414536038394637,
+          "production_TE_delta_from_anchor": 1.457335972719278,
+          "rhythm_tuple": [
+            9,
+            11,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 1.9238739315509505,
+          "continuous_exposure_equivalent": 14.8294027985148,
+          "fingerprint": "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+          "fleet_tuple": [
+            12,
+            2713,
+            49
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 5,
+          "production_SSE": 0.012524369948702048,
+          "production_TE": 19.48118060651341,
+          "production_TE_delta_from_anchor": 2.52398054083805,
+          "rhythm_tuple": [
+            8,
+            11,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 2.0463582235374904,
+          "continuous_exposure_equivalent": 14.951887090501339,
+          "fingerprint": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+          "fleet_tuple": [
+            12,
+            1592,
+            71
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 5,
+          "production_SSE": 0.011758617635110654,
+          "production_TE": 18.653435879634017,
+          "production_TE_delta_from_anchor": 1.6962358139586584,
+          "rhythm_tuple": [
+            8,
+            11,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 0.3918230056112346,
+          "continuous_exposure_equivalent": 13.297351872575083,
+          "fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "fleet_tuple": [
+            13,
+            2447,
+            71
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 4,
+          "production_SSE": 0.010613576150656733,
+          "production_TE": 17.995211037710533,
+          "production_TE_delta_from_anchor": 1.038010972035174,
+          "rhythm_tuple": [
+            10,
+            12,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 0.0,
+          "continuous_exposure_equivalent": 12.905528866963849,
+          "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "fleet_tuple": [
+            13,
+            2432,
+            71
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": true,
+          "micro_rhythm_boundary_count": 4,
+          "production_SSE": 0.00936973709558608,
+          "production_TE": 16.95720006567536,
+          "production_TE_delta_from_anchor": 0.0,
+          "rhythm_tuple": [
+            11,
+            12,
+            7,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 1.6743197551466054,
+          "continuous_exposure_equivalent": 14.579848622110454,
+          "fingerprint": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "fleet_tuple": [
+            13,
+            2207,
+            81
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 4,
+          "production_SSE": 0.011317367734105051,
+          "production_TE": 18.145829326833024,
+          "production_TE_delta_from_anchor": 1.188629261157665,
+          "rhythm_tuple": [
+            8,
+            12,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 1.9858806668778222,
+          "continuous_exposure_equivalent": 14.89140953384167,
+          "fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "fleet_tuple": [
+            12,
+            1683,
+            71
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": true,
+          "micro_rhythm_boundary_count": 5,
+          "production_SSE": 0.010728881378053444,
+          "production_TE": 17.669451511448948,
+          "production_TE_delta_from_anchor": 0.7122514457735889,
+          "rhythm_tuple": [
+            9,
+            11,
+            6,
+            0
+          ]
+        }
+      ],
+      "candidate_universe_count": 8,
+      "classification": "PHASE_ROBUST_MATERIALITY_SELECTS_TRANSLATED_ALTERNATIVE",
+      "common_anchor_fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+      "common_anchor_sse": 0.00936973709558608,
+      "common_anchor_te": 16.95720006567536,
+      "continuous_preservation_bound": 1.9858806668778222,
+      "hard_feasible_count": 8,
+      "legacy_calibration_fingerprints": [
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "legacy_calibration_set_count": 2,
+      "legacy_te_calibration_band_trips": 1.0,
+      "pair_fingerprint_is_quality_objective": false,
+      "passenger_access_safe_count": 8,
+      "phase_robust_materiality_fingerprints": [
+        "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+        "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+        "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+        "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+        "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+        "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+        "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+      ],
+      "phase_robust_materiality_set_count": 7,
+      "priority_order": [
+        "HARD_OPERATIONAL_FEASIBILITY",
+        "SCENARIO_B_MAX_ACCESS_NON_REGRESSION",
+        "COMMON_SSE_TE_DEMAND_FIT_ANCHOR",
+        "LEGACY_ONE_TRIP_TE_SEMANTIC_CALIBRATION",
+        "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE",
+        "RHYTHM_SIMPLICITY",
+        "FLEET_EFFICIENCY"
+      ],
+      "profile": "legacy_calibrated_continuous_exposure_operational_selector_v3",
+      "rejected_candidates": [
+        {
+          "fingerprint": "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 12.905528866963849,
+            "candidate_pair_continuous_exposure_equivalent": 14.951887090501339,
+            "continuous_preservation_bound": 1.9858806668778222,
+            "delta_continuous_exposure_from_anchor": 2.0463582235374904
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              6,
+              6,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              9,
+              11,
+              5,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              6,
+              6,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              8,
+              11,
+              6,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              6,
+              6,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              10,
+              12,
+              6,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              6,
+              6,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              11,
+              12,
+              7,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              6,
+              6,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              8,
+              12,
+              6,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              6,
+              6,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              9,
+              11,
+              6,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        }
+      ],
+      "route_id": "10",
+      "scenario_b_access_safe_universe_reconstruction": {
+        "authority": "COMMITTED_PR62_S_ACCESS_SAFE_CANDIDATE_UNIVERSE",
+        "directional_maxima_used_to_preserve_prefiltered_universe": {
+          "inbound": 14.066666666666666,
+          "outbound": 13.800000000000002
+        }
+      },
+      "selected_delta_continuous_from_anchor": 1.5562442641156515,
+      "selected_delta_te_from_anchor": 3.3704127647491333,
+      "selected_inside_legacy_te_calibration_set": false,
+      "selected_is_anchor": false,
+      "selected_pair_fingerprint": "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+      "selected_stage": "RHYTHM_SIMPLICITY",
+      "sse_best_count": 1,
+      "stage_trace": [
+        {
+          "input_count": 8,
+          "retained_count": 8,
+          "retained_fingerprints": [
+            "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+            "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+            "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+            "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+          ],
+          "stage": "HARD_OPERATIONAL_FEASIBILITY"
+        },
+        {
+          "input_count": 8,
+          "retained_count": 8,
+          "retained_fingerprints": [
+            "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+            "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+            "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+            "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+          ],
+          "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+        },
+        {
+          "input_count": 8,
+          "retained_count": 8,
+          "retained_fingerprints": [
+            "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+            "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+            "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+            "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede",
+            "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+          ],
+          "stage": "COMMON_SSE_TE_DEMAND_FIT_ANCHOR"
+        },
+        {
+          "input_count": 8,
+          "retained_count": 2,
+          "retained_fingerprints": [
+            "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+          ],
+          "stage": "LEGACY_ONE_TRIP_TE_SEMANTIC_CALIBRATION"
+        },
+        {
+          "input_count": 8,
+          "retained_count": 7,
+          "retained_fingerprints": [
+            "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+            "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3",
+            "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16",
+            "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0",
+            "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c",
+            "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7",
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+          ],
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "input_count": 7,
+          "retained_count": 1,
+          "retained_fingerprints": [
+            "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5"
+          ],
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "input_count": 1,
+          "retained_count": 1,
+          "retained_fingerprints": [
+            "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5"
+          ],
+          "stage": "FLEET_EFFICIENCY"
+        }
+      ],
+      "te_best_count": 1
+    },
+    "6_current_production": {
+      "anchor_continuous_exposure_equivalent": 19.732375325543522,
+      "best_fleet_efficiency_count": 1,
+      "best_rhythm_count": 1,
+      "candidate_metric_audit": [
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 0.20215241169405118,
+          "continuous_exposure_equivalent": 19.934527737237573,
+          "fingerprint": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "fleet_tuple": [
+            19,
+            4778,
+            75
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": true,
+          "micro_rhythm_boundary_count": 0,
+          "production_SSE": 0.007844748788009408,
+          "production_TE": 21.409068471613054,
+          "production_TE_delta_from_anchor": 0.4852947125692779,
+          "rhythm_tuple": [
+            9,
+            14,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 7.225195902119076,
+          "continuous_exposure_equivalent": 26.957571227662598,
+          "fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "fleet_tuple": [
+            14,
+            1768,
+            31
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 10,
+          "production_SSE": 0.014405216915627458,
+          "production_TE": 29.187521617555298,
+          "production_TE_delta_from_anchor": 8.263747858511522,
+          "rhythm_tuple": [
+            8,
+            14,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 1.2760765031007502,
+          "continuous_exposure_equivalent": 21.008451828644272,
+          "fingerprint": "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+          "fleet_tuple": [
+            18,
+            4312,
+            60
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": true,
+          "micro_rhythm_boundary_count": 2,
+          "production_SSE": 0.00792946693663908,
+          "production_TE": 21.747939022607262,
+          "production_TE_delta_from_anchor": 0.8241652635634864,
+          "rhythm_tuple": [
+            10,
+            16,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 5.139129670386655,
+          "continuous_exposure_equivalent": 24.871504995930177,
+          "fingerprint": "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+          "fleet_tuple": [
+            17,
+            3596,
+            53
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 5,
+          "production_SSE": 0.011522188274652378,
+          "production_TE": 26.39031970344591,
+          "production_TE_delta_from_anchor": 5.466545944402135,
+          "rhythm_tuple": [
+            9,
+            14,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 4.032314553009222,
+          "continuous_exposure_equivalent": 23.764689878552744,
+          "fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "fleet_tuple": [
+            16,
+            3109,
+            53
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 4,
+          "production_SSE": 0.010444362064544018,
+          "production_TE": 25.31426575619964,
+          "production_TE_delta_from_anchor": 4.390491997155863,
+          "rhythm_tuple": [
+            8,
+            13,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 0.5353067336036972,
+          "continuous_exposure_equivalent": 20.26768205914722,
+          "fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+          "fleet_tuple": [
+            19,
+            5042,
+            84
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": true,
+          "micro_rhythm_boundary_count": 1,
+          "production_SSE": 0.006996508425112851,
+          "production_TE": 21.653274998981715,
+          "production_TE_delta_from_anchor": 0.7295012399379388,
+          "rhythm_tuple": [
+            8,
+            15,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 2.558959187290206,
+          "continuous_exposure_equivalent": 22.29133451283373,
+          "fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "fleet_tuple": [
+            18,
+            4912,
+            62
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 3,
+          "production_SSE": 0.008916512172125109,
+          "production_TE": 24.340916729855508,
+          "production_TE_delta_from_anchor": 3.4171429708117316,
+          "rhythm_tuple": [
+            8,
+            13,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 5.7045336513364475,
+          "continuous_exposure_equivalent": 25.43690897687997,
+          "fingerprint": "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+          "fleet_tuple": [
+            15,
+            2540,
+            45
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 9,
+          "production_SSE": 0.012546933358743944,
+          "production_TE": 27.579568221382317,
+          "production_TE_delta_from_anchor": 6.655794462338541,
+          "rhythm_tuple": [
+            9,
+            14,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 3.38928234130217,
+          "continuous_exposure_equivalent": 23.121657666845692,
+          "fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "fleet_tuple": [
+            16,
+            3298,
+            51
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 7,
+          "production_SSE": 0.010276894785270142,
+          "production_TE": 24.372237827757978,
+          "production_TE_delta_from_anchor": 3.448464068714202,
+          "rhythm_tuple": [
+            9,
+            16,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 8.019357560391136,
+          "continuous_exposure_equivalent": 27.751732885934658,
+          "fingerprint": "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+          "fleet_tuple": [
+            15,
+            2014,
+            37
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 7,
+          "production_SSE": 0.014373833136336233,
+          "production_TE": 30.414592530016566,
+          "production_TE_delta_from_anchor": 9.49081877097279,
+          "rhythm_tuple": [
+            7,
+            11,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 7.135642517604165,
+          "continuous_exposure_equivalent": 26.868017843147687,
+          "fingerprint": "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+          "fleet_tuple": [
+            14,
+            1767,
+            31
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 7,
+          "production_SSE": 0.013977792814008651,
+          "production_TE": 29.250864543278375,
+          "production_TE_delta_from_anchor": 8.3270907842346,
+          "rhythm_tuple": [
+            9,
+            12,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 3.6689605843839317,
+          "continuous_exposure_equivalent": 23.401335909927454,
+          "fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "fleet_tuple": [
+            20,
+            4065,
+            94
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 3,
+          "production_SSE": 0.01037409852064166,
+          "production_TE": 24.73365442082246,
+          "production_TE_delta_from_anchor": 3.809880661778685,
+          "rhythm_tuple": [
+            7,
+            12,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 6.17995684679174,
+          "continuous_exposure_equivalent": 25.91233217233526,
+          "fingerprint": "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+          "fleet_tuple": [
+            15,
+            2593,
+            45
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 6,
+          "production_SSE": 0.012701115545335193,
+          "production_TE": 28.459853580051707,
+          "production_TE_delta_from_anchor": 7.536079821007931,
+          "rhythm_tuple": [
+            8,
+            11,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 0.7374591452977448,
+          "continuous_exposure_equivalent": 20.469834470841267,
+          "fingerprint": "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+          "fleet_tuple": [
+            18,
+            4590,
+            71
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 1,
+          "production_SSE": 0.008149760259092994,
+          "production_TE": 22.13856971155099,
+          "production_TE_delta_from_anchor": 1.2147959525072132,
+          "rhythm_tuple": [
+            9,
+            15,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 3.056021079531334,
+          "continuous_exposure_equivalent": 22.788396405074856,
+          "fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "fleet_tuple": [
+            18,
+            3665,
+            60
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 3,
+          "production_SSE": 0.009894494039029296,
+          "production_TE": 24.225768176293663,
+          "production_TE_delta_from_anchor": 3.3019944172498867,
+          "rhythm_tuple": [
+            10,
+            13,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 3.2997289567872627,
+          "continuous_exposure_equivalent": 23.032104282330785,
+          "fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "fleet_tuple": [
+            16,
+            3311,
+            52
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 4,
+          "production_SSE": 0.009849470683651338,
+          "production_TE": 24.435580753481055,
+          "production_TE_delta_from_anchor": 3.511806994437279,
+          "rhythm_tuple": [
+            10,
+            14,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 6.269510231306654,
+          "continuous_exposure_equivalent": 26.001885556850176,
+          "fingerprint": "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+          "fleet_tuple": [
+            15,
+            2594,
+            45
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 9,
+          "production_SSE": 0.013128539646953997,
+          "production_TE": 28.39651065432863,
+          "production_TE_delta_from_anchor": 7.472736895284854,
+          "rhythm_tuple": [
+            7,
+            13,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 0.7407697694970565,
+          "continuous_exposure_equivalent": 20.47314509504058,
+          "fingerprint": "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+          "fleet_tuple": [
+            19,
+            4159,
+            71
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": true,
+          "micro_rhythm_boundary_count": 1,
+          "production_SSE": 0.007624455465555494,
+          "production_TE": 21.018437782669324,
+          "production_TE_delta_from_anchor": 0.0946640236255476,
+          "rhythm_tuple": [
+            10,
+            15,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 6.334516591832493,
+          "continuous_exposure_equivalent": 26.066891917376015,
+          "fingerprint": "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+          "fleet_tuple": [
+            15,
+            2594,
+            45
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 9,
+          "production_SSE": 0.01369768151188426,
+          "production_TE": 28.683212720073584,
+          "production_TE_delta_from_anchor": 7.759438961029808,
+          "rhythm_tuple": [
+            7,
+            13,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 5.691484380125445,
+          "continuous_exposure_equivalent": 25.423859705668967,
+          "fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "fleet_tuple": [
+            14,
+            1728,
+            30
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 12,
+          "production_SSE": 0.013530214232610385,
+          "production_TE": 27.741184791631923,
+          "production_TE_delta_from_anchor": 6.817411032588147,
+          "rhythm_tuple": [
+            8,
+            16,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 2.7611115989842574,
+          "continuous_exposure_equivalent": 22.49348692452778,
+          "fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "fleet_tuple": [
+            18,
+            4904,
+            73
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 3,
+          "production_SSE": 0.010069764006105254,
+          "production_TE": 24.826211442424782,
+          "production_TE_delta_from_anchor": 3.902437683381006,
+          "rhythm_tuple": [
+            9,
+            13,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 6.347565863043499,
+          "continuous_exposure_equivalent": 26.07994118858702,
+          "fingerprint": "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+          "fleet_tuple": [
+            15,
+            2593,
+            45
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 6,
+          "production_SSE": 0.01271440063801782,
+          "production_TE": 28.521596149823978,
+          "production_TE_delta_from_anchor": 7.597822390780202,
+          "rhythm_tuple": [
+            8,
+            11,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 2.850664983499165,
+          "continuous_exposure_equivalent": 22.583040309042687,
+          "fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "fleet_tuple": [
+            17,
+            4114,
+            59
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 6,
+          "production_SSE": 0.010497188107724058,
+          "production_TE": 24.762868516701705,
+          "production_TE_delta_from_anchor": 3.8390947576579286,
+          "rhythm_tuple": [
+            8,
+            15,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 3.2915447835121654,
+          "continuous_exposure_equivalent": 23.023920109055688,
+          "fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "fleet_tuple": [
+            18,
+            4967,
+            65
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 3,
+          "production_SSE": 0.00951140355301779,
+          "production_TE": 25.219601732574088,
+          "production_TE_delta_from_anchor": 4.2958279735303115,
+          "rhythm_tuple": [
+            6,
+            12,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 3.1039840044137286,
+          "continuous_exposure_equivalent": 22.83635932995725,
+          "fingerprint": "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+          "fleet_tuple": [
+            20,
+            4571,
+            90
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 3,
+          "production_SSE": 0.009792492232431609,
+          "production_TE": 23.916711987876145,
+          "production_TE_delta_from_anchor": 2.9929382288323687,
+          "rhythm_tuple": [
+            9,
+            13,
+            7,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 5.111990063917652,
+          "continuous_exposure_equivalent": 24.844365389461174,
+          "fingerprint": "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+          "fleet_tuple": [
+            17,
+            3596,
+            53
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 5,
+          "production_SSE": 0.012057789066996394,
+          "production_TE": 26.563222812404582,
+          "production_TE_delta_from_anchor": 5.639449053360806,
+          "rhythm_tuple": [
+            9,
+            14,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 4.576683330313962,
+          "continuous_exposure_equivalent": 24.309058655857484,
+          "fingerprint": "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+          "fleet_tuple": [
+            17,
+            3265,
+            65
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 4,
+          "production_SSE": 0.011752777595912808,
+          "production_TE": 25.833721572466647,
+          "production_TE_delta_from_anchor": 4.909947813422871,
+          "rhythm_tuple": [
+            9,
+            13,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 0.0,
+          "continuous_exposure_equivalent": 19.732375325543522,
+          "fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+          "fleet_tuple": [
+            20,
+            5219,
+            75
+          ],
+          "inside_continuous_materiality_set": true,
+          "inside_legacy_te_calibration_set": true,
+          "micro_rhythm_boundary_count": 0,
+          "production_SSE": 0.006691496954029265,
+          "production_TE": 20.923773759043776,
+          "production_TE_delta_from_anchor": 0.0,
+          "rhythm_tuple": [
+            8,
+            14,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 2.6485125718051172,
+          "continuous_exposure_equivalent": 22.38088789734864,
+          "fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "fleet_tuple": [
+            18,
+            4305,
+            61
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 6,
+          "production_SSE": 0.009343936273743914,
+          "production_TE": 24.27757380413243,
+          "production_TE_delta_from_anchor": 3.3538000450886543,
+          "rhythm_tuple": [
+            7,
+            15,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 3.065577772719184,
+          "continuous_exposure_equivalent": 22.797953098262706,
+          "fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "fleet_tuple": [
+            19,
+            2949,
+            80
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 5,
+          "production_SSE": 0.010471097888010745,
+          "production_TE": 24.74997253452543,
+          "production_TE_delta_from_anchor": 3.8261987754816538,
+          "rhythm_tuple": [
+            11,
+            14,
+            7,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 3.4936971952062166,
+          "continuous_exposure_equivalent": 23.22607252074974,
+          "fingerprint": "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+          "fleet_tuple": [
+            18,
+            4682,
+            74
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 3,
+          "production_SSE": 0.010664655386997932,
+          "production_TE": 25.704896445143362,
+          "production_TE_delta_from_anchor": 4.781122686099586,
+          "rhythm_tuple": [
+            7,
+            12,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 8.975043231203557,
+          "continuous_exposure_equivalent": 28.70741855674708,
+          "fingerprint": "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+          "fleet_tuple": [
+            14,
+            1808,
+            23
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 8,
+          "production_SSE": 0.015650510405009692,
+          "production_TE": 31.205603493243235,
+          "production_TE_delta_from_anchor": 10.281829734199459,
+          "rhythm_tuple": [
+            8,
+            12,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 3.620997659501537,
+          "continuous_exposure_equivalent": 23.35337298504506,
+          "fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "fleet_tuple": [
+            18,
+            3156,
+            65
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 3,
+          "production_SSE": 0.010476100327239347,
+          "production_TE": 25.04271060923998,
+          "production_TE_delta_from_anchor": 4.118936850196203,
+          "rhythm_tuple": [
+            8,
+            12,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 4.398359900889602,
+          "continuous_exposure_equivalent": 24.130735226433124,
+          "fingerprint": "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+          "fleet_tuple": [
+            18,
+            4358,
+            65
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 4,
+          "production_SSE": 0.01058922976312615,
+          "production_TE": 26.295655679820364,
+          "production_TE_delta_from_anchor": 5.3718819207765875,
+          "rhythm_tuple": [
+            7,
+            13,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 3.042971808320331,
+          "continuous_exposure_equivalent": 22.775347133863853,
+          "fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "fleet_tuple": [
+            18,
+            3645,
+            60
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 6,
+          "production_SSE": 0.010877774912895734,
+          "production_TE": 24.38738474654327,
+          "production_TE_delta_from_anchor": 3.463610987499493,
+          "rhythm_tuple": [
+            9,
+            15,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 6.912542443013699,
+          "continuous_exposure_equivalent": 26.64491776855722,
+          "fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "fleet_tuple": [
+            14,
+            1810,
+            23
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 6,
+          "production_SSE": 0.013296006926227871,
+          "production_TE": 29.33853858277029,
+          "production_TE_delta_from_anchor": 8.414764823726514,
+          "rhythm_tuple": [
+            6,
+            10,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 5.61498026682154,
+          "continuous_exposure_equivalent": 25.347355592365062,
+          "fingerprint": "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+          "fleet_tuple": [
+            16,
+            3352,
+            45
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 6,
+          "production_SSE": 0.01211950925712514,
+          "production_TE": 27.642911147105394,
+          "production_TE_delta_from_anchor": 6.719137388061618,
+          "rhythm_tuple": [
+            10,
+            12,
+            6,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 2.084074862248656,
+          "continuous_exposure_equivalent": 21.816450187792178,
+          "fingerprint": "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+          "fleet_tuple": [
+            20,
+            3960,
+            108
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 3,
+          "production_SSE": 0.009230933008699621,
+          "production_TE": 23.139131657137618,
+          "production_TE_delta_from_anchor": 2.215357898093842,
+          "rhythm_tuple": [
+            13,
+            15,
+            8,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 3.5913278131350275,
+          "continuous_exposure_equivalent": 23.32370313867855,
+          "fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "fleet_tuple": [
+            16,
+            3311,
+            52
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 4,
+          "production_SSE": 0.010199505510112882,
+          "production_TE": 24.9552694162316,
+          "production_TE_delta_from_anchor": 4.0314956571878255,
+          "rhythm_tuple": [
+            10,
+            14,
+            5,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 7.868228113826124,
+          "continuous_exposure_equivalent": 27.600603439369646,
+          "fingerprint": "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+          "fleet_tuple": [
+            15,
+            2014,
+            37
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 7,
+          "production_SSE": 0.014572684194901334,
+          "production_TE": 30.12954954599696,
+          "production_TE_delta_from_anchor": 9.205775786953183,
+          "rhythm_tuple": [
+            7,
+            11,
+            4,
+            0
+          ]
+        },
+        {
+          "authority": "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER",
+          "continuous_exposure_delta_from_anchor": 7.4543809804209324,
+          "continuous_exposure_equivalent": 27.186756305964455,
+          "fingerprint": "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21",
+          "fleet_tuple": [
+            14,
+            1767,
+            31
+          ],
+          "inside_continuous_materiality_set": false,
+          "inside_legacy_te_calibration_set": false,
+          "micro_rhythm_boundary_count": 7,
+          "production_SSE": 0.01379222684812618,
+          "production_TE": 29.59765009707025,
+          "production_TE_delta_from_anchor": 8.673876338026474,
+          "rhythm_tuple": [
+            9,
+            12,
+            5,
+            0
+          ]
+        }
+      ],
+      "candidate_universe_count": 41,
+      "classification": "PHASE_ROBUST_MATERIALITY_SELECTS_ANCHOR",
+      "common_anchor_fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+      "common_anchor_sse": 0.006691496954029265,
+      "common_anchor_te": 20.923773759043776,
+      "continuous_preservation_bound": 1.2760765031007502,
+      "hard_feasible_count": 41,
+      "legacy_calibration_fingerprints": [
+        "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+        "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+        "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+        "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+        "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+      ],
+      "legacy_calibration_set_count": 5,
+      "legacy_te_calibration_band_trips": 1.0,
+      "pair_fingerprint_is_quality_objective": false,
+      "passenger_access_safe_count": 41,
+      "phase_robust_materiality_fingerprints": [
+        "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+        "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+        "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+        "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+        "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+        "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+      ],
+      "phase_robust_materiality_set_count": 6,
+      "priority_order": [
+        "HARD_OPERATIONAL_FEASIBILITY",
+        "SCENARIO_B_MAX_ACCESS_NON_REGRESSION",
+        "COMMON_SSE_TE_DEMAND_FIT_ANCHOR",
+        "LEGACY_ONE_TRIP_TE_SEMANTIC_CALIBRATION",
+        "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE",
+        "RHYTHM_SIMPLICITY",
+        "FLEET_EFFICIENCY"
+      ],
+      "profile": "legacy_calibrated_continuous_exposure_operational_selector_v3",
+      "rejected_candidates": [
+        {
+          "fingerprint": "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 26.957571227662598,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 7.225195902119076
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 24.871504995930177,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 5.139129670386655
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 23.764689878552744,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 4.032314553009222
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 22.29133451283373,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 2.558959187290206
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 25.43690897687997,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 5.7045336513364475
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 23.121657666845692,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 3.38928234130217
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 27.751732885934658,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 8.019357560391136
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 26.868017843147687,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 7.135642517604165
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 23.401335909927454,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 3.6689605843839317
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 25.91233217233526,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 6.17995684679174
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 22.788396405074856,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 3.056021079531334
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 23.032104282330785,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 3.2997289567872627
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 26.001885556850176,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 6.269510231306654
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 26.066891917376015,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 6.334516591832493
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 25.423859705668967,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 5.691484380125445
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 22.49348692452778,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 2.7611115989842574
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 26.07994118858702,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 6.347565863043499
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 22.583040309042687,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 2.850664983499165
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 23.023920109055688,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 3.2915447835121654
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 22.83635932995725,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 3.1039840044137286
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 24.844365389461174,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 5.111990063917652
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 24.309058655857484,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 4.576683330313962
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 22.38088789734864,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 2.6485125718051172
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 22.797953098262706,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 3.065577772719184
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 23.22607252074974,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 3.4936971952062166
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 28.70741855674708,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 8.975043231203557
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 23.35337298504506,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 3.620997659501537
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 24.130735226433124,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 4.398359900889602
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 22.775347133863853,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 3.042971808320331
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 26.64491776855722,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 6.912542443013699
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 25.347355592365062,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 5.61498026682154
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 21.816450187792178,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 2.084074862248656
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 23.32370313867855,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 3.5913278131350275
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 27.600603439369646,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 7.868228113826124
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21",
+          "reason": "OUTSIDE_ROUTE_LOCAL_CONTINUOUS_EXPOSURE_ENVELOPE",
+          "relevant_metric_values": {
+            "anchor_pair_continuous_exposure_equivalent": 19.732375325543522,
+            "candidate_pair_continuous_exposure_equivalent": 27.186756305964455,
+            "continuous_preservation_bound": 1.2760765031007502,
+            "delta_continuous_exposure_from_anchor": 7.4543809804209324
+          },
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "fingerprint": "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              8,
+              14,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              9,
+              14,
+              5,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              8,
+              14,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              10,
+              16,
+              4,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              8,
+              14,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              8,
+              15,
+              5,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              8,
+              14,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              9,
+              15,
+              4,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "fingerprint": "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+          "reason": "NOT_IN_BEST_RHYTHM_SET",
+          "relevant_metric_values": {
+            "best_rhythm_simplicity_tuple": [
+              8,
+              14,
+              6,
+              0
+            ],
+            "rhythm_simplicity_tuple": [
+              10,
+              15,
+              5,
+              0
+            ]
+          },
+          "stage": "RHYTHM_SIMPLICITY"
+        }
+      ],
+      "route_id": "6",
+      "scenario_b_access_safe_universe_reconstruction": {
+        "authority": "COMMITTED_PR62_S_ACCESS_SAFE_CANDIDATE_UNIVERSE",
+        "directional_maxima_used_to_preserve_prefiltered_universe": {
+          "inbound": 12.5,
+          "outbound": 12.5
+        }
+      },
+      "selected_delta_continuous_from_anchor": 0.0,
+      "selected_delta_te_from_anchor": 0.0,
+      "selected_inside_legacy_te_calibration_set": true,
+      "selected_is_anchor": true,
+      "selected_pair_fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+      "selected_stage": "RHYTHM_SIMPLICITY",
+      "sse_best_count": 1,
+      "stage_trace": [
+        {
+          "input_count": 41,
+          "retained_count": 41,
+          "retained_fingerprints": [
+            "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+            "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+            "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+            "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+            "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+            "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+            "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+            "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+            "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+            "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+            "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+            "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+            "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+            "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+            "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+            "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+            "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+            "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+            "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+            "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+            "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+            "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+            "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+            "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+            "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+            "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+            "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+            "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+            "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+            "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+            "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+            "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+            "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+            "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+            "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+            "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+            "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+            "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+            "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+            "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+            "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21"
+          ],
+          "stage": "HARD_OPERATIONAL_FEASIBILITY"
+        },
+        {
+          "input_count": 41,
+          "retained_count": 41,
+          "retained_fingerprints": [
+            "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+            "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+            "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+            "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+            "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+            "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+            "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+            "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+            "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+            "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+            "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+            "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+            "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+            "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+            "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+            "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+            "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+            "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+            "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+            "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+            "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+            "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+            "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+            "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+            "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+            "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+            "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+            "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+            "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+            "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+            "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+            "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+            "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+            "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+            "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+            "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+            "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+            "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+            "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+            "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+            "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21"
+          ],
+          "stage": "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+        },
+        {
+          "input_count": 41,
+          "retained_count": 41,
+          "retained_fingerprints": [
+            "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+            "033a75f2b83562191946307bb53f2dd8ad7f45fc29c1bd52209e5ffb7be3b1bc",
+            "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+            "179c8efc17091308c8742882848066067accc7e79c9b168f2969eb6dbe7d0e39",
+            "1bc1df6afa1f403b7d2a34110075f5de91c4e79e8816972a5078e2fb0287a4d0",
+            "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+            "1efac6b6aaa18c159d794434bdfbce0c2dbe0a9db961442a0987a5a03700c402",
+            "1ff565ac48659a2ecfdf551efd79bd4e32b27e7b39fc6c5a0a71d1998eb48174",
+            "21ac738b1df108ebb080f0ea61ec7d1039a44cde9e066510bf625b40088becbb",
+            "280cc2d49857a2ad1e77604e0e5c9f8e14a91da68661d28cf9457292b56d7593",
+            "3ab3bdade2be747955e6e4056358117dc31d255f3d7d350eb02a55edbfb31e35",
+            "469d9aca5c96181be86ec08d2fa606bb8114dd45e8389d693ae1ce2967704ab9",
+            "4cbe10d5c7256479ff39c5692f178fdc054327a817dd9c90b82a5516cbd15472",
+            "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+            "634e6f69338fe80aa4d2f6685c3a836f7a0a3caac2976a8fb3c64cdc37d68c67",
+            "68cd267111c1a97a01909cf728d0e9ba6f378ade3dca24e9b3756fd36938e601",
+            "761aa022a9894c7052257175ae7773ffd3b49a13fc3b89ed98bc7060b0195dc4",
+            "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+            "7819413ae98e3754344888fca808d47b4f9c9215aa23012198a32e2350cb3a45",
+            "7ed55e54ac0542416be3a51cc82dcbe6426d2980d31e85456225a634b8879150",
+            "7ef1fa7def515932324258702b49b03f9190075cf94160950c989583377c2976",
+            "8de3ced9d9380e313fbc066fbdb566c924c4e9e38e41039c572b0786057f9784",
+            "904454dd3c073c3224564785c8448a7d0210ceff72e693cae6341dc0a69dbe25",
+            "91bd392692a31e0c33b59cc5e0ec893d1147fcb7fb7b04661a40a378a2abc6dc",
+            "943d945f456bd8f37a1cd69b7d636663b31e7ef914fc5e3789fa34c9a77c954c",
+            "95c11153d00966ad9e123aa834fb91a792252f362e15d45d71a7046932583f1b",
+            "a175d032e1cb762d331bb10fbd295e13c83aa7ffc0b8fd91ea865d16955b3b68",
+            "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b",
+            "ae3c74d827222635551a604db5dfcc138d439813d4fcff2d3a85d4102b2a17fa",
+            "b0304898fb52f996a0fc40f118dc3d8f00a4e17df3d5e62ab7845d13a2c283f9",
+            "b17bc634113d05a522c38bda928ce2e9ac279b96b806d667576f4b6f4d53a0c1",
+            "bc3e9946718cd7e30ab7b77851b8fc1b28ed217a0f4fdfdf803e3b1861e21e98",
+            "bf87f0e423a10d98905c35ea49a1e8d4498fc3104439133cfbef6697678a4592",
+            "c5ff7f77da6aec9e6d8cf14a5079fb6ff85d05ccc3ec2094321e572ca2b79076",
+            "cb026731062f4f2c184ce81a776f1ed77d0b606a81bc99cd19c676697c3a63f9",
+            "ccd0e2b10d9ec9c2f1cd1cf41e6a3ea72c3f84283830af9277b3dfb5fd620fdb",
+            "d5313d40a54e9530c76c76c45615c590923cb543458ab74005f35e1649177dfe",
+            "e5e3545595252a70a44f571d0356dfae0e7889caed3e3db7ec94cce7bfc21bf4",
+            "e9704d01790d8b98e175e8b950701c40d05edeaa571aa051425c6c2271c89250",
+            "f525ef2971fdb14506db37e2278b0f0ae9b6b31a0f70cd09976a4bdb62b4c7d6",
+            "fb48ae7e5f34205c107648983ff728f2b2cd6fdb139bde21aece5874fd2b6e21"
+          ],
+          "stage": "COMMON_SSE_TE_DEMAND_FIT_ANCHOR"
+        },
+        {
+          "input_count": 41,
+          "retained_count": 5,
+          "retained_fingerprints": [
+            "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+            "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+            "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+            "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+            "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+          ],
+          "stage": "LEGACY_ONE_TRIP_TE_SEMANTIC_CALIBRATION"
+        },
+        {
+          "input_count": 41,
+          "retained_count": 6,
+          "retained_fingerprints": [
+            "017daab382aff6b20febeec27745ab7764c8fedc64ab928e0e4d3377c0ae4699",
+            "14c734fd84cb8c5fcf9c43c7bbcf147ac62c1db128e003844955c1bac840c6e6",
+            "1ee89f8429eb087e4f9663975ae893fb8e636d0eadd617783cbc8428847192e8",
+            "5b88a90840c914acb13c44f84ebf07cf2144a03ed1d64aded2c0658b123e976e",
+            "7626c51434bdfea5615100eaa15c8a8ff5cf3d1ee43282e77edc2243d24a2a1e",
+            "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+          ],
+          "stage": "ROUTE_LOCAL_CONTINUOUS_EXPOSURE_MATERIALITY_ENVELOPE"
+        },
+        {
+          "input_count": 6,
+          "retained_count": 1,
+          "retained_fingerprints": [
+            "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+          ],
+          "stage": "RHYTHM_SIMPLICITY"
+        },
+        {
+          "input_count": 1,
+          "retained_count": 1,
+          "retained_fingerprints": [
+            "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+          ],
+          "stage": "FLEET_EFFICIENCY"
+        }
+      ],
+      "te_best_count": 1
+    }
+  },
+  "source_commit": "b45a7317de9f8142da8d5976280b1503964ee054",
+  "v3_profile": "legacy_calibrated_continuous_exposure_operational_selector_v3"
+}

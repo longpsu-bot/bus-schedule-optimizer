@@ -1,0 +1,2767 @@
+{
+  "P_commit_SHA": "01614f98c7cc53c3098ac37bbf1e3c82634f1a84",
+  "P_product_locks": {
+    "production_files": {
+      "src/bus_schedule_engine/clean_boundary_pilot.py": "1b17298d31ed308da058ba213748c23b7a76f8902c3abcef20715d5ca1a99fd9",
+      "src/bus_schedule_engine/contracts_v1/clean_boundary_compiler.py": "e36950284e7d2bea1f7ff15dc1bb016d360b8b3dd6ff3ce0299cfcbdb3952490",
+      "src/bus_schedule_engine/contracts_v1/operational_selection_policy.py": "5f10bf7130c20898a3e537fc8f7b73e990335f92ccb7913c41e50a308809e415",
+      "src/bus_schedule_engine/contracts_v1/operational_selection_policy_v2.py": "79a63d38dfde00f42af1f5a56cb67adb3280c3941b45cdb1f67fb65c67ea3181",
+      "src/bus_schedule_engine/service_plan_coordinator.py": "99da83840f30d5ff7781b1525ec5202074641f1c01203ad46ddc42200a24bfc0"
+    },
+    "workbooks": {
+      "10": {
+        "bytes": 29943,
+        "path": "outputs/final_pilot/Route_10_Final_Pilot_Timetable.xlsx",
+        "sha256": "d84dd2e873d3ba30275463a5eff67277a22467839af0f0125e69160a891fc3db"
+      },
+      "6": {
+        "bytes": 34890,
+        "path": "outputs/final_pilot/Route_6_Final_Pilot_Timetable.xlsx",
+        "sha256": "13454026722f996d8b06e5305b3b6ab2d57ea6126734f4deeb23c3e7dbafd02c"
+      }
+    }
+  },
+  "Q_LOCAL_CANONICALIZATION_REVIEW_FRONTIER": [
+    "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5"
+  ],
+  "READY_FOR_PR62_COMPLETION_REVIEW": false,
+  "blocking_stage": "V2_TE_MATERIALITY_BLOCKER",
+  "compiler_backed_census": {
+    "Q_LOCAL_CANONICALIZATION_REVIEW_FRONTIER": [
+      "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5"
+    ],
+    "access_safe_pairs": 1,
+    "declared_local_search_domain": {
+      "inbound": {
+        "arithmetic_transfer_radius": 3,
+        "boundary_step_radius": 3,
+        "classification": "CANONICAL_FAMILY_REQUIRES_TAIL_REALLOCATION",
+        "compile_frontier_limit_per_state": 256,
+        "compiled_candidates": 9,
+        "compiler_internal_limit_pruned": 0,
+        "family_planning_regime_indices": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "hard_valid_directional_candidates": 1,
+        "invalid_service_plan_combinations": 19,
+        "merged_state_fingerprint": "307ff4bad25263f9f6295ef5d74876315d731488e62fe05bdd649c6fb60d8fd2",
+        "rejected_compilations": 29,
+        "starting_state_fingerprint": "9b02726db02473726514ebd0fd4cbd6cc2de3da48c83361829605fca3aeb6d22",
+        "states_compiled": 30,
+        "target_sustained_headways": [
+          19,
+          24
+        ],
+        "tier": "Q-B",
+        "total_theoretical_combinations": 49,
+        "trip_transfer_radius": 3,
+        "valid_unique_service_plan_states": 30
+      },
+      "outbound": {
+        "arithmetic_transfer_radius": 2,
+        "boundary_step_radius": 2,
+        "classification": "CANONICAL_FAMILY_CLEANLY_REPRESENTABLE",
+        "compile_frontier_limit_per_state": 256,
+        "compiled_candidates": 413,
+        "compiler_internal_limit_pruned": 0,
+        "family_planning_regime_indices": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "hard_valid_directional_candidates": 1,
+        "invalid_service_plan_combinations": 0,
+        "merged_state_fingerprint": "0e973f553f957ff71ec5e793e13a4d9ecd10800760b34004809e8576ab93d483",
+        "rejected_compilations": 420,
+        "starting_state_fingerprint": "fa6162630cc3d6f0f84e657786a78398d1c38d36b9963dd6de406dbc34fade60",
+        "states_compiled": 25,
+        "target_sustained_headways": [
+          20,
+          14,
+          18,
+          23
+        ],
+        "tier": "Q-A",
+        "total_theoretical_combinations": 25,
+        "trip_transfer_radius": 2,
+        "valid_unique_service_plan_states": 25
+      }
+    },
+    "descriptive_review_representative": null,
+    "fleet_rejected_pairs": 0,
+    "hard_valid_candidate_summaries": [
+      {
+        "V2_materiality_compatible": false,
+        "access_safe": true,
+        "average_passenger_wait_minutes": 9.550674843255882,
+        "delta_TE_from_common_anchor": 3.3704127647491333,
+        "directional_access": {
+          "inbound": {
+            "candidate_maximum_bucket_wait_minutes": 13.8,
+            "p90_bucket_wait_minutes": 11.400000000000002,
+            "safe": true,
+            "scenario_b_maximum_bucket_wait_minutes": 14.166666666666666,
+            "tail_maximum_bucket_wait_minutes": 13.8
+          },
+          "outbound": {
+            "candidate_maximum_bucket_wait_minutes": 12.900000000000002,
+            "p90_bucket_wait_minutes": 11.666666666666666,
+            "safe": true,
+            "scenario_b_maximum_bucket_wait_minutes": 14.166666666666668,
+            "tail_maximum_bucket_wait_minutes": 12.900000000000002
+          }
+        },
+        "directions": {
+          "inbound": {
+            "average_passenger_wait_minutes": 9.744810864712461,
+            "compilation_fingerprint": "9bdc8a3cb6f548a11b821a8635424315eb5a432de53fd30840d1e78fd0a64802",
+            "exact_departure_fingerprint": "3d8a1cfe8de155b14903449ebb705f8bea791d11afb9546d0eac099fc352755d",
+            "exact_departures": [
+              17100,
+              18240,
+              19380,
+              20520,
+              21660,
+              22800,
+              23940,
+              25080,
+              26220,
+              27360,
+              28500,
+              29640,
+              30780,
+              31920,
+              33060,
+              34200,
+              35340,
+              36480,
+              37620,
+              38760,
+              39900,
+              41040,
+              42180,
+              43320,
+              44460,
+              45600,
+              46740,
+              47880,
+              49020,
+              50160,
+              51300,
+              52440,
+              53580,
+              54720,
+              55860,
+              57000,
+              58140,
+              59280,
+              60420,
+              61560,
+              62700,
+              63840,
+              64980,
+              66120,
+              67260,
+              68400,
+              69840,
+              71280,
+              72720,
+              74160,
+              75600
+            ],
+            "local_rhythm_families": [],
+            "max_frequency_jump": 0.2336148511815052,
+            "maximum_bucket_wait_minutes": 13.8,
+            "observed_demand_SSE": 0.0058920145406376676,
+            "p90_bucket_wait_minutes": 11.400000000000002,
+            "rhythm_simplicity": {
+              "actual_service_regime_count": 2,
+              "effective_headway_palette": [
+                19,
+                24
+              ],
+              "effective_headway_palette_count": 2,
+              "effective_palette_tolerance_minutes": 1,
+              "gaps_by_headway": [
+                [
+                  19,
+                  44
+                ],
+                [
+                  24,
+                  5
+                ]
+              ],
+              "headway_transition_count": 1,
+              "service_minutes_by_headway": [
+                [
+                  19,
+                  836
+                ],
+                [
+                  24,
+                  120
+                ]
+              ],
+              "single_gap_headway_levels": [],
+              "single_gap_regime_count": 0,
+              "sustained_headway_level_count": 2,
+              "sustained_headway_levels": [
+                19,
+                24
+              ],
+              "sustained_service_regime_count": 2
+            },
+            "service_regimes": [
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-01"
+                ],
+                "departures": [
+                  17100,
+                  18240,
+                  19380,
+                  20520,
+                  21660,
+                  22800,
+                  23940,
+                  25080,
+                  26220,
+                  27360,
+                  28500,
+                  29640,
+                  30780,
+                  31920,
+                  33060,
+                  34200,
+                  35340,
+                  36480,
+                  37620,
+                  38760,
+                  39900,
+                  41040,
+                  42180,
+                  43320,
+                  44460,
+                  45600,
+                  46740,
+                  47880,
+                  49020,
+                  50160,
+                  51300,
+                  52440,
+                  53580,
+                  54720,
+                  55860,
+                  57000,
+                  58140,
+                  59280,
+                  60420,
+                  61560,
+                  62700,
+                  63840,
+                  64980,
+                  66120,
+                  67260
+                ],
+                "direction": "inbound",
+                "first_departure": 17100,
+                "last_departure": 67260,
+                "service_regime_id": "SERVICE-INBOUND-01",
+                "trip_count": 45,
+                "uniform_headway_minutes": 19
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-INBOUND-02"
+                ],
+                "departures": [
+                  68400,
+                  69840,
+                  71280,
+                  72720,
+                  74160,
+                  75600
+                ],
+                "direction": "inbound",
+                "first_departure": 68400,
+                "last_departure": 75600,
+                "service_regime_id": "SERVICE-INBOUND-02",
+                "trip_count": 6,
+                "uniform_headway_minutes": 24
+              }
+            ],
+            "state_fingerprint": "914e19d951bf5bb1d38b32ad083dda2e42a139e3a66bc582f8a4d04f5197fa5f",
+            "tail_headway_minutes": 24,
+            "tail_maximum_bucket_wait_minutes": 13.8,
+            "tail_ordering": {
+              "classification": "TAIL_IS_SLOWEST",
+              "demand_justified": false,
+              "direction": "inbound",
+              "eligible": true,
+              "max_non_tail_headway_minutes": 19,
+              "offending_regime_count": 0,
+              "offending_regimes": [],
+              "protection_justified": false,
+              "protection_witnesses": [],
+              "service_regime_demand_evidence": [
+                {
+                  "demand_rate_per_hour": 85.0374957000344,
+                  "integrated_demand_mass": 1211.7843137254902,
+                  "service_regime_id": "SERVICE-INBOUND-01",
+                  "support_duration_hours": 14.25,
+                  "support_end": 68400,
+                  "support_start": 17100
+                },
+                {
+                  "demand_rate_per_hour": 39.71895424836602,
+                  "integrated_demand_mass": 79.43790849673204,
+                  "service_regime_id": "SERVICE-INBOUND-02",
+                  "support_duration_hours": 2.0,
+                  "support_end": 75600,
+                  "support_start": 68400
+                }
+              ],
+              "tail_demand_rate_per_hour": 39.71895424836602,
+              "tail_headway_minutes": 24,
+              "tail_service_regime_id": "SERVICE-INBOUND-02",
+              "tail_slowest_margin_minutes": 5
+            },
+            "total_frequency_variation": 0.2336148511815052,
+            "trip_equivalent_error": 8.955205775172304
+          },
+          "outbound": {
+            "average_passenger_wait_minutes": 9.381892448133264,
+            "compilation_fingerprint": "520b309a092fc643405fa4c564449d3416f8a8bc09ccf89c73d46ed3b3c4af99",
+            "exact_departure_fingerprint": "30870ff7a2ce3d4e2db8a20c41afbaf856a06b1ee7dea3c588cc54fd6dbb19c7",
+            "exact_departures": [
+              18000,
+              19200,
+              20400,
+              21600,
+              22800,
+              24000,
+              25200,
+              26400,
+              27600,
+              28800,
+              30000,
+              31200,
+              32400,
+              33600,
+              34800,
+              36000,
+              37200,
+              38400,
+              39600,
+              40800,
+              42000,
+              43200,
+              44400,
+              45600,
+              46800,
+              48000,
+              49200,
+              50400,
+              51600,
+              52800,
+              54000,
+              55200,
+              56040,
+              56880,
+              57720,
+              58560,
+              59400,
+              60240,
+              61080,
+              61920,
+              63000,
+              64080,
+              65160,
+              66240,
+              67320,
+              68700,
+              70080,
+              71460,
+              72840,
+              74220,
+              75600
+            ],
+            "local_rhythm_families": [],
+            "max_frequency_jump": 0.3566749439387324,
+            "maximum_bucket_wait_minutes": 12.900000000000002,
+            "observed_demand_SSE": 0.008073333723275785,
+            "p90_bucket_wait_minutes": 11.666666666666666,
+            "rhythm_simplicity": {
+              "actual_service_regime_count": 4,
+              "effective_headway_palette": [
+                14,
+                18,
+                20,
+                23
+              ],
+              "effective_headway_palette_count": 4,
+              "effective_palette_tolerance_minutes": 1,
+              "gaps_by_headway": [
+                [
+                  14,
+                  7
+                ],
+                [
+                  18,
+                  4
+                ],
+                [
+                  20,
+                  31
+                ],
+                [
+                  23,
+                  5
+                ]
+              ],
+              "headway_transition_count": 3,
+              "service_minutes_by_headway": [
+                [
+                  14,
+                  98
+                ],
+                [
+                  18,
+                  72
+                ],
+                [
+                  20,
+                  620
+                ],
+                [
+                  23,
+                  115
+                ]
+              ],
+              "single_gap_headway_levels": [],
+              "single_gap_regime_count": 0,
+              "sustained_headway_level_count": 4,
+              "sustained_headway_levels": [
+                14,
+                18,
+                20,
+                23
+              ],
+              "sustained_service_regime_count": 4
+            },
+            "service_regimes": [
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-01"
+                ],
+                "departures": [
+                  18000,
+                  19200,
+                  20400,
+                  21600,
+                  22800,
+                  24000,
+                  25200,
+                  26400,
+                  27600,
+                  28800,
+                  30000,
+                  31200,
+                  32400,
+                  33600,
+                  34800,
+                  36000,
+                  37200,
+                  38400,
+                  39600,
+                  40800,
+                  42000,
+                  43200,
+                  44400,
+                  45600,
+                  46800,
+                  48000,
+                  49200,
+                  50400,
+                  51600,
+                  52800,
+                  54000,
+                  55200
+                ],
+                "direction": "outbound",
+                "first_departure": 18000,
+                "last_departure": 55200,
+                "service_regime_id": "SERVICE-OUTBOUND-01",
+                "trip_count": 32,
+                "uniform_headway_minutes": 20
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-02"
+                ],
+                "departures": [
+                  56040,
+                  56880,
+                  57720,
+                  58560,
+                  59400,
+                  60240,
+                  61080,
+                  61920
+                ],
+                "direction": "outbound",
+                "first_departure": 56040,
+                "last_departure": 61920,
+                "service_regime_id": "SERVICE-OUTBOUND-02",
+                "trip_count": 8,
+                "uniform_headway_minutes": 14
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-03"
+                ],
+                "departures": [
+                  63000,
+                  64080,
+                  65160,
+                  66240,
+                  67320
+                ],
+                "direction": "outbound",
+                "first_departure": 63000,
+                "last_departure": 67320,
+                "service_regime_id": "SERVICE-OUTBOUND-03",
+                "trip_count": 5,
+                "uniform_headway_minutes": 18
+              },
+              {
+                "demand_regime_ids": [
+                  "PLAN-OUTBOUND-04"
+                ],
+                "departures": [
+                  68700,
+                  70080,
+                  71460,
+                  72840,
+                  74220,
+                  75600
+                ],
+                "direction": "outbound",
+                "first_departure": 68700,
+                "last_departure": 75600,
+                "service_regime_id": "SERVICE-OUTBOUND-04",
+                "trip_count": 6,
+                "uniform_headway_minutes": 23
+              }
+            ],
+            "state_fingerprint": "69961a9f67feaa937a2496ebb47efb32877d394ce0145c4e723857f3be7656f9",
+            "tail_headway_minutes": 23,
+            "tail_maximum_bucket_wait_minutes": 12.900000000000002,
+            "tail_ordering": {
+              "classification": "TAIL_IS_SLOWEST",
+              "demand_justified": false,
+              "direction": "outbound",
+              "eligible": true,
+              "max_non_tail_headway_minutes": 20,
+              "offending_regime_count": 0,
+              "offending_regimes": [],
+              "protection_justified": false,
+              "protection_witnesses": [],
+              "service_regime_demand_evidence": [
+                {
+                  "demand_rate_per_hour": 99.5480859010271,
+                  "integrated_demand_mass": 1045.2549019607845,
+                  "service_regime_id": "SERVICE-OUTBOUND-01",
+                  "support_duration_hours": 10.5,
+                  "support_end": 55800,
+                  "support_start": 18000
+                },
+                {
+                  "demand_rate_per_hour": 131.29411764705884,
+                  "integrated_demand_mass": 262.5882352941177,
+                  "service_regime_id": "SERVICE-OUTBOUND-02",
+                  "support_duration_hours": 2.0,
+                  "support_end": 63000,
+                  "support_start": 55800
+                },
+                {
+                  "demand_rate_per_hour": 72.81917211328977,
+                  "integrated_demand_mass": 109.22875816993465,
+                  "service_regime_id": "SERVICE-OUTBOUND-03",
+                  "support_duration_hours": 1.5,
+                  "support_end": 68400,
+                  "support_start": 63000
+                },
+                {
+                  "demand_rate_per_hour": 34.05555555555556,
+                  "integrated_demand_mass": 68.11111111111111,
+                  "service_regime_id": "SERVICE-OUTBOUND-04",
+                  "support_duration_hours": 2.0,
+                  "support_end": 75600,
+                  "support_start": 68400
+                }
+              ],
+              "tail_demand_rate_per_hour": 34.05555555555556,
+              "tail_headway_minutes": 23,
+              "tail_service_regime_id": "SERVICE-OUTBOUND-04",
+              "tail_slowest_margin_minutes": 3
+            },
+            "total_frequency_variation": 0.8531118302526235,
+            "trip_equivalent_error": 11.372407055252186
+          }
+        },
+        "fleet_required": 12,
+        "max_excess_terminal_wait": 71,
+        "observed_demand_SSE": 0.013965348263913453,
+        "pair_fingerprint": "12e9541a84a90d3a8c58a749b140173668e721b951399dab90b0066792c6e4a5",
+        "pair_trip_equivalent_error": 20.327612830424492,
+        "production_pareto_audit": {
+          "current_candidates_dominated": [],
+          "dominated_by": [],
+          "dominated_by_current_frontier": false,
+          "nondominance_witness_dimensions": {
+            "025353e2311d8508d1984a34d4acb2ee9e7228a16af1a69bb97ff5b649e77934": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "2a7a8c3c142d6aee45394dcacf024718f9f57b277e32587964f20d941c4d39f3": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              9
+            ],
+            "4e9ab6a29572ccb813f06a11a3a8ee62792d5fc9290f3485dbaa99706716b9be": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "6dbd9d2cac0931e85b1b50283b7011c610488226c863ce0192ff6bdf22bd3f16": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              9
+            ],
+            "8fcacf72ae51cf31e351f29f367f0094fac654ea85bd0f3a29470502a0939d62": [
+              1,
+              2,
+              3,
+              4,
+              8,
+              9
+            ],
+            "91e7e59f64f782f45705d945fa8a8338cf5cd4c812a3e97a93e40d95b0d79ede": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ],
+            "9ed9d164b35e14bb8a86145fc62823ea334313f15f7c746d43e2756171e0fcd0": [
+              1,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "bb35aa0cc7221a887be8328d18de289447ef4070fa147820546efad691fb719c": [
+              1,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "c8eeb70f59bbf027e8444148533e639e0a7123b5225e7fec25a242475a678dd7": [
+              1,
+              2,
+              3,
+              4,
+              8,
+              9
+            ],
+            "d8743c4608523fe045f6abda7e4c322c01c958ccad17e5ad80d72584f844fabb": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7
+            ]
+          },
+          "pareto_relevant": true,
+          "unresolved_current_candidates": []
+        },
+        "production_pareto_vector": {
+          "actual_service_regime_count": 6.0,
+          "demand_weighted_expected_passenger_wait_minutes": 9.550674843255882,
+          "fleet_required": 12.0,
+          "max_frequency_jump": 0.3566749439387324,
+          "maximum_bucket_expected_wait_minutes": 13.8,
+          "moved_trips_vs_b": 10.0,
+          "observed_demand_mismatch": 0.013965348263913453,
+          "total_directional_sustained_headway_level_count": 6.0,
+          "total_excess_terminal_wait": 1716.0,
+          "total_frequency_variation": 1.0867266814341288
+        },
+        "review_metrics": {
+          "actual_service_regime_count": 6,
+          "average_passenger_wait_minutes": 9.550674843255882,
+          "fleet_required": 12,
+          "micro_rhythm_boundary_count": 0,
+          "pair_trip_equivalent_error": 20.327612830424492,
+          "sustained_exact_headway_level_count": 6
+        },
+        "total_excess_terminal_wait": 1716
+      }
+    ],
+    "hard_valid_pairs": 1,
+    "pair_cartesian_combinations": 1,
+    "plausible_review_pairs": 0,
+    "production_pareto_relevant_pairs": 1,
+    "within_one_TE_pairs": 0
+  },
+  "deterministic_render": true,
+  "milestone": "PR62-Q",
+  "next_milestone_recommendation": "PR62-R_LOCAL_RHYTHM_DEMAND_FIT_TRADEOFF_REVIEW",
+  "production_guards": {
+    "10_D_Pareto_changed": false,
+    "SSE_changed": false,
+    "TE_changed": false,
+    "V2_selector_changed": false,
+    "access_changed": false,
+    "boundary_semantics_changed": false,
+    "canonical_XLSX_regenerated": false,
+    "compiler_changed": false,
+    "fleet_validator_changed": false,
+    "private_workbook_committed": false,
+    "private_workbook_opened": false,
+    "production_search_changed": false,
+    "protection_changed": false,
+    "queue_changed": false,
+    "route_10_canonical_workbook_changed": false,
+    "route_6_timetable_changed": false,
+    "search_budget_changed": false,
+    "settlement_or_residual_added": false,
+    "tail_semantics_changed": false
+  },
+  "root_cause_classification": "Q_EVIDENCE_INCONCLUSIVE",
+  "routes": {
+    "10": {
+      "baseline_pair_fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24",
+      "baseline_review_metrics": {
+        "P90": 11.333333333333334,
+        "SSE": 0.010728881378053444,
+        "actual_service_regime_count": 11,
+        "average_wait": 9.636890463523153,
+        "effective_palette_count": 6,
+        "fleet": 12,
+        "gap_weighted_canonical_deviation": 23,
+        "local_rhythm_family_count": 2,
+        "max_frequency_jump": 0.42285685082003344,
+        "maximum_access": 14.066666666666666,
+        "micro_rhythm_boundary_count": 5,
+        "pair_TE": 17.669451511448948,
+        "sustained_exact_headway_level_count": 9,
+        "tails": {
+          "inbound": 29,
+          "outbound": 23
+        },
+        "terminal_excess_wait": 1683,
+        "total_frequency_variation": 1.5274288925741724
+      },
+      "current_service_regimes": {
+        "inbound": [
+          {
+            "demand_regime_ids": [
+              "PLAN-INBOUND-01",
+              "PLAN-INBOUND-02"
+            ],
+            "departures": [
+              17100,
+              18240,
+              19380,
+              20520,
+              21660,
+              22800,
+              23940,
+              25080,
+              26220,
+              27360,
+              28500,
+              29640,
+              30780,
+              31920,
+              33060,
+              34200,
+              35340,
+              36480,
+              37620,
+              38760,
+              39900,
+              41040,
+              42180,
+              43320,
+              44460,
+              45600,
+              46740,
+              47880,
+              49020,
+              50160,
+              51300,
+              52440,
+              53580,
+              54720
+            ],
+            "direction": "inbound",
+            "first_departure": 17100,
+            "last_departure": 54720,
+            "service_regime_id": "SERVICE-INBOUND-01",
+            "trip_count": 34,
+            "uniform_headway_minutes": 19
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-INBOUND-03"
+            ],
+            "departures": [
+              55860,
+              57060,
+              58260,
+              59460,
+              60660,
+              61860
+            ],
+            "direction": "inbound",
+            "first_departure": 55860,
+            "last_departure": 61860,
+            "service_regime_id": "SERVICE-INBOUND-02",
+            "trip_count": 6,
+            "uniform_headway_minutes": 20
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-INBOUND-04"
+            ],
+            "departures": [
+              63000,
+              64140,
+              65280,
+              66420,
+              67560,
+              68700,
+              69840,
+              70980
+            ],
+            "direction": "inbound",
+            "first_departure": 63000,
+            "last_departure": 70980,
+            "service_regime_id": "SERVICE-INBOUND-03",
+            "trip_count": 8,
+            "uniform_headway_minutes": 19
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-INBOUND-05"
+            ],
+            "departures": [
+              72120,
+              73860,
+              75600
+            ],
+            "direction": "inbound",
+            "first_departure": 72120,
+            "last_departure": 75600,
+            "service_regime_id": "SERVICE-INBOUND-04",
+            "trip_count": 3,
+            "uniform_headway_minutes": 29
+          }
+        ],
+        "outbound": [
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-01"
+            ],
+            "departures": [
+              18000,
+              19140,
+              20280,
+              21420,
+              22560
+            ],
+            "direction": "outbound",
+            "first_departure": 18000,
+            "last_departure": 22560,
+            "service_regime_id": "SERVICE-OUTBOUND-01",
+            "trip_count": 5,
+            "uniform_headway_minutes": 19
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-02"
+            ],
+            "departures": [
+              23700,
+              24960,
+              26220,
+              27480,
+              28740
+            ],
+            "direction": "outbound",
+            "first_departure": 23700,
+            "last_departure": 28740,
+            "service_regime_id": "SERVICE-OUTBOUND-02",
+            "trip_count": 5,
+            "uniform_headway_minutes": 21
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-03",
+              "PLAN-OUTBOUND-04"
+            ],
+            "departures": [
+              29940,
+              31140,
+              32340,
+              33540,
+              34740,
+              35940,
+              37140,
+              38340,
+              39540,
+              40740,
+              41940,
+              43140
+            ],
+            "direction": "outbound",
+            "first_departure": 29940,
+            "last_departure": 43140,
+            "service_regime_id": "SERVICE-OUTBOUND-03",
+            "trip_count": 12,
+            "uniform_headway_minutes": 20
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-05"
+            ],
+            "departures": [
+              44340,
+              45480,
+              46620,
+              47760,
+              48900,
+              50040,
+              51180,
+              52320,
+              53460,
+              54600,
+              55740
+            ],
+            "direction": "outbound",
+            "first_departure": 44340,
+            "last_departure": 55740,
+            "service_regime_id": "SERVICE-OUTBOUND-04",
+            "trip_count": 11,
+            "uniform_headway_minutes": 19
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-06"
+            ],
+            "departures": [
+              56880,
+              57720,
+              58560,
+              59400,
+              60240,
+              61080,
+              61920
+            ],
+            "direction": "outbound",
+            "first_departure": 56880,
+            "last_departure": 61920,
+            "service_regime_id": "SERVICE-OUTBOUND-05",
+            "trip_count": 7,
+            "uniform_headway_minutes": 14
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-07"
+            ],
+            "departures": [
+              63000,
+              64080,
+              65160,
+              66240,
+              67320
+            ],
+            "direction": "outbound",
+            "first_departure": 63000,
+            "last_departure": 67320,
+            "service_regime_id": "SERVICE-OUTBOUND-06",
+            "trip_count": 5,
+            "uniform_headway_minutes": 18
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-08"
+            ],
+            "departures": [
+              68700,
+              70080,
+              71460,
+              72840,
+              74220,
+              75600
+            ],
+            "direction": "outbound",
+            "first_departure": 68700,
+            "last_departure": 75600,
+            "service_regime_id": "SERVICE-OUTBOUND-07",
+            "trip_count": 6,
+            "uniform_headway_minutes": 23
+          }
+        ]
+      },
+      "directions": {
+        "inbound": {
+          "arithmetic_census": {
+            "Q_A": {
+              "compositions": [],
+              "feasible": false,
+              "gap_count": 50,
+              "ordered_headways": [
+                19,
+                29
+              ],
+              "service_span_minutes": 975
+            },
+            "Q_B": {
+              "feasible": true,
+              "witness": {
+                "gap_counts": [
+                  45,
+                  5
+                ],
+                "tail_headway": 24,
+                "weighted_minutes": 975
+              },
+              "witnesses": [
+                {
+                  "gap_counts": [
+                    45,
+                    5
+                  ],
+                  "tail_headway": 24,
+                  "weighted_minutes": 975
+                },
+                {
+                  "gap_counts": [
+                    25,
+                    25
+                  ],
+                  "tail_headway": 20,
+                  "weighted_minutes": 975
+                },
+                {
+                  "gap_counts": [
+                    49,
+                    1
+                  ],
+                  "tail_headway": 44,
+                  "weighted_minutes": 975
+                }
+              ]
+            },
+            "Q_C": {
+              "production_compiler_changed": false,
+              "residual_gap_minutes": null,
+              "residual_required": false,
+              "residual_service_regime_created": false,
+              "settlement_added": false,
+              "theoretical_positions": [],
+              "witness": null
+            },
+            "baseline_gap_counts": {
+              "19": 43,
+              "20": 5,
+              "29": 2
+            },
+            "canonical_representative": 19,
+            "exact_gap_sum_minutes": 975,
+            "frozen_non_family_headways": [],
+            "frozen_tail_headway": 29,
+            "gap_count": 50,
+            "service_span_minutes": 975
+          },
+          "demand_justification_audit": [
+            {
+              "classification": "NOT_DEMAND_RESPONSE_EXPLANATORY",
+              "demand_direction": "UP",
+              "left_demand_rate_per_hour": 80.91807265541875,
+              "left_frequency_per_hour": 3.1578947368421053,
+              "left_headway": 19,
+              "left_integrated_demand_mass": 869.8692810457516,
+              "left_regime_id": "SERVICE-INBOUND-01",
+              "right_demand_rate_per_hour": 121.62418300653594,
+              "right_frequency_per_hour": 3.0,
+              "right_headway": 20,
+              "right_integrated_demand_mass": 243.2483660130719,
+              "right_regime_id": "SERVICE-INBOUND-02",
+              "service_frequency_direction": "DOWN"
+            },
+            {
+              "classification": "NOT_DEMAND_RESPONSE_EXPLANATORY",
+              "demand_direction": "DOWN",
+              "left_demand_rate_per_hour": 121.62418300653594,
+              "left_frequency_per_hour": 3.0,
+              "left_headway": 20,
+              "left_integrated_demand_mass": 243.2483660130719,
+              "left_regime_id": "SERVICE-INBOUND-02",
+              "right_demand_rate_per_hour": 58.29803921568627,
+              "right_frequency_per_hour": 3.1578947368421053,
+              "right_headway": 19,
+              "right_integrated_demand_mass": 145.7450980392157,
+              "right_regime_id": "SERVICE-INBOUND-03",
+              "service_frequency_direction": "UP"
+            }
+          ],
+          "target_family": {
+            "canonical_representative": 19,
+            "demand_rate_per_hour_by_member": [
+              80.91807265541875,
+              121.62418300653594,
+              58.29803921568627
+            ],
+            "end": 70980,
+            "exact_headways": [
+              19,
+              20,
+              19
+            ],
+            "exact_sustained_headway_levels": [
+              19,
+              20
+            ],
+            "gap_weighted_absolute_deviation": 5,
+            "integrated_immutable_demand_by_member": [
+              869.8692810457516,
+              243.2483660130719,
+              145.7450980392157
+            ],
+            "internal_family_regime_boundary_count": 2,
+            "internal_gap_counts": [
+              33,
+              5,
+              7
+            ],
+            "micro_rhythm_boundary_count": 2,
+            "regime_ids": [
+              "SERVICE-INBOUND-01",
+              "SERVICE-INBOUND-02",
+              "SERVICE-INBOUND-03"
+            ],
+            "service_frequency_per_hour_by_member": [
+              3.1578947368421053,
+              3.0,
+              3.1578947368421053
+            ],
+            "start": 17100,
+            "trip_counts": [
+              34,
+              6,
+              8
+            ]
+          }
+        },
+        "outbound": {
+          "arithmetic_census": {
+            "Q_A": {
+              "compositions": [
+                {
+                  "gap_counts": [
+                    1,
+                    3,
+                    32,
+                    14
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    1,
+                    8,
+                    23,
+                    18
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    1,
+                    13,
+                    14,
+                    22
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    1,
+                    18,
+                    5,
+                    26
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    2,
+                    1,
+                    35,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    2,
+                    6,
+                    26,
+                    16
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    2,
+                    11,
+                    17,
+                    20
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    2,
+                    16,
+                    8,
+                    24
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    3,
+                    4,
+                    29,
+                    14
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    3,
+                    9,
+                    20,
+                    18
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    3,
+                    14,
+                    11,
+                    22
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    3,
+                    19,
+                    2,
+                    26
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    4,
+                    2,
+                    32,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    4,
+                    7,
+                    23,
+                    16
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    4,
+                    12,
+                    14,
+                    20
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    4,
+                    17,
+                    5,
+                    24
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    5,
+                    5,
+                    26,
+                    14
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    5,
+                    10,
+                    17,
+                    18
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    5,
+                    15,
+                    8,
+                    22
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    6,
+                    3,
+                    29,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    6,
+                    8,
+                    20,
+                    16
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    6,
+                    13,
+                    11,
+                    20
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    6,
+                    18,
+                    2,
+                    24
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    7,
+                    1,
+                    32,
+                    10
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    7,
+                    6,
+                    23,
+                    14
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    7,
+                    11,
+                    14,
+                    18
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    7,
+                    16,
+                    5,
+                    22
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    8,
+                    4,
+                    26,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    8,
+                    9,
+                    17,
+                    16
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    8,
+                    14,
+                    8,
+                    20
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    9,
+                    2,
+                    29,
+                    10
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    9,
+                    7,
+                    20,
+                    14
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    9,
+                    12,
+                    11,
+                    18
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    9,
+                    17,
+                    2,
+                    22
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    10,
+                    5,
+                    23,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    10,
+                    10,
+                    14,
+                    16
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    10,
+                    15,
+                    5,
+                    20
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    11,
+                    3,
+                    26,
+                    10
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    11,
+                    8,
+                    17,
+                    14
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    11,
+                    13,
+                    8,
+                    18
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    12,
+                    1,
+                    29,
+                    8
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    12,
+                    6,
+                    20,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    12,
+                    11,
+                    11,
+                    16
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    12,
+                    16,
+                    2,
+                    20
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    13,
+                    4,
+                    23,
+                    10
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    13,
+                    9,
+                    14,
+                    14
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    13,
+                    14,
+                    5,
+                    18
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    14,
+                    2,
+                    26,
+                    8
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    14,
+                    7,
+                    17,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    14,
+                    12,
+                    8,
+                    16
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    15,
+                    5,
+                    20,
+                    10
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    15,
+                    10,
+                    11,
+                    14
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    15,
+                    15,
+                    2,
+                    18
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    16,
+                    3,
+                    23,
+                    8
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    16,
+                    8,
+                    14,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    16,
+                    13,
+                    5,
+                    16
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    17,
+                    1,
+                    26,
+                    6
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    17,
+                    6,
+                    17,
+                    10
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    17,
+                    11,
+                    8,
+                    14
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    18,
+                    4,
+                    20,
+                    8
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    18,
+                    9,
+                    11,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    18,
+                    14,
+                    2,
+                    16
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    19,
+                    2,
+                    23,
+                    6
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    19,
+                    7,
+                    14,
+                    10
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    19,
+                    12,
+                    5,
+                    14
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    20,
+                    5,
+                    17,
+                    8
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    20,
+                    10,
+                    8,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    21,
+                    3,
+                    20,
+                    6
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    21,
+                    8,
+                    11,
+                    10
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    21,
+                    13,
+                    2,
+                    14
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    22,
+                    1,
+                    23,
+                    4
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    22,
+                    6,
+                    14,
+                    8
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    22,
+                    11,
+                    5,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    23,
+                    4,
+                    17,
+                    6
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    23,
+                    9,
+                    8,
+                    10
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    24,
+                    2,
+                    20,
+                    4
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    24,
+                    7,
+                    11,
+                    8
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    24,
+                    12,
+                    2,
+                    12
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    25,
+                    5,
+                    14,
+                    6
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    25,
+                    10,
+                    5,
+                    10
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    26,
+                    3,
+                    17,
+                    4
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    26,
+                    8,
+                    8,
+                    8
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    27,
+                    1,
+                    20,
+                    2
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    27,
+                    6,
+                    11,
+                    6
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    27,
+                    11,
+                    2,
+                    10
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    28,
+                    4,
+                    14,
+                    4
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    28,
+                    9,
+                    5,
+                    8
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    29,
+                    2,
+                    17,
+                    2
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    29,
+                    7,
+                    8,
+                    6
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    30,
+                    5,
+                    11,
+                    4
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    30,
+                    10,
+                    2,
+                    8
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    31,
+                    3,
+                    14,
+                    2
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    31,
+                    8,
+                    5,
+                    6
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    32,
+                    6,
+                    8,
+                    4
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    33,
+                    4,
+                    11,
+                    2
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    33,
+                    9,
+                    2,
+                    6
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    34,
+                    7,
+                    5,
+                    4
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    35,
+                    5,
+                    8,
+                    2
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    36,
+                    8,
+                    2,
+                    4
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    37,
+                    6,
+                    5,
+                    2
+                  ],
+                  "weighted_minutes": 960
+                },
+                {
+                  "gap_counts": [
+                    39,
+                    7,
+                    2,
+                    2
+                  ],
+                  "weighted_minutes": 960
+                }
+              ],
+              "feasible": true,
+              "gap_count": 50,
+              "ordered_headways": [
+                20,
+                14,
+                18,
+                23
+              ],
+              "service_span_minutes": 960
+            },
+            "Q_B": {
+              "feasible": false,
+              "witness": null,
+              "witnesses": []
+            },
+            "Q_C": {
+              "production_compiler_changed": false,
+              "residual_gap_minutes": null,
+              "residual_required": false,
+              "residual_service_regime_created": false,
+              "settlement_added": false,
+              "theoretical_positions": [],
+              "witness": null
+            },
+            "baseline_gap_counts": {
+              "14": 6,
+              "18": 5,
+              "19": 16,
+              "20": 13,
+              "21": 4,
+              "23": 6
+            },
+            "canonical_representative": 20,
+            "exact_gap_sum_minutes": 960,
+            "frozen_non_family_headways": [
+              14,
+              18
+            ],
+            "frozen_tail_headway": 23,
+            "gap_count": 50,
+            "service_span_minutes": 960
+          },
+          "demand_justification_audit": [
+            {
+              "classification": "NOT_DEMAND_RESPONSE_EXPLANATORY",
+              "demand_direction": "UP",
+              "left_demand_rate_per_hour": 100.1132897603486,
+              "left_frequency_per_hour": 3.1578947368421053,
+              "left_headway": 19,
+              "left_integrated_demand_mass": 150.16993464052288,
+              "left_regime_id": "SERVICE-OUTBOUND-01",
+              "right_demand_rate_per_hour": 135.49455337690634,
+              "right_frequency_per_hour": 2.857142857142857,
+              "right_headway": 21,
+              "right_integrated_demand_mass": 203.2418300653595,
+              "right_regime_id": "SERVICE-OUTBOUND-02",
+              "service_frequency_direction": "DOWN"
+            },
+            {
+              "classification": "NOT_DEMAND_RESPONSE_EXPLANATORY",
+              "demand_direction": "DOWN",
+              "left_demand_rate_per_hour": 135.49455337690634,
+              "left_frequency_per_hour": 2.857142857142857,
+              "left_headway": 21,
+              "left_integrated_demand_mass": 203.2418300653595,
+              "left_regime_id": "SERVICE-OUTBOUND-02",
+              "right_demand_rate_per_hour": 97.98529411764706,
+              "right_frequency_per_hour": 3.0,
+              "right_headway": 20,
+              "right_integrated_demand_mass": 391.94117647058823,
+              "right_regime_id": "SERVICE-OUTBOUND-03",
+              "service_frequency_direction": "UP"
+            },
+            {
+              "classification": "NOT_DEMAND_RESPONSE_EXPLANATORY",
+              "demand_direction": "DOWN",
+              "left_demand_rate_per_hour": 97.98529411764706,
+              "left_frequency_per_hour": 3.0,
+              "left_headway": 20,
+              "left_integrated_demand_mass": 391.94117647058823,
+              "left_regime_id": "SERVICE-OUTBOUND-03",
+              "right_demand_rate_per_hour": 85.68627450980394,
+              "right_frequency_per_hour": 3.1578947368421053,
+              "right_headway": 19,
+              "right_integrated_demand_mass": 299.90196078431376,
+              "right_regime_id": "SERVICE-OUTBOUND-04",
+              "service_frequency_direction": "UP"
+            }
+          ],
+          "target_family": {
+            "canonical_representative": 20,
+            "demand_rate_per_hour_by_member": [
+              100.1132897603486,
+              135.49455337690634,
+              97.98529411764706,
+              85.68627450980394
+            ],
+            "end": 55740,
+            "exact_headways": [
+              19,
+              21,
+              20,
+              19
+            ],
+            "exact_sustained_headway_levels": [
+              19,
+              20,
+              21
+            ],
+            "gap_weighted_absolute_deviation": 18,
+            "integrated_immutable_demand_by_member": [
+              150.16993464052288,
+              203.2418300653595,
+              391.94117647058823,
+              299.90196078431376
+            ],
+            "internal_family_regime_boundary_count": 3,
+            "internal_gap_counts": [
+              4,
+              4,
+              11,
+              10
+            ],
+            "micro_rhythm_boundary_count": 3,
+            "regime_ids": [
+              "SERVICE-OUTBOUND-01",
+              "SERVICE-OUTBOUND-02",
+              "SERVICE-OUTBOUND-03",
+              "SERVICE-OUTBOUND-04"
+            ],
+            "service_frequency_per_hour_by_member": [
+              3.1578947368421053,
+              2.857142857142857,
+              3.0,
+              3.1578947368421053
+            ],
+            "start": 18000,
+            "trip_counts": [
+              5,
+              5,
+              12,
+              11
+            ]
+          }
+        }
+      },
+      "local_rhythm_families": {
+        "inbound": [
+          {
+            "canonical_representative": 19,
+            "demand_rate_per_hour_by_member": [
+              80.91807265541875,
+              121.62418300653594,
+              58.29803921568627
+            ],
+            "end": 70980,
+            "exact_headways": [
+              19,
+              20,
+              19
+            ],
+            "exact_sustained_headway_levels": [
+              19,
+              20
+            ],
+            "gap_weighted_absolute_deviation": 5,
+            "integrated_immutable_demand_by_member": [
+              869.8692810457516,
+              243.2483660130719,
+              145.7450980392157
+            ],
+            "internal_family_regime_boundary_count": 2,
+            "internal_gap_counts": [
+              33,
+              5,
+              7
+            ],
+            "micro_rhythm_boundary_count": 2,
+            "regime_ids": [
+              "SERVICE-INBOUND-01",
+              "SERVICE-INBOUND-02",
+              "SERVICE-INBOUND-03"
+            ],
+            "service_frequency_per_hour_by_member": [
+              3.1578947368421053,
+              3.0,
+              3.1578947368421053
+            ],
+            "start": 17100,
+            "trip_counts": [
+              34,
+              6,
+              8
+            ]
+          }
+        ],
+        "outbound": [
+          {
+            "canonical_representative": 20,
+            "demand_rate_per_hour_by_member": [
+              100.1132897603486,
+              135.49455337690634,
+              97.98529411764706,
+              85.68627450980394
+            ],
+            "end": 55740,
+            "exact_headways": [
+              19,
+              21,
+              20,
+              19
+            ],
+            "exact_sustained_headway_levels": [
+              19,
+              20,
+              21
+            ],
+            "gap_weighted_absolute_deviation": 18,
+            "integrated_immutable_demand_by_member": [
+              150.16993464052288,
+              203.2418300653595,
+              391.94117647058823,
+              299.90196078431376
+            ],
+            "internal_family_regime_boundary_count": 3,
+            "internal_gap_counts": [
+              4,
+              4,
+              11,
+              10
+            ],
+            "micro_rhythm_boundary_count": 3,
+            "regime_ids": [
+              "SERVICE-OUTBOUND-01",
+              "SERVICE-OUTBOUND-02",
+              "SERVICE-OUTBOUND-03",
+              "SERVICE-OUTBOUND-04"
+            ],
+            "service_frequency_per_hour_by_member": [
+              3.1578947368421053,
+              2.857142857142857,
+              3.0,
+              3.1578947368421053
+            ],
+            "start": 18000,
+            "trip_counts": [
+              5,
+              5,
+              12,
+              11
+            ]
+          }
+        ]
+      },
+      "selected_pair_fingerprint": "e76426dc2e4420d7f826c939f40d5fb1ea3414744bba3a1a379eb19bc9d4cb24"
+    },
+    "6": {
+      "baseline_review_metrics": {
+        "P90": 7.500000000000001,
+        "SSE": 0.006691496954029265,
+        "actual_service_regime_count": 14,
+        "average_wait": 6.087639155987586,
+        "effective_palette_count": 6,
+        "fleet": 20,
+        "gap_weighted_canonical_deviation": 0,
+        "local_rhythm_family_count": 0,
+        "max_frequency_jump": 0.6286086594223742,
+        "maximum_access": 12.5,
+        "micro_rhythm_boundary_count": 0,
+        "pair_TE": 20.923773759043776,
+        "sustained_exact_headway_level_count": 8,
+        "tails": {
+          "inbound": 15,
+          "outbound": 15
+        },
+        "terminal_excess_wait": 5219,
+        "total_frequency_variation": 5.732735658960005
+      },
+      "classification": "NO_LOCAL_MICRO_RHYTHM_TARGET",
+      "current_service_regimes": {
+        "inbound": [
+          {
+            "demand_regime_ids": [
+              "PLAN-INBOUND-01"
+            ],
+            "departures": [
+              17700,
+              18600,
+              19500,
+              20400,
+              21300
+            ],
+            "direction": "inbound",
+            "first_departure": 17700,
+            "last_departure": 21300,
+            "service_regime_id": "SERVICE-INBOUND-01",
+            "trip_count": 5,
+            "uniform_headway_minutes": 15
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-INBOUND-02"
+            ],
+            "departures": [
+              21780,
+              22260,
+              22740,
+              23220,
+              23700,
+              24180,
+              24660,
+              25140,
+              25620,
+              26100,
+              26580
+            ],
+            "direction": "inbound",
+            "first_departure": 21780,
+            "last_departure": 26580,
+            "service_regime_id": "SERVICE-INBOUND-02",
+            "trip_count": 11,
+            "uniform_headway_minutes": 8
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-INBOUND-03"
+            ],
+            "departures": [
+              27480,
+              28380,
+              29280,
+              30180,
+              31080,
+              31980,
+              32880,
+              33780,
+              34680,
+              35580,
+              36480,
+              37380
+            ],
+            "direction": "inbound",
+            "first_departure": 27480,
+            "last_departure": 37380,
+            "service_regime_id": "SERVICE-INBOUND-03",
+            "trip_count": 12,
+            "uniform_headway_minutes": 15
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-INBOUND-04"
+            ],
+            "departures": [
+              38040,
+              38700,
+              39360,
+              40020,
+              40680,
+              41340,
+              42000,
+              42660
+            ],
+            "direction": "inbound",
+            "first_departure": 38040,
+            "last_departure": 42660,
+            "service_regime_id": "SERVICE-INBOUND-04",
+            "trip_count": 8,
+            "uniform_headway_minutes": 11
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-INBOUND-05"
+            ],
+            "departures": [
+              43320,
+              44220,
+              45120,
+              46020,
+              46920,
+              47820,
+              48720,
+              49620,
+              50520,
+              51420,
+              52320,
+              53220,
+              54120,
+              55020,
+              55920,
+              56820
+            ],
+            "direction": "inbound",
+            "first_departure": 43320,
+            "last_departure": 56820,
+            "service_regime_id": "SERVICE-INBOUND-05",
+            "trip_count": 16,
+            "uniform_headway_minutes": 15
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-INBOUND-06"
+            ],
+            "departures": [
+              57720,
+              58200,
+              58680,
+              59160,
+              59640,
+              60120,
+              60600,
+              61080,
+              61560,
+              62040,
+              62520
+            ],
+            "direction": "inbound",
+            "first_departure": 57720,
+            "last_departure": 62520,
+            "service_regime_id": "SERVICE-INBOUND-06",
+            "trip_count": 11,
+            "uniform_headway_minutes": 8
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-INBOUND-07",
+              "PLAN-INBOUND-08"
+            ],
+            "departures": [
+              63000,
+              63900,
+              64800,
+              65700,
+              66600,
+              67500,
+              68400,
+              69300,
+              70200,
+              71100,
+              72000,
+              72900,
+              73800,
+              74700,
+              75600
+            ],
+            "direction": "inbound",
+            "first_departure": 63000,
+            "last_departure": 75600,
+            "service_regime_id": "SERVICE-INBOUND-07",
+            "trip_count": 15,
+            "uniform_headway_minutes": 15
+          }
+        ],
+        "outbound": [
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-01"
+            ],
+            "departures": [
+              17700,
+              18480,
+              19260,
+              20040,
+              20820
+            ],
+            "direction": "outbound",
+            "first_departure": 17700,
+            "last_departure": 20820,
+            "service_regime_id": "SERVICE-OUTBOUND-01",
+            "trip_count": 5,
+            "uniform_headway_minutes": 13
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-02"
+            ],
+            "departures": [
+              21600,
+              22200,
+              22800,
+              23400,
+              24000,
+              24600,
+              25200,
+              25800,
+              26400
+            ],
+            "direction": "outbound",
+            "first_departure": 21600,
+            "last_departure": 26400,
+            "service_regime_id": "SERVICE-OUTBOUND-02",
+            "trip_count": 9,
+            "uniform_headway_minutes": 10
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-03"
+            ],
+            "departures": [
+              27240,
+              28080,
+              28920,
+              29760,
+              30600,
+              31440,
+              32280,
+              33120,
+              33960,
+              34800,
+              35640,
+              36480,
+              37320
+            ],
+            "direction": "outbound",
+            "first_departure": 27240,
+            "last_departure": 37320,
+            "service_regime_id": "SERVICE-OUTBOUND-03",
+            "trip_count": 13,
+            "uniform_headway_minutes": 14
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-04"
+            ],
+            "departures": [
+              37920,
+              38520,
+              39120,
+              39720,
+              40320,
+              40920,
+              41520,
+              42120,
+              42720
+            ],
+            "direction": "outbound",
+            "first_departure": 37920,
+            "last_departure": 42720,
+            "service_regime_id": "SERVICE-OUTBOUND-04",
+            "trip_count": 9,
+            "uniform_headway_minutes": 10
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-05"
+            ],
+            "departures": [
+              43320,
+              44220,
+              45120,
+              46020,
+              46920,
+              47820,
+              48720,
+              49620,
+              50520,
+              51420,
+              52320,
+              53220,
+              54120,
+              55020,
+              55920,
+              56820
+            ],
+            "direction": "outbound",
+            "first_departure": 43320,
+            "last_departure": 56820,
+            "service_regime_id": "SERVICE-OUTBOUND-05",
+            "trip_count": 16,
+            "uniform_headway_minutes": 15
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-06"
+            ],
+            "departures": [
+              57720,
+              58200,
+              58680,
+              59160,
+              59640,
+              60120,
+              60600,
+              61080,
+              61560,
+              62040,
+              62520
+            ],
+            "direction": "outbound",
+            "first_departure": 57720,
+            "last_departure": 62520,
+            "service_regime_id": "SERVICE-OUTBOUND-06",
+            "trip_count": 11,
+            "uniform_headway_minutes": 8
+          },
+          {
+            "demand_regime_ids": [
+              "PLAN-OUTBOUND-07",
+              "PLAN-OUTBOUND-08"
+            ],
+            "departures": [
+              63000,
+              63900,
+              64800,
+              65700,
+              66600,
+              67500,
+              68400,
+              69300,
+              70200,
+              71100,
+              72000,
+              72900,
+              73800,
+              74700,
+              75600
+            ],
+            "direction": "outbound",
+            "first_departure": 63000,
+            "last_departure": 75600,
+            "service_regime_id": "SERVICE-OUTBOUND-07",
+            "trip_count": 15,
+            "uniform_headway_minutes": 15
+          }
+        ]
+      },
+      "local_rhythm_families": {
+        "inbound": [],
+        "outbound": []
+      },
+      "selected_pair_fingerprint": "ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b"
+    }
+  }
+}

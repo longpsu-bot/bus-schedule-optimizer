@@ -1,0 +1,543 @@
+{
+  "evidence_profile": "pr62_f2_fleet_neighborhood_narrowing_v1",
+  "f1_artifacts": {
+    "committed_head_sha": "2e2603657c3caa939b55f31d87960ea227530b2d",
+    "json": {
+      "path": "docs/engine/evidence/PR62_F1_FLEET_FEEDBACK_EXPANSION_CONTROL.json",
+      "sha256": "06570ac08b8d618bc20c7d3502e8499ba59d24dc2a4c4cea429f17041db79984",
+      "size_bytes": 11993
+    },
+    "markdown": {
+      "path": "docs/engine/evidence/PR62_F1_FLEET_FEEDBACK_EXPANSION_CONTROL.md",
+      "sha256": "63c62adedfc5bdeb850b9534c343ebf6ea6d1b602a2da1408bd03a2bb755ed68",
+      "size_bytes": 6382
+    }
+  },
+  "post_f2_decision": {
+    "classification": "QUEUE_PRIORITY_NOW_PRIMARY",
+    "queue_priority_change_implemented_in_f2": false,
+    "queue_priority_work_now_justified": true,
+    "rationale": "Pure-fleet neighborhoods are now small one-step sets and fleet generation is below one fifth of generated states on both routes. Route 10 response children receive evaluation and feasible-pair participation, while Route 6 response children remain unevaluated under the unchanged queue ordering and 24-state budget.",
+    "route_10_queue_starvation": "RESOLVED",
+    "route_6_queue_starvation": "PERSISTS",
+    "settlement_classification": "SETTLEMENT_NOT_CURRENTLY_NEEDED"
+  },
+  "production_change_statement": {
+    "compiler_changed": false,
+    "d1_queue_identity_changed": false,
+    "demand_response_semantics_changed": false,
+    "f1_idempotence_changed": false,
+    "fleet_validator_changed": false,
+    "generic_nonfleet_operators_changed": false,
+    "pareto_changed": false,
+    "production_search_controller_semantics_changed": true,
+    "pure_fleet_operator_family_changed": true,
+    "queue_priority_changed": false,
+    "search_budgets_changed": false,
+    "settlement_added": false
+  },
+  "production_semantic_change": {
+    "bounded_shift_has_exhaustive_fallback": false,
+    "implemented_as_truncation": false,
+    "pure_fleet_after": [
+      "MERGE_ADJACENT",
+      "SHIFT_BOUNDARY_LEFT with feasible parent-left-count +/- 1",
+      "SHIFT_BOUNDARY_RIGHT with feasible parent-left-count +/- 1",
+      "MOVE_ONE_TRIP_LEFT_TO_RIGHT",
+      "MOVE_ONE_TRIP_RIGHT_TO_LEFT",
+      "TAIL_ABSORB_ONE",
+      "TAIL_RELEASE_ONE"
+    ],
+    "pure_fleet_before": [
+      "MERGE_ADJACENT",
+      "SPLIT_REGIME",
+      "SHIFT_BOUNDARY_LEFT with exhaustive feasible redistribution",
+      "SHIFT_BOUNDARY_RIGHT with exhaustive feasible redistribution",
+      "MOVE_ONE_TRIP_LEFT_TO_RIGHT",
+      "MOVE_ONE_TRIP_RIGHT_TO_LEFT",
+      "TAIL_ABSORB_ONE",
+      "TAIL_RELEASE_ONE"
+    ],
+    "split_regime_preserved_for_localized_demand_response": true,
+    "split_regime_removed_from_pure_fleet": true,
+    "structural_upper_bound_before_fingerprint_dedupe": "9 * (N - 1) + 2"
+  },
+  "required_starting_sha": "2e2603657c3caa939b55f31d87960ea227530b2d",
+  "routes": {
+    "10": {
+      "after_pr62_f2": {
+        "duplicate_states_skipped": 710,
+        "fleet_children_by_move": {
+          "MERGE_ADJACENT": 143,
+          "MOVE_ONE_TRIP_LEFT_TO_RIGHT": 139,
+          "MOVE_ONE_TRIP_RIGHT_TO_LEFT": 132,
+          "SHIFT_BOUNDARY_LEFT": 406,
+          "SHIFT_BOUNDARY_RIGHT": 406,
+          "SPLIT_REGIME": 0,
+          "TAIL_ABSORB_ONE": 0,
+          "TAIL_RELEASE_ONE": 0
+        },
+        "fleet_children_share_of_generated": 0.1525634644101543,
+        "fleet_feedback_event_count": 973,
+        "fleet_feedback_expansion_requests": 1946,
+        "fleet_feedback_expansions_executed": 23,
+        "fleet_feedback_expansions_skipped": 1923,
+        "fleet_feedback_generated_children": 1226,
+        "fleet_neighbors_per_executed_parent": {
+          "executed_parent_count": 23,
+          "maximum": 68,
+          "median": 59,
+          "minimum": 36,
+          "total": 1226
+        },
+        "fleet_validations_run": 1392,
+        "generation_to_evaluation_ratio": 334.8333333333333,
+        "open_queue_at_stop": 512,
+        "pareto_size": 124,
+        "response_mismatch": {
+          "evaluated_descendants": 8,
+          "feasible_pair_participation": 103,
+          "final_pareto_ancestry": 28,
+          "generated_child_states": 279,
+          "pair_participation": 672,
+          "retained_directional_compilations": 13
+        },
+        "states_evaluated": 24,
+        "states_generated": 8036,
+        "states_pruned": 6790,
+        "status": "SEARCH_BUDGET_EXHAUSTED"
+      },
+      "before_pr62_f1": {
+        "duplicate_states_skipped": 1418,
+        "fleet_feedback_event_count": 973,
+        "fleet_feedback_expansion_requests": 1946,
+        "fleet_feedback_expansions_executed": 23,
+        "fleet_feedback_expansions_skipped": 1923,
+        "fleet_feedback_generated_children": 8130,
+        "fleet_neighbors_per_executed_parent": {
+          "executed_parent_count": 23,
+          "maximum": 587,
+          "median": 313,
+          "minimum": 209,
+          "total": 8130
+        },
+        "fleet_validations_run": 1392,
+        "generation_to_evaluation_ratio": 622.5,
+        "open_queue_at_stop": 512,
+        "pareto_size": 124,
+        "response_mismatch": {
+          "evaluated_descendants": 0,
+          "final_pareto_ancestry": 0,
+          "generated_child_states": 279,
+          "retained_directional_compilations": 0
+        },
+        "states_evaluated": 24,
+        "states_generated": 14940,
+        "states_pruned": 12978,
+        "status": "SEARCH_BUDGET_EXHAUSTED"
+      },
+      "clean_boundary_blocker_count": 0,
+      "determinism": {
+        "evaluated_fingerprints_equal": true,
+        "feedback_counts_equal": true,
+        "pareto_fingerprints_equal": true,
+        "passed": true,
+        "signature_sha256": "82062d271c25b5cbce870ee0b9b60f30e6bfd5e4414bcffa47165db8f885b3a8",
+        "statistics_equal": true
+      },
+      "frontier": {
+        "pr62_f1": {
+          "metric_ranges": {
+            "demand_response_direction_accuracy": {
+              "maximum": 1.0,
+              "minimum": 0.11965811965811966
+            },
+            "demand_weighted_expected_passenger_wait_minutes": {
+              "maximum": 10.064759999058358,
+              "minimum": 9.537104608551676
+            },
+            "fleet_required": {
+              "maximum": 13,
+              "minimum": 11
+            },
+            "observed_demand_mismatch": {
+              "maximum": 0.014004741204219927,
+              "minimum": 0.007901129936465988
+            }
+          },
+          "pareto_size": 124,
+          "representative": {
+            "actual_service_regime_count": 12,
+            "demand_weighted_expected_passenger_wait_minutes": 9.537104608551676,
+            "fleet_required": 12,
+            "meaningful_demand_differentiation": true,
+            "minimum_directional_frequency_ratio": 1.2195121951219512,
+            "observed_demand_mismatch": 0.011870927003400686,
+            "pair_fingerprint": "e8daa851f95a2eee08d6e6ccf6524adfbd5a0187932dcf35cb90f257f9d0043b",
+            "sustained_clean_service_regimes": true
+          }
+        },
+        "pr62_f2": {
+          "metric_ranges": {
+            "demand_response_direction_accuracy": {
+              "maximum": 1.0,
+              "minimum": 0.11965811965811966
+            },
+            "demand_weighted_expected_passenger_wait_minutes": {
+              "maximum": 10.064759999058358,
+              "minimum": 9.537104608551676
+            },
+            "fleet_required": {
+              "maximum": 13,
+              "minimum": 11
+            },
+            "observed_demand_mismatch": {
+              "maximum": 0.014004741204219927,
+              "minimum": 0.007901129936465988
+            }
+          },
+          "pareto_size": 124,
+          "representative": {
+            "actual_service_regime_count": 12,
+            "demand_weighted_expected_passenger_wait_minutes": 9.537104608551676,
+            "fleet_required": 12,
+            "inbound_service_regimes": [
+              {
+                "first_departure": 17100,
+                "last_departure": 25080,
+                "trip_count": 8,
+                "uniform_headway_minutes": 19
+              },
+              {
+                "first_departure": 26280,
+                "last_departure": 55080,
+                "trip_count": 25,
+                "uniform_headway_minutes": 20
+              },
+              {
+                "first_departure": 56100,
+                "last_departure": 62220,
+                "trip_count": 7,
+                "uniform_headway_minutes": 17
+              },
+              {
+                "first_departure": 63240,
+                "last_departure": 70800,
+                "trip_count": 7,
+                "uniform_headway_minutes": 21
+              },
+              {
+                "first_departure": 72000,
+                "last_departure": 75600,
+                "trip_count": 4,
+                "uniform_headway_minutes": 20
+              }
+            ],
+            "meaningful_demand_differentiation": true,
+            "minimum_directional_frequency_ratio": 1.2352941176470587,
+            "observed_demand_mismatch": 0.011870927003400686,
+            "outbound_service_regimes": [
+              {
+                "first_departure": 18000,
+                "last_departure": 23100,
+                "trip_count": 6,
+                "uniform_headway_minutes": 17
+              },
+              {
+                "first_departure": 24120,
+                "last_departure": 28440,
+                "trip_count": 5,
+                "uniform_headway_minutes": 18
+              },
+              {
+                "first_departure": 29520,
+                "last_departure": 42720,
+                "trip_count": 12,
+                "uniform_headway_minutes": 20
+              },
+              {
+                "first_departure": 43860,
+                "last_departure": 55260,
+                "trip_count": 11,
+                "uniform_headway_minutes": 19
+              },
+              {
+                "first_departure": 56280,
+                "last_departure": 62400,
+                "trip_count": 7,
+                "uniform_headway_minutes": 17
+              },
+              {
+                "first_departure": 63420,
+                "last_departure": 67380,
+                "trip_count": 4,
+                "uniform_headway_minutes": 22
+              },
+              {
+                "first_departure": 68700,
+                "last_departure": 75600,
+                "trip_count": 6,
+                "uniform_headway_minutes": 23
+              }
+            ],
+            "pair_fingerprint": "e8daa851f95a2eee08d6e6ccf6524adfbd5a0187932dcf35cb90f257f9d0043b",
+            "sustained_clean_service_regimes": true
+          }
+        },
+        "representative_pair_changed": false
+      },
+      "queue_starvation_classification": "LOCALIZED_FEEDBACK_QUEUE_STARVATION_RESOLVED",
+      "settlement_classification": "SETTLEMENT_NOT_CURRENTLY_NEEDED"
+    },
+    "6": {
+      "after_pr62_f2": {
+        "duplicate_states_skipped": 670,
+        "fleet_children_by_move": {
+          "MERGE_ADJACENT": 208,
+          "MOVE_ONE_TRIP_LEFT_TO_RIGHT": 189,
+          "MOVE_ONE_TRIP_RIGHT_TO_LEFT": 190,
+          "SHIFT_BOUNDARY_LEFT": 510,
+          "SHIFT_BOUNDARY_RIGHT": 518,
+          "SPLIT_REGIME": 0,
+          "TAIL_ABSORB_ONE": 0,
+          "TAIL_RELEASE_ONE": 0
+        },
+        "fleet_children_share_of_generated": 0.18683479870430356,
+        "fleet_feedback_event_count": 1372,
+        "fleet_feedback_expansion_requests": 2744,
+        "fleet_feedback_expansions_executed": 23,
+        "fleet_feedback_expansions_skipped": 2721,
+        "fleet_feedback_generated_children": 1615,
+        "fleet_neighbors_per_executed_parent": {
+          "executed_parent_count": 23,
+          "maximum": 87,
+          "median": 63,
+          "minimum": 60,
+          "total": 1615
+        },
+        "fleet_validations_run": 1728,
+        "generation_to_evaluation_ratio": 360.1666666666667,
+        "open_queue_at_stop": 512,
+        "pareto_size": 130,
+        "response_mismatch": {
+          "evaluated_descendants": 0,
+          "feasible_pair_participation": 0,
+          "final_pareto_ancestry": 0,
+          "generated_child_states": 262,
+          "pair_participation": 0,
+          "retained_directional_compilations": 0
+        },
+        "states_evaluated": 24,
+        "states_generated": 8644,
+        "states_pruned": 7438,
+        "status": "SEARCH_BUDGET_EXHAUSTED"
+      },
+      "before_pr62_f1": {
+        "duplicate_states_skipped": 1481,
+        "fleet_feedback_event_count": 1372,
+        "fleet_feedback_expansion_requests": 2744,
+        "fleet_feedback_expansions_executed": 23,
+        "fleet_feedback_expansions_skipped": 2721,
+        "fleet_feedback_generated_children": 9799,
+        "fleet_neighbors_per_executed_parent": {
+          "executed_parent_count": 23,
+          "maximum": 494,
+          "median": 473,
+          "minimum": 267,
+          "total": 9799
+        },
+        "fleet_validations_run": 1728,
+        "generation_to_evaluation_ratio": 701.1666666666666,
+        "open_queue_at_stop": 512,
+        "pareto_size": 130,
+        "response_mismatch": {
+          "evaluated_descendants": 0,
+          "final_pareto_ancestry": 0,
+          "generated_child_states": 262,
+          "retained_directional_compilations": 0
+        },
+        "states_evaluated": 24,
+        "states_generated": 16828,
+        "states_pruned": 14811,
+        "status": "SEARCH_BUDGET_EXHAUSTED"
+      },
+      "clean_boundary_blocker_count": 0,
+      "determinism": {
+        "evaluated_fingerprints_equal": true,
+        "feedback_counts_equal": true,
+        "pareto_fingerprints_equal": true,
+        "passed": true,
+        "signature_sha256": "47aa88aa5c16b0f59b73cbbbf9d38784239cfbea40d60abb9fa3f23b73f78d41",
+        "statistics_equal": true
+      },
+      "frontier": {
+        "pr62_f1": {
+          "metric_ranges": {
+            "demand_response_direction_accuracy": {
+              "maximum": 1.0,
+              "minimum": 0.5673352435530086
+            },
+            "demand_weighted_expected_passenger_wait_minutes": {
+              "maximum": 6.237120455185592,
+              "minimum": 6.043783393326659
+            },
+            "fleet_required": {
+              "maximum": 20,
+              "minimum": 14
+            },
+            "observed_demand_mismatch": {
+              "maximum": 0.015650510405009692,
+              "minimum": 0.00620534956155345
+            }
+          },
+          "pareto_size": 130,
+          "representative": {
+            "actual_service_regime_count": 15,
+            "demand_weighted_expected_passenger_wait_minutes": 6.043783393326659,
+            "fleet_required": 19,
+            "meaningful_demand_differentiation": true,
+            "minimum_directional_frequency_ratio": 1.7567567567567568,
+            "observed_demand_mismatch": 0.007197180311487441,
+            "pair_fingerprint": "b6712e5e1a552fa75fbfe042454b7d0568e4cd06b265b7d38d8760358dfb4063",
+            "sustained_clean_service_regimes": true
+          }
+        },
+        "pr62_f2": {
+          "metric_ranges": {
+            "demand_response_direction_accuracy": {
+              "maximum": 1.0,
+              "minimum": 0.5673352435530086
+            },
+            "demand_weighted_expected_passenger_wait_minutes": {
+              "maximum": 6.237120455185592,
+              "minimum": 6.043783393326659
+            },
+            "fleet_required": {
+              "maximum": 20,
+              "minimum": 14
+            },
+            "observed_demand_mismatch": {
+              "maximum": 0.015650510405009692,
+              "minimum": 0.00620534956155345
+            }
+          },
+          "pareto_size": 130,
+          "representative": {
+            "actual_service_regime_count": 15,
+            "demand_weighted_expected_passenger_wait_minutes": 6.043783393326659,
+            "fleet_required": 19,
+            "inbound_service_regimes": [
+              {
+                "first_departure": 17700,
+                "last_departure": 21540,
+                "trip_count": 5,
+                "uniform_headway_minutes": 16
+              },
+              {
+                "first_departure": 22080,
+                "last_departure": 26940,
+                "trip_count": 10,
+                "uniform_headway_minutes": 9
+              },
+              {
+                "first_departure": 27480,
+                "last_departure": 37560,
+                "trip_count": 13,
+                "uniform_headway_minutes": 14
+              },
+              {
+                "first_departure": 38160,
+                "last_departure": 42960,
+                "trip_count": 9,
+                "uniform_headway_minutes": 10
+              },
+              {
+                "first_departure": 43560,
+                "last_departure": 57060,
+                "trip_count": 16,
+                "uniform_headway_minutes": 15
+              },
+              {
+                "first_departure": 57600,
+                "last_departure": 62460,
+                "trip_count": 10,
+                "uniform_headway_minutes": 9
+              },
+              {
+                "first_departure": 63000,
+                "last_departure": 75600,
+                "trip_count": 15,
+                "uniform_headway_minutes": 15
+              }
+            ],
+            "meaningful_demand_differentiation": true,
+            "minimum_directional_frequency_ratio": 1.777777777777778,
+            "observed_demand_mismatch": 0.007197180311487441,
+            "outbound_service_regimes": [
+              {
+                "first_departure": 17700,
+                "last_departure": 21540,
+                "trip_count": 5,
+                "uniform_headway_minutes": 16
+              },
+              {
+                "first_departure": 22140,
+                "last_departure": 26940,
+                "trip_count": 9,
+                "uniform_headway_minutes": 10
+              },
+              {
+                "first_departure": 27540,
+                "last_departure": 37620,
+                "trip_count": 13,
+                "uniform_headway_minutes": 14
+              },
+              {
+                "first_departure": 38220,
+                "last_departure": 43020,
+                "trip_count": 9,
+                "uniform_headway_minutes": 10
+              },
+              {
+                "first_departure": 43620,
+                "last_departure": 57120,
+                "trip_count": 16,
+                "uniform_headway_minutes": 15
+              },
+              {
+                "first_departure": 58020,
+                "last_departure": 62820,
+                "trip_count": 11,
+                "uniform_headway_minutes": 8
+              },
+              {
+                "first_departure": 63300,
+                "last_departure": 67500,
+                "trip_count": 6,
+                "uniform_headway_minutes": 14
+              },
+              {
+                "first_departure": 68400,
+                "last_departure": 75600,
+                "trip_count": 9,
+                "uniform_headway_minutes": 15
+              }
+            ],
+            "pair_fingerprint": "b6712e5e1a552fa75fbfe042454b7d0568e4cd06b265b7d38d8760358dfb4063",
+            "sustained_clean_service_regimes": true
+          }
+        },
+        "representative_pair_changed": false
+      },
+      "queue_starvation_classification": "LOCALIZED_FEEDBACK_QUEUE_STARVATION_PERSISTS",
+      "settlement_classification": "SETTLEMENT_NOT_CURRENTLY_NEEDED"
+    }
+  },
+  "search_budget": {
+    "max_compile_frontier_per_state": 4,
+    "max_directional_compilations": 24,
+    "max_open_states": 512,
+    "max_pair_frontier": 512,
+    "max_service_plan_evaluations": 24
+  }
+}
