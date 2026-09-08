@@ -289,9 +289,23 @@ create cross-family quality authority.
 The source candidate is eligible for a retained slot so one-direction changes remain
 representable. If the eligible aggregate contains at most the configured cap, all are
 retained. The canonical cap is 32 and is named the `TECHNICAL_SHADOW_FRONTIER_LIMIT`;
-it is not production transport policy. The implementation first measures the 59b
-selector on pools no larger than 256. If it is not operationally adequate, U6 stops
-and reports measurements before any U0 optimization is considered.
+it is not production transport policy. Because every detected family may contribute
+up to 256 raw candidates, the cross-family eligible aggregate has no assumed maximum
+of 256 and receives no pre-diversity truncation. The implementation measures the
+unchanged 59b selector on the actual deduplicated hard-eligible aggregate pool and
+records, per source and direction:
+
+- detected family count;
+- raw candidates before cross-family deduplication;
+- hard-eligible candidates before cross-family deduplication;
+- aggregate eligible count after compilation-fingerprint deduplication, including the
+  revalidated source candidate;
+- whether the source candidate added a new aggregate identity;
+- selector runtime and retained count.
+
+If the unchanged selector is operationally inadequate on the actual aggregate, U6
+stops and reports the measurements before any U0 optimization is considered. An
+additional aggregate cap may not be inserted to avoid that stop.
 
 ## Pair, fleet, Pareto, and V3 integration
 
@@ -408,10 +422,31 @@ their union by pair fingerprint in fingerprint order, then rebuilding the exact
 combined nondominated frontier through unchanged
 `update_operating_pair_pareto_v1` with `limit=None`. Running the unchanged V3 selector
 directly on the unnormalized union is prohibited. V3 receives only this normalized
-10-dimensional Pareto frontier. The cap is binding iff normalized-union V3 selects a
-candidate available only through the complete cap-64 run instead of the cap-32 final
-selection. That condition classifies `U6_DIRECTIONAL_FRONTIER_32_CAP_BINDING` and
-stops before Route 6. A cap-16 difference is diagnostic only.
+10-dimensional Pareto frontier. Because V3 derives its common SSE/TE anchor and
+materiality envelope from the complete candidate universe, binding is defined by the
+final selector outcome rather than winner provenance:
+
+```text
+U6_DIRECTIONAL_FRONTIER_32_CAP_BINDING
+iff
+
+V3(
+    ParetoNormalize(
+        cap32_final_pareto union cap64_final_pareto
+    )
+).selected_pair_fingerprint
+
+!=
+
+cap32_final_v3.selected_pair_fingerprint
+```
+
+Evidence separately records
+`normalized_union_winner_cap32_present = true|false` and
+`normalized_union_winner_cap64_only = true|false`. These are diagnostic provenance
+and do not determine binding. Any selected-fingerprint inequality under the rule above
+classifies `U6_DIRECTIONAL_FRONTIER_32_CAP_BINDING` and stops before Route 6. A cap-16
+difference is diagnostic only.
 
 ## Route 10 saved-global continuation
 
@@ -453,8 +488,11 @@ rerun during U6.
 
 The base and final control selection must both be
 `ad0ebdf717ff9c9e5aa79bbfe2ae36082875b5bb57620d917f9dec695374174b`.
-The Route 6 shadow flow uses the same cap-32 canonical path and reused-pool cap-64
-sensitivity. A changed final selection classifies
+Route 6 uses the same independent complete cap-32 and cap-64 shadow-local sensitivity
+semantics as Route 10. Content-addressed DAG and hard-eligibility cache reuse is
+allowed only for identical semantic source/family inputs under the global sensitivity
+caching contract. No cap-specific worklist, retention, pair, Pareto, descendant, or V3
+state is reused. A changed final selection classifies
 `ROUTE6_CONTROL_CHANGED_UNDER_KBEST_DAG_SHADOW` without rationalization.
 
 The deterministic repeat reloads the saved completed Route 6 result and consumes no
