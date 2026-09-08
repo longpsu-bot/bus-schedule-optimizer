@@ -81,11 +81,19 @@ def compile_service_plan_family_kbest_v1(
     ...
 ```
 
-`states` is one local-family state set for one route and direction. Input validation
-requires a non-empty, canonically ordered, fingerprint-distinct sequence whose route,
-direction, fixed endpoints, total trips, and endpoint authority agree. The production
-function accepts `raw_limit` only in the inclusive range `1..256`; canonical U6 runs
-always use `256`.
+`states` is one local-family state set for one route and direction. The API accepts
+arbitrary caller order and internally freezes the state order as:
+
+```python
+ordered_states = tuple(sorted(states, key=service_plan_fingerprint_v1))
+```
+
+State indices, graph manifests, source edges, and tie identities use this internal
+order. Input validation requires a non-empty sequence, rejects duplicate ServicePlan
+fingerprints, and requires every state's route, direction, fixed endpoints, total
+trips, and endpoint authority to agree. Caller order is technical input presentation,
+not transport authority. The production function accepts `raw_limit` only in the
+inclusive range `1..256`; canonical U6 runs always use `256`.
 
 The frozen return contracts are immutable, slotted dataclasses:
 
@@ -268,6 +276,16 @@ semantics are then applied once to the aggregate directional pool:
 - fill by exact-departure max-min distance;
 - resolve ties by existing exact deterministic ordering.
 
+Within one family DAG, `exact_scaled_quantization` participates in exact path ordering
+under that DAG's proven denominator scale. It is never compared across separately
+scaled family DAGs. Cross-family duplicate identity remains the compilation
+fingerprint. After fingerprint deduplication, cross-family quality-anchor selection and
+diversity ordering use the existing compiler objective
+`(Fraction quantization, actual service regime count, phase imbalance)`, followed by
+the existing headway-vector and departure-vector tie fields. Thus independently
+inferred integer scales remain telemetry/proof fields local to their DAG and cannot
+create cross-family quality authority.
+
 The source candidate is eligible for a retained slot so one-direction changes remain
 representable. If the eligible aggregate contains at most the configured cap, all are
 retained. The canonical cap is 32 and is named the `TECHNICAL_SHADOW_FRONTIER_LIMIT`;
@@ -363,18 +381,37 @@ wall-clock timings. Candidate, eligible, retained, pair, Pareto, and selection h
 are computed from explicit semantic fields rather than dataclass reprs or filesystem
 paths.
 
-Route 10 and Route 6 each require two fresh-process shadow local-stage runs. Their
-processed source order, raw DAG hashes, eligible hashes, retained hashes, pair
-fingerprints, final Pareto hash, and final V3 selection must be identical. A Route 10
-mismatch classifies `U6_ROUTE10_SHADOW_NONDETERMINISTIC` and stops.
+Route 10 and Route 6 each require two fresh-process shadow local-stage runs with empty
+process caches. Their processed source order, raw DAG hashes, eligible hashes,
+retained hashes, pair fingerprints, final Pareto hash, and final V3 selection must be
+identical. A Route 10 mismatch classifies
+`U6_ROUTE10_SHADOW_NONDETERMINISTIC` and stops.
 
-Each canonical run freezes raw and hard-eligible pools before diversity. Cap
-sensitivity reuses those exact pools for limits 16, 32, and 64; it does not rebuild a
-DAG. The cap-64 and cap-32 final outcomes are compared by running unchanged V3 over
-the union of their final Pareto candidates. The cap is binding only when the union
-selects a candidate exposed exclusively by cap 64 instead of the cap-32 selection.
-That condition classifies `U6_DIRECTIONAL_FRONTIER_32_CAP_BINDING` and stops before
-Route 6. A cap-16 difference is diagnostic only.
+The 16, 32, and 64 sensitivity cases are complete independent shadow-local runs from
+the same completed global result. Each case owns its source/materiality worklist,
+Pareto evolution, and V3 history. A larger cap may admit a different pair, expose a
+new materiality descendant, and therefore create a source/family DAG that no smaller
+cap encounters; every such cap-specific descendant is processed normally.
+
+DAG and hard-eligibility results may be content-addressed and reused across
+sensitivity cases only when the semantic input key is identical. The key binds at
+least the source-pair fingerprint, direction, family identity, sorted planning-state
+manifest and fingerprints, endpoint authority, hard-eligibility context authorities,
+raw limit `256`, and U6 implementation authority. Cache values contain only frozen
+raw/eligible semantics and hashes, never cap-specific retention, pair, Pareto,
+worklist, or V3 state. Reuse is an execution optimization, not a way to suppress a
+cap-specific graph. Fresh-process determinism repeats start with empty caches so cache
+hits cannot mask generation nondeterminism.
+
+The cap-32 and cap-64 final Pareto frontiers are adjudicated by first deduplicating
+their union by pair fingerprint in fingerprint order, then rebuilding the exact
+combined nondominated frontier through unchanged
+`update_operating_pair_pareto_v1` with `limit=None`. Running the unchanged V3 selector
+directly on the unnormalized union is prohibited. V3 receives only this normalized
+10-dimensional Pareto frontier. The cap is binding iff normalized-union V3 selects a
+candidate available only through the complete cap-64 run instead of the cap-32 final
+selection. That condition classifies `U6_DIRECTIONAL_FRONTIER_32_CAP_BINDING` and
+stops before Route 6. A cap-16 difference is diagnostic only.
 
 ## Route 10 saved-global continuation
 
