@@ -5,10 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, fields, is_dataclass, replace
 from fractions import Fraction
+from pathlib import Path
 from time import perf_counter
-from typing import Any
+from types import UnionType
+from typing import Any, get_args, get_origin, get_type_hints
 
 from .contracts_v1.clean_boundary_compiler import (
     CleanBoundaryCompilationStatusV1,
@@ -27,6 +29,7 @@ from .contracts_v1.closed_loop_service_protection import (
 from .contracts_v1.kbest_dag_frontier import (
     KBestDagCandidateV1,
     KBestDagFrontierV1,
+    KBestDagTelemetryV1,
     compile_service_plan_family_kbest_v1,
     service_plan_matches_endpoint_contract_v1,
 )
@@ -191,6 +194,25 @@ def evaluate_kbest_dag_hard_eligibility_v1(
             rejects[rejection] += 1
         else:
             eligible.append(candidate)
+    return _eligibility_with_progress_v1(
+        source_directional=source_directional,
+        raw_candidates=raw_candidates,
+        eligible=tuple(eligible),
+        structural_rejects=rejects["structural"],
+        protection_rejects=rejects["protection"],
+        tail_rejects=rejects["tail"],
+    )
+
+
+def _eligibility_with_progress_v1(
+    *,
+    source_directional: DirectionalCompilationCandidateV1,
+    raw_candidates: tuple[KBestDagCandidateV1, ...],
+    eligible: tuple[DirectionalCompilationCandidateV1, ...],
+    structural_rejects: int,
+    protection_rejects: int,
+    tail_rejects: int,
+) -> KBestDagEligibilityResultV1:
     progressing = (
         retain_strict_directional_canonicalizations_v1(source_directional, eligible)
         if eligible
@@ -200,9 +222,9 @@ def evaluate_kbest_dag_hard_eligibility_v1(
         raw_candidates=raw_candidates,
         eligible_candidates=tuple(eligible),
         candidates=tuple(progressing),
-        structural_rejects=rejects["structural"],
-        protection_rejects=rejects["protection"],
-        tail_rejects=rejects["tail"],
+        structural_rejects=structural_rejects,
+        protection_rejects=protection_rejects,
+        tail_rejects=tail_rejects,
         strict_progress_rejects=len(eligible) - len(progressing),
     )
 
@@ -406,6 +428,8 @@ class KBestDagFamilyManifestV1:
     eligible_hash: str
     classification: str
     total_seconds: float
+    cache_key: KBestDagSemanticCacheKeyV1 | None = None
+    cache_hit: bool = False
 
 
 def _semantic_hash_v1(payload: Any) -> str:
@@ -413,10 +437,159 @@ def _semantic_hash_v1(payload: Any) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+@dataclass(frozen=True, slots=True)
+class KBestDagSemanticCacheKeyV1:
+    source_pair_fingerprint: str
+    source_directional_hash: str
+    direction: str
+    family_identity_hash: str
+    sorted_state_manifest: tuple[tuple[str, str], ...]
+    endpoint_authority_hash: str
+    protection_authority_hash: str
+    demand_authority_hash: str
+    tail_context_authority_hash: str
+    raw_limit: int
+    implementation_authority_hash: str
+
+
+@dataclass(frozen=True, slots=True)
+class KBestDagSemanticCacheValueV1:
+    """Only immutable raw DAG and hard-eligible semantics; no strict/retained selection."""
+
+    frontier: KBestDagFrontierV1
+    eligible_candidates: tuple[DirectionalCompilationCandidateV1, ...]
+    structural_rejects: int
+    protection_rejects: int
+    tail_rejects: int
+
+
+def kbest_dag_implementation_authority_hash_v1() -> str:
+    """Bind U6 realization and its existing compilation/eligibility authorities to source bytes."""
+    root = Path(__file__).parent
+    relative_paths = (
+        "contracts_v1/clean_boundary_compiler.py",
+        "contracts_v1/clean_compile_frontier.py",
+        "contracts_v1/closed_loop_service_protection.py",
+        "contracts_v1/kbest_dag_frontier.py",
+        "contracts_v1/service_plan_state.py",
+        "kbest_shadow_refinement.py",
+        "local_rhythm_refinement.py",
+        "service_plan_coordinator.py",
+    )
+    return _semantic_hash_v1(
+        {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in relative_paths}
+    )
+
+
+def _family_cache_key_v1(
+    *,
+    source_pair_fingerprint: str,
+    source_directional: DirectionalCompilationCandidateV1,
+    family_index: int,
+    family: LocalRhythmFamilyV1,
+    planning_indices: tuple[int, ...],
+    states: Sequence[Any],
+    context: Any,
+    implementation_authority_hash: str,
+) -> KBestDagSemanticCacheKeyV1:
+    direction = source_directional.state.direction
+    protection = context.service_protection_authority
+    protection_hash = _semantic_hash_v1(None if protection is None else asdict(protection))
+    response = context.demand_response_regimes
+    demand_hash = _semantic_hash_v1(
+        {
+            "immutable_demand_sha256": getattr(context, "immutable_demand_sha256", None),
+            "demand_buckets": [asdict(bucket) for bucket in context.demand_buckets[direction]],
+            "demand_response_regimes": None
+            if response is None
+            else [asdict(regime) for regime in response[direction]],
+        }
+    )
+    return KBestDagSemanticCacheKeyV1(
+        source_pair_fingerprint=source_pair_fingerprint,
+        source_directional_hash=_semantic_hash_v1(
+            {
+                "state_fingerprint": source_directional.state_fingerprint,
+                "state": asdict(source_directional.state),
+                "compilation_fingerprint": source_directional.compile_variant.compilation_fingerprint,
+                "compilation": asdict(source_directional.compile_variant.compilation),
+            }
+        ),
+        direction=direction,
+        family_identity_hash=_semantic_hash_v1(
+            {
+                "family_index": family_index,
+                "family": asdict(family),
+                "planning_indices": planning_indices,
+            }
+        ),
+        sorted_state_manifest=tuple(
+            sorted(
+                (service_plan_fingerprint_v1(state), _semantic_hash_v1(asdict(state)))
+                for state in states
+            )
+        ),
+        endpoint_authority_hash=_semantic_hash_v1(asdict(context.endpoint_authority[direction])),
+        protection_authority_hash=protection_hash,
+        demand_authority_hash=demand_hash,
+        tail_context_authority_hash=_semantic_hash_v1(
+            {
+                "protection_authority": protection_hash,
+                "demand_authority": demand_hash,
+                "scenario_b_departures": tuple(context.scenario_b_departures[direction]),
+            }
+        ),
+        raw_limit=256,
+        implementation_authority_hash=implementation_authority_hash,
+    )
+
+
+def _validate_semantic_cache_value_v1(value: Any) -> None:
+    schemas = {}
+
+    def frozen(item: Any, schema: Any) -> bool:
+        origin, arguments = get_origin(schema), get_args(schema)
+        if origin is UnionType:
+            return any(frozen(item, option) for option in arguments)
+        if origin is tuple:
+            if type(item) is not tuple:
+                return False
+            if len(arguments) == 2 and arguments[1] is Ellipsis:
+                return all(frozen(child, arguments[0]) for child in item)
+            return len(item) == len(arguments) and all(
+                frozen(child, expected) for child, expected in zip(item, arguments, strict=True)
+            )
+        if is_dataclass(schema):
+            if type(item) is not schema or not schema.__dataclass_params__.frozen:
+                return False
+            if schema not in schemas:
+                schemas[schema] = get_type_hints(schema)
+            return all(
+                frozen(getattr(item, field.name), schemas[schema][field.name])
+                for field in fields(schema)
+            )
+        return type(item) is schema or (schema is float and type(item) is int)
+
+    if not frozen(value, KBestDagSemanticCacheValueV1) or value.frontier.requested_raw_limit != 256:
+        raise ValueError(
+            "semantic cache values must contain only frozen raw/eligible family results"
+        )
+
+
 def realize_kbest_dag_families_v1(
-    *, source_directional: DirectionalCompilationCandidateV1, context: Any
+    *,
+    source_directional: DirectionalCompilationCandidateV1,
+    context: Any,
+    source_pair_fingerprint: str | None = None,
+    semantic_cache: dict[KBestDagSemanticCacheKeyV1, KBestDagSemanticCacheValueV1] | None = None,
+    implementation_authority_hash: str | None = None,
 ) -> tuple[KBestDagFamilyManifestV1, ...]:
     """Realize each unchanged local family once after endpoint preflight."""
+    if semantic_cache is not None:
+        if not source_pair_fingerprint:
+            raise ValueError("semantic cache requires the source pair fingerprint")
+        if implementation_authority_hash is None:
+            implementation_authority_hash = kbest_dag_implementation_authority_hash_v1()
     compilation = source_directional.compile_variant.compilation
     direction = source_directional.state.direction
     authority = context.endpoint_authority[direction]
@@ -430,6 +603,9 @@ def realize_kbest_dag_families_v1(
         generated_fingerprints = valid_fingerprints = rejected_fingerprints = ()
         shadow = None
         graph_hash = None
+        cache_key = None
+        cache_hit = False
+        dag_call_count = 0
         classification = "NO_ENDPOINT_VALID_STATES"
         try:
             indices = map_actual_family_to_planning_indices_v1(
@@ -456,14 +632,55 @@ def realize_kbest_dag_families_v1(
                 fp for fp in generated_fingerprints if fp not in valid_set
             )
             if valid:
-                frontier = compile_service_plan_family_kbest_v1(
-                    states=valid, endpoint_authority=authority, raw_limit=256
-                )
-                eligibility = evaluate_kbest_dag_hard_eligibility_v1(
-                    source_directional=source_directional,
-                    candidates=frontier.candidates,
-                    context=context,
-                )
+                cached = None
+                if semantic_cache is not None:
+                    cache_key = _family_cache_key_v1(
+                        source_pair_fingerprint=source_pair_fingerprint,
+                        source_directional=source_directional,
+                        family_index=family_index,
+                        family=family,
+                        planning_indices=indices,
+                        states=valid,
+                        context=context,
+                        implementation_authority_hash=implementation_authority_hash,
+                    )
+                    if cache_key in semantic_cache:
+                        cached = semantic_cache[cache_key]
+                        _validate_semantic_cache_value_v1(cached)
+                        cache_hit = True
+                if cached is None:
+                    frontier = compile_service_plan_family_kbest_v1(
+                        states=valid, endpoint_authority=authority, raw_limit=256
+                    )
+                    dag_call_count = 1
+                    eligibility = evaluate_kbest_dag_hard_eligibility_v1(
+                        source_directional=source_directional,
+                        candidates=frontier.candidates,
+                        context=context,
+                    )
+                    if semantic_cache is not None:
+                        cached = KBestDagSemanticCacheValueV1(
+                            # Cached semantics cannot attribute a previous run's wall-clock work.
+                            frontier=replace(
+                                frontier, telemetry=KBestDagTelemetryV1(0, 0, 0, 0, 0)
+                            ),
+                            eligible_candidates=eligibility.eligible_candidates,
+                            structural_rejects=eligibility.structural_rejects,
+                            protection_rejects=eligibility.protection_rejects,
+                            tail_rejects=eligibility.tail_rejects,
+                        )
+                        _validate_semantic_cache_value_v1(cached)
+                        semantic_cache[cache_key] = cached
+                else:
+                    frontier = cached.frontier
+                    eligibility = _eligibility_with_progress_v1(
+                        source_directional=source_directional,
+                        raw_candidates=frontier.candidates,
+                        eligible=cached.eligible_candidates,
+                        structural_rejects=cached.structural_rejects,
+                        protection_rejects=cached.protection_rejects,
+                        tail_rejects=cached.tail_rejects,
+                    )
                 shadow = KBestDagFamilyShadowV1(family_index, frontier, eligibility)
                 # The semantic graph manifest binds its complete inputs and structural counts.
                 graph_hash = _semantic_hash_v1(
@@ -504,7 +721,7 @@ def realize_kbest_dag_families_v1(
                 valid_state_fingerprints=valid_fingerprints,
                 endpoint_rejected_state_fingerprints=rejected_fingerprints,
                 shadow=shadow,
-                dag_call_count=int(shadow is not None),
+                dag_call_count=dag_call_count,
                 state_manifest_hash=_semantic_hash_v1(manifest),
                 graph_hash=graph_hash,
                 raw_hash=_semantic_hash_v1(shadow.frontier.ordered_fingerprints if shadow else ()),
@@ -513,6 +730,8 @@ def realize_kbest_dag_families_v1(
                 ),
                 classification=classification,
                 total_seconds=perf_counter() - started,
+                cache_key=cache_key,
+                cache_hit=cache_hit,
             )
         )
     return tuple(records)
@@ -653,6 +872,8 @@ def refine_kbest_dag_source_pair_v1(
     pair_frontier_limit: int,
     already_generated: set[str],
     directional_frontier_limit: int = 32,
+    semantic_cache: dict[KBestDagSemanticCacheKeyV1, KBestDagSemanticCacheValueV1] | None = None,
+    implementation_authority_hash: str | None = None,
 ) -> KBestDagSourceRefinementV1:
     """Realize all families, retain each aggregate once, then cross only retained candidates."""
     _validate_directional_limit_v1(directional_frontier_limit)
@@ -661,7 +882,13 @@ def refine_kbest_dag_source_pair_v1(
     retained = {}
     for direction in ("outbound", "inbound"):
         source = getattr(source_pair, direction)
-        manifests = realize_kbest_dag_families_v1(source_directional=source, context=context)
+        manifests = realize_kbest_dag_families_v1(
+            source_directional=source,
+            context=context,
+            source_pair_fingerprint=source_pair.pair_fingerprint,
+            semantic_cache=semantic_cache,
+            implementation_authority_hash=implementation_authority_hash,
+        )
         families.extend(manifests)
         retained[direction] = retain_kbest_dag_directional_frontier_v1(
             source_directional=source,
@@ -741,11 +968,20 @@ def run_kbest_dag_shadow_from_completed_result_v1(
     context: RouteCoordinatorContextV1,
     coordinator_budget: CoordinatorSearchBudgetV1,
     directional_frontier_limit: int = 32,
+    semantic_cache: dict[KBestDagSemanticCacheKeyV1, KBestDagSemanticCacheValueV1] | None = None,
+    implementation_authority_hash: str | None = None,
 ) -> KBestDagShadowResultV1:
     """Consume a completed search with a sorted, source-once strict-descendant worklist."""
     _validate_directional_limit_v1(directional_frontier_limit)
     started = perf_counter()
-    frontier = tuple(base_coordinator_result.pareto_frontier)
+    frontier = tuple(item for item in base_coordinator_result.pareto_frontier)
+    cache_options = {}
+    if semantic_cache is not None:
+        cache_options = {
+            "semantic_cache": semantic_cache,
+            "implementation_authority_hash": implementation_authority_hash
+            or kbest_dag_implementation_authority_hash_v1(),
+        }
     base_selection = select_operational_timetable_v3(context=context, candidates=frontier)
     selection = base_selection
     base_by_fingerprint = {item.pair_fingerprint: item for item in frontier}
@@ -775,6 +1011,7 @@ def run_kbest_dag_shadow_from_completed_result_v1(
             pair_frontier_limit=coordinator_budget.max_pair_frontier,
             directional_frontier_limit=directional_frontier_limit,
             already_generated=generated,
+            **cache_options,
         )
         source_results.append(refined)
         frontier = refined.frontier
@@ -856,4 +1093,93 @@ def run_kbest_dag_shadow_from_completed_result_v1(
         continuation_history=tuple(continuations),
         selection_history=tuple(selection_history),
         pareto_history_hashes=tuple(pareto_history),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class KBestDagCapBindingResultV1:
+    normalized_union_frontier: tuple[Any, ...]
+    normalized_union_selection: OperationalSelectionResultV3
+    cap32_final_v3_selection: OperationalSelectionResultV3
+    binding: bool
+    normalized_union_winner_cap32_present: bool
+    normalized_union_winner_cap64_only: bool
+    classification: str
+
+
+def adjudicate_kbest_dag_cap_binding_v1(
+    *,
+    cap32: KBestDagShadowResultV1,
+    cap64: KBestDagShadowResultV1,
+    context: RouteCoordinatorContextV1,
+) -> KBestDagCapBindingResultV1:
+    """Normalize the final 32/64 union before V3; compare outcomes, irrespective of provenance."""
+    by_fingerprint = {}
+    for candidate in (*cap32.augmented_pareto_frontier, *cap64.augmented_pareto_frontier):
+        by_fingerprint.setdefault(candidate.pair_fingerprint, candidate)
+    normalized = ()
+    for fingerprint in sorted(by_fingerprint):
+        normalized = update_operating_pair_pareto_v1(
+            normalized, by_fingerprint[fingerprint], limit=None
+        )
+    selection = select_operational_timetable_v3(context=context, candidates=normalized)
+    winner = selection.selected_pair_fingerprint
+    binding = winner != cap32.final_v3_selection.selected_pair_fingerprint
+    cap32_fingerprints = {item.pair_fingerprint for item in cap32.augmented_pareto_frontier}
+    cap64_fingerprints = {item.pair_fingerprint for item in cap64.augmented_pareto_frontier}
+    return KBestDagCapBindingResultV1(
+        normalized_union_frontier=normalized,
+        normalized_union_selection=selection,
+        cap32_final_v3_selection=cap32.final_v3_selection,
+        binding=binding,
+        normalized_union_winner_cap32_present=winner in cap32_fingerprints,
+        normalized_union_winner_cap64_only=(
+            winner in cap64_fingerprints and winner not in cap32_fingerprints
+        ),
+        classification=(
+            "U6_DIRECTIONAL_FRONTIER_32_CAP_BINDING"
+            if binding
+            else "U6_DIRECTIONAL_FRONTIER_32_CAP_NON_BINDING"
+        ),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class KBestDagSensitivityResultV1:
+    cap16: KBestDagShadowResultV1
+    cap32: KBestDagShadowResultV1
+    cap64: KBestDagShadowResultV1
+    cap_binding: KBestDagCapBindingResultV1
+
+
+def run_kbest_dag_cap_sensitivity_v1(
+    *,
+    base_coordinator_result: RouteCoordinatorResultV1,
+    context: RouteCoordinatorContextV1,
+    coordinator_budget: CoordinatorSearchBudgetV1,
+    semantic_cache: dict[KBestDagSemanticCacheKeyV1, KBestDagSemanticCacheValueV1] | None = None,
+    fresh_repeat: bool = False,
+    implementation_authority_hash: str | None = None,
+) -> KBestDagSensitivityResultV1:
+    """Run three independent completed-result worklists; share only family raw/eligible results."""
+    cache = {} if fresh_repeat or semantic_cache is None else semantic_cache
+    implementation_hash = (
+        implementation_authority_hash or kbest_dag_implementation_authority_hash_v1()
+    )
+    runs = tuple(
+        run_kbest_dag_shadow_from_completed_result_v1(
+            base_coordinator_result=base_coordinator_result,
+            context=context,
+            coordinator_budget=coordinator_budget,
+            directional_frontier_limit=cap,
+            semantic_cache=cache,
+            implementation_authority_hash=implementation_hash,
+        )
+        for cap in (16, 32, 64)
+    )
+    return KBestDagSensitivityResultV1(
+        *runs,
+        cap_binding=adjudicate_kbest_dag_cap_binding_v1(
+            cap32=runs[1], cap64=runs[2], context=context
+        ),
     )
