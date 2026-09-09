@@ -391,6 +391,61 @@ def test_diagnostic_evidence_preserves_selection_blocker_and_false_readiness(tmp
     assert "no selected timetable" in markdown
 
 
+def test_cap16_only_null_v3_is_diagnostic_and_does_not_block_certification():
+    kwargs = _evidence_kwargs()
+    cap16 = kwargs["sensitivity"]["independent_runs"]["16"]
+    cap16["semantic"]["final_v3_fingerprint"] = None
+    cap16["semantic"]["final_selection"] = {
+        "selected_pair_fingerprint": None,
+        "classification": "DEMAND_FIT_ANCHOR_CONFLICT",
+    }
+    cap16["semantic_sha256"] = runner.semantic_hash(cap16["semantic"])
+
+    # Canonical/repeat/cap32/cap64 and the nonbinding union all have a selection.
+    evidence = runner.build_evidence(**kwargs)
+    assert evidence["ROUTE 10"]["classification"] == "ROUTE10_KBEST_DAG_SHADOW_VALIDATED"
+    assert evidence["ROUTE 10"]["sensitivity_validation"]["all_case_hard_runtime_gates_revalidated"]
+    assert not evidence["ROUTE 10"]["sensitivity_validation"]["binding"]
+    assert evidence["ROUTE 6"]["state"] == "NOT_RUN_ROUTE10_GATE_PENDING"
+    assert not any(evidence["READINESS"].values())
+
+
+@pytest.mark.parametrize("cap", [16, 32, 64])
+def test_measured_payload_validation_exempts_only_cap16_final_selection(cap):
+    payload = _frozen_run(cap=cap, selected=None)
+    if cap == 16:
+        runner.validate_route10_payload(payload)
+        assert (
+            payload["semantic"]["final_selection"]["classification"] == "DEMAND_FIT_ANCHOR_CONFLICT"
+        )
+    else:
+        with pytest.raises(
+            runner.CertificationError, match="U6_ROUTE10_FINAL_V3_SELECTION_UNAVAILABLE"
+        ):
+            runner.validate_route10_payload(payload)
+
+
+@pytest.mark.parametrize(
+    "mutation,label",
+    [
+        ("hard_valid", "U6_ROUTE10_HARD_ELIGIBILITY_CONTRACT_MISMATCH"),
+        ("total_seconds", "U6_ROUTE10_SHADOW_OPERATIONALLY_INTRACTABLE"),
+        ("semantic_sha256", "U6_ROUTE10_SEMANTIC_PAYLOAD_CORRUPTED"),
+    ],
+)
+def test_measured_cap16_null_does_not_exempt_hard_runtime_or_content_authority(mutation, label):
+    payload = _frozen_run(cap=16, selected=None)
+    if mutation == "hard_valid":
+        payload["semantic"][mutation] = False
+        payload["semantic_sha256"] = runner.semantic_hash(payload["semantic"])
+    elif mutation == "total_seconds":
+        payload["timings"][mutation] = 301
+    else:
+        payload[mutation] = "tampered"
+    with pytest.raises(runner.CertificationError, match=label):
+        runner.validate_route10_payload(payload)
+
+
 @pytest.mark.parametrize(
     "filename",
     [

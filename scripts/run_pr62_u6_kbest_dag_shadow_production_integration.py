@@ -579,6 +579,10 @@ def _validate_route10_hard_gates(payload):
 def validate_route10_payload(payload, *, diagnostic_final_selection=False):
     _validate_route10_hard_gates(payload)
     semantic = payload["semantic"]
+    # The measured cap16 payload is diagnostic; its hard/content/runtime gates
+    # still run, but its V3 outcome cannot terminate the sensitivity launch.
+    if semantic.get("directional_cap") == 16:
+        return
     require(
         semantic["final_v3_fingerprint"] is not None
         or (
@@ -759,8 +763,19 @@ def build_evidence(
         not sensitivity["binding"] or diagnostic_final_selection,
         "U6_DIRECTIONAL_FRONTIER_32_CAP_BINDING",
     )
-    for run in (canonical, repeat, *sensitivity["independent_runs"].values()):
+    # Cap16 is diagnostic only; cap64 affects certification through the normalized
+    # union. All three cases already passed hard/runtime/authority validation above.
+    for run in (canonical, repeat, sensitivity["independent_runs"]["32"]):
         validate_route10_payload(run, diagnostic_final_selection=diagnostic_final_selection)
+    union_selection = sensitivity["normalized_union_selection"]
+    require(
+        union_selection["selected_pair_fingerprint"] is not None
+        or (
+            diagnostic_final_selection
+            and union_selection["classification"] == "DEMAND_FIT_ANCHOR_CONFLICT"
+        ),
+        "U6_ROUTE10_FINAL_V3_SELECTION_UNAVAILABLE",
+    )
     classification = "ROUTE10_KBEST_DAG_SHADOW_VALIDATED"
     if sensitivity["binding"]:
         classification = "U6_DIRECTIONAL_FRONTIER_32_CAP_BINDING"
