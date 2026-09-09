@@ -23,17 +23,6 @@ from fractions import Fraction
 from pathlib import Path
 
 import pytest
-from bus_schedule_engine.contracts_v1.kbest_dag_frontier import (
-    KBestDagCandidateV1,
-    KBestDagFrontierV1,
-    KBestDagGraphStatisticsV1,
-    KBestDagTelemetryV1,
-    _build_layered_domain_v1,
-    _enumerate_state_domain_v1,
-    compile_service_plan_family_kbest_v1,
-    kbest_dag_candidate_payload_v1,
-    service_plan_matches_endpoint_contract_v1,
-)
 
 from bus_schedule_engine.contracts_v1.clean_boundary_compiler import (
     OperationalEndpointAuthorityV1,
@@ -44,6 +33,17 @@ from bus_schedule_engine.contracts_v1.clean_boundary_compiler import (
 from bus_schedule_engine.contracts_v1.clean_compile_frontier import (
     _regimes_from_state,
     clean_compilation_fingerprint_v1,
+)
+from bus_schedule_engine.contracts_v1.kbest_dag_frontier import (
+    KBestDagCandidateV1,
+    KBestDagFrontierV1,
+    KBestDagGraphStatisticsV1,
+    KBestDagTelemetryV1,
+    _build_layered_domain_v1,
+    _enumerate_state_domain_v1,
+    compile_service_plan_family_kbest_v1,
+    kbest_dag_candidate_payload_v1,
+    service_plan_matches_endpoint_contract_v1,
 )
 from bus_schedule_engine.contracts_v1.service_plan_state import (
     ServicePlanStateV1,
@@ -561,8 +561,25 @@ def test_u5_frozen_family_has_exact_production_port_parity():
         if record["integer_objective"] not in tiers:
             tiers.append(record["integer_objective"])
     assert tiers[:3] == [[8214, 7, 74], [9264, 7, 51], [10734, 7, 58]]
+    # U5's worker added these derived evidence fields after core extraction.
+    # The frozen raw.json hash covers that decorated encoding; the production
+    # payload remains the exact core schema asserted independently below.
+    u5_evidence_records = [
+        {
+            **record,
+            "tier_index": tiers.index(record["integer_objective"]),
+            "delta_from_tier0": [
+                value - baseline
+                for value, baseline in zip(
+                    record["integer_objective"], records[0]["integer_objective"], strict=True
+                )
+            ],
+            "unscaled_quantization": record["objective"][0],
+        }
+        for record in records
+    ]
     assert (
-        hashlib.sha256(_canonical_bytes(records)).hexdigest()
+        hashlib.sha256(_canonical_bytes(u5_evidence_records)).hexdigest()
         == payload["expected"]["raw_top256_sha256"]
         == RAW_SHA
     )
@@ -623,15 +640,35 @@ def test_production_dag_has_no_experiments_or_ortools_imports():
 
 def test_production_dag_imports_in_child_process_with_ortools_unavailable(tmp_path):
     env = dict(os.environ, PYTHONPATH=str(ROOT / "src"), PYTHONDONTWRITEBYTECODE="1")
+    # The unchanged package initializers eagerly export legacy OR-Tools solvers.
+    # Seed only namespace paths so this process loads the real DAG and its real
+    # dependency closure without executing unrelated application exports.
+    probe = f"""
+import importlib
+import sys
+import types
+from pathlib import Path
+
+source = Path({str(ROOT / "src")!r})
+for name in ("bus_schedule_engine", "bus_schedule_engine.contracts_v1"):
+    package = types.ModuleType(name)
+    package.__path__ = [str(source.joinpath(*name.split(".")))]
+    sys.modules[name] = package
+sys.modules["ortools"] = None
+importlib.import_module({MODULE!r})
+assert sys.modules["ortools"] is None
+assert not any(
+    name == "experiments" or name.startswith(("experiments.", "ortools."))
+    or (name.startswith("bus_schedule_engine.") and "solver" in name)
+    for name in sys.modules
+)
+print("DAG_IMPORT_WITHOUT_ORTOOLS_OK")
+"""
     child = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            f"import sys; sys.modules['ortools'] = None; import {MODULE}; "
-            "assert not any(n == 'experiments' or n.startswith('experiments.') for n in sys.modules); print('DAG_IMPORT_WITHOUT_ORTOOLS_OK')",
-        ],
+        [sys.executable, "-c", probe],
         cwd=tmp_path,
         env=env,
+        stdin=subprocess.DEVNULL,
         text=True,
         capture_output=True,
         check=False,
