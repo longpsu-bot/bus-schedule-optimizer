@@ -9,6 +9,7 @@ import json
 import os
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -24,12 +25,77 @@ SAVED = Path(
 FIXTURE = ROOT / "tests/fixtures/pr62_u6/u5_frozen_family.json"
 
 
-def test_saved_route10_binds_exact_bytes_and_reconstructs_authorities(monkeypatch):
+@pytest.fixture
+def private_route10_saved_base():
+    if not SAVED.exists():
+        pytest.skip(
+            f"Private preserved Route 10 pickle is absent: {SAVED}; "
+            "exact saved-base reconstruction requires this external artifact."
+        )
+    return SAVED
+
+
+def test_non_private_tests_pass_when_external_and_scratch_roots_are_absent(tmp_path):
+    program = r"""
+import pathlib, sys
+from unittest.mock import patch
+import pytest
+
+repo, allowed_temp = (pathlib.Path(p).resolve() for p in sys.argv[1:3])
+private_parent = pathlib.Path(sys.argv[3]).resolve().parent
+hidden_roots = (private_parent, repo.parent / 'pr62-u6-runs')
+original_open, original_is_file, original_exists = (
+    pathlib.Path.open, pathlib.Path.is_file, pathlib.Path.exists
+)
+def hidden(path):
+    resolved = path.resolve()
+    return not resolved.is_relative_to(allowed_temp) and any(
+        resolved.is_relative_to(root) for root in hidden_roots
+    )
+def checked_open(path, *args, **kwargs):
+    if hidden(path):
+        raise FileNotFoundError('Private external and scratch roots are absent')
+    return original_open(path, *args, **kwargs)
+with (
+    patch.object(pathlib.Path, 'open', checked_open),
+    patch.object(pathlib.Path, 'is_file', lambda path: False if hidden(path) else original_is_file(path)),
+    patch.object(pathlib.Path, 'exists', lambda path: False if hidden(path) else original_exists(path)),
+):
+    raise SystemExit(pytest.main([
+        str(repo / 'tests/test_pr62_u6_kbest_dag_shadow_integration.py'),
+        '-q', '--tb=short', '-k', 'not non_private_tests_pass_when_external_and_scratch_roots_are_absent',
+        '--basetemp', str(allowed_temp / 'pytest'), '--junitxml', str(allowed_temp / 'result.xml'),
+    ]))
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", program, str(ROOT), str(tmp_path), str(SAVED)],
+        env={
+            **os.environ,
+            "PYTHONPATH": os.pathsep.join((str(ROOT / "src"), str(ROOT / "scripts"))),
+        },
+        capture_output=True,
+        stdin=subprocess.DEVNULL,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    cases = ET.parse(tmp_path / "result.xml").getroot().findall(".//testcase")
+    skipped = {case.attrib["name"] for case in cases if case.find("skipped") is not None}
+    assert skipped == {
+        "test_saved_route10_binds_exact_bytes_and_reconstructs_authorities",
+        "test_route10_reconstruction_rejects_wrong_budget_and_selection",
+    }
+    assert all(case.find("failure") is None and case.find("error") is None for case in cases)
+
+
+def test_saved_route10_binds_exact_bytes_and_reconstructs_authorities(
+    monkeypatch, private_route10_saved_base
+):
     def forbidden(**kwargs):
         pytest.fail("global coordinator called while reconstructing Route 10")
 
     monkeypatch.setattr(coordinator, "search_route_service_plans_v1", forbidden)
-    loaded = runner.load_route10_saved_result(SAVED)
+    loaded = runner.load_route10_saved_result(private_route10_saved_base)
     assert loaded.input_authority["size"] == 70577
     assert loaded.input_authority["sha256"] == (
         "d2ba609ffd8fa4450e0a0662a0c9255dcdf1d8d2b759e63a8de6cf44fbfb114b"
@@ -47,16 +113,16 @@ def test_saved_route10_binds_exact_bytes_and_reconstructs_authorities(monkeypatc
 
 @pytest.mark.parametrize("mutation", ["size", "hash", "path"])
 def test_saved_wrong_authority_is_rejected_before_unpickle(tmp_path, monkeypatch, mutation):
-    path = SAVED if mutation != "path" else tmp_path / "untrusted.pickle"
-    original = Path.read_bytes
-    data = original(SAVED)
-    assert len(data) == 70577
-    assert hashlib.sha256(data).hexdigest() == runner.ROUTE10_SHA256
+    authority_path = tmp_path / "authoritative.pickle"
+    path = authority_path if mutation != "path" else tmp_path / "untrusted.pickle"
+    data = b"\0" * 70577
+    monkeypatch.setattr(runner, "ROUTE10_PATH", authority_path)
+    monkeypatch.setattr(runner, "ROUTE10_SHA256", hashlib.sha256(data).hexdigest())
     if mutation == "size":
         data = data[:-1]
     elif mutation == "hash":
         data = bytes([data[0] ^ 1]) + data[1:]
-    monkeypatch.setattr(Path, "read_bytes", lambda self: data)
+    path.write_bytes(data)
     monkeypatch.setattr(
         runner.pickle, "loads", lambda _: pytest.fail("unpickled before byte authority check")
     )
@@ -64,8 +130,8 @@ def test_saved_wrong_authority_is_rejected_before_unpickle(tmp_path, monkeypatch
         runner.load_route10_saved_result(path)
 
 
-def test_route10_reconstruction_rejects_wrong_budget_and_selection():
-    loaded = runner.load_route10_saved_result(SAVED)
+def test_route10_reconstruction_rejects_wrong_budget_and_selection(private_route10_saved_base):
+    loaded = runner.load_route10_saved_result(private_route10_saved_base)
     altered = dataclasses.replace(
         loaded.base,
         search_budget=dataclasses.replace(loaded.base.search_budget, max_pair_frontier=1),
@@ -671,12 +737,15 @@ def test_saved_repeat_is_still_accepted_without_running_a_route_stage(monkeypatc
         "run_kbest_dag_shadow_from_completed_result_v1",
         lambda **kw: pytest.fail("route stage rerun"),
     )
-    scratch = ROOT.parent / "pr62-u6-runs"
-    canonical = runner._read_payload(scratch / "task7-route10-canonical-20260909-01/cap32.json")
-    repeat = runner._read_payload(scratch / "task7-route10-repeat-20260909-01/cap32.json")
+    evidence = json.loads((ROOT / "docs/engine/evidence" / runner.EVIDENCE_JSON).read_bytes())
+    canonical = evidence["ROUTE 10"]["canonical"]
+    repeat = evidence["ROUTE 10"]["repeat"]
     result = runner.compare_route10_repeat(canonical, repeat)
     assert result["identical"] and result["fresh_process"] and result["cold_initial_caches"]
-    assert result["canonical_pid"] == 10176 and result["repeat_pid"] == 29540
+    assert result["canonical_pid"] > 0 and result["repeat_pid"] > 0
+    assert result["canonical_pid"] != result["repeat_pid"]
+    assert canonical["execution"]["initial_cache_entries"] == 0
+    assert repeat["execution"]["initial_cache_entries"] == 0
 
 
 def test_novel_union_without_saved_selector_authority_fails_closed():
