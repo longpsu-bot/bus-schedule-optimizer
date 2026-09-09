@@ -197,6 +197,8 @@ class _AggregateEntryV1:
             self.raw.departure_vector,
             self.raw.state_fingerprint,
             self.raw.compilation_fingerprint,
+            self.directional.compile_variant.frontier_rank,
+            self.directional.compile_variant.compilation.candidate_id,
         )
 
 

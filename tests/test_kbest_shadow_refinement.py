@@ -434,3 +434,42 @@ def test_aggregate_dedupe_uses_exact_objective_not_family_integer_scale():
         limit=32,
     )
     assert repeat.candidates == result.candidates
+
+
+def test_aggregate_equal_semantic_duplicate_provenance_is_family_order_independent():
+    source, context, raws = _large_pool(2)
+    source_raw, target = raws
+    rank_two = replace(
+        target,
+        compilation=replace(
+            target.compilation,
+            candidate_id=target.compilation.candidate_id.replace("C001", "C002"),
+        ),
+    )
+    rank_one_family = _family((target,), source, context)
+    rank_two_family = _family((source_raw, rank_two), source, context, 1)
+    assert rank_one_family.eligibility.candidates[0].compile_variant.frontier_rank == 1
+    assert rank_two_family.eligibility.candidates[0].compile_variant.frontier_rank == 2
+
+    forward = shadow.retain_kbest_dag_directional_frontier_v1(
+        source_directional=source,
+        family_results=(rank_one_family, rank_two_family),
+        context=context,
+        limit=32,
+    )
+    reverse = shadow.retain_kbest_dag_directional_frontier_v1(
+        source_directional=source,
+        family_results=(rank_two_family, rank_one_family),
+        context=context,
+        limit=32,
+    )
+
+    assert forward.retained_fingerprints == reverse.retained_fingerprints
+    assert forward.candidates == reverse.candidates
+    retained = next(
+        candidate
+        for candidate in forward.candidates
+        if candidate.compile_variant.compilation_fingerprint == target.compilation_fingerprint
+    )
+    assert retained.compile_variant.frontier_rank == 1
+    assert retained.compile_variant.compilation.candidate_id.endswith("C001")
