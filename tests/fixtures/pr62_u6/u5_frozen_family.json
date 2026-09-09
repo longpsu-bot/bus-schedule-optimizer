@@ -1,0 +1,2395 @@
+{
+  "endpoint_authority": {
+    "analysis_window_end": 77400,
+    "analysis_window_start": 16200,
+    "authority_source": "E:\\Project\\Bi\u1ec3u \u0111\u1ed3 gi\u1edd\\New model\\Engine_Input_MST_10_V3_MultiPeriod_Mar-Jul_2026.xlsx::THAM_SO_B::terminal_1_first_departure,terminal_1_last_departure",
+    "direction": "outbound",
+    "fixed_first_departure": 18000,
+    "fixed_last_departure": 75600,
+    "route_id": "10"
+  },
+  "expected": {
+    "first_distinct_objective_tiers": [
+      [
+        8214,
+        7,
+        74
+      ],
+      [
+        9264,
+        7,
+        51
+      ],
+      [
+        10734,
+        7,
+        58
+      ]
+    ],
+    "raw_top256_sha256": "71092c883923e6d5460980a8c528f263a275255986e887bb03c3c1ef16c17601",
+    "top1_fingerprint": "8e06dbcafc0194e5d338bc96b28569825bff30a79f96eaec8b5eda3c778ca7f6",
+    "top_objective": [
+      8214,
+      7,
+      74
+    ]
+  },
+  "family_manifest_sha256": "465c0800be66ce991af017ecea6dc87cdd4db7342d8ac9adb30ba1b5678fa905",
+  "profile": "pr62_u6_u5_frozen_family_v1",
+  "state_fingerprints": [
+    "0b045942750a183b02ad35781962cf1bf6adc844ceb968bee647af40a1151a8e",
+    "0b6c69fb34e04cdf3ef2c2122c90439ae8457801469d01f559c72c98a87cf5e6",
+    "0cba66fb4ce97844b411e8fa7f19d4229e5d5afd8a025cef4582cf86071ec1a2",
+    "144f9d00b7f71e21062c717398aeea48987d794ba7462116e1ee4c3c515cbe5c",
+    "1ca6d3b7f4f4f56a4b84b9aea968e50236addea67315074ebc1dbc9d5b255c81",
+    "1fdd8680eef81ef3aff6b82079787891de4a064e827a19f27ac0865d7e478ab8",
+    "20d28e4434528425e4645fca111c5ddfe905d6e750c7f29f3f2a213b752f0193",
+    "20f24ce879e775037d812c14c8e2e4ef01c80ac6dcdcf70ba860c57e2976693a",
+    "25abbac2f12aa30a11f8a61191884e5231b0cb5ee6367e7aade67c6edc6368d9",
+    "263d90370e560d4e5ee0af11553306c3b48007e142c634c9410a0b1d4316019c",
+    "29dc118d63b54c67b6acdbf1e40d32ecfb49159365f859ce7d7c9bb651a88e98",
+    "2ba04e78f20d7d8b4a2353050d0e7bb22869a46b3d569cb0f22dffe3bf46a7b8",
+    "3669847e13d6a219e2a90e627404b53ae08e33b4f926ae361611066ea9a34ed6",
+    "37e7df8b38cb8cf0a261f70cbf8a58634b29b89e22bdadc528710cc6654fcd0c",
+    "3bc3ca5b4dc7972c61856b4b1d13601670ada90dfd5487f2363b71c55cf5eed3",
+    "40235707b498309a319867be4ae67204852236141d00cd0688f66a3de2fd1371",
+    "433d8da14a3e5160bb748e9fad134207470a72a466c035ef473bc85914ac2eb3",
+    "53146389a53cf03b258cbf1c02241124b5f9a69ab296fe4871b3b5f4c40b701d",
+    "55054fe1242eeadf5ae0de03ef5819a357da5cdc77a4709afb14d1eac487242a",
+    "5552d0e45309d6e71decab8c6ff99f4423d3c05d90a1dd0fa77001d2a5ce80ef",
+    "58614d896c93d73a23df04cabde0a00ef008188e4dcdd3d3394a54bcfd6dac77",
+    "5e300f86820ddaf39c5815bef38ab3accb31526d40bf1fab346cbd0d74c318b3",
+    "5fe36bb98034b5210d063dcdd3d103a3e68e580559de0c3e0a1f7fed4742eb4d",
+    "673c2d7b7d8058e8f694ce157b21a684d6f357e3e4909ab2f7eb0e083ebab00b",
+    "69ea9ec7752c0137b64970379f7d7b833b30e0bacdf4f19aa5ce5ddaca43dbc4",
+    "6e47e7639220d922cb442cb98853364c8bbe035d0dfd1bdd52f0b26987bb6b11",
+    "7d8c58c20b25431ec9746c72371c694615aaba82e82dc9cf79bdf33d0fdc4cbc",
+    "9eaf20a3cc97a78cf670c8415d7ec893b5fd9430c642b433d8bb2c950d22ce0e",
+    "a5ba4ecdd831e86c6b6b505c0c62ea1038b050cd580f4b414d3ce4d01cb762e1",
+    "abe82ceb856fbbf796a25bff4be0452412e8b91ace88f8f2a40c408bb244a535",
+    "b04c4649654fc80c3baebb3959d26953177174f258f52b49ac1809b0443f285e",
+    "ba28dcda66c22156458bf6221097ec45e48b331dd9027f8daf1bbc3363bdf36f",
+    "bc8ca1a930c753204a6a966ab2987187e44b025b4c116782de919f6203d2699f",
+    "be1206d390558d84349db1b04d4516525df0fd6324fb6929f6fb9d655deb10b1",
+    "c39bb68ae7df08543476b06a9424ac120dcd9936122e396086ba2dcb417b708c",
+    "ca2d6692002945eb07ba49a3dec2343ba3ad626cdfa3b678639b5f16baad505b",
+    "cc37eb22aba1474d651fc21641ad4d3e30a14be36d7e7a6e65d6184548abbee7",
+    "cdbf53b1a5e9050ae402f6da65c1a197574a3d9751713af31ac543085bae4f04",
+    "cfbe21e920a69696d8ab9ab10ce0bd1ace12ba288a8aa505d50de13901046258",
+    "d8dc4f9e9f571f50d80d0d1e7727382a4357361da3513516312828a6546b0d22",
+    "df0c7ea714bebedd67711e3ddb6114eddb2ed354d595bf35c82dc2be1727c02c",
+    "e3f165dd897ae6ef5740f5a8452d2244fa2cd387b1d82fa489518bbc3a25b7ae",
+    "e44cf1df66e1c3d5befffdef030c779c9c6cf860b70e7b7f64c13b415c01f8a2",
+    "e93f95686f0dfa92ca744e48cf4162dc1f4575df13660130eaec25abf7f0e1b9",
+    "ea322741a4d579b1ce9f4420a9fcbb79f876f36f4b1b8096b531cc6d11cc0095",
+    "ed336d40c00b611959b1f806b173fbbf5ac5397d9afa9ec7fe66e116e9088d6a",
+    "edb8921387ca14723c38e5c5404e567d55e0d66ac52bf5ea14cd55236c6392a6",
+    "f1c974a34cf6cee5dddaf3354531b1b48626e4aa1ef0ad6c124a1706a18ef805",
+    "f4eca255847cdcdc99d316e62ef738516bb7635442ce7f75aad7a5e75cf2a547"
+  ],
+  "states": [
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 25200,
+          "start": 16200,
+          "trip_count": 14
+        },
+        {
+          "end": 36000,
+          "start": 25200,
+          "trip_count": 3
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 27000,
+          "start": 16200,
+          "trip_count": 8
+        },
+        {
+          "end": 36000,
+          "start": 27000,
+          "trip_count": 9
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 32400,
+          "start": 16200,
+          "trip_count": 8
+        },
+        {
+          "end": 36000,
+          "start": 32400,
+          "trip_count": 9
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 30600,
+          "start": 16200,
+          "trip_count": 11
+        },
+        {
+          "end": 36000,
+          "start": 30600,
+          "trip_count": 6
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 23400,
+          "start": 16200,
+          "trip_count": 9
+        },
+        {
+          "end": 36000,
+          "start": 23400,
+          "trip_count": 8
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 28800,
+          "start": 16200,
+          "trip_count": 13
+        },
+        {
+          "end": 36000,
+          "start": 28800,
+          "trip_count": 4
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 30600,
+          "start": 16200,
+          "trip_count": 13
+        },
+        {
+          "end": 36000,
+          "start": 30600,
+          "trip_count": 4
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 30600,
+          "start": 16200,
+          "trip_count": 9
+        },
+        {
+          "end": 36000,
+          "start": 30600,
+          "trip_count": 8
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 28800,
+          "start": 16200,
+          "trip_count": 12
+        },
+        {
+          "end": 36000,
+          "start": 28800,
+          "trip_count": 5
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 28800,
+          "start": 16200,
+          "trip_count": 11
+        },
+        {
+          "end": 36000,
+          "start": 28800,
+          "trip_count": 6
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 27000,
+          "start": 16200,
+          "trip_count": 9
+        },
+        {
+          "end": 36000,
+          "start": 27000,
+          "trip_count": 8
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 23400,
+          "start": 16200,
+          "trip_count": 12
+        },
+        {
+          "end": 36000,
+          "start": 23400,
+          "trip_count": 5
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 23400,
+          "start": 16200,
+          "trip_count": 8
+        },
+        {
+          "end": 36000,
+          "start": 23400,
+          "trip_count": 9
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 34200,
+          "start": 16200,
+          "trip_count": 9
+        },
+        {
+          "end": 36000,
+          "start": 34200,
+          "trip_count": 8
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 27000,
+          "start": 16200,
+          "trip_count": 12
+        },
+        {
+          "end": 36000,
+          "start": 27000,
+          "trip_count": 5
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 34200,
+          "start": 16200,
+          "trip_count": 10
+        },
+        {
+          "end": 36000,
+          "start": 34200,
+          "trip_count": 7
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 34200,
+          "start": 16200,
+          "trip_count": 13
+        },
+        {
+          "end": 36000,
+          "start": 34200,
+          "trip_count": 4
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 30600,
+          "start": 16200,
+          "trip_count": 12
+        },
+        {
+          "end": 36000,
+          "start": 30600,
+          "trip_count": 5
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 34200,
+          "start": 16200,
+          "trip_count": 14
+        },
+        {
+          "end": 36000,
+          "start": 34200,
+          "trip_count": 3
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 23400,
+          "start": 16200,
+          "trip_count": 14
+        },
+        {
+          "end": 36000,
+          "start": 23400,
+          "trip_count": 3
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 32400,
+          "start": 16200,
+          "trip_count": 10
+        },
+        {
+          "end": 36000,
+          "start": 32400,
+          "trip_count": 7
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 27000,
+          "start": 16200,
+          "trip_count": 11
+        },
+        {
+          "end": 36000,
+          "start": 27000,
+          "trip_count": 6
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 28800,
+          "start": 16200,
+          "trip_count": 10
+        },
+        {
+          "end": 36000,
+          "start": 28800,
+          "trip_count": 7
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 28800,
+          "start": 16200,
+          "trip_count": 8
+        },
+        {
+          "end": 36000,
+          "start": 28800,
+          "trip_count": 9
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 32400,
+          "start": 16200,
+          "trip_count": 13
+        },
+        {
+          "end": 36000,
+          "start": 32400,
+          "trip_count": 4
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 25200,
+          "start": 16200,
+          "trip_count": 11
+        },
+        {
+          "end": 36000,
+          "start": 25200,
+          "trip_count": 6
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 25200,
+          "start": 16200,
+          "trip_count": 9
+        },
+        {
+          "end": 36000,
+          "start": 25200,
+          "trip_count": 8
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 23400,
+          "start": 16200,
+          "trip_count": 10
+        },
+        {
+          "end": 36000,
+          "start": 23400,
+          "trip_count": 7
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 34200,
+          "start": 16200,
+          "trip_count": 8
+        },
+        {
+          "end": 36000,
+          "start": 34200,
+          "trip_count": 9
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 34200,
+          "start": 16200,
+          "trip_count": 11
+        },
+        {
+          "end": 36000,
+          "start": 34200,
+          "trip_count": 6
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 32400,
+          "start": 16200,
+          "trip_count": 14
+        },
+        {
+          "end": 36000,
+          "start": 32400,
+          "trip_count": 3
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 32400,
+          "start": 16200,
+          "trip_count": 12
+        },
+        {
+          "end": 36000,
+          "start": 32400,
+          "trip_count": 5
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 23400,
+          "start": 16200,
+          "trip_count": 11
+        },
+        {
+          "end": 36000,
+          "start": 23400,
+          "trip_count": 6
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 32400,
+          "start": 16200,
+          "trip_count": 9
+        },
+        {
+          "end": 36000,
+          "start": 32400,
+          "trip_count": 8
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 25200,
+          "start": 16200,
+          "trip_count": 10
+        },
+        {
+          "end": 36000,
+          "start": 25200,
+          "trip_count": 7
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 32400,
+          "start": 16200,
+          "trip_count": 11
+        },
+        {
+          "end": 36000,
+          "start": 32400,
+          "trip_count": 6
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 28800,
+          "start": 16200,
+          "trip_count": 14
+        },
+        {
+          "end": 36000,
+          "start": 28800,
+          "trip_count": 3
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 28800,
+          "start": 16200,
+          "trip_count": 9
+        },
+        {
+          "end": 36000,
+          "start": 28800,
+          "trip_count": 8
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 30600,
+          "start": 16200,
+          "trip_count": 10
+        },
+        {
+          "end": 36000,
+          "start": 30600,
+          "trip_count": 7
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 27000,
+          "start": 16200,
+          "trip_count": 10
+        },
+        {
+          "end": 36000,
+          "start": 27000,
+          "trip_count": 7
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 34200,
+          "start": 16200,
+          "trip_count": 12
+        },
+        {
+          "end": 36000,
+          "start": 34200,
+          "trip_count": 5
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 27000,
+          "start": 16200,
+          "trip_count": 14
+        },
+        {
+          "end": 36000,
+          "start": 27000,
+          "trip_count": 3
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 23400,
+          "start": 16200,
+          "trip_count": 13
+        },
+        {
+          "end": 36000,
+          "start": 23400,
+          "trip_count": 4
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 27000,
+          "start": 16200,
+          "trip_count": 13
+        },
+        {
+          "end": 36000,
+          "start": 27000,
+          "trip_count": 4
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 30600,
+          "start": 16200,
+          "trip_count": 14
+        },
+        {
+          "end": 36000,
+          "start": 30600,
+          "trip_count": 3
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 25200,
+          "start": 16200,
+          "trip_count": 12
+        },
+        {
+          "end": 36000,
+          "start": 25200,
+          "trip_count": 5
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 25200,
+          "start": 16200,
+          "trip_count": 13
+        },
+        {
+          "end": 36000,
+          "start": 25200,
+          "trip_count": 4
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 30600,
+          "start": 16200,
+          "trip_count": 8
+        },
+        {
+          "end": 36000,
+          "start": 30600,
+          "trip_count": 9
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    },
+    {
+      "direction": "outbound",
+      "fixed_first_departure": 18000,
+      "fixed_last_departure": 75600,
+      "operation": "LOCAL_RHYTHM_CANONICALIZE",
+      "operation_evidence": "LOCAL_NEAR_EQUIVALENT_RHYTHM_FAMILY",
+      "parent_fingerprint": "8155b99db85182593f584600aa04b20bfa372f3f63d2c50757a633247cd32e19",
+      "route_id": "10",
+      "seed_id": "B_V3_C3_BALANCED",
+      "service_regimes": [
+        {
+          "end": 25200,
+          "start": 16200,
+          "trip_count": 8
+        },
+        {
+          "end": 36000,
+          "start": 25200,
+          "trip_count": 9
+        },
+        {
+          "end": 43200,
+          "start": 36000,
+          "trip_count": 6
+        },
+        {
+          "end": 55800,
+          "start": 43200,
+          "trip_count": 11
+        },
+        {
+          "end": 63000,
+          "start": 55800,
+          "trip_count": 7
+        },
+        {
+          "end": 68400,
+          "start": 63000,
+          "trip_count": 4
+        },
+        {
+          "end": 77400,
+          "start": 68400,
+          "trip_count": 6
+        }
+      ]
+    }
+  ]
+}
