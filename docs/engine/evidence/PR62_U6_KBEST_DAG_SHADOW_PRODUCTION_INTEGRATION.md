@@ -19,13 +19,16 @@
     "outputs/final_pilot/archive/pr62_g/Route_10_Final_Pilot_Timetable.xlsx": "e49031892388714850001c0a97f91db9e3380b2dc0808d45095ce9825abf9da0",
     "outputs/final_pilot/archive/pr62_g/Route_6_Final_Pilot_Timetable.xlsx": "35a4ef65b0bc64cc8e18397c27bc7a135d5039857321f06e5ec5aadf15bf8879",
     "pyproject.toml": "30fed6237a06b2d2485d5acc6bf8afbe1cc171370f5bcb76e3964823f648191c",
-    "scripts/run_pr62_u6_kbest_dag_shadow_production_integration.py": "9b5d036b86e10415ef09befe83094cc93a892c15d0c6577e42a457f3d57a7454",
+    "scripts/run_pr62_u6_kbest_dag_shadow_production_integration.py": "d6df373b6c421a402a1b0d3b14987f41f1f16ba45ef95eccd8aa6f1cccc6c5e2",
+    "src/bus_schedule_engine/clean_boundary_pilot.py": "1b17298d31ed308da058ba213748c23b7a76f8902c3abcef20715d5ca1a99fd9",
     "src/bus_schedule_engine/contracts_v1/clean_boundary_compiler.py": "e36950284e7d2bea1f7ff15dc1bb016d360b8b3dd6ff3ce0299cfcbdb3952490",
     "src/bus_schedule_engine/contracts_v1/clean_compile_frontier.py": "ed770bf575d9a426d6f8f32f9524694bb54a56d8d0f1147b35b07134ea602be3",
     "src/bus_schedule_engine/contracts_v1/closed_loop_service_protection.py": "c5a7e1329454c552008acd324c1fe10391181221836c0564fd36954651fc2a94",
     "src/bus_schedule_engine/contracts_v1/end_tail_settlement.py": "018232a94600d4ce0773402f8de15087c6e4fd152fa8949a82f9edb3828bae03",
     "src/bus_schedule_engine/contracts_v1/fleet_assignment.py": "3f2f336fcac16477f167cd96d7c7b2a0c7401784018a0d0ff631f59158e096d2",
     "src/bus_schedule_engine/contracts_v1/kbest_dag_frontier.py": "dd7397097d733703220b420a777e794631b7aed1c52bf47130df63f43532d063",
+    "src/bus_schedule_engine/contracts_v1/operational_selection_policy.py": "ba0f48b5d0f3d9ed3dacb96aaff2b13d69c68961d835ac2cd33c2f356b40c0d3",
+    "src/bus_schedule_engine/contracts_v1/operational_selection_policy_v2.py": "22e271dd673cf9629fdb5f621d3e350fa9c8eaaa3afa7aede0ba341eeaaf7766",
     "src/bus_schedule_engine/contracts_v1/operational_selection_policy_v3.py": "b36390de2737cf344a26621f7de03f399eac34d730d895ef162f4913bf4eb4d3",
     "src/bus_schedule_engine/kbest_shadow_refinement.py": "0198247b8eb999cc18f17c7913dc4c0c83071332ec863a0300c6c0f41a93a672",
     "src/bus_schedule_engine/local_rhythm_refinement.py": "0e0c27c5d4e12ef1aa15bf38f0227cb7594dee6bde9b509763ad2d53b3b19b38",
@@ -54,6 +57,11 @@
       ]
     ],
     "fixture_sha256": "1b65a2f34c6bf06e9e2b94a8371e1e2d447b1e1b6fd2464510e7cd9066294a0f",
+    "persisted_artifact": {
+      "path": "E:/Project/Biểu đồ giờ/pr62-u6-runs/task7-parity-20260909-01/parity.json",
+      "sha256": "bb58f5327d17c522a32138d88b6a4a0311808d18dcd5af9039e20dbaa50f91ca",
+      "size": 535
+    },
     "raw_count": 256,
     "raw_top256_sha256": "71092c883923e6d5460980a8c528f263a275255986e887bb03c3c1ef16c17601",
     "state_count": 49,
@@ -177,7 +185,12 @@ Full source, family, raw/eligible/retained, pair, Pareto, and V3 histories are i
   "canonical_cap32_semantic_sha256": "46cd605e4ffb0a9aa00bb9376002b2001ada60760d460e1cbf38ba69aa549d99",
   "classification": "U6_DIRECTIONAL_FRONTIER_32_CAP_NON_BINDING",
   "normalized_union_winner_cap32_present": false,
-  "normalized_union_winner_cap64_only": false
+  "normalized_union_winner_cap64_only": false,
+  "persisted_artifact": {
+    "path": "E:/Project/Bi\u1ec3u \u0111\u1ed3 gi\u1edd/pr62-u6-runs/task7-route10-sensitivity-20260909-01/sensitivity.json",
+    "sha256": "78d92eaa66400eb83bd34302f7d9aa6d19f4508c68a67a796e833b28575ca523",
+    "size": 35499892
+  }
 }
 ```
 

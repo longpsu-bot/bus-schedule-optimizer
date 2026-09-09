@@ -15,6 +15,7 @@ from enum import Enum
 from fractions import Fraction
 from pathlib import Path
 from time import perf_counter
+from types import SimpleNamespace
 from typing import Any
 
 from bus_schedule_engine import kbest_shadow_refinement as shadow
@@ -532,24 +533,52 @@ def project_shadow_result(result, *, context, observed, cap):
     }
 
 
-def validate_route10_payload(payload, *, diagnostic_final_selection=False):
+def _validate_route10_hard_gates(payload):
     semantic, timings = payload["semantic"], payload["timings"]
+    statistics = semantic.get("statistics", {})
+    source_order = semantic["processed_source_order"]
     require(
         payload["semantic_sha256"] == semantic_hash(semantic),
         "U6_ROUTE10_SEMANTIC_PAYLOAD_CORRUPTED",
     )
     for condition, label in (
-        (semantic["global_coordinator_executions"] == 0, "U6_ROUTE10_GLOBAL_CALL_PROHIBITED"),
-        (semantic["source_once"], "U6_ROUTE10_SOURCE_ONCE_CONTRACT_MISMATCH"),
-        (semantic["hard_valid"], "U6_ROUTE10_HARD_ELIGIBILITY_CONTRACT_MISMATCH"),
-        (semantic["exact_fleet_valid"], "U6_ROUTE10_EXACT_FLEET_CONTRACT_MISMATCH"),
-        (timings["total_seconds"] <= 300, "U6_ROUTE10_SHADOW_OPERATIONALLY_INTRACTABLE"),
         (
-            timings["max_family_dag_seconds"] <= 60,
+            semantic["global_coordinator_executions"] == 0
+            and timings.get("global_coordinator_executions", 0) == 0
+            and statistics.get("global_coordinator_executions", 0) == 0,
+            "U6_ROUTE10_GLOBAL_CALL_PROHIBITED",
+        ),
+        (
+            semantic["source_once"] and len(source_order) == len(set(source_order)),
+            "U6_ROUTE10_SOURCE_ONCE_CONTRACT_MISMATCH",
+        ),
+        (
+            semantic["hard_valid"] and statistics.get("structural_rejects", 0) == 0,
+            "U6_ROUTE10_HARD_ELIGIBILITY_CONTRACT_MISMATCH",
+        ),
+        (semantic["exact_fleet_valid"], "U6_ROUTE10_EXACT_FLEET_CONTRACT_MISMATCH"),
+        (0 <= timings["total_seconds"] <= 300, "U6_ROUTE10_SHADOW_OPERATIONALLY_INTRACTABLE"),
+        (
+            0 <= timings["max_family_dag_seconds"] <= 60
+            and all(
+                0 <= family["dag"]["total_seconds"] <= 60 for family in timings.get("families", [])
+            ),
             "U6_ROUTE10_FAMILY_DAG_OPERATIONALLY_INTRACTABLE",
         ),
     ):
         require(condition, label)
+    if "final_pareto" in semantic:
+        require(
+            semantic["final_pareto_hash"] == semantic_hash(semantic["final_pareto"])
+            and semantic["final_selection"].get("selected_pair_fingerprint")
+            == semantic["final_v3_fingerprint"],
+            "U6_ROUTE10_SEMANTIC_PAYLOAD_CORRUPTED",
+        )
+
+
+def validate_route10_payload(payload, *, diagnostic_final_selection=False):
+    _validate_route10_hard_gates(payload)
+    semantic = payload["semantic"]
     require(
         semantic["final_v3_fingerprint"] is not None
         or (
@@ -561,13 +590,122 @@ def validate_route10_payload(payload, *, diagnostic_final_selection=False):
     )
 
 
-def compare_route10_repeat(canonical, repeat):
+def _compare_route10_semantics(canonical, repeat):
     require(
         canonical["semantic"] == repeat["semantic"]
         and canonical["semantic_sha256"] == repeat["semantic_sha256"],
         "U6_ROUTE10_SHADOW_NONDETERMINISTIC",
     )
-    return {"identical": True, "semantic_sha256": canonical["semantic_sha256"]}
+
+
+def compare_route10_repeat(canonical, repeat):
+    executions = [run.get("execution", {}) for run in (canonical, repeat)]
+    artifacts = [run.get("persisted_artifact", {}) for run in (canonical, repeat)]
+    require(
+        canonical is not repeat
+        and all(type(e.get("pid")) is int and e["pid"] > 0 for e in executions)
+        and executions[0]["pid"] != executions[1]["pid"]
+        and all(e.get("initial_cache_entries") == 0 for e in executions)
+        and all(a.get("path") and a.get("sha256") for a in artifacts)
+        and Path(artifacts[0]["path"]).resolve() != Path(artifacts[1]["path"]).resolve()
+        and artifacts[0]["sha256"] != artifacts[1]["sha256"],
+        "U6_ROUTE10_REPEAT_PROVENANCE_INVALID",
+    )
+    _compare_route10_semantics(canonical, repeat)
+    return {
+        "identical": True,
+        "semantic_sha256": canonical["semantic_sha256"],
+        "fresh_process": True,
+        "cold_initial_caches": True,
+        "canonical_pid": executions[0]["pid"],
+        "repeat_pid": executions[1]["pid"],
+        "canonical_artifact": artifacts[0],
+        "repeat_artifact": artifacts[1],
+    }
+
+
+def validate_route10_sensitivity(sensitivity, *, canonical, port):
+    """Recheck saved cases and derive the summary without launching any route stage.
+
+    A saved V3 result may be reused only for an exactly equal normalized frontier.
+    If the union is novel, this evidence-only path fails closed: it cannot invent
+    a selector result from the summary or run a new Route 10 experiment.
+    """
+    label = "U6_ROUTE10_SENSITIVITY_AUTHORITY_MISMATCH"
+    runs = sensitivity.get("independent_runs", {})
+    require(set(runs) == {"16", "32", "64"}, label)
+    # All hard/runtime gates take precedence over the provisional selection blocker.
+    for run in runs.values():
+        _validate_route10_hard_gates(run)
+    for cap, run in runs.items():
+        require(
+            run["semantic"].get("directional_cap") == int(cap)
+            and run.get("input_authority") == canonical.get("input_authority")
+            and run.get("implementation_authority_sha256")
+            == canonical.get("implementation_authority_sha256")
+            == port.get("implementation_authority_sha256")
+            and run["semantic"].get("base_pareto") == canonical["semantic"].get("base_pareto")
+            and run["semantic"].get("base_selection")
+            == canonical["semantic"].get("base_selection"),
+            label,
+        )
+    require(
+        sensitivity.get("canonical_cap32_semantic_sha256") == canonical["semantic_sha256"],
+        "U6_ROUTE10_SHADOW_NONDETERMINISTIC",
+    )
+    # Sensitivity legitimately shares raw/eligible caches; it is not the cold repeat.
+    _compare_route10_semantics(canonical, runs["32"])
+    by_fingerprint = {}
+    for cap in ("32", "64"):
+        for pair in runs[cap]["semantic"]["final_pareto"]:
+            previous = by_fingerprint.setdefault(pair["fingerprint"], pair)
+            require(previous == pair, label)
+    normalized = ()
+    for fingerprint in sorted(by_fingerprint):
+        pair = by_fingerprint[fingerprint]
+        normalized = coordinator.update_operating_pair_pareto_v1(
+            normalized,
+            SimpleNamespace(
+                pair_fingerprint=fingerprint,
+                metrics=SimpleNamespace(pareto_vector=tuple(pair["pareto_vector"])),
+            ),
+            limit=None,
+        )
+    union = [by_fingerprint[p.pair_fingerprint] for p in normalized]
+    require(sensitivity.get("normalized_union") == union, label)
+    matching_caps = [cap for cap in ("32", "64") if runs[cap]["semantic"]["final_pareto"] == union]
+    require(bool(matching_caps), "U6_ROUTE10_UNION_SELECTION_AUTHORITY_UNAVAILABLE")
+    selection = runs[matching_caps[0]]["semantic"]["final_selection"]
+    require(
+        all(runs[cap]["semantic"]["final_selection"] == selection for cap in matching_caps)
+        and sensitivity.get("normalized_union_selection") == selection,
+        label,
+    )
+    winner = selection["selected_pair_fingerprint"]
+    fingerprints = {
+        cap: {p["fingerprint"] for p in runs[cap]["semantic"]["final_pareto"]}
+        for cap in ("32", "64")
+    }
+    binding = winner != runs["32"]["semantic"]["final_v3_fingerprint"]
+    derived = {
+        "binding": binding,
+        "classification": "U6_DIRECTIONAL_FRONTIER_32_CAP_BINDING"
+        if binding
+        else "U6_DIRECTIONAL_FRONTIER_32_CAP_NON_BINDING",
+        "normalized_union_winner_cap32_present": winner in fingerprints["32"],
+        "normalized_union_winner_cap64_only": winner in fingerprints["64"]
+        and winner not in fingerprints["32"],
+    }
+    require(all(sensitivity.get(key) == value for key, value in derived.items()), label)
+    return {
+        "all_case_hard_runtime_gates_revalidated": True,
+        "case_payload_sha256": {cap: semantic_hash(run) for cap, run in runs.items()},
+        "normalized_union_sha256": semantic_hash(union),
+        "normalized_union_selection_sha256": semantic_hash(selection),
+        "selection_authority": "IDENTICAL_VALIDATED_FINAL_FRONTIER",
+        "selection_authority_caps": matching_caps,
+        **derived,
+    }
 
 
 def observe_q_after_freeze(frozen, fingerprint):
@@ -600,17 +738,29 @@ def build_evidence(
         "U6_PRODUCTION_PORT_DIVERGED_FROM_U5",
     )
     require(port["protected_authority_unchanged"], "U6_UNEXPECTED_PRODUCTION_AUTHORITY_CHANGE")
-    validate_route10_payload(canonical, diagnostic_final_selection=diagnostic_final_selection)
-    validate_route10_payload(repeat, diagnostic_final_selection=diagnostic_final_selection)
+    require(
+        canonical.get("input_authority", {}).get("sha256") == ROUTE10_SHA256
+        and repeat.get("input_authority") == canonical.get("input_authority"),
+        "U6_ROUTE10_SAVED_BASE_AUTHORITY_MISMATCH",
+    )
+    require(
+        canonical.get("implementation_authority_sha256")
+        == repeat.get("implementation_authority_sha256")
+        == port.get("implementation_authority_sha256"),
+        "U6_UNEXPECTED_PRODUCTION_AUTHORITY_CHANGE",
+    )
+    _validate_route10_hard_gates(canonical)
+    _validate_route10_hard_gates(repeat)
+    sensitivity_validation = validate_route10_sensitivity(
+        sensitivity, canonical=canonical, port=port
+    )
     comparison = compare_route10_repeat(canonical, repeat)
     require(
         not sensitivity["binding"] or diagnostic_final_selection,
         "U6_DIRECTIONAL_FRONTIER_32_CAP_BINDING",
     )
-    require(
-        sensitivity["canonical_cap32_semantic_sha256"] == canonical["semantic_sha256"],
-        "U6_ROUTE10_SHADOW_NONDETERMINISTIC",
-    )
+    for run in (canonical, repeat, *sensitivity["independent_runs"].values()):
+        validate_route10_payload(run, diagnostic_final_selection=diagnostic_final_selection)
     classification = "ROUTE10_KBEST_DAG_SHADOW_VALIDATED"
     if sensitivity["binding"]:
         classification = "U6_DIRECTIONAL_FRONTIER_32_CAP_BINDING"
@@ -624,6 +774,7 @@ def build_evidence(
             "repeat": repeat,
             "determinism": comparison,
             "sensitivity": sensitivity,
+            "sensitivity_validation": sensitivity_validation,
         },
         "ROUTE 6": {
             "state": "NOT_RUN_ROUTE10_GATE_PENDING"
@@ -647,6 +798,16 @@ def build_evidence(
 
 
 def render_evidence(evidence, output_dir):
+    route10 = evidence["ROUTE 10"]
+    rebuilt = build_evidence(
+        parity=evidence["PORT"]["u5_parity"],
+        port={k: v for k, v in evidence["PORT"].items() if k != "u5_parity"},
+        canonical=route10["canonical"],
+        repeat=route10["repeat"],
+        sensitivity=route10["sensitivity"],
+        diagnostic_final_selection=True,
+    )
+    require(evidence == rebuilt, "U6_RENDER_EVIDENCE_AUTHORITY_MISMATCH")
     output_dir.mkdir(parents=True, exist_ok=False)
     write_once(output_dir / EVIDENCE_JSON, canonical_bytes(evidence))
     lines = ["# PR62-U6 k-best DAG shadow integration", ""]
@@ -772,8 +933,13 @@ def authority_audit(repo_root):
         "src/bus_schedule_engine/contracts_v1/clean_boundary_compiler.py",
         "src/bus_schedule_engine/contracts_v1/clean_compile_frontier.py",
         "src/bus_schedule_engine/service_plan_coordinator.py",
+        # Coordinator imports the exact fleet builder/validator from this module.
+        "src/bus_schedule_engine/clean_boundary_pilot.py",
         "src/bus_schedule_engine/local_rhythm_refinement.py",
         "src/bus_schedule_engine/contracts_v1/operational_selection_policy_v3.py",
+        # V3 imports V2 and V1; V2 calls the unchanged V1 hard-feasibility builder.
+        "src/bus_schedule_engine/contracts_v1/operational_selection_policy_v2.py",
+        "src/bus_schedule_engine/contracts_v1/operational_selection_policy.py",
         "src/bus_schedule_engine/contracts_v1/closed_loop_service_protection.py",
         "src/bus_schedule_engine/contracts_v1/end_tail_settlement.py",
         "src/bus_schedule_engine/contracts_v1/fleet_assignment.py",
@@ -828,7 +994,15 @@ def authority_audit(repo_root):
 
 def _read_payload(path):
     require(path is not None, "U6_EXPLICIT_INPUT_PATH_REQUIRED")
-    return json.loads(path.read_bytes())
+    data = path.read_bytes()
+    payload = json.loads(data)
+    # The reader, never an embedded claim, supplies the artifact identity.
+    payload["persisted_artifact"] = {
+        "path": path.resolve().as_posix(),
+        "size": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+    }
+    return payload
 
 
 def main(argv=None):
@@ -910,7 +1084,7 @@ def main(argv=None):
             validate_route10_payload(
                 payload, diagnostic_final_selection=args.diagnostic_final_selection
             )
-            projected[cap] = payload
+            projected[cap] = _read_payload(args.output_dir / f"cap{cap}.json")
             return result
 
         if args.stage == "route10-sensitivity":
@@ -928,7 +1102,7 @@ def main(argv=None):
                 )
             finally:
                 shadow.run_kbest_dag_shadow_from_completed_result_v1 = original_run
-            compare_route10_repeat(canonical, projected[32])
+            _compare_route10_semantics(canonical, projected[32])
             binding = sensitivity.cap_binding
             payload = {
                 "binding": binding.binding,
