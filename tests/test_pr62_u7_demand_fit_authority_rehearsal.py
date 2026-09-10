@@ -400,6 +400,49 @@ def test_missing_route10_cap_and_source_batch_fields_fail_as_insufficient_eviden
     assert classification(batch_error) == "ROUTE10_EVIDENCE_INSUFFICIENT"
 
 
+def test_malformed_route10_counts_batches_and_stage_records_fail_as_insufficient(
+    authorities: dict[str, object],
+) -> None:
+    damaged_count = copy.deepcopy(authorities)
+    damaged_count["u6"]["ROUTE 10"]["sensitivity"]["independent_runs"]["32"]["semantic"][
+        "final_selection"
+    ]["passenger_access_safe_count"] = "83"
+
+    damaged_batches = copy.deepcopy(authorities)
+    damaged_batches["u6"]["ROUTE 10"]["canonical"]["semantic"]["processed_source_order"].pop()
+
+    damaged_stage = copy.deepcopy(authorities)
+    stage_trace = damaged_stage["u6"]["ROUTE 10"]["sensitivity"]["independent_runs"]["32"][
+        "semantic"
+    ]["final_selection"]["stage_trace"]
+    access_stage = next(
+        row for row in stage_trace if row["stage"] == "SCENARIO_B_MAX_ACCESS_NON_REGRESSION"
+    )
+    access_stage["retained_fingerprints"] = SSE_BEST
+
+    for damaged in (damaged_count, damaged_stage):
+        with pytest.raises(u7.ReviewError) as error:
+            u7.reconstruct_route10_cap_universes(damaged)
+        assert classification(error) == "ROUTE10_EVIDENCE_INSUFFICIENT"
+
+    with pytest.raises(u7.ReviewError) as error:
+        u7.reconstruct_route10_source_batch_universes(damaged_batches)
+    assert classification(error) == "ROUTE10_EVIDENCE_INSUFFICIENT"
+
+
+def test_duplicate_historical_route6_fingerprint_fails_as_insufficient(
+    authorities: dict[str, object],
+) -> None:
+    damaged = copy.deepcopy(authorities)
+    candidates = damaged["s"]["routes"]["6"]["candidates"]
+    candidates[1]["fingerprint"] = candidates[0]["fingerprint"]
+
+    with pytest.raises(u7.ReviewError) as error:
+        u7.reconstruct_historical_route6_universe(damaged)
+
+    assert classification(error) == "HISTORICAL_ROUTE6_EVIDENCE_INSUFFICIENT"
+
+
 def test_c4_reconstructs_bucket_exposure_sse_and_equivalent_ranks(
     cap_universes: dict[str, tuple[dict[str, object], ...]],
 ) -> None:

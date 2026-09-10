@@ -113,6 +113,15 @@ def require(condition: bool, classification: str) -> None:
         raise ReviewError(classification)
 
 
+EVIDENCE_INTEGRITY_FAILURES = {
+    "DIRECTIONAL_EVIDENCE_CONFLICT",
+    "DIRECTIONAL_EVIDENCE_LABEL_MISMATCH",
+    "DIRECTIONAL_SSE_RECONSTRUCTION_MISMATCH",
+    "DIRECTIONAL_BUCKET_COUNT_MISMATCH",
+    "PAIR_SSE_RECONSTRUCTION_MISMATCH",
+}
+
+
 def insufficient_evidence(classification: str):
     """Translate absent or malformed preserved fields into one fail-closed result."""
 
@@ -121,8 +130,13 @@ def insufficient_evidence(classification: str):
         def guarded(*args: Any, **kwargs: Any):
             try:
                 return function(*args, **kwargs)
-            except ReviewError:
-                raise
+            except ReviewError as error:
+                if (
+                    error.classification == classification
+                    or error.classification in EVIDENCE_INTEGRITY_FAILURES
+                ):
+                    raise
+                raise ReviewError(classification) from error
             except (
                 KeyError,
                 TypeError,
@@ -751,6 +765,8 @@ def reconstruct_historical_route6_universe(
                 },
             }
         )
+    fingerprints = [row["fingerprint"] for row in reconstructed]
+    require(len(set(fingerprints)) == len(fingerprints), classification)
     return tuple(sorted(reconstructed, key=lambda row: row["fingerprint"]))
 
 
