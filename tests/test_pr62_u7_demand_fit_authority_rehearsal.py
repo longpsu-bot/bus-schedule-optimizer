@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import builtins
+import copy
 import importlib.util
 import itertools
 import math
@@ -156,14 +157,16 @@ def test_d_epsilon_dominance_requires_one_improvement_beyond_epsilon() -> None:
     assert [row["fingerprint"] for row in frontier] == ["best", "epsilon_equal"]
 
 
-def test_d_transitivity_sensitive_chain_leaves_only_true_nondominated_point() -> None:
+def test_d_transitivity_sensitive_epsilon_chain_remains_mutually_nondominated() -> None:
     rows = [
-        candidate("a", sse=0.0, te=0.0, continuous=9.0),
-        candidate("b", sse=0.5e-12, te=1.0, continuous=5.0),
-        candidate("c", sse=1.0e-12, te=2.0, continuous=1.0),
+        candidate("a", sse=0.0, te=2.2e-12, continuous=9.0),
+        candidate("b", sse=0.6e-12, te=1.1e-12, continuous=5.0),
+        candidate("c", sse=1.2e-12, te=0.0, continuous=1.0),
     ]
+    expected = ["a", "b", "c"]
 
-    assert [row["fingerprint"] for row in u7.pareto_frontier(rows)] == ["a"]
+    for permutation in itertools.permutations(rows):
+        assert [row["fingerprint"] for row in u7.pareto_frontier(permutation)] == expected
 
 
 def test_d_is_caller_order_deterministic_and_continuous_is_not_a_dimension() -> None:
@@ -330,6 +333,89 @@ def test_historical_route6_snapshot_only_authorities_are_preserved(
     assert [row["fingerprint"] for row in u7.pareto_frontier(rows)] == [ROUTE6_COMMON]
 
 
+@pytest.mark.parametrize(
+    "field_path",
+    [
+        ("production_SSE",),
+        ("production_TE",),
+        ("continuous_exposure_equivalent",),
+        ("bucket_exposure_equivalent",),
+        ("operations", "average_passenger_wait_minutes"),
+        ("operations", "directions", "outbound", "maximum_bucket_wait_minutes"),
+        ("authority",),
+        ("rhythm_tuple",),
+        ("fleet_tuple",),
+    ],
+)
+def test_missing_historical_route6_fields_fail_as_insufficient_evidence(
+    authorities: dict[str, object], field_path: tuple[str, ...]
+) -> None:
+    damaged = copy.deepcopy(authorities)
+    target = damaged["s"]["routes"]["6"]["candidates"][0]
+    for key in field_path[:-1]:
+        target = target[key]
+    del target[field_path[-1]]
+
+    with pytest.raises(u7.ReviewError) as error:
+        u7.reconstruct_historical_route6_universe(damaged)
+
+    assert classification(error) == "HISTORICAL_ROUTE6_EVIDENCE_INSUFFICIENT"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("production_SSE", math.nan),
+        ("production_TE", "not-a-number"),
+        ("authority", "UNVERIFIED_CANDIDATE"),
+        ("rhythm_tuple", "9,9,6,0"),
+        ("fleet_tuple", [12, 100]),
+    ],
+)
+def test_malformed_historical_route6_fields_fail_as_insufficient_evidence(
+    authorities: dict[str, object], field: str, value: object
+) -> None:
+    damaged = copy.deepcopy(authorities)
+    damaged["s"]["routes"]["6"]["candidates"][0][field] = value
+
+    with pytest.raises(u7.ReviewError) as error:
+        u7.reconstruct_historical_route6_universe(damaged)
+
+    assert classification(error) == "HISTORICAL_ROUTE6_EVIDENCE_INSUFFICIENT"
+
+
+def test_missing_route10_cap_and_source_batch_fields_fail_as_insufficient_evidence(
+    authorities: dict[str, object],
+) -> None:
+    damaged_cap = copy.deepcopy(authorities)
+    del damaged_cap["u6"]["ROUTE 10"]["sensitivity"]["independent_runs"]["32"]
+    with pytest.raises(u7.ReviewError) as cap_error:
+        u7.reconstruct_route10_cap_universes(damaged_cap)
+    assert classification(cap_error) == "ROUTE10_EVIDENCE_INSUFFICIENT"
+
+    damaged_batch = copy.deepcopy(authorities)
+    del damaged_batch["u6"]["ROUTE 10"]["canonical"]["semantic"]["selection_history"]
+    with pytest.raises(u7.ReviewError) as batch_error:
+        u7.reconstruct_route10_source_batch_universes(damaged_batch)
+    assert classification(batch_error) == "ROUTE10_EVIDENCE_INSUFFICIENT"
+
+
+def test_c4_reconstructs_bucket_exposure_sse_and_equivalent_ranks(
+    cap_universes: dict[str, tuple[dict[str, object], ...]],
+) -> None:
+    ranked = u7._ranked_candidates(cap_universes["32"])
+
+    expected = {
+        SSE_BEST: (1, 0.005534496763787693),
+        CONTINUOUS_BEST: (2, 0.0055392767198022205),
+        TE_BEST: (27, 0.006720273975286064),
+    }
+    for fingerprint, (rank, value) in expected.items():
+        assert ranked[fingerprint]["bucket_exposure_sse_rank"] == rank
+        assert ranked[fingerprint]["bucket_exposure_sse"] == pytest.approx(value, abs=1e-15)
+        assert "bucket_exposure_rank" in ranked[fingerprint]
+
+
 def test_evidence_contains_special_table_criterion_matrix_and_no_hidden_blend(
     evidence: dict[str, object],
 ) -> None:
@@ -340,6 +426,9 @@ def test_evidence_contains_special_table_criterion_matrix_and_no_hidden_blend(
     assert special[TE_BEST]["in_D_frontier"] is True
     assert special[CONTINUOUS_BEST]["in_D_frontier"] is False
     assert special[CONTINUOUS_BEST]["continuous_rank"] == 1
+    assert special[SSE_BEST]["bucket_exposure_sse_rank"] == 1
+    assert special[CONTINUOUS_BEST]["bucket_exposure_sse_rank"] == 2
+    assert special[TE_BEST]["bucket_exposure_sse_rank"] == 27
     assert special[CONTINUOUS_BEST]["fleet"] == 13
     assert special[CONTINUOUS_BEST]["rhythm_tuple"] == [9, 9, 6, 0]
     assert set(evidence["criterion_matrix"]) == {"A", "B", "C", "D"}
@@ -348,8 +437,19 @@ def test_evidence_contains_special_table_criterion_matrix_and_no_hidden_blend(
         for row in evidence["criterion_matrix"].values()
     )
     assert evidence["policies"]["D"]["dimensions"] == ["sse", "te"]
+    assert (
+        evidence["policies"]["D"]["dominance"]
+        == "EXACT_COMPONENTWISE_NO_WORSE_AND_ONE_IMPROVEMENT_BEYOND_EPSILON"
+    )
     assert evidence["policies"]["D"]["weights_added"] is False
     assert evidence["policies"]["D"]["continuous_is_primary_dimension"] is False
+    assert set(route10["phase_edge_sensitivity"]["available_representations"]) == {
+        "production_point_count_sse",
+        "production_point_count_te",
+        "pr62_r_bucket_exposure_sse_reconstruction",
+        "pr62_r_bucket_exposure_te_equivalent_reconstruction",
+        "exact_continuous_exposure_equivalent",
+    }
 
 
 def test_protected_production_and_all_tracked_xlsx_hashes_are_unchanged(

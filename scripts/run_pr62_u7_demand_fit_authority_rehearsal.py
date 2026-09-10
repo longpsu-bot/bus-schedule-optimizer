@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
+from functools import wraps
 from math import isfinite
 from pathlib import Path
 from typing import Any
@@ -110,6 +111,31 @@ class ReviewError(RuntimeError):
 def require(condition: bool, classification: str) -> None:
     if not condition:
         raise ReviewError(classification)
+
+
+def insufficient_evidence(classification: str):
+    """Translate absent or malformed preserved fields into one fail-closed result."""
+
+    def decorate(function):
+        @wraps(function)
+        def guarded(*args: Any, **kwargs: Any):
+            try:
+                return function(*args, **kwargs)
+            except ReviewError:
+                raise
+            except (
+                KeyError,
+                TypeError,
+                ValueError,
+                IndexError,
+                StopIteration,
+                OverflowError,
+            ) as error:
+                raise ReviewError(classification) from error
+
+        return guarded
+
+    return decorate
 
 
 def file_sha256(path: Path) -> str:
@@ -305,9 +331,9 @@ def _continuous_exposure_equivalent(
     return len(exact) * 0.5 * absolute_integral
 
 
-def _bucket_exposure_equivalent(
+def _bucket_exposure_metrics(
     departures: Sequence[int], buckets: Sequence[Mapping[str, float]]
-) -> float:
+) -> tuple[float, float]:
     exact = tuple(int(value) for value in departures)
     units = [0.0] * len(buckets)
     for left, right in zip(exact, exact[1:], strict=False):
@@ -317,13 +343,13 @@ def _bucket_exposure_equivalent(
             units[index] += overlap / width
     total_units = sum(units)
     require(total_units > 0, "BUCKET_EXPOSURE_EMPTY")
+    residuals = tuple(
+        unit / total_units - bucket["demand_share"]
+        for unit, bucket in zip(units, buckets, strict=True)
+    )
     return (
-        len(exact)
-        * 0.5
-        * sum(
-            abs(unit / total_units - bucket["demand_share"])
-            for unit, bucket in zip(units, buckets, strict=True)
-        )
+        sum(value * value for value in residuals),
+        len(exact) * 0.5 * sum(abs(value) for value in residuals),
     )
 
 
@@ -415,7 +441,7 @@ def pareto_frontier(
 
     def dominates(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
         values = [(float(left[name]), float(right[name])) for name in metric_names]
-        return all(a <= b + epsilon for a, b in values) and any(a < b - epsilon for a, b in values)
+        return all(a <= b for a, b in values) and any(a < b - epsilon for a, b in values)
 
     frontier = [
         candidate
@@ -505,7 +531,8 @@ def _candidate_from_pair(
     pair_sse = 0.0
     pair_te = 0.0
     pair_continuous = 0.0
-    pair_bucket_exposure = 0.0
+    pair_bucket_exposure_sse = 0.0
+    pair_bucket_exposure_te = 0.0
     directional_maximum_access: dict[str, float] = {}
     directional_departures: dict[str, tuple[int, ...]] = {}
     directional_metrics: dict[str, dict[str, float]] = {}
@@ -527,7 +554,9 @@ def _candidate_from_pair(
                 "DIRECTIONAL_BUCKET_COUNT_MISMATCH",
             )
         continuous = _continuous_exposure_equivalent(departures, buckets[direction])
-        bucket_exposure = _bucket_exposure_equivalent(departures, buckets[direction])
+        bucket_exposure_sse, bucket_exposure_te = _bucket_exposure_metrics(
+            departures, buckets[direction]
+        )
         average_wait, maximum_access = _wait_metrics(departures, buckets[direction])
         directional_departures[direction] = departures
         directional_maximum_access[direction] = maximum_access
@@ -535,14 +564,16 @@ def _candidate_from_pair(
             "sse": sse,
             "te": te,
             "continuous_exposure": continuous,
-            "bucket_exposure": bucket_exposure,
+            "bucket_exposure_sse": bucket_exposure_sse,
+            "bucket_exposure": bucket_exposure_te,
             "average_scheduled_passenger_wait_minutes": average_wait,
             "maximum_bucket_average_wait_minutes": maximum_access,
         }
         pair_sse += sse
         pair_te += te
         pair_continuous += continuous
-        pair_bucket_exposure += bucket_exposure
+        pair_bucket_exposure_sse += bucket_exposure_sse
+        pair_bucket_exposure_te += bucket_exposure_te
 
     metrics = pair["metrics"]
     require(
@@ -556,7 +587,8 @@ def _candidate_from_pair(
         "sse": pair_sse,
         "te": pair_te,
         "continuous_exposure": pair_continuous,
-        "bucket_exposure": pair_bucket_exposure,
+        "bucket_exposure_sse": pair_bucket_exposure_sse,
+        "bucket_exposure": pair_bucket_exposure_te,
         "average_scheduled_passenger_wait_minutes": float(
             metrics["demand_weighted_expected_passenger_wait_minutes"]
         ),
@@ -602,6 +634,7 @@ def _reconstruct_universe(
     return rows
 
 
+@insufficient_evidence("ROUTE10_EVIDENCE_INSUFFICIENT")
 def reconstruct_route10_cap_universes(
     authorities: Mapping[str, Any],
 ) -> dict[str, tuple[dict[str, Any], ...]]:
@@ -620,6 +653,7 @@ def reconstruct_route10_cap_universes(
     return result
 
 
+@insufficient_evidence("ROUTE10_EVIDENCE_INSUFFICIENT")
 def reconstruct_route10_source_batch_universes(
     authorities: Mapping[str, Any],
 ) -> tuple[dict[str, Any], ...]:
@@ -652,56 +686,78 @@ def reconstruct_route10_source_batch_universes(
     )
 
 
+@insufficient_evidence("HISTORICAL_ROUTE6_EVIDENCE_INSUFFICIENT")
 def reconstruct_historical_route6_universe(
     authorities: Mapping[str, Any],
 ) -> tuple[dict[str, Any], ...]:
     candidates = authorities["s"]["routes"]["6"]["candidates"]
     require(len(candidates) == 41, "HISTORICAL_ROUTE6_EVIDENCE_INSUFFICIENT")
-    return tuple(
-        sorted(
-            (
-                {
-                    "fingerprint": row["fingerprint"],
-                    "hard_feasible": True,
-                    "access_safe": True,
-                    "sse": float(row["production_SSE"]),
-                    "te": float(row["production_TE"]),
-                    "continuous_exposure": float(row["continuous_exposure_equivalent"]),
-                    "bucket_exposure": float(row["bucket_exposure_equivalent"]),
-                    "average_scheduled_passenger_wait_minutes": float(
-                        row["operations"]["average_passenger_wait_minutes"]
-                    ),
-                    "directional_maximum_access_minutes": {
-                        direction: float(
-                            row["operations"]["directions"][direction][
-                                "maximum_bucket_wait_minutes"
-                            ]
-                        )
-                        for direction in ("outbound", "inbound")
-                    },
-                    "rhythm_tuple": list(row["rhythm_tuple"]),
-                    "fleet": int(row["fleet_tuple"][0]),
-                    "terminal_excess": {
-                        "total": int(row["fleet_tuple"][1]),
-                        "maximum": int(row["fleet_tuple"][2]),
-                    },
-                    "lineage": {
-                        "origin": "PR62_R_S_COMMITTED_ROUTE6_SNAPSHOT",
-                        "source_pair_fingerprint": None,
-                        "parent_pair_fingerprint": None,
-                        "parent_rhythm": None,
-                        "child_rhythm": None,
-                    },
-                }
-                for row in candidates
-            ),
-            key=lambda row: row["fingerprint"],
+    classification = "HISTORICAL_ROUTE6_EVIDENCE_INSUFFICIENT"
+
+    def finite_number(value: Any) -> float:
+        require(
+            not isinstance(value, bool) and isinstance(value, (int, float)) and isfinite(value),
+            classification,
         )
-    )
+        return float(value)
+
+    def integer_tuple(value: Any, length: int) -> list[int]:
+        require(
+            isinstance(value, Sequence)
+            and not isinstance(value, (str, bytes))
+            and len(value) == length
+            and all(type(item) is int for item in value),
+            classification,
+        )
+        return list(value)
+
+    reconstructed = []
+    for row in candidates:
+        require(isinstance(row, Mapping), classification)
+        fingerprint = row["fingerprint"]
+        require(isinstance(fingerprint, str) and fingerprint, classification)
+        require(row["authority"] == "CURRENT_PRODUCTION_ACCESS_SAFE_FRONTIER", classification)
+        operations = row["operations"]
+        require(isinstance(operations, Mapping), classification)
+        directions = operations["directions"]
+        require(isinstance(directions, Mapping), classification)
+        rhythm = integer_tuple(row["rhythm_tuple"], 4)
+        fleet = integer_tuple(row["fleet_tuple"], 3)
+        reconstructed.append(
+            {
+                "fingerprint": fingerprint,
+                "hard_feasible": True,
+                "access_safe": True,
+                "sse": finite_number(row["production_SSE"]),
+                "te": finite_number(row["production_TE"]),
+                "continuous_exposure": finite_number(row["continuous_exposure_equivalent"]),
+                "bucket_exposure": finite_number(row["bucket_exposure_equivalent"]),
+                "average_scheduled_passenger_wait_minutes": finite_number(
+                    operations["average_passenger_wait_minutes"]
+                ),
+                "directional_maximum_access_minutes": {
+                    direction: finite_number(directions[direction]["maximum_bucket_wait_minutes"])
+                    for direction in ("outbound", "inbound")
+                },
+                "rhythm_tuple": rhythm,
+                "fleet": fleet[0],
+                "terminal_excess": {"total": fleet[1], "maximum": fleet[2]},
+                "lineage": {
+                    "origin": "PR62_R_S_COMMITTED_ROUTE6_SNAPSHOT",
+                    "source_pair_fingerprint": None,
+                    "parent_pair_fingerprint": None,
+                    "parent_rhythm": None,
+                    "child_rhythm": None,
+                },
+            }
+        )
+    return tuple(sorted(reconstructed, key=lambda row: row["fingerprint"]))
 
 
 def _ranked_candidates(candidates: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
-    metric_names = ("sse", "te", "continuous_exposure", "bucket_exposure")
+    metric_names = ["sse", "te", "continuous_exposure", "bucket_exposure"]
+    if all("bucket_exposure_sse" in candidate for candidate in candidates):
+        metric_names.append("bucket_exposure_sse")
     result: dict[str, dict[str, Any]] = {}
     for candidate in candidates:
         copy = dict(candidate)
@@ -715,7 +771,7 @@ def _ranked_candidates(candidates: Sequence[Mapping[str, Any]]) -> dict[str, dic
 
 
 def _compact_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
-    return {
+    compact = {
         "fingerprint": candidate["fingerprint"],
         "sse_rank": candidate["sse_rank"],
         "sse": candidate["sse"],
@@ -737,6 +793,10 @@ def _compact_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
         ),
         "lineage": candidate["lineage"],
     }
+    if "bucket_exposure_sse" in candidate:
+        compact["bucket_exposure_sse_rank"] = candidate["bucket_exposure_sse_rank"]
+        compact["bucket_exposure_sse"] = candidate["bucket_exposure_sse"]
+    return compact
 
 
 def _boundedness(candidates: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -965,7 +1025,7 @@ def _criterion_matrix() -> dict[str, dict[str, str]]:
         "C2": "PASS — no weights, percentages, normalized composite, preferred identity, or historical-Q rule.",
         "C5": "PASS — contextual wait/access/operations are reported without reranking; metric is not passenger welfare.",
         "C6": "PASS — committed Route 6 snapshots preserve the historical authority; U7 executions remain zero.",
-        "C8": "PASS — empty, malformed, nonfinite, epsilon ties, equality, dominance, and nondominance fail or resolve deterministically.",
+        "C8": "PASS — empty, malformed, nonfinite, epsilon ties, equality, transitivity-sensitive dominance, and nondominance fail or resolve deterministically.",
     }
     return {
         "A": {
@@ -993,7 +1053,7 @@ def _criterion_matrix() -> dict[str, dict[str, str]]:
             "C9": "LARGER CONTRACT CHANGE — promotes continuous exposure from materiality to anchor authority.",
         },
         "D": {
-            "C1": "PASS — finite nonempty strict-epsilon SSE/TE nondominated sets.",
+            "C1": "PASS — finite nonempty SSE/TE sets using transitive strict Pareto: exact componentwise no-worse and improvement beyond epsilon in at least one dimension.",
             **common,
             "C3": "PASS WITH EVIDENCE — AUTHORITY_SET_UNIVERSE_SENSITIVE with explicit entries, exits, and overlaps.",
             "C4": "CAUTION — primary frontier remains point-bucket-sensitive; continuous ranks stay diagnostic.",
@@ -1126,6 +1186,7 @@ def build_evidence(repo_root: Path) -> dict[str, Any]:
             "D": {
                 "name": "MULTI_METRIC_DEMAND_FIT_FRONTIER",
                 "dimensions": ["sse", "te"],
+                "dominance": "EXACT_COMPONENTWISE_NO_WORSE_AND_ONE_IMPROVEMENT_BEYOND_EPSILON",
                 "weights_added": False,
                 "continuous_is_primary_dimension": False,
                 "minimum_contract_change": "Replace one anchor with an SSE/TE Pareto set and separately define downstream admissibility.",
@@ -1142,7 +1203,8 @@ def build_evidence(repo_root: Path) -> dict[str, Any]:
                 "available_representations": [
                     "production_point_count_sse",
                     "production_point_count_te",
-                    "pr62_r_bucket_exposure_equivalent_reconstruction",
+                    "pr62_r_bucket_exposure_sse_reconstruction",
+                    "pr62_r_bucket_exposure_te_equivalent_reconstruction",
                     "exact_continuous_exposure_equivalent",
                 ],
                 "authority_candidate_ranks": special,
@@ -1360,8 +1422,8 @@ def render_markdown(evidence: Mapping[str, Any]) -> str:
             "",
             "The metrics below are contextual outcomes, not a hidden reranking and not actual onboard passenger delay.",
             "",
-            "| Fingerprint | SSE rank/value | TE rank/value | Continuous rank/value | Bucket exposure rank/value | Avg scheduled wait | Out max | In max | Rhythm | Fleet | Terminal excess total/max | Lineage | In D |",
-            "|---|---|---|---|---|---:|---:|---:|---|---:|---|---|---|",
+            "| Fingerprint | SSE rank/value | TE rank/value | Continuous rank/value | Bucket exposure SSE rank/value | Bucket exposure TE-eq rank/value | Avg scheduled wait | Out max | In max | Rhythm | Fleet | Terminal excess total/max | Lineage | In D |",
+            "|---|---|---|---|---|---|---:|---:|---:|---|---:|---|---|---|",
         ]
     )
     for row in evidence["route_10"]["special_candidate_table"]:
@@ -1370,7 +1432,7 @@ def render_markdown(evidence: Mapping[str, Any]) -> str:
         if lineage["parent_pair_fingerprint"] is not None:
             lineage_text += f" from {lineage['parent_pair_fingerprint']}"
         lines.append(
-            "| `{}` | {}/{} | {}/{} | {}/{} | {}/{} | {} | {} | {} | `{}` | {} | {}/{} | `{}` | {} |".format(
+            "| `{}` | {}/{} | {}/{} | {}/{} | {}/{} | {}/{} | {} | {} | {} | `{}` | {} | {}/{} | `{}` | {} |".format(
                 row["fingerprint"],
                 row["sse_rank"],
                 _f(row["sse"]),
@@ -1378,6 +1440,8 @@ def render_markdown(evidence: Mapping[str, Any]) -> str:
                 _f(row["te"]),
                 row["continuous_rank"],
                 _f(row["continuous_exposure"]),
+                row["bucket_exposure_sse_rank"],
+                _f(row["bucket_exposure_sse"]),
                 row["bucket_exposure_rank"],
                 _f(row["bucket_exposure"]),
                 _f(row["average_scheduled_passenger_wait_minutes"]),
