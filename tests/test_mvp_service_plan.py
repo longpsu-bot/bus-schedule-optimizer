@@ -6,8 +6,8 @@ from openpyxl import load_workbook
 
 from bus_schedule_engine.mvp.circulation import assign_fleet, validate_chains
 from bus_schedule_engine.mvp.input import validate_bundle
-from bus_schedule_engine.mvp.planning import compile_plan
-from bus_schedule_engine.mvp.quality import evaluate, select_candidate
+from bus_schedule_engine.mvp.planning import compile_plan, revise_plan
+from bus_schedule_engine.mvp.quality import change_justification, evaluate, select_candidate
 from bus_schedule_engine.mvp.runner import export_result, run_bundle
 
 
@@ -35,7 +35,7 @@ def bundle():
 
 def test_hand_checked_vertical_slice_and_exports(tmp_path):
     result = run_bundle(bundle(), {"candidate_budget": 5})
-    assert result["status"] in {"FEASIBLE_RECOMMENDATION", "FEASIBLE_BUDGET_LIMITED"}
+    assert result["status"] == "NO_CHANGE_RECOMMENDED"
     selected = result["recommended"]
     assert selected["departures"] == {
         "outbound": [360, 380, 400, 420],
@@ -52,7 +52,7 @@ def test_hand_checked_vertical_slice_and_exports(tmp_path):
         == selected["departures"]
     )
     workbook = load_workbook(tmp_path / "recommended_timetable.xlsx", data_only=True)
-    assert workbook.sheetnames == [
+    assert workbook.sheetnames[:5] == [
         "Outbound",
         "Inbound",
         "ServiceRegimes",
@@ -207,7 +207,9 @@ def test_determinism_budgets_and_independent_routes():
     settings = {"candidate_budget": 1, "max_revisions": 0}
     first = run_bundle(bundle(), settings)
     assert first == run_bundle(bundle(), settings)
-    assert first["status"] == "FEASIBLE_BUDGET_LIMITED"
+    assert first["status"] == "NO_CHANGE_RECOMMENDED"
+    assert first["search_status"] == "FEASIBLE_RECOMMENDATION"
+    assert first["diagnostics"]["search_exhausted"]
     assert first["diagnostics"]["evaluations"] == 1
     bad = bundle()
     del bad["fleet_ceiling"]
@@ -292,7 +294,8 @@ def test_candidate_generation_itself_is_bounded():
         ]
         d["protected_windows"] = []
     result = run_bundle(data, {"candidate_budget": 3})
-    assert result["diagnostics"]["distinct_plans_generated"] <= 3
+    assert result["diagnostics"]["evaluations"] <= 3
+    assert result["diagnostics"]["maximum_pending_plans"] <= 4 * 3
 
 
 def test_time_of_day_runtime_and_terminal_specific_layover():
@@ -355,7 +358,9 @@ def test_service_density_responds_to_demand_and_reports_response():
             {"start": d["first"], "end": d["first"] + 60, "passengers": 240},
             {"start": d["first"] + 60, "end": d["last"], "passengers": 15},
         ]
-    candidate = run_bundle(data, {"candidate_budget": 1})["recommended"]
+    result = run_bundle(data, {"candidate_budget": 1})
+    candidate = result["alternatives"][0]
+    assert candidate["change_assessment"]["reason"] == "FLEET_INCREASE_NOT_AUTHORIZED"
     assert candidate is not None
     out = [r for r in candidate["regimes"] if r["direction"] == "outbound"]
     assert out[0]["headway_minutes"] < out[-1]["headway_minutes"]
@@ -365,7 +370,418 @@ def test_service_density_responds_to_demand_and_reports_response():
 
 def test_independent_regime_check_rejects_tampered_membership_count():
     data = validate_bundle(bundle())
-    selected = run_bundle(data)["recommended"]
+    selected = compile_plan(data["directions"]["outbound"], [{"end": 420, "gaps": 3}], {})
+    inbound = compile_plan(data["directions"]["inbound"], [{"end": 440, "gaps": 3}], {})
+    times = {"outbound": selected["departures"], "inbound": inbound["departures"]}
+    selected["regimes"][0]["direction"] = "outbound"
+    inbound["regimes"][0]["direction"] = "inbound"
+    selected["regimes"] += inbound["regimes"]
     regimes = deepcopy(selected["regimes"])
     regimes[0]["planned_departure_count"] += 1
-    assert not evaluate(data, selected["departures"], regimes)["hard_constraints_pass"]
+    assert not evaluate(data, times, regimes)["hard_constraints_pass"]
+
+
+def policy_candidate(wait=10, fleet=2, valid=True, source="OPTIMIZED"):
+    return {
+        "id": source,
+        "source": source,
+        "departures": {"outbound": [0, 20, 40], "inbound": [20, 40, 60]},
+        "quality": {
+            "hard_constraints_pass": valid,
+            "waiting_minutes": wait,
+            "directional_waiting_minutes": dict.fromkeys(("outbound", "inbound"), wait),
+            "required_fleet": fleet,
+            "maximum_protected_gap": 20,
+            "protected_windows": [],
+            "regime_count": 2,
+            "transition_jump": 0,
+            "terminal_wait": 0,
+            "tail_gap": 20,
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    "wait,fleet,expected",
+    [
+        (10.01, 2, False),
+        (10, 2, False),
+        (10.1, 1, True),
+        (10.21, 1, False),
+        (9.8, 2, True),
+        (9.99, 2, False),
+        (9.8, 3, False),
+    ],
+)
+def test_baseline_change_requires_material_service_or_equivalent_fleet_saving(
+    wait, fleet, expected
+):
+    baseline = policy_candidate(source="BASELINE")
+    candidate = policy_candidate(wait, fleet)
+    evidence = change_justification(candidate, baseline, {})
+    assert evidence["justified"] is expected
+    assert select_candidate([candidate], {}, baseline) is (candidate if expected else baseline)
+
+
+def test_directional_deterioration_cannot_hide_in_combined_average():
+    baseline = policy_candidate(source="BASELINE")
+    candidate = policy_candidate(9.8, 1)
+    candidate["quality"]["directional_waiting_minutes"]["inbound"] = 11
+    assert not change_justification(candidate, baseline, {})["justified"]
+
+
+def test_noncompliant_baseline_requires_valid_replacement():
+    baseline = policy_candidate(valid=False, source="BASELINE")
+    candidate = policy_candidate(11, 2)
+    assert select_candidate([candidate], {}, baseline) is candidate
+    candidate["quality"]["hard_constraints_pass"] = False
+    assert select_candidate([candidate], {}, baseline) is None
+
+
+def test_irregular_baseline_retained_with_actual_exports(tmp_path):
+    data = bundle()
+    data["fleet_ceiling"] = 8
+    for d in data["directions"].values():
+        d["baseline"][1] -= 1
+        d["protected_windows"] = []
+    result = run_bundle(data, {"candidate_budget": 1})
+    assert result["status"] == "NO_CHANGE_RECOMMENDED"
+    assert result["recommended"]["source"] == "BASELINE"
+    assert result["recommended"]["regimes"] == []
+    assert result["recommended"]["quality"]["regime_count"] is None
+    assert result["recommended"]["departures"] == {
+        d: v["baseline"] for d, v in data["directions"].items()
+    }
+    validate_chains(
+        validate_bundle(data),
+        result["recommended"]["departures"],
+        result["recommended"]["vehicle_chains"],
+    )
+    export_result(result, tmp_path)
+    exported = json.loads((tmp_path / "recommended_timetable.json").read_text())
+    assert exported["selected_source"] == "BASELINE"
+    assert json.loads((tmp_path / "service_regimes.json").read_text()) == []
+    wb = load_workbook(tmp_path / "recommended_timetable.xlsx", data_only=True)
+    assert wb["QualityComparison"]["C3"].value == "BASELINE"
+    assert [r[1] for r in wb["Outbound"].iter_rows(min_row=2, values_only=True)] == exported[
+        "departures"
+    ]["outbound"]
+
+
+def test_baseline_fixed_count_and_hard_transition_are_checked():
+    data = bundle()
+    data["directions"]["outbound"]["trip_count"] = 5
+    result = run_bundle(data, {"candidate_budget": 1})
+    assert not result["baseline"]["hard_constraints_pass"]
+    assert result.get("selected_source") != "BASELINE"
+    data = bundle()
+    data["directions"]["outbound"]["baseline"][1] -= 5
+    data["directions"]["outbound"]["protected_windows"] = []
+    result = run_bundle(data, {"candidate_budget": 1, "maximum_transition_jump": 1})
+    assert "HARD_TRANSITION_JUMP" in result["baseline"]["failures"]
+    assert result["selected_source"] == "OPTIMIZED"
+
+
+def targeted_fixture():
+    data = bundle()
+    data["fleet_ceiling"] = 20
+    for d in data["directions"].values():
+        start = d["first"]
+        d.update(
+            last=start + 120,
+            trip_count=9,
+            baseline=list(range(start, start + 121, 15)),
+            protected_windows=[],
+        )
+        d["demand"] = [
+            {"start": start, "end": start + 60, "passengers": 600},
+            {"start": start + 60, "end": start + 120, "passengers": 1},
+        ]
+    return validate_bundle(data)
+
+
+def test_bucket_feedback_uses_absolute_exposure_and_integrates_exact_wait():
+    data = targeted_fixture()
+    times = {
+        d: [v["first"] + t for t in [0, 30, 60, 70, 80, 90, 100, 110, 120]]
+        for d, v in data["directions"].items()
+    }
+    q = evaluate(data, times, [])
+    rows = q["demand_buckets"]
+    assert rows[0]["waiting_integral"] == pytest.approx(9000)
+    assert rows[0]["baseline_waiting_minutes"] == pytest.approx(7.5)
+    assert rows[0]["waiting_difference_minutes"] == pytest.approx(7.5)
+    assert rows[0]["maximum_intersecting_gap"] == 30
+    assert sum(b["waiting_contribution_minutes"] for b in rows) == pytest.approx(
+        q["waiting_minutes"]
+    )
+    assert q["service_feedback"][0]["problem"] == "EXCESS_WAIT_VS_BASELINE"
+    assert q["service_feedback"][0]["severity"] == pytest.approx(4500)
+
+
+def test_protected_and_capacity_feedback_identifies_responsible_gap():
+    data = targeted_fixture()
+    start = data["directions"]["outbound"]["first"]
+    data["directions"]["outbound"]["protected_windows"] = [
+        {"start": start, "end": start + 60, "max_gap": 15}
+    ]
+    data.update(vehicle_capacity=100, maximum_load_factor=0.8, capacity_policy="hard")
+    times = {
+        d: [v["first"] + t for t in [0, 30, 60, 70, 80, 90, 100, 110, 120]]
+        for d, v in data["directions"].items()
+    }
+    q = evaluate(data, times, [])
+    assert q["service_feedback"][0]["problem"] == "PROTECTED_SERVICE"
+    item = next(
+        f
+        for f in q["service_feedback"]
+        if f["problem"] == "CAPACITY_PROXY" and f["direction"] == "outbound"
+    )
+    assert (item["interval_start"], item["interval_end"]) == (start, start + 30)
+    assert item["modeled_boardings"] == 300
+    assert item["threshold"] == 80
+    assert item["severity"] == 220
+    assert q["capacity"]["actual_load_factor_certified"] is False
+
+
+def test_low_demand_relative_error_does_not_dominate_revision_priority():
+    data = targeted_fixture()
+    times = {
+        d: [v["first"] + t for t in [0, 20, 40, 60, 61, 62, 63, 64, 120]]
+        for d, v in data["directions"].items()
+    }
+    q = evaluate(data, times, [])
+    ordinary = [f for f in q["service_feedback"] if f["problem"] == "EXCESS_WAIT_VS_BASELINE"]
+    assert ordinary[0]["interval_end"] - ordinary[0]["interval_start"] == 60
+    assert ordinary[0]["interval_start"] == data["directions"][ordinary[0]["direction"]]["first"]
+    assert ordinary[0]["severity"] > ordinary[-1]["severity"]
+
+
+def test_targeted_reallocation_and_boundary_neighbors_improve_peak():
+    data = targeted_fixture()["directions"]["outbound"]
+    plan = [{"end": data["first"] + 60, "gaps": 4}, {"end": data["last"], "gaps": 4}]
+    feedback = [
+        {
+            "direction": "outbound",
+            "interval_start": data["first"],
+            "interval_end": data["first"] + 60,
+            "problem": "EXCESS_WAIT_VS_BASELINE",
+            "priority": 2,
+            "severity": 100,
+        }
+    ]
+    neighbors = revise_plan(data, plan, feedback, {})
+    assert neighbors[0][0] == "reallocate_trip"
+    assert neighbors[0][1][0]["gaps"] == 5
+    shifted = next(p for name, p in neighbors if name == "shift_boundary")
+    assert shifted[0]["end"] < plan[0]["end"]
+    old = compile_plan(data, plan, {})
+    new = compile_plan(data, neighbors[0][1], {})
+    assert old["status"] == new["status"] == "COMPILED"
+    from bus_schedule_engine.mvp.quality import waiting
+
+    assert (
+        waiting(new["departures"], data["demand"])["wait"]
+        < waiting(old["departures"], data["demand"])["wait"]
+    )
+
+
+def test_search_directional_fairness_and_operation_diversity():
+    data = targeted_fixture()
+    result = run_bundle(data)
+    operations = [f["operation"] for f in result["diagnostics"]["feedback"]][1:]
+    directions = [op.split(":")[0] for op in operations]
+    assert directions.count("outbound") >= 4
+    assert directions.count("inbound") >= 4
+    assert abs(directions.count("outbound") - directions.count("inbound")) <= 1
+    assert len({op.split(":")[1] for op in operations}) >= 2
+    assert result["diagnostics"]["demand_guided_evaluations"] > 0
+    assert result["diagnostics"]["evaluations"] == 25
+    assert result == run_bundle(data)
+
+
+def test_strict_proxy_exhaustion_is_incomplete_not_proven_infeasible():
+    data = bundle()
+    data.update(vehicle_capacity=20, maximum_load_factor=0.8, capacity_policy="hard")
+    result = run_bundle(data)
+    assert result["status"] == "SEARCH_INCOMPLETE_NO_FEASIBLE_CANDIDATE"
+    assert result["diagnostics"]["global_optimality_proved"] is False
+    assert result["baseline"]["capacity"]["within_policy"] is False
+    assert result["diagnostics"]["remaining_service_violations"]
+
+
+def test_material_protected_gap_improvement_can_justify_equivalent_service():
+    baseline = policy_candidate(source="BASELINE")
+    candidate = policy_candidate()
+    baseline["quality"]["protected_windows"] = [{"maximum_gap": 20}]
+    candidate["quality"]["protected_windows"] = [{"maximum_gap": 15}]
+    assert (
+        change_justification(candidate, baseline, {})["reason"]
+        == "MATERIAL_PROTECTED_SERVICE_IMPROVEMENT"
+    )
+    candidate["quality"]["waiting_minutes"] = 11
+    assert not change_justification(candidate, baseline, {})["justified"]
+
+
+def test_uncertified_baseline_is_not_treated_as_proved_noncompliant():
+    baseline = policy_candidate(valid=False, source="BASELINE")
+    baseline["quality"]["operational_certification"] = "INCOMPLETE"
+    assert not change_justification(policy_candidate(), baseline, {})["justified"]
+    assert select_candidate([policy_candidate()], {}, baseline) is None
+
+
+def test_fleet_pressure_feedback_targets_exact_peak_and_revisions():
+    data = validate_bundle(bundle())
+    data["fleet_ceiling"] = 1
+    times = {d: v["baseline"] for d, v in data["directions"].items()}
+    q = evaluate(data, times, [])
+    item = next(f for f in q["service_feedback"] if f["problem"] == "FLEET_PRESSURE")
+    assert item["severity"] == 1
+    assert item["required_fleet"] == 2
+    assert item["overlapping_trip_ids"]
+    assert "SHIFT_BOUNDARY" in item["recommended_revision_types"]
+
+
+def test_boundary_shift_alone_improves_a_known_peak():
+    from bus_schedule_engine.mvp.quality import waiting
+
+    direction = targeted_fixture()["directions"]["outbound"]
+    direction["demand"] = [
+        {"start": 360, "end": 390, "passengers": 600},
+        {"start": 390, "end": 480, "passengers": 1},
+    ]
+    plan = [{"end": 405, "gaps": 4}, {"end": 480, "gaps": 4}]
+    feedback = [
+        {
+            "interval_start": 360,
+            "interval_end": 390,
+            "problem": "EXCESS_WAIT_VS_BASELINE",
+            "priority": 2,
+            "severity": 600,
+        }
+    ]
+    shifted = next(
+        p for name, p in revise_plan(direction, plan, feedback, {}) if name == "shift_boundary"
+    )
+    old, new = compile_plan(direction, plan, {}), compile_plan(direction, shifted, {})
+    assert old["status"] == new["status"] == "COMPILED"
+    assert (
+        waiting(new["departures"], direction["demand"])["wait"]
+        < waiting(old["departures"], direction["demand"])["wait"]
+    )
+
+
+def test_custom_materiality_rejects_tiny_improvement_and_settings_are_validated():
+    baseline = policy_candidate(source="BASELINE")
+    assert not change_justification(
+        policy_candidate(9.8), baseline, {"wait_materiality_minutes": 0.3}
+    )["justified"]
+    assert run_bundle(bundle(), {"wait_materiality_relative": -1})["status"] == "BLOCKED_INPUT"
+
+
+def test_unproved_baseline_fleet_leaves_operator_decision_unresolved(monkeypatch):
+    from bus_schedule_engine.mvp import runner
+
+    original, calls = runner.assign_fleet, []
+
+    def assignment(*args, **kwargs):
+        calls.append(True)
+        if len(calls) == 1:
+            return {"status": "MINIMUM_FLEET_UNPROVED", "required_fleet": None, "trips": []}
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "assign_fleet", assignment)
+    result = run_bundle(bundle(), {"candidate_budget": 1})
+    assert result["recommended"] is None
+    assert result["operator_decision"] == "UNRESOLVED"
+    assert result["status"] == "BASELINE_COMPARISON_INCOMPLETE"
+    assert result["search_status"] == "FEASIBLE_BUDGET_LIMITED"
+    assert result["diagnostics"]["baseline_status"] == "INCOMPLETE"
+    assert result["diagnostics"]["budget_limited"]
+
+
+def test_protected_tail_precedes_high_demand_wait_in_revision_order():
+    direction = targeted_fixture()["directions"]["outbound"]
+    plan = [{"end": 420, "gaps": 4}, {"end": 480, "gaps": 4}]
+    feedback = [
+        {
+            "interval_start": 360,
+            "interval_end": 420,
+            "problem": "EXCESS_WAIT_VS_BASELINE",
+            "priority": 2,
+            "severity": 5000,
+        },
+        {
+            "interval_start": 420,
+            "interval_end": 480,
+            "problem": "PROTECTED_SERVICE",
+            "priority": 0,
+            "severity": 1,
+        },
+    ]
+    name, changed = revise_plan(direction, plan, feedback, {})[0]
+    assert name == "reallocate_trip"
+    assert changed[1]["gaps"] == 5
+
+
+def test_optimized_source_and_exact_regimes_exported(tmp_path):
+    data = bundle()
+    data["directions"]["outbound"]["baseline"][1] -= 5
+    result = run_bundle(data, {"candidate_budget": 1})
+    assert result["selected_source"] == "OPTIMIZED"
+    assert result["decision"]["reason"] == "REPLACE_NONCOMPLIANT_BASELINE"
+    export_result(result, tmp_path)
+    assert (
+        json.loads((tmp_path / "recommended_timetable.json").read_text())["selected_source"]
+        == "OPTIMIZED"
+    )
+    assert len(json.loads((tmp_path / "service_regimes.json").read_text())) == 2
+
+
+def test_explicit_zero_demand_does_not_hide_protected_service_benefit():
+    data = bundle()
+    data["fleet_ceiling"] = 8
+    candidate_times = {}
+    for direction, d in data["directions"].items():
+        start = d["first"]
+        d.update(
+            last=start + 180,
+            trip_count=10,
+            baseline=[start + t for t in [0, 30, 60, 90, 100, 110, 120, 140, 160, 180]],
+            demand=[{"start": start, "end": start + 180, "passengers": 0}],
+            protected_windows=[{"start": start, "end": start + 60, "max_gap": 30}],
+        )
+        candidate_times[direction] = [start + t for t in [0, 20, 40, 60, 70, 80, 90, 120, 150, 180]]
+    data = validate_bundle(data)
+    baseline_times = {d: v["baseline"] for d, v in data["directions"].items()}
+    baseline = {"quality": evaluate(data, baseline_times, [])}
+    candidate = {"quality": evaluate(data, candidate_times, [])}
+    assert baseline["quality"]["waiting_minutes"] is None
+    assert baseline["quality"]["required_fleet"] == candidate["quality"]["required_fleet"] == 4
+    assert (
+        change_justification(candidate, baseline, {})["reason"]
+        == "MATERIAL_PROTECTED_SERVICE_IMPROVEMENT"
+    )
+    unknown = policy_candidate(wait=None, source="BASELINE")
+    assert not change_justification(policy_candidate(wait=None), unknown, {})["justified"]
+
+
+def test_proven_baseline_service_failure_allows_replacement_even_if_fleet_unproved(monkeypatch):
+    from bus_schedule_engine.mvp import runner
+
+    original, calls = runner.assign_fleet, []
+
+    def assignment(*args, **kwargs):
+        calls.append(True)
+        if len(calls) == 1:
+            return {"status": "MINIMUM_FLEET_UNPROVED", "required_fleet": None, "trips": []}
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "assign_fleet", assignment)
+    data = bundle()
+    data["directions"]["outbound"]["baseline"][1] -= 5
+    result = run_bundle(data, {"candidate_budget": 1})
+    assert result["recommended"]["source"] == "OPTIMIZED"
+    assert result["decision"]["reason"] == "REPLACE_NONCOMPLIANT_BASELINE"
+    assert "outbound: PROTECTED_SERVICE" in result["baseline"]["proven_hard_failures"]
+    assert result["diagnostics"]["baseline_status"] == "INCOMPLETE"

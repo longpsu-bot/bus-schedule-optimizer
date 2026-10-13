@@ -80,7 +80,8 @@ def revise_plan(direction, plan, feedback, settings):
             changed = deepcopy(plan)
             changed[i]["end"] += delta
             start = direction["first"] if i == 0 else plan[i - 1]["end"]
-            if start + 30 <= changed[i]["end"] <= changed[i + 1]["end"] - 30:
+            duration = settings.get("minimum_regime_minutes", 30)
+            if start + duration <= changed[i]["end"] <= changed[i + 1]["end"] - duration:
                 output.append(("shift_boundary", changed))
     if len(plan) < settings.get("maximum_regimes", 4):
         start = direction["first"]
@@ -96,9 +97,10 @@ def revise_plan(direction, plan, feedback, settings):
                 ]
                 output.append(("split_tail" if i == len(plan) - 1 else "split", split))
             start = block["end"]
+    category = feedback if isinstance(feedback, str) else "SERVICE"
     order = (
         ["reallocate_trip", "shift_boundary", "merge", "split", "split_tail"]
-        if feedback in {"COMPILATION", "QUALITY", "SERVICE"}
+        if category in {"COMPILATION", "QUALITY", "SERVICE"}
         else ["merge", "reallocate_trip", "shift_boundary", "split_tail", "split"]
     )
     output.sort(key=lambda item: order.index(item[0]))
@@ -111,7 +113,37 @@ def revise_plan(direction, plan, feedback, settings):
             used.add(item[0])
         else:
             remaining.append(item)
-    return first_per_operation + remaining
+    output = first_per_operation + remaining
+    if isinstance(feedback, list):
+        output.sort(key=lambda item: revision_priority(direction, plan, item[0], item[1], feedback))
+    return output
+
+
+def revision_priority(direction, plan, name, changed, feedback):
+    """Local nominal-headway lookahead only orders neighbors; exact validators decide."""
+    # shortcut: nominal headways can misrank integer settlements; use bounded compile lookahead if strict-proxy search must improve.
+    fallback = (4, 0.0)
+    if not isinstance(feedback, list):
+        return fallback
+
+    def exposure(blocks, start, end):
+        cursor, total = direction["first"], 0.0
+        for block in blocks:
+            overlap = max(0, min(end, block["end"]) - max(start, cursor))
+            total += overlap * (block["end"] - cursor) / block["gaps"] / 2
+            cursor = block["end"]
+        return total
+
+    priorities = []
+    for item in feedback:
+        start, end = item["interval_start"], item["interval_end"]
+        old, new = exposure(plan, start, end), exposure(changed, start, end)
+        improvement = (old - new) / old if old else 0
+        if item["problem"] == "FLEET_PRESSURE":
+            improvement = -improvement
+        if improvement > 1e-9:
+            priorities.append((item["priority"], -improvement * item["severity"]))
+    return min(priorities, default=fallback)
 
 
 def compile_plan(direction, plan, settings):

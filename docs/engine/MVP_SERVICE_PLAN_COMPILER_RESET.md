@@ -218,3 +218,216 @@ No known unfixed defect is asserted to be operational infeasibility.
 evidence to target bounded trip reallocation and boundary revisions, so the same
 25-plan budget finds better passenger service and can satisfy hard load factor
 0.8 when feasible. Keep exact compiler/fleet validation and baseline comparisons.
+
+## MVP-2: baseline-aware, demand-guided continuation (2026-10-13)
+
+Starting local/remote SHA: `5ac83f1d1f491bbca6434d3c55c9526b09f78eb0`, existing
+`feat/mvp-service-plan-compiler`, Draft PR #63. Original checkout edits and all
+historical research branches were preserved. The existing worktree was reused;
+the app refused to reattach its prior-chat ownership, which was left intact.
+
+### Implementation and decision semantics
+
+`quality.evaluate` now reports every bucket's demand, B/candidate departure
+coverage, served/outside mass, exact waiting integral in passenger-minutes,
+mean wait/difference/percentage, contribution to combined wait, intersecting
+gap, relevant regimes, protection violations and capacity threshold. Times are
+whole minutes from midnight; arrivals are modeled uniformly within each supplied
+bucket, not actual timestamped passenger observations. Every departure interval
+reports modeled boarding exposure separately from physical capacity/onboard load.
+
+Feedback priorities target explicit protected violations, capacity-proxy limits,
+material excess wait versus B, and ordinary wait opportunities. Severity uses
+actual gap/count deficits, excess modeled boardings, or absolute passenger-minutes;
+relative percentage alone cannot dominate high-demand exposure. Fleet feedback
+uses exact excess fleet plus a measured runtime/layover concurrency peak to locate
+boundary/reallocation opportunities. This peak is not a replacement fleet estimate.
+
+Existing merge/reallocate/shift/split operations are ordered by local nominal
+headway reduction over the measured problem interval. All revisions still pass
+the unchanged exact compiler and independent vehicle-chain validator. No compiler,
+circulation, input-authority, frozen benchmark or SSE/TE gate was rewritten.
+
+The queue holds at most `4 * effective evaluation budget` pending plans (100 at
+default 25), reserving a bounded pool per direction. Evaluated plans are never
+repeated; evicted unevaluated plans may re-enter. Candidate registration no longer
+uses up the evaluation budget. Direction turns alternate when both pools exist;
+every third turn explores a less-used operation. Generation and duplicate counters
+are distinct from the 25 exact ServicePlan evaluations. Full measured quality,
+including rejections, is retained as deterministic feedback. These settings bound
+memory by evaluation count and the existing finite neighborhood; no brute-force
+budget increase was made.
+
+B is independently checked with its original times and the same authoritative
+directional counts, endpoints, runtime, layover, fleet ceiling, stock, protection,
+hard proxy and any configured maximum headway transition. It is not converted to
+uniform regimes: regime count is `null`, regimes are `[]`. An irregular compliant
+B is admissible. A solver limit is incomplete certification, not proof of a hard
+failure. Separately proven service/authority failures can still establish that B
+is noncompliant even when its minimum fleet is not certified.
+
+Change justification is explicit, without a composite score:
+
+- Replace a baseline with a proven hard failure when a fully certified alternative exists.
+- Otherwise require material combined waiting improvement or at least one whole-minute
+  protected-gap improvement, with no protected-gap deterioration, directional wait
+  outside equivalence, or fleet increase versus B.
+- Allow fewer vehicles with combined and directional wait inside the configured
+  equivalence band; secondary regime/transition/terminal measures cannot justify
+  change by themselves.
+- The existing equivalence band is `max(0.10 minutes, 2% of B wait)`. Separate
+  provisional materiality is `max(0.05 minutes, 1% of B wait)`; both thresholds
+  are configurable and exported. Tiny numerical differences are not improvements.
+- Explicit zero demand does not fabricate a mean wait; independently measurable
+  protected improvement can still justify change without extra fleet. Missing wait
+  evidence is not treated as zero demand.
+
+`status=NO_CHANGE_RECOMMENDED`, `operator_decision=KEEP_BASELINE` and
+`selected_source=BASELINE` recommend the actual certified B. `search_status` can
+independently remain budget-limited or contain no feasible generated candidate.
+An uncertified B plus feasible generated schedules leaves the operator unresolved,
+with `BASELINE_COMPARISON_INCOMPLETE`; it never certifies retaining B or automatically
+authorizes replacement. Existing statuses remain available. No outcome claims B
+is globally optimal or a limited search proves a route infeasible.
+
+All six output names and essential contracts remain. JSON reports include source,
+decision, comparisons and alternative rejection reasons; no-change exports B's
+actual timetable and exact chains. The original five XLSX sheets remain, plus
+`DemandBuckets`, `Alternatives` and `ServiceFeedback`. All timetable/chain row
+coverage is verified. CLI prints measured elapsed seconds separately so deterministic
+result payloads do not contain wall-clock measurements.
+
+### Independently reproduced real-route comparison
+
+Inputs, SHA256 identities, `STABLE_MAR_JUL_2026`, source runtime/capacity/ceiling
+and explicit 5-minute layover are unchanged from MVP-1 above. MVP-1 was also replayed
+directly from `5ac83f1` in a local isolated module namespace, without checking out
+another branch or modifying frozen evidence; its accepted figures reproduced.
+
+| Metric | Route 6 B | Route 6 MVP-1 | Route 6 MVP-2 | Route 10 B | Route 10 MVP-1 | Route 10 MVP-2 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Exact fleet | 20 | 16 | 16 | 12 | 12 | 12 |
+| Modeled wait, minutes | 6.1656251053 | 6.1828200591 | 6.1652384347 | 9.5702955186 | 9.7109891162 | 9.5702955186 |
+| Maximum headway, minutes | 15 | 21 | 18 | 25 | 22 | 25 |
+| ServiceRegimes | Not modeled | 6 (3/3) | 6 (3/3) | Not modeled | 5 (2/3) | Not modeled |
+| Terminal wait, vehicle-minutes | 6130 | 956 | 2289 | 2885 | 2154 | 2885 |
+| Maximum headway transition jump, minutes | 7 | 11 | 11 | 5 | 4 | 5 |
+| Applicable hard validity | PASS | PASS | PASS | PASS | PASS | PASS |
+| Decision/source | Benchmark B | Generated | REPLACE / OPTIMIZED | Benchmark B | Generated | KEEP / BASELINE |
+
+Route 6 selected `C010`: four fewer vehicles and wait difference from B
+**-0.0003866706 minutes (-0.006271%)**, below materiality; justification is
+**FLEET_SAVING_WITH_EQUIVALENT_WAIT**, not a material passenger-wait improvement.
+Waiting improves versus MVP-1 by **0.0175816244 minutes** while keeping fleet16.
+Directional waits are **6.2081507648 / 6.1250026374** minutes; B is
+**6.2110095898 / 6.1230713470**. Terminal wait is higher than MVP-1 but lower than B.
+Transitions remain exact meaningful blocks, including a 35-minute/five-gap inbound
+peak; its 7→18-minute transition is disclosed, not hidden as a one-gap block.
+
+An alternative `C023` uses fleet15 and wait6.2815705897 but is rejected for
+directional deterioration outside equivalence. `C002` uses fleet16 and
+wait6.1678185565 and remains justified, but loses generated-candidate tie-breaking.
+
+Route 10 keeps B. Generated `C013` has fleet11, wait9.7857123912; `C011` has fleet12,
+wait9.8083099885. Both exceed B's permitted service equivalence. Fewer regimes or
+lower terminal waiting cannot force adopting them. Selected directional waits are
+**9.5111955570 / 9.6382731735**. Default capacity is evaluation-only: B's maximum
+boarding proxy **53.4640522876** exceeds the 0.9 planning limit **45.9**, which is
+reported rather than described as an onboard-load certificate.
+
+### Budget efficiency and measured runtime
+
+| Per-route search | R6 MVP-1 | R6 MVP-2 | R10 MVP-1 | R10 MVP-2 |
+| --- | ---: | ---: | ---: | ---: |
+| Evaluated distinct ServicePlans | 25 | 25 | 25 | 25 |
+| Distinct generated plans | 25 | 590 | 25 | 568 |
+| Total generated proposals, including repeats | Not recorded | 668 | Not recorded | 631 |
+| Compiled two-direction candidates, including duplicate schedules | 25 | 24 | 19 | 24 |
+| Feasible distinct generated schedules | 14 | 17 | 3 | 2 |
+| Duplicate compiled schedules | 10 | 7 | 5 | 7 |
+| Guided / fallback evaluations | Generic / not recorded | 24 / 1 | Generic / not recorded | 24 / 1 |
+| Outbound / inbound revisions | 10 / 14 | 12 / 12 | 20 / 4 | 12 / 12 |
+| Maximum pending plans | 4 | 100 | 4 | 100 |
+| Runtime, seconds (one local measurement) | 0.490 | 0.771 | 0.324 | 0.646 |
+
+Generation counts are proposals, not additional solver evaluations. The small
+priority pool improves Route 6 service per evaluation and supplies an explicit
+Route 10 no-change decision. It does **not** demonstrate more feasible candidates
+or better generated passenger service on every route. Runtime is machine-dependent,
+includes baseline certification, and stays below the unchanged 120-second deadline.
+All four MVP-2 scenario result payloads reproduced identically on a second run.
+
+### Strict hard 0.8 proxy: accurate certification and remaining violations
+
+Both routes ran independently without relaxing capacity or changing inputs.
+Each evaluated25 plans, used24 guided/1 fallback turns, and balanced revisions12/12.
+Both still have pending families after the budget and zero feasible generated
+alternatives. The search is not exhausted; route infeasibility is not proved.
+
+- **Route 6:** `NO_CHANGE_RECOMMENDED`, sourceBASELINE, search status
+  `SEARCH_INCOMPLETE_NO_FEASIBLE_CANDIDATE`. B passes the configured hard proxy:
+  max51.5882352941 ≤54.4, fleet20, wait6.1656251053; its timetable and exact chains
+  are usable outputs. Closest generated rejection is evaluation3, fleet20, with
+  inbound400–412 exposure60.0052287582 versus54.4 (**+5.6052287582**),
+  inbound988–1000 **+2.5394335512**, and inbound412–424 **+1.4074074074**.
+- **Route 10:** `SEARCH_INCOMPLETE_NO_FEASIBLE_CANDIDATE`, operatorUNRESOLVED.
+  B fails the hard proxy (53.4640522876 versus40.8). Closest fleet-admissible
+  generated rejection is evaluation11, fleet12; outbound996–1018 exposure
+  58.2736383442 versus40.8 (**+17.4736383442**), outbound930–952 **+12.8819172113**,
+  outbound390–409 **+9.9908496732**. No timetable is falsely certified.
+
+MVP-1 hard runs also found zero feasible generated schedules. Its closest Route6
+proxy was55.0671023965 (**+0.6671023965**); MVP-2 generated search is worse on this
+measure, although it now certifies and retains valid B. Route10's best remaining
+maximum excess is unchanged at17.4736383442. This limitation is material: nominal
+local headway estimates can misrank exact integer settlement and cannot promise
+monotonic proxy improvement. No favorable outcome or expected fleet was hard-coded.
+
+Source data contain no real protected windows or initial terminal stock. Both are
+tested synthetically; real-route protection is not certified from aggregate ticketing.
+The 0.8 check certifies only the configured **boarding planning proxy**, not actual
+onboard load factor. Stop-level boardings/alightings/occupancy are unavailable.
+
+### Validation and independent review
+
+```powershell
+$env:PYTHONPATH='src'
+$env:BUS_MVP_ROUTE6_WORKBOOK='E:\Project\Biểu đồ giờ\New model\Engine_Input_MST_6_V3_MultiPeriod_Mar-Jul_2026.xlsx'
+$env:BUS_MVP_ROUTE10_WORKBOOK='E:\Project\Biểu đồ giờ\New model\Engine_Input_MST_10_V3_MultiPeriod_Mar-Jul_2026.xlsx'
+python -m pytest tests/test_mvp_service_plan.py tests/test_mvp_acceptance.py --basetemp outputs/mvp2_validation/focused-final --tb=short
+python -m pytest -s --basetemp outputs/mvp2_validation/full-final --tb=short
+python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
+python -m ruff format --check src/bus_schedule_engine/contracts_v1 tests/test_contract*.py
+python -m ruff format --check src/bus_schedule_engine/mvp scripts/run_mvp_service_plan.py tests/test_mvp_service_plan.py tests/test_mvp_acceptance.py
+```
+
+Focused: **62 passed in9.57seconds**, including explicit synthetic reallocation and
+boundary-shift improvements, absolute-versus-relative exposure, protected-before-quality
+ordering, exact capacity intervals,12/12 fairness, all baseline policy cases,
+uncertified fleet handling, zero-demand protection, deterministic repeats, six-output
+contracts, unchanged compiler/chain validation and four independent private-route cases.
+Lint and both format scopes pass. Full suite: **1515 passed,4 skipped,4 failed,
+2 warnings in143.34seconds**. No MVP failure. The four failures match MVP-1:
+
+- `test_input_template_semantics_are_frozen`: unchanged generated-template fingerprint.
+- Two `test_fixture_json_is_structural_and_byte_deterministic` fixtures and
+  `test_reviewed_baseline_json_is_byte_deterministic_and_has_review_status`: CRLF/LF bytes.
+
+Separate inherited-only run without MVP collection: **50 passed,4 skipped,4 failed**.
+No frozen fingerprint or unrelated expectation was changed. Full log is local
+`outputs/mvp2_validation/pytest-full-final.log`; private reports/replay inputs remain
+ignored, not committed. Independent reviewer reproduced four important decision
+edge cases; RED→GREEN regressions fixed all of them, with no separate Minor findings.
+
+Reproducible product CLI, run separately for each route:
+
+```powershell
+python scripts/run_mvp_service_plan.py --input 'E:\Project\Biểu đồ giờ\New model\Engine_Input_MST_6_V3_MultiPeriod_Mar-Jul_2026.xlsx' --minimum-layover 5 --output-dir outputs/mvp2_validation/route_6
+# Strict scenario: add --capacity-policy hard --maximum-load-factor 0.8 and use another output directory.
+```
+
+**Smallest next product decision:** authorize a bounded compile lookahead for the
+top capacity-targeted neighbors so priority reflects actual settled gap exposure,
+then rerun the same25-plan acceptance. First calibrate wait materiality/equivalence
+with operators; do not equate the boarding proxy with observed load factor. No
+Streamlit redesign, Route53 scale work, forecasting or network research was started.

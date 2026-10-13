@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from time import monotonic
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -32,6 +33,7 @@ def main(argv=None):
         help="explicit JSON protected_windows/initial_vehicles overrides for workbook inputs",
     )
     args = parser.parse_args(argv)
+    started = monotonic()
     try:
         settings = json.loads(args.settings.read_text(encoding="utf-8")) if args.settings else None
         if args.input.suffix.lower() == ".json":
@@ -75,6 +77,9 @@ def main(argv=None):
         }
     export_result(result, args.output_dir)
     print(f"{result['status']} -> {args.output_dir}")
+    print(
+        f"source={result.get('selected_source')}, search={result.get('search_status')}, runtime_seconds={monotonic() - started:.3f}"
+    )
     if result["recommended"]:
         q = result["recommended"]["quality"]
         print(
