@@ -46,7 +46,15 @@ def test_hand_checked_vertical_slice_and_exports(tmp_path):
     assert selected["quality"]["hard_constraints_pass"]
     assert all(r["headway_minutes"] == 20 for r in selected["regimes"])
     export_result(result, tmp_path)
-    assert len(list(tmp_path.iterdir())) == 6
+    assert {p.name for p in tmp_path.iterdir()} == {
+        "recommended_timetable.json",
+        "service_regimes.json",
+        "vehicle_chains.json",
+        "quality_report.json",
+        "run_diagnostics.json",
+        "recommended_timetable.xlsx",
+        "operational_review.html",
+    }
     assert (
         json.loads((tmp_path / "recommended_timetable.json").read_text())["departures"]
         == selected["departures"]

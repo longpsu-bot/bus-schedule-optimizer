@@ -487,12 +487,20 @@ from a route name, ticketing totals, or Human Final reference.
 provisional waiting equivalence tolerance. Defaults: 25 distinct plan evaluations,
 24 revisions, 2 seconds and 0.2 deterministic solver work units per solve, 120 seconds
 total, minimum two internal gaps and 30 minutes per regime, maximum four regimes
-per direction. A four-plan pending queue bounds generation as well as evaluation.
+per direction. Per-direction pending pools hold at most 100 plans at the default
+25-evaluation budget; proposals do not consume extra timetable evaluations.
 The selected service band is `max(0.10 minutes, 2% of best modeled wait)`.
 
 Each run writes `recommended_timetable.xlsx`, `recommended_timetable.json`,
 `service_regimes.json`, `vehicle_chains.json`, `quality_report.json` and
-`run_diagnostics.json`. A failed/incomplete run retains diagnostics with an empty
+`run_diagnostics.json`. MVP-3 adds the offline Vietnamese `operational_review.html`
+and an additive `operational_review` field in quality JSON. The report separates
+the engine decision, confirmed hard failures, review warnings and missing operational
+evidence. `--review-settings` configures warning materiality; `--operating-scenarios`
+accepts explicitly named runtime/layover scenarios with independently validated chains.
+See [MVP-3 operational review](docs/engine/MVP3_OPERATIONAL_REVIEW.md) for contracts,
+examples, real-route findings and certification limits.
+A failed/incomplete run retains diagnostics with an empty
 recommendation; exit code is 2. A verified recommendation has exit code 0, including
 budget-limited runs. The XLSX includes direction timetables, regimes, vehicle
 circulation and comparison with B. Out-of-window demand and unavailable capacity

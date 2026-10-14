@@ -105,4 +105,4 @@ def test_private_route_strict_proxy_is_independently_certified_or_incomplete(rou
         assert not result["baseline"]["hard_constraints_pass"]
         assert result["diagnostics"]["best_rejected_service_violations"]
     export_result(result, tmp_path)
-    assert len(list(tmp_path.iterdir())) == 6
+    assert len(list(tmp_path.iterdir())) == 7

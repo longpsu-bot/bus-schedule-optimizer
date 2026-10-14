@@ -14,6 +14,8 @@ from .circulation import assign_fleet
 from .input import DIRECTIONS, integer, number, validate_bundle
 from .planning import compile_plan, initial_plan, revise_plan, revision_priority
 from .quality import change_justification, evaluate, select_candidate
+from .review import build_review, warning_policy
+from .review_html import render_review_html
 
 DEFAULTS = {
     "candidate_budget": 25,
@@ -60,7 +62,7 @@ def _settings(settings):
     return active
 
 
-def run_bundle(bundle, settings=None):
+def run_bundle(bundle, settings=None, *, review_settings=None, operating_scenarios=None):
     result = {
         "status": "BLOCKED_INPUT",
         "search_status": "BLOCKED_INPUT",
@@ -72,6 +74,7 @@ def run_bundle(bundle, settings=None):
     }
     try:
         data, active = validate_bundle(bundle), _settings(settings)
+        warning_policy(review_settings)
     except ValueError as exc:
         result["diagnostics"]["input_error"] = str(exc)
         return result
@@ -413,6 +416,7 @@ def run_bundle(bundle, settings=None):
         selection_policy="hard admissibility > explicit benefit versus B > protected service > wait-equivalence > fleet > regimes > transitions > terminal wait > tail; secondary metrics never justify change alone",
         global_optimality_proved=False,
     )
+    result["operational_review"] = build_review(data, result, review_settings, operating_scenarios)
     return result
 
 
@@ -432,6 +436,7 @@ def export_result(result, directory):
         "provenance": result.get("provenance"),
         "settings": result.get("settings"),
         "demand_basis": result.get("demand_basis"),
+        "operational_review": result.get("operational_review"),
         "alternatives": [
             {
                 "id": c["id"],
@@ -684,6 +689,9 @@ def export_result(result, directory):
                 70, max(14, max(len(str(c.value or "")) for c in column) + 2)
             )
     workbook.save(directory / "recommended_timetable.xlsx")
+    (directory / "operational_review.html").write_text(
+        render_review_html(result.get("operational_review")), encoding="utf-8"
+    )
 
 
 def _time(minutes):

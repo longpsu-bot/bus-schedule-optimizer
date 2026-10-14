@@ -21,6 +21,14 @@ def main(argv=None):
     )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--settings", type=Path, help="JSON settings overrides")
+    parser.add_argument(
+        "--review-settings", type=Path, help="JSON warning thresholds; not service authority"
+    )
+    parser.add_argument(
+        "--operating-scenarios",
+        type=Path,
+        help="JSON list of explicit runtime/layover scenarios; unchanged departures, independently validated chains",
+    )
     parser.add_argument("--profile")
     parser.add_argument("--minimum-layover", type=int)
     parser.add_argument("--maximum-load-factor", type=float)
@@ -67,7 +75,19 @@ def main(argv=None):
                     for d, windows in constraints["protected_windows"].items():
                         data["directions"][d]["protected_windows"] = windows
                 data["provenance"]["protection_source"] = args.constraints.name
-        result = run_bundle(data, settings)
+        review_settings = (
+            json.loads(args.review_settings.read_text(encoding="utf-8"))
+            if args.review_settings
+            else None
+        )
+        scenarios = (
+            json.loads(args.operating_scenarios.read_text(encoding="utf-8"))
+            if args.operating_scenarios
+            else None
+        )
+        result = run_bundle(
+            data, settings, review_settings=review_settings, operating_scenarios=scenarios
+        )
     except (OSError, ValueError, KeyError, TypeError) as exc:
         result = {
             "status": "BLOCKED_INPUT",
