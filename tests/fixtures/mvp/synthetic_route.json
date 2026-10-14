@@ -1,0 +1,21 @@
+{
+  "route_id": "synthetic",
+  "provenance": {"source": "hand-checked regression: two 20-minute rhythms, 15-minute runtime, 5-minute layover; minimum fleet 2; expected wait 10 minutes"},
+  "demand_basis": "independent_arrivals",
+  "fleet_ceiling": 2,
+  "layover_minutes": {"outbound": 5, "inbound": 5},
+  "directions": {
+    "outbound": {
+      "first": 360, "last": 420, "trip_count": 4, "runtime_minutes": 15,
+      "baseline": [360, 380, 400, 420],
+      "demand": [{"start": 360, "end": 420, "passengers": 60}],
+      "protected_windows": [{"start": 360, "end": 420, "max_gap": 20}]
+    },
+    "inbound": {
+      "first": 380, "last": 440, "trip_count": 4, "runtime_minutes": 15,
+      "baseline": [380, 400, 420, 440],
+      "demand": [{"start": 380, "end": 440, "passengers": 60}],
+      "protected_windows": [{"start": 380, "end": 440, "max_gap": 20}]
+    }
+  }
+}
