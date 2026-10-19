@@ -517,3 +517,19 @@ python -m pytest tests/test_mvp_acceptance.py --basetemp outputs/mvp_validation/
 ```
 
 See [reset audit and acceptance evidence](docs/engine/MVP_SERVICE_PLAN_COMPILER_RESET.md).
+
+## External timetable benchmark (MVP-4)
+
+Review existing B and externally proposed X directly from the verified eight-sheet
+report, without KH/HT inputs or timetable optimization:
+
+```powershell
+python scripts/run_external_benchmark.py --input local_inputs/external_report.xlsx --output-dir outputs/external_benchmark
+```
+
+Writes separate normalized JSON, benchmark JSON and offline Vietnamese HTML. Actual
+departures, repeated-demand reconciliation and recorded vehicle chains retain source
+cells. Reported fleet, validated assignment and unproven minimum fleet stay separate;
+missing runtime, mandatory layover and occupancy evidence remain explicit. Optional
+C comparison is recalculated and only ranked within an explicitly compatible context.
+See [MVP-4 scope and usage](docs/engine/MVP4_EXTERNAL_BENCHMARK.md).
