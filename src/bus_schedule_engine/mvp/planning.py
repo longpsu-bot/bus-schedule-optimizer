@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from math import sqrt
+from time import monotonic
 
 from ortools.sat.python import cp_model
 
@@ -184,6 +185,7 @@ def compile_plan(direction, plan, settings):
     model.add(ends[-1] == direction["last"])
     # This is boundary settlement, not the production selection objective.
     model.minimize(sum(costs))
+    started = monotonic()
     engine = solver(settings)
     status = engine.solve(model)
     if status not in (cp_model.FEASIBLE, cp_model.OPTIMAL):
@@ -191,13 +193,82 @@ def compile_plan(direction, plan, settings):
             "status": "FAMILY_INFEASIBLE" if status == cp_model.INFEASIBLE else "SOLVER_LIMIT",
             "reason": "No settled integer rhythm found in this bounded plan family; revise allocation/boundary/count.",
         }
+    selected = tuple(engine.value(h) for h in headways)
+    preview_evidence = {}
+    if settings.get("compilation_lookahead", 0):
+        # Local import breaks quality -> circulation -> planning's initialization cycle.
+        from .quality import waiting
+
+        def rank(values):
+            times = [direction["first"]]
+            for block, headway in zip(plan, values, strict=True):
+                start = times[-1]
+                times.extend(start + headway * j for j in range(1, block["gaps"] + 1))
+            violations = 0
+            for window in direction.get("protected_windows", []):
+                gap = max(
+                    (
+                        z - a
+                        for a, z in zip(times, times[1:], strict=False)
+                        if a < window["end"] and z > window["start"]
+                    ),
+                    default=0,
+                )
+                count = sum(window["start"] <= t < window["end"] for t in times)
+                violations += gap > window["max_gap"] or count < window.get("minimum_departures", 0)
+            cost = sum(
+                abs(block["gaps"] * h - (block["end"] - start))
+                for block, h, start in zip(
+                    plan, values, [direction["first"]] + [p["end"] for p in plan[:-1]], strict=True
+                )
+            )
+            return violations, waiting(times, direction["demand"])["integral"], cost, values
+
+        best = rank(selected)
+
+        class Preview(cp_model.CpSolverSolutionCallback):
+            def __init__(self):
+                super().__init__()
+                self.count = 0
+
+            def on_solution_callback(self):
+                nonlocal best, selected
+                values = tuple(self.value(h) for h in headways)
+                score = rank(values)
+                if score < best:
+                    best, selected = score, values
+                self.count += 1
+                if self.count >= settings["compilation_lookahead"]:
+                    self.stop_search()
+
+        model.clear_objective()
+        model.add_forbidden_assignments(headways, [selected])
+        preview = Preview()
+        remaining = settings.get("solver_seconds", 2) - (monotonic() - started)
+        remaining_work = (
+            settings.get("solver_work_limit", 0.2) - engine.response_proto.deterministic_time
+        )
+        enumeration_status = cp_model.UNKNOWN
+        if remaining > 0 and remaining_work > 0:
+            lookahead = solver(
+                settings | {"solver_seconds": remaining, "solver_work_limit": remaining_work}
+            )
+            lookahead.parameters.enumerate_all_solutions = True
+            enumeration_status = lookahead.solve(model, preview)
+        preview_evidence = {
+            "settlement_previews": preview.count + 1,
+            "settlement_lookahead_complete": enumeration_status
+            in (cp_model.OPTIMAL, cp_model.INFEASIBLE),
+            "settlement_objective": "explicit protection violations, exact demand waiting, boundary fit",
+        }
     departures = [direction["first"]]
     regimes = []
-    for p, h in zip(plan, headways, strict=True):
-        headway = engine.value(h)
+    settled_ends = []
+    for p, headway in zip(plan, selected, strict=True):
         start = departures[-1]
         for _ in range(p["gaps"]):
             departures.append(departures[-1] + headway)
+        settled_ends.append(departures[-1])
         if regimes and regimes[-1]["headway_minutes"] == headway:
             regimes[-1]["end_time"] = departures[-1]
             regimes[-1]["gap_count"] += p["gaps"]
@@ -217,8 +288,7 @@ def compile_plan(direction, plan, settings):
         "status": "COMPILED",
         "departures": departures,
         "regimes": regimes,
-        "boundary_settlement": [
-            engine.value(e) - p["end"] for e, p in zip(ends, plan, strict=True)
-        ],
-        "solver_optimal_settlement": status == cp_model.OPTIMAL,
+        "boundary_settlement": [end - p["end"] for end, p in zip(settled_ends, plan, strict=True)],
+        "solver_optimal_settlement": status == cp_model.OPTIMAL and not preview_evidence,
+        **preview_evidence,
     }

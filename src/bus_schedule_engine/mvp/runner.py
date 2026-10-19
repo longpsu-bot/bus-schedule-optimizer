@@ -27,6 +27,7 @@ DEFAULTS = {
     "minimum_regime_minutes": 30,
     "maximum_regimes": 4,
     "boundary_settlement_minutes": 60,
+    "compilation_lookahead": 0,
     "wait_absolute_tolerance": 0.10,
     "wait_relative_tolerance": 0.02,
     "wait_materiality_minutes": 0.05,
@@ -46,6 +47,9 @@ def _settings(settings):
         raise ValueError("minimum_internal_gaps must be >=2; one-gap regimes are forbidden")
     for key in ("max_revisions", "minimum_regime_minutes", "boundary_settlement_minutes"):
         integer(active[key], key)
+    integer(active["compilation_lookahead"], "compilation_lookahead")
+    if active["compilation_lookahead"] > 256:
+        raise ValueError("compilation_lookahead must be <=256")
     for key in ("solver_seconds", "solver_work_limit", "total_seconds"):
         number(active[key], key)
         if active[key] <= 0:
@@ -231,6 +235,8 @@ def run_bundle(bundle, settings=None, *, review_settings=None, operating_scenari
                     feedback["fleet_status"] = fleet["status"]
                     feedback["failures"] = quality["failures"]
                     feedback["quality"] = quality
+                    feedback["departures"] = departures
+                    feedback["regimes"] = regimes
                     solver_limited |= fleet["status"] in {"SOLVER_LIMIT", "MINIMUM_FLEET_UNPROVED"}
                     rejections.update(quality["failures"])
                     if quality["hard_constraints_pass"]:
