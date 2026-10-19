@@ -451,3 +451,85 @@ Optional `protected_service_floor_*` entries in `CAU_HINH` declare the 6A2A poli
 supplemental planning settings and do not change Contract V1 or Scenario C.
 
 The current exporters create new workbooks and do not overwrite `Schedule template.xlsx`.
+# MVP Service Plan Compiler
+
+The product CLI generates one validated timetable for both directions, using bounded
+ServiceRegime revisions and exact minimum vehicle chains. It runs independently of
+the research selectors and never requires SSE/TE top-rank agreement.
+
+```powershell
+python scripts/run_mvp_service_plan.py --input tests/fixtures/mvp/synthetic_route.json --output-dir outputs/mvp_synthetic
+python scripts/run_mvp_service_plan.py --input local_inputs/route.xlsx --minimum-layover 5 --output-dir outputs/mvp_route
+```
+
+Use the existing V3 workbook schema or the committed JSON fixture as the normalized
+bundle example. JSON timestamps, runtimes and terminal layovers are **minutes**.
+`layover_minutes.outbound` means layover at the outbound starting terminal, applied
+after an inbound arrival. A variable runtime uses `runtime_periods` records with
+`start`, `end`, `minutes` covering every departure.
+
+Capacity is unavailable when omitted. When supplied, set `vehicle_capacity`,
+`maximum_load_factor` (e.g. `0.8`) and `capacity_policy` (`hard` or
+`evaluation_only`). The workbook adapter defaults to explicit evaluation-only
+capacity diagnostics, using the source workbook's maximum load factor; use
+`--capacity-policy hard --maximum-load-factor 0.8` to enforce that planning policy.
+Boardings are modeled as uniform arrivals, not observed onboard load.
+
+Protection windows use `start`, `end`, `max_gap`, optional `minimum_departures`.
+The maximum-gap contract covers every actual consecutive departure gap intersecting
+the window; departure counts use `[start,end)`. Initial terminal availability is
+optional `initial_vehicles: {"outbound": 4, "inbound": 1}`. Workbook-specific
+protections/initial stock can be supplied with `--constraints constraints.json`.
+Unknown constraints fail closed. The adapter never infers layover or protection
+from a route name, ticketing totals, or Human Final reference.
+
+`--settings settings.json` overrides candidate/revision/time budgets and the
+provisional waiting equivalence tolerance. Defaults: 25 distinct plan evaluations,
+24 revisions, 2 seconds and 0.2 deterministic solver work units per solve, 120 seconds
+total, minimum two internal gaps and 30 minutes per regime, maximum four regimes
+per direction. Per-direction pending pools hold at most 100 plans at the default
+25-evaluation budget; proposals do not consume extra timetable evaluations.
+The selected service band is `max(0.10 minutes, 2% of best modeled wait)`.
+
+Each run writes `recommended_timetable.xlsx`, `recommended_timetable.json`,
+`service_regimes.json`, `vehicle_chains.json`, `quality_report.json` and
+`run_diagnostics.json`. MVP-3 adds the offline Vietnamese `operational_review.html`
+and an additive `operational_review` field in quality JSON. The report separates
+the engine decision, confirmed hard failures, review warnings and missing operational
+evidence. `--review-settings` configures warning materiality; `--operating-scenarios`
+accepts explicitly named runtime/layover scenarios with independently validated chains.
+See [MVP-3 operational review](docs/engine/MVP3_OPERATIONAL_REVIEW.md) for contracts,
+examples, real-route findings and certification limits.
+A failed/incomplete run retains diagnostics with an empty
+recommendation; exit code is 2. A verified recommendation has exit code 0, including
+budget-limited runs. The XLSX includes direction timetables, regimes, vehicle
+circulation and comparison with B. Out-of-window demand and unavailable capacity
+are disclosed. Feasible does not mean globally optimal or superior to B.
+
+```powershell
+$env:PYTHONPATH='src'
+New-Item -ItemType Directory -Force outputs/mvp_validation | Out-Null
+python -m pytest tests/test_mvp_service_plan.py tests/test_mvp_acceptance.py --basetemp outputs/mvp_validation/pytest
+# Optional private acceptance (each route is a separate test):
+$env:BUS_MVP_ROUTE6_WORKBOOK='local_inputs/route6.xlsx'
+$env:BUS_MVP_ROUTE10_WORKBOOK='local_inputs/route10.xlsx'
+python -m pytest tests/test_mvp_acceptance.py --basetemp outputs/mvp_validation/acceptance
+```
+
+See [reset audit and acceptance evidence](docs/engine/MVP_SERVICE_PLAN_COMPILER_RESET.md).
+
+## External timetable benchmark (MVP-4)
+
+Review existing B and externally proposed X directly from the verified eight-sheet
+report, without KH/HT inputs or timetable optimization:
+
+```powershell
+python scripts/run_external_benchmark.py --input local_inputs/external_report.xlsx --output-dir outputs/external_benchmark
+```
+
+Writes separate normalized JSON, benchmark JSON and offline Vietnamese HTML. Actual
+departures, repeated-demand reconciliation and recorded vehicle chains retain source
+cells. Reported fleet, validated assignment and unproven minimum fleet stay separate;
+missing runtime, mandatory layover and occupancy evidence remain explicit. Optional
+C comparison is recalculated and only ranked within an explicitly compatible context.
+See [MVP-4 scope and usage](docs/engine/MVP4_EXTERNAL_BENCHMARK.md).
