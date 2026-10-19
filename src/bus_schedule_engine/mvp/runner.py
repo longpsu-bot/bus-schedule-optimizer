@@ -4,16 +4,25 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from copy import deepcopy
+from itertools import product
 from pathlib import Path
-from time import monotonic
+from time import perf_counter as monotonic
 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 from .circulation import assign_fleet
 from .input import DIRECTIONS, integer, number, validate_bundle
-from .planning import compile_plan, initial_plan, revise_plan, revision_priority
-from .quality import change_justification, evaluate, select_candidate
+from .joint import local_evidence, pair_key, pair_priority
+from .planning import (
+    _compiled_settlement,
+    compile_plan,
+    initial_plan,
+    revise_plan,
+    revision_priority,
+)
+from .quality import change_justification, evaluate, regime_failures, select_candidate
 from .review import build_review, warning_policy
 from .review_html import render_review_html
 
@@ -28,6 +37,9 @@ DEFAULTS = {
     "maximum_regimes": 4,
     "boundary_settlement_minutes": 60,
     "compilation_lookahead": 0,
+    "directional_settlements": 1,
+    "pair_evaluation_budget": 160,
+    "pairs_per_plan": 16,
     "wait_absolute_tolerance": 0.10,
     "wait_relative_tolerance": 0.02,
     "wait_materiality_minutes": 0.05,
@@ -50,6 +62,12 @@ def _settings(settings):
     integer(active["compilation_lookahead"], "compilation_lookahead")
     if active["compilation_lookahead"] > 256:
         raise ValueError("compilation_lookahead must be <=256")
+    for key in ("directional_settlements", "pair_evaluation_budget", "pairs_per_plan"):
+        integer(active[key], key, 1)
+    if active["directional_settlements"] > 4:
+        raise ValueError("directional_settlements must be <=4")
+    if active["pairs_per_plan"] > 16:
+        raise ValueError("pairs_per_plan must be <=16")
     for key in ("solver_seconds", "solver_work_limit", "total_seconds"):
         number(active[key], key)
         if active[key] <= 0:
@@ -66,7 +84,9 @@ def _settings(settings):
     return active
 
 
-def run_bundle(bundle, settings=None, *, review_settings=None, operating_scenarios=None):
+def run_bundle(
+    bundle, settings=None, *, review_settings=None, operating_scenarios=None, incumbents=None
+):
     result = {
         "status": "BLOCKED_INPUT",
         "search_status": "BLOCKED_INPUT",
@@ -79,6 +99,42 @@ def run_bundle(bundle, settings=None, *, review_settings=None, operating_scenari
     try:
         data, active = validate_bundle(bundle), _settings(settings)
         warning_policy(review_settings)
+        if incumbents is not None:
+            if (
+                not isinstance(incumbents, list)
+                or len(incumbents) > 1
+                or active["directional_settlements"] == 1
+            ):
+                raise ValueError(
+                    "incumbents requires joint mode and at most one supplied timetable"
+                )
+            for c in incumbents:
+                if not isinstance(c, dict) or not {"departures", "regimes"} <= set(c):
+                    raise ValueError("incumbents requires departures and regimes")
+                if not isinstance(c["departures"], dict) or set(c["departures"]) != set(DIRECTIONS):
+                    raise ValueError("incumbents requires both directional departure vectors")
+                for d in DIRECTIONS:
+                    times = c["departures"].get(d, [])
+                    direction = data["directions"][d]
+                    if (
+                        not isinstance(times, list)
+                        or len(times) != direction["trip_count"]
+                        or any(type(t) is not int for t in times)
+                        or times != sorted(set(times))
+                        or times[0] != direction["first"]
+                        or times[-1] != direction["last"]
+                    ):
+                        raise ValueError("incumbents must preserve exact whole-minute authority")
+                if not isinstance(c["regimes"], list) or not c["regimes"]:
+                    raise ValueError("incumbents requires uniform ServiceRegime evidence")
+                if regime_failures(c["departures"], c["regimes"], active):
+                    raise ValueError("incumbents contains invalid ServiceRegime evidence")
+                if any(
+                    not isinstance(r.get("regime_type"), str)
+                    or r["regime_type"] not in {"normal", "peak", "low-demand", "end_tail"}
+                    for r in c["regimes"]
+                ):
+                    raise ValueError("incumbents requires supported regime_type metadata")
     except ValueError as exc:
         result["diagnostics"]["input_error"] = str(exc)
         return result
@@ -114,6 +170,12 @@ def run_bundle(bundle, settings=None, *, review_settings=None, operating_scenari
     direction_counts, operation_counts, rejections = Counter(), Counter(), Counter()
     generated_count, max_pending, compiled_count, duplicates, guided_count = 1, 1, 0, 0, 0
     schedules = set()
+    retained_pair_keys = set()
+    joint = active["directional_settlements"] > 1
+    compilation_cache, pair_cache = {}, {}
+    exact_pairs = compilation_hits = 0
+    pair_limited = False
+    unexamined_pairs = 0
     candidates = []
     limited = False
     baseline = None
@@ -141,10 +203,52 @@ def run_bundle(bundle, settings=None, *, review_settings=None, operating_scenari
     result["diagnostics"]["baseline_status"] = (
         "TIME_LIMIT" if not baseline else "INCOMPLETE" if baseline_incomplete else "EVALUATED"
     )
-    max_evaluations = min(active["candidate_budget"], active["max_revisions"] + 1)
+    max_evaluations = min(25, active["candidate_budget"], active["max_revisions"] + 1)
+    incumbent_evidence = []
+    for supplied in incumbents or []:
+        if monotonic() >= deadline:
+            limited = True
+            break
+        times, regimes = deepcopy(supplied["departures"]), deepcopy(supplied["regimes"])
+        # Canonicalize equal-headway labels before a complete candidate is cached by vector.
+        canonical_regimes = []
+        for d in DIRECTIONS:
+            blocks = [r for r in regimes if r["direction"] == d]
+            settled = _compiled_settlement(
+                data["directions"][d],
+                [{"end": r["end_time"], "gaps": r["gap_count"]} for r in blocks],
+                [r["headway_minutes"] for r in blocks],
+            )
+            canonical_regimes.extend(r | {"direction": d} for r in settled["regimes"])
+        regimes = canonical_regimes
+        bounded = active | {"solver_seconds": min(active["solver_seconds"], deadline - monotonic())}
+        fleet = assign_fleet(data, times, settings=bounded, deadline=deadline)
+        candidate = {
+            "id": "I001",
+            "source": "OPTIMIZED",
+            "verified_incumbent": True,
+            "departures": times,
+            "regimes": regimes,
+            "vehicle_chains": fleet,
+            "quality": evaluate(data, times, regimes, fleet, bounded),
+        }
+        local_evidence(data, candidate, baseline, review_settings, active)
+        key = pair_key(data, times, active, review_settings)
+        schedules.add(key)
+        retained_pair_keys.add(key)
+        pair_cache[key] = candidate
+        exact_pairs += 1
+        incumbent_evidence.append(candidate)
+        if candidate["quality"]["hard_constraints_pass"]:
+            candidates.append(candidate)
     solver_limited = baseline_incomplete
+    quality_feedback = []
     while pending:
-        if result["diagnostics"]["evaluations"] >= max_evaluations or monotonic() >= deadline:
+        if (
+            pair_limited
+            or result["diagnostics"]["evaluations"] >= max_evaluations
+            or monotonic() >= deadline
+        ):
             limited = True
             break
         if initial_key in pending and not evaluated:
@@ -183,7 +287,7 @@ def run_bundle(bundle, settings=None, *, review_settings=None, operating_scenari
             "demand_guided": entry["guided"],
             "revision_priority": list(entry["priority"]),
         }
-        departures, regimes = {}, []
+        departures, regimes, directional = {}, [], {}
         for direction in DIRECTIONS:
             remaining = deadline - monotonic()
             if remaining <= 0:
@@ -194,67 +298,154 @@ def run_bundle(bundle, settings=None, *, review_settings=None, operating_scenari
                 limited = True
                 break
             bounded = active | {"solver_seconds": min(active["solver_seconds"], remaining)}
-            compiled = compile_plan(data["directions"][direction], plans[direction], bounded)
+            compilation_key = json.dumps([direction, plans[direction]], sort_keys=True)
+            cached_compile = joint and compilation_key in compilation_cache
+            if cached_compile:
+                compiled = deepcopy(compilation_cache[compilation_key])
+                compilation_hits += 1
+            else:
+                compiled = compile_plan(
+                    data["directions"][direction],
+                    plans[direction],
+                    bounded,
+                    **({"deadline": deadline} if joint else {}),
+                )
+                if joint:
+                    compilation_cache[compilation_key] = deepcopy(compiled)
             feedback["compilation"][direction] = {
-                k: v for k, v in compiled.items() if k not in {"departures", "regimes"}
+                k: v
+                for k, v in compiled.items()
+                if k not in {"departures", "regimes", "settlements"}
             }
+            if joint and compiled.get("settlement_lookahead_complete") is False:
+                solver_limited = True
+            if joint:
+                feedback["compilation"][direction]["cache_hit"] = cached_compile
+                if cached_compile:
+                    feedback["compilation"][direction]["settlement_previews"] = 0
             if compiled["status"] != "COMPILED":
                 rejections[compiled["status"]] += 1
                 solver_limited |= compiled["status"] == "SOLVER_LIMIT"
                 continue
             departures[direction] = compiled["departures"]
+            directional[direction] = compiled.get("settlements", [compiled])
             average = (
                 data["directions"][direction]["last"] - data["directions"][direction]["first"]
             ) / (data["directions"][direction]["trip_count"] - 1)
-            for r in compiled["regimes"]:
-                r["direction"] = direction
-                if r["regime_type"] != "end_tail":
-                    r["regime_type"] = "peak" if r["headway_minutes"] < average else "low-demand"
-                regimes.append(r)
+            for settlement in directional[direction]:
+                for r in settlement["regimes"]:
+                    r["direction"] = direction
+                    if r["regime_type"] != "end_tail":
+                        r["regime_type"] = (
+                            "peak" if r["headway_minutes"] < average else "low-demand"
+                        )
         reason = "COMPILATION"
         quality = None
         if len(departures) == 2:
             compiled_count += 1
-            key = json.dumps(departures, sort_keys=True)
-            if key in schedules:
-                feedback["candidate_status"] = "DUPLICATE_TIMETABLE"
-                duplicates += 1
-            else:
-                schedules.add(key)
+            pairs = list(product(*(directional[d] for d in DIRECTIONS)))
+            if joint:
+                retained_pair_keys.update(
+                    pair_key(
+                        data,
+                        {d: c["departures"] for d, c in zip(DIRECTIONS, p, strict=True)},
+                        active,
+                        review_settings,
+                    )
+                    for p in pairs
+                )
+            if joint:
+                pairs.sort(key=lambda p: pair_priority(p, quality_feedback))
+            unexamined_pairs += max(0, len(pairs) - active["pairs_per_plan"])
+            pair_records = []
+            for pair_index, pair in enumerate(pairs[: active["pairs_per_plan"]], 1):
+                departures = {d: c["departures"] for d, c in zip(DIRECTIONS, pair, strict=True)}
+                regimes = [r for c in pair for r in c["regimes"]]
+                key = (
+                    pair_key(data, departures, active, review_settings)
+                    if joint
+                    else json.dumps(departures, sort_keys=True)
+                )
+                record = {"pair_index": pair_index}
+                if key in schedules:
+                    record.update(candidate_status="DUPLICATE_TIMETABLE")
+                    if joint:
+                        record["cached_candidate_id"] = pair_cache[key]["id"]
+                        record["quality"] = pair_cache[key]["quality"]
+                    duplicates += 1
+                    pair_records.append(record)
+                    continue
+                if exact_pairs >= active["pair_evaluation_budget"]:
+                    pair_limited = limited = True
+                    unexamined_pairs += len(pairs[: active["pairs_per_plan"]]) - pair_index + 1
+                    break
                 remaining = deadline - monotonic()
                 if remaining <= 0:
                     limited = True
-                    feedback["candidate_status"] = "SOLVER_LIMIT"
-                else:
-                    bounded = active | {"solver_seconds": min(active["solver_seconds"], remaining)}
-                    fleet = assign_fleet(data, departures, settings=bounded, deadline=deadline)
-                    quality = evaluate(data, departures, regimes, fleet, bounded)
-                    feedback["candidate_status"] = (
-                        "FEASIBLE" if quality["hard_constraints_pass"] else "REJECTED"
+                    unexamined_pairs += len(pairs[: active["pairs_per_plan"]]) - pair_index + 1
+                    break
+                schedules.add(key)
+                exact_pairs += 1
+                bounded = active | {"solver_seconds": min(active["solver_seconds"], remaining)}
+                fleet = assign_fleet(data, departures, settings=bounded, deadline=deadline)
+                quality = evaluate(data, departures, regimes, fleet, bounded)
+                candidate = {
+                    "id": f"C{index:03d}_{pair_index:02d}" if joint else f"C{index:03d}",
+                    "source": "OPTIMIZED",
+                    "departures": departures,
+                    "regimes": regimes,
+                    "vehicle_chains": fleet,
+                    "quality": quality,
+                }
+                if joint:
+                    local_evidence(data, candidate, baseline, review_settings, active)
+                    pair_cache[key] = candidate
+                record.update(
+                    candidate_status="FEASIBLE" if quality["hard_constraints_pass"] else "REJECTED",
+                    fleet_status=fleet["status"],
+                    failures=quality["failures"],
+                    quality=quality,
+                    departures=departures,
+                    regimes=regimes,
+                )
+                if joint:
+                    record["candidate"] = candidate
+                pair_records.append(record)
+                solver_limited |= fleet["status"] in {"SOLVER_LIMIT", "MINIMUM_FLEET_UNPROVED"}
+                rejections.update(quality["failures"])
+                if quality["hard_constraints_pass"]:
+                    candidates.append(candidate)
+            if pair_records:
+                measured = [p for p in pair_records if p.get("quality")]
+                representative = (
+                    min(
+                        measured,
+                        key=lambda p: (
+                            not p["quality"]["hard_constraints_pass"],
+                            p["quality"]["required_fleet"]
+                            if p["quality"]["required_fleet"] is not None
+                            else float("inf"),
+                            p["quality"]["waiting_minutes"] or 0,
+                            p["pair_index"],
+                        ),
                     )
-                    feedback["fleet_status"] = fleet["status"]
-                    feedback["failures"] = quality["failures"]
-                    feedback["quality"] = quality
-                    feedback["departures"] = departures
-                    feedback["regimes"] = regimes
-                    solver_limited |= fleet["status"] in {"SOLVER_LIMIT", "MINIMUM_FLEET_UNPROVED"}
-                    rejections.update(quality["failures"])
-                    if quality["hard_constraints_pass"]:
-                        candidate = {
-                            "id": f"C{index:03d}",
-                            "source": "OPTIMIZED",
-                            "departures": departures,
-                            "regimes": regimes,
-                            "vehicle_chains": fleet,
-                            "quality": quality,
-                        }
-                        candidates.append(candidate)
-                        result["recommended"] = select_candidate(candidates, active, baseline)
-                        reason = "QUALITY"
-                    else:
-                        reason = (
-                            "FLEET" if any("FLEET" in x for x in quality["failures"]) else "SERVICE"
-                        )
+                    if measured
+                    else pair_records[0]
+                )
+                feedback.update({k: v for k, v in representative.items() if k != "candidate"})
+                quality = representative.get("quality")
+                if quality:
+                    reason = (
+                        "QUALITY"
+                        if quality["hard_constraints_pass"]
+                        else "FLEET"
+                        if any("FLEET" in x for x in quality["failures"])
+                        else "SERVICE"
+                    )
+                    quality_feedback = quality["service_feedback"]
+            if joint:
+                feedback["pairs"] = pair_records
+                feedback["retained_pair_count"] = len(pairs)
         result["diagnostics"]["feedback"].append(feedback)
         for direction in DIRECTIONS:
             evidence = (
@@ -294,7 +485,9 @@ def run_bundle(bundle, settings=None, *, review_settings=None, operating_scenari
             for k in keys[2 * max_evaluations :]:
                 del pending[k]
         max_pending = max(max_pending, len(pending))
-    limited = limited or solver_limited
+    if joint:
+        unexamined_pairs = len(retained_pair_keys - schedules)
+    limited = limited or solver_limited or unexamined_pairs > 0
     result["recommended"] = select_candidate(candidates, active, baseline) if baseline else None
     result["search_status"] = (
         ("FEASIBLE_BUDGET_LIMITED" if limited else "FEASIBLE_RECOMMENDATION")
@@ -382,24 +575,35 @@ def run_bundle(bundle, settings=None, *, review_settings=None, operating_scenari
     result["diagnostics"].update(
         budget_limited=limited,
         feasible_candidates=len(candidates),
+        feasible_generated_candidates=sum(not c.get("verified_incumbent") for c in candidates),
+        incumbents=incumbent_evidence,
         distinct_plans_generated=len(generated),
         total_plans_generated=generated_count,
         distinct_plans_evaluated=len(evaluated),
         compiled_candidates=compiled_count,
         duplicate_schedules=duplicates,
+        exact_pair_evaluations=exact_pairs,
+        pair_evaluation_budget=active["pair_evaluation_budget"],
+        directional_compilation_cache_hits=compilation_hits,
+        unexamined_retained_pairs=unexamined_pairs,
+        distinct_retained_pairs_discovered=len(retained_pair_keys) if joint else len(schedules),
         rejections_by_reason=dict(sorted(rejections.items())),
         demand_guided_evaluations=guided_count,
         fallback_evaluations=result["diagnostics"]["evaluations"] - guided_count,
         directional_evaluations=dict(direction_counts),
         maximum_pending_plans=max_pending,
         pending_plans=len(pending),
-        search_exhausted=not pending and not solver_limited,
+        search_exhausted=not pending and not solver_limited and not unexamined_pairs,
         search_limit_reason="TOTAL_DEADLINE"
         if monotonic() >= deadline
+        else "PAIR_EVALUATION_BUDGET"
+        if pair_limited
         else "EVALUATION_BUDGET"
         if limited and pending
         else "SOLVER_LIMIT"
         if solver_limited
+        else "PAIRS_PER_PLAN"
+        if unexamined_pairs
         else None,
         remaining_service_violations=[
             f
@@ -419,9 +623,29 @@ def run_bundle(bundle, settings=None, *, review_settings=None, operating_scenari
         ]
         if best_rejected
         else [],
-        selection_policy="hard admissibility > explicit benefit versus B > protected service > wait-equivalence > fleet > regimes > transitions > terminal wait > tail; secondary metrics never justify change alone",
+        selection_policy=(
+            "hard admissibility > explicit benefit versus B > verified-incumbent non-regression > protected service > wait-equivalence > maximum material local deterioration > positive passenger-minute deterioration > review warning severity/count and gaps > fleet > regimes > transitions > terminal wait > tail"
+            if joint
+            else "hard admissibility > explicit benefit versus B > protected service > wait-equivalence > fleet > regimes > transitions > terminal wait > tail; secondary metrics never justify change alone"
+        ),
         global_optimality_proved=False,
     )
+    if joint:
+        selected = result["recommended"]
+        result["diagnostics"]["joint_selection"] = {
+            "selected_id": selected["id"] if selected else None,
+            "selected_local_service": selected.get("local_service") if selected else None,
+            "verified_incumbent_retained": bool(selected and selected.get("verified_incumbent")),
+            "minimum_feasible_fleet": min(
+                (c["quality"]["required_fleet"] for c in candidates), default=None
+            ),
+            "best_feasible_waiting_minutes": min(
+                (c["quality"]["waiting_minutes"] or 0 for c in candidates), default=None
+            ),
+            "baseline_exact_evaluations": int(baseline is not None),
+            "pair_budget_includes_incumbent_revalidation": True,
+            "unexamined_pair_basis": "Distinct retained vectors discovered so far, excluding every evaluated or cached vector; uncompiled plan families are uncounted.",
+        }
     result["operational_review"] = build_review(data, result, review_settings, operating_scenarios)
     return result
 

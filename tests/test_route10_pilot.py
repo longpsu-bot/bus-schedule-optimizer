@@ -191,3 +191,38 @@ def test_private_route10_pilot_independent_evaluation(tmp_path):
         json.loads((tmp_path / "pilot_report.json").read_text(encoding="utf-8"))["schema_version"]
         == "route10_pilot_v1"
     )
+
+
+def test_private_joint_route10_acceptance_and_incumbent_recovery(tmp_path):
+    from bus_schedule_engine.mvp.route10_joint_pilot import run_joint_pilot
+
+    path = os.environ.get("BUS_MVP5_ROUTE10_WORKBOOK")
+    if not path:
+        pytest.skip("private MVP-5 workbook not configured")
+    report = run_joint_pilot(Path(path), tmp_path)
+    primary = report["scenarios"][0]
+    c = primary["joint"]["recommended"]
+    assert c["quality"]["required_fleet"] <= 14
+    assert c["quality"]["waiting_minutes"] <= 9.441296
+    for row in report["scenarios"]:
+        diag = row["joint"]["diagnostics"]
+        assert diag["evaluations"] <= 25
+        assert diag["exact_pair_evaluations"] <= 160
+        assert row["infeasibility_proof"] is None
+        assert len(row["trial_fleets"]) == diag["exact_pair_evaluations"]
+        assert row["revalidated_incumbent"]["quality"]["required_fleet"] == (
+            15 if row["id"] == "report_p75" else 14
+        )
+        for candidate in diag["incumbents"]:
+            validate_chains(row["bundle"], candidate["departures"], candidate["vehicle_chains"])
+        if row["joint"]["recommended"]:
+            chosen = row["joint"]["recommended"]
+            assert chosen["quality"]["hard_constraints_pass"]
+            validate_chains(row["bundle"], chosen["departures"], chosen["vehicle_chains"])
+        if "B25" in row["id"]:
+            assert all(
+                w["pass"] and w["maximum_allowed_gap"] == 25
+                for w in row["comparison"]["C"]["quality"]["protected_windows"]
+            )
+    assert (tmp_path / "report_p50/vehicle_chains.json").is_file()
+    assert (tmp_path / "report_p50/operational_review.html").is_file()

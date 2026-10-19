@@ -1,4 +1,4 @@
-# MVP-5A: Route 10 engine optimization pilot
+# MVP-5: Route 10 engine optimization pilot
 
 The engine independently generates an exact, explainable C using 14 vehicles in the primary report-derived p50 scenario. It has marginally lower modeled waiting than B and lower waiting than X. This is a **conditional experimental result requiring service review**, not unqualified operator acceptance: nine interval review exceptions remain, including a 4.167-minute local waiting increase. The p75 sensitivity is **SEARCH_INCOMPLETE** at 14 vehicles. No route-infeasibility proof or operational approval is claimed.
 
@@ -129,9 +129,76 @@ Inbound: 05:00, 05:17, 05:34, 05:51, 06:08, 06:25, 06:42, 06:59, 07:16, 07:33, 0
 
 The generated vehicle-chain JSON lists all 102 trip IDs, assigned vehicles, recomputed arrivals, ready times and 14 alternating-terminal chains. The independent validator checks identity coverage, uniqueness, endpoints, direction changes and destination layovers. Unit tests cover runtime-window boundaries, source coverage, nearest-rank summaries, sparse evidence, protection, transition limits, demand response, boundedness and determinism. Private acceptance tests independently regenerate and evaluate the result when `BUS_MVP5_ROUTE10_WORKBOOK` is configured. Route 6/10 MVP-1/2/3 private regressions use their separate existing environment variables; they never provide demand to this pilot.
 
-## Final verification
+## MVP-5A final verification
 
 - Linux Python 3.11, canonical LF checkout of the staged source: **1,621 passed, four skipped**, with both private V3 route regressions and the actual SHA-verified pilot workbook enabled. Whole-repository Ruff lint passed; CI Contract V1 format scope passed (59 files); all six changed Python files passed formatting. Two inherited Kaleido deprecation warnings remain. This is a local execution of the existing CI checks; no GitHub Actions run or new PR was created.
 - Windows full suite before the final two review regressions: 1,615 passed, four skipped, four inherited frozen template/CRLF fingerprint failures. Frozen fixtures and expectations were not edited. Final focused new checks: 15 passed, one private-input skip.
 - Two complete final actual-workbook Windows runs reproduce every non-timing pilot field exactly. Windows/Linux independently agree on all three scenarios' B/X/C departures and exact vehicle chains; numerical quality evidence agrees within 1e-9. Improved-run non-timing statistics also agree. The unchanged p75 control follows different tied boundary settlements across platforms (Windows 23 compiled/20 fleet rejections; Linux 25 compiled/21 fleet rejections), with no feasible C in either. Same-environment repeatability is verified; cross-platform bitwise equality of the inherited control search is not claimed.
 - Independent reviewer verified the input hash and all scenario metrics. Two findings were fixed with RED-to-GREEN regressions: share deterministic solver work between boundary solve/lookahead, and independently evaluate retained measured rejected-trial times instead of rerunning a bounded solve. Final verdict: no remaining critical/important findings; ship as a conditional experiment.
+
+## MVP-5B: joint fleet-aware timetable selection
+
+Starting SHA: `bb571eabdb4f3d572ef1bc08d01dc36539848a73`, on the same isolated pilot branch. The preceding MVP-5A evidence remains frozen. A before-edit control was preserved under ignored `outputs/mvp5b_frozen_5a`; the final control reproduces its C departures and numerical quality in all three scenarios. Workbook SHA, original B/X data, demand, runtime windows, five-minute experimental layover, 51/51 trips and endpoints are unchanged. PR #63 remains a separate open Draft at `e9fe4eb92c785748d939d44c6386c005d5d9cd3c`.
+
+The existing compiler optionally returns up to four distinct legal departure vectors per direction. It retains legal boundary-fit, minimum-wait, best protected-gap and local-deterioration representatives in that deterministic order, then fills remaining slots by departure-time distance. Representatives may coincide; with four distinct higher-priority representatives no extra timing slot is available. Exact vectors are deduplicated, and no direction-only dominance rule removes circulation opportunities. Invalid plan families and explicit protection failures are rejected before pairing. The single-candidate compiler remains the default.
+
+The existing coordinator pairs these vectors, orders them using previous exact fleet-pressure feedback and local waiting deterioration, and recomputes scenario-specific arrivals, ready times and exact minimum vehicle chains before acceptance. Identical directional plans reuse compilation results. Pair-cache keys include the full normalized operating/demand authorities, exact vectors, planning settings and review settings. A supplied incumbent must pass timetable/regime schema and coverage checks; adjacent equal-headway labels are canonicalized before vector caching. Its fleet and quality are always recomputed under the current scenario. No incumbent timestamps are embedded in production logic.
+
+Search limits are separate: **25 distinct ServicePlans**, **160 distinct exact pair evaluations**, at most **16 pairs per plan**, **256 total directional previews per compilation**, the existing shared CP-SAT time/work bounds, one worker/seed zero and a 120-second route-search deadline. The original MVP-5A mode retains its historical 256-additional-preview convention. The 160 evaluations include incumbent revalidation; the baseline and independent acceptance checks are separately disclosed. This is additional exact work beyond MVP-5A's 11/12 unique evaluated pairs. Deadline checks cover compilation, new diversity scoring and fleet matching; completing the current quality/review calculation adds bounded tail overhead rather than a strict process-kill deadline.
+
+Selection preserves hard admissibility and baseline justification. A verified feasible incumbent cannot be replaced with worse overall waiting or a worse hierarchical local-service result. Within the existing waiting-equivalence band, joint selection compares maximum material local deterioration, positive passenger-minute deterioration, review warning counts/severity and exact intersecting gap evidence before fleet/regime/transition tie breakers. Directional waits remain explicit evidence. Existing warning thresholds remain review policy, not hard transport authority; SSE/TE remain diagnostics.
+
+### Reproduce MVP-5B
+
+```powershell
+$env:PYTHONPATH='src'
+python scripts/run_route10_pilot.py --joint --input 'C:\Users\HOME\Downloads\Bus10_MienTay_DHQG_A.xlsx' --output-dir outputs/mvp5b_final_route10
+python -m pytest -o addopts='' -q tests/test_mvp_joint.py tests/test_mvp_settlement.py tests/test_mvp_service_plan.py tests/test_mvp_review.py tests/test_route10_pilot.py
+$env:BUS_MVP5_ROUTE10_WORKBOOK='C:\Users\HOME\Downloads\Bus10_MienTay_DHQG_A.xlsx'
+python -m pytest -o addopts='' -q tests/test_route10_pilot.py
+python -m pytest -o addopts='' -q
+python -m ruff check . --exclude .artifact --exclude outputs --exclude .venv
+python -m ruff format --check src/bus_schedule_engine/contracts_v1 (Get-ChildItem tests/test_contract*.py).FullName
+python -m ruff format --check src/bus_schedule_engine/mvp tests/test_mvp_joint.py tests/test_route10_pilot.py scripts/run_route10_pilot.py
+```
+
+### Measured benchmark
+
+The table uses the final Windows run; elapsed times vary. p75 columns describe a **rejected near-feasible trial**, never a recommendation.
+
+| Metric | MVP-5A p50 | MVP-5B p50 | MVP-5A p75 | MVP-5B p75 trial |
+|---|---:|---:|---:|---:|
+| Exact fleet | 14 | 14 | 15 | 15 |
+| Modeled wait, minutes | 9.441295 | 9.441295 | 9.441295 | 9.447497 |
+| Max headway outbound/inbound | 23/21 | 23/21 | 23/21 | 24/21 |
+| Review exception intervals | 9 | 9 | 9 | 8 |
+| Positive deterioration, passenger-minutes | 3,301.567 | 3,301.567 | 3,301.567 | 2,890.627 |
+| Feasible generated candidates | 1 | 1 (+ retained incumbent) | 0 | 0 |
+| Distinct exact pairs | 11 | 160 | 12 | 160 |
+| ServicePlans evaluated | 25 | 15 | 25 | 12 |
+| Actual directional previews | 6,637 | 1,518 | 7,222 | 1,218 |
+| Directional compilation cache hits | 0 | 14 | 0 | 12 |
+| Runtime, seconds | 12.836 | 12.602 | 14.149 | 11.792 |
+
+p50 retains revalidated incumbent `I001`: exact departures and seven regimes are the unchanged primary C listed above. Initial stock is eight outbound/six inbound, with all 102 trips independently chain-validated. No improved admissible p50 timetable was found; the nine review exceptions and maximum 4.167-minute local waiting deterioration remain unresolved. One other generated timetable passed the hard gates but did not justify replacing this incumbent.
+
+p75's selected trial `C001_04` needs 15 vehicles, a one-vehicle shortfall. Its 0.006202-minute aggregate wait increase accompanies 410.940 fewer positive deterioration passenger-minutes and one fewer warning interval. Maximum material local deterioration remains 4.167 minutes, and maximum outbound headway grows by one minute. All 160 retained trials have exact fleet counts: **15: 11 trials; 16: 35; 17: 46; 18: 37; 19: 21; 20: 9; 21: 1**. No 14-vehicle result or route-infeasibility proof exists.
+
+The separately declared B-derived 25-minute experiment preserves its protection. It retains `I001`, 14 vehicles, wait 9.441295, headways 23/21 and nine exception intervals. It tests 160 exact pairs across 19 plans, with two feasible generated alternatives plus the incumbent, 1,596 previews, 22 directional compilation cache hits and 12.752 seconds. No protection was silently relaxed.
+
+All three runs stop on the **pair budget**. The known distinct retained but unexamined pairs are 12/12/4 for p50/p75/B25; each run still has 100 queued ServicePlans, and additional generated/evicted or ungenerated families remain. These counts describe discovered search space, not a global exhaustion claim. Cached duplicate pair encounters are 33/17/109 and consume no new exact evaluations. The budgets are upper limits, so reaching 160 pairs can stop before 25 plans.
+
+### Evidence, review and next decision
+
+Ignored `outputs/mvp5b_final_route10` contains `mvp5a_control/`, `joint_report.json` with all retained trial fleet counts, shortfalls, local-service summaries, full tested pair timetables/regimes/chains/quality and structured rejection reasons, plus `comparison_report.md`. Each scenario retains the existing XLSX/JSON/offline HTML exports; p75 has no recommended timetable, and its rejected trial is explicitly identified in the joint report. No private input or large evidence file is committed.
+
+Two final Windows executions reproduce all 15 scenario JSON exports byte for byte, including fleet chains and diagnostics. Independent review found incumbent schema/cache contamination, a missing protected-service representative, inaccurate remaining-pair counts and missing diversity-scoring deadline polls; all were corrected with focused regressions. A further regression verifies canonical incumbent regime labels before caching. The focused public run passes 119 tests, with four private-input skips.
+
+The smallest next product experiment is to use the existing `pairs_per_plan=6` setting while retaining four directional candidates, 25 plans and the 160-pair ceiling. The measured searches currently spend their budget after only 15/12 plans; distributing checks across more plans tests this concrete coverage limitation without another engine or a larger global budget. Do not weaken the certified p50 incumbent or the B25 policy to obtain a result. Runtime authority, terminal stock, drivers and onboard-load/operational certification remain unresolved as described in MVP-5A.
+
+### MVP-5B final verification
+
+- Local Linux Python 3.11, canonical LF snapshot: **1,647 passed, four skipped**, in 360.95 seconds, with the SHA-verified Route 10 pilot and both private V3 route inputs enabled. This includes independent MVP-5A and joint MVP-5B actual-workbook acceptance. The nine staged Python files match that snapshot byte for byte. Whole-repository Ruff lint and the 59-file Contract V1 formatting scope pass. Two inherited Kaleido deprecation warnings remain.
+- Final focused public Windows run: **119 passed, four skipped**. A separate Linux run of the final joint/compiler tests passes **34 tests**, including a synthetic local-quality case where exact fleet minimization alone selects the worse local-service timetable. Full Windows run: **1,636 passed, 12 skipped**, with three inherited CRLF-versus-LF byte-canonical fixture failures. Frozen fixtures and expectations were not changed; their canonical LF versions pass on Linux. All 17 MVP/changed-test/CLI files pass formatting, and `git diff --check` passes.
+- Two final actual-workbook Windows executions produce identical bytes for all 15 scenario JSON exports. The original workbook SHA-256 is unchanged. XLSX departures were independently checked against JSON; the recommended output has 102 trips, 14 chains and an operational-review HTML artifact.
+- Independent review has no remaining material findings after the documented fixes and regressions. Validation logs and complete private evidence remain under ignored outputs. These are **local CI-equivalent checks**, not a GitHub Actions run; the existing workflow triggers on main pushes/main-targeted PRs, and no PR was opened or merged.

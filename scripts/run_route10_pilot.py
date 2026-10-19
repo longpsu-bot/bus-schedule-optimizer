@@ -16,9 +16,17 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--joint", action="store_true", help="Run MVP-5B plus unchanged MVP-5A control"
+    )
     args = parser.parse_args(argv)
     try:
-        report = run_pilot(args.input, args.output_dir)
+        if args.joint:
+            from bus_schedule_engine.mvp.route10_joint_pilot import run_joint_pilot
+
+            report = run_joint_pilot(args.input, args.output_dir)
+        else:
+            report = run_pilot(args.input, args.output_dir)
     except (OSError, ValueError, KeyError) as error:
         print(f"Route 10 pilot failed: {error}", file=sys.stderr)
         return 2

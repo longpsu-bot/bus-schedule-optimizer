@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from time import monotonic
+from time import perf_counter as monotonic
 
 from ortools.sat.python import cp_model
 

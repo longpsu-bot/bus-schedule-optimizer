@@ -120,6 +120,51 @@ def demand_fit_diagnostics(departures, buckets):
     }
 
 
+def regime_failures(departures, regimes, settings):
+    """Shared rhythm validation also guards externally supplied pilot incumbents."""
+    failures = []
+    fields = ("start_time", "end_time", "headway_minutes", "gap_count", "planned_departure_count")
+    if any(
+        not isinstance(r, dict)
+        or r.get("direction") not in DIRECTIONS
+        or any(type(r.get(k)) is not int or r[k] < 0 for k in fields)
+        for r in regimes
+    ):
+        return ["REGIME_SCHEMA"]
+    for direction in DIRECTIONS:
+        blocks = [r for r in regimes if r.get("direction") == direction]
+        if regimes and not blocks:
+            failures.append("REGIME_DIRECTION_MISSING")
+        if blocks:
+            gaps = []
+            for r in blocks:
+                if (
+                    r["headway_minutes"] < 1
+                    or type(r["headway_minutes"]) is not int
+                    or r["gap_count"] < settings.get("minimum_internal_gaps", 2)
+                    or r["end_time"] - r["start_time"] < settings.get("minimum_regime_minutes", 30)
+                    or r["end_time"] - r["start_time"] != r["headway_minutes"] * r["gap_count"]
+                ):
+                    failures.append("REGIME_UNIFORMITY_OR_MEANINGFULNESS")
+                gaps.extend([r["headway_minutes"]] * r["gap_count"])
+            actual = [
+                b - a
+                for a, b in zip(departures[direction], departures[direction][1:], strict=False)
+            ]
+            if (
+                gaps != actual
+                or sum(r["planned_departure_count"] for r in blocks) != len(departures[direction])
+                or blocks[0]["start_time"] != departures[direction][0]
+                or blocks[-1]["end_time"] != departures[direction][-1]
+                or any(
+                    a["end_time"] != b["start_time"]
+                    for a, b in zip(blocks, blocks[1:], strict=False)
+                )
+            ):
+                failures.append("REGIME_BOUNDARY_COVERAGE")
+    return failures
+
+
 def evaluate(data, departures, regimes, fleet=None, settings=None):
     settings = settings or {}
     failures = []
@@ -338,37 +383,7 @@ def evaluate(data, departures, regimes, fleet=None, settings=None):
                             ],
                         }
                     )
-    for direction in DIRECTIONS:
-        blocks = [r for r in regimes if r.get("direction") == direction]
-        if regimes and not blocks:
-            failures.append("REGIME_DIRECTION_MISSING")
-        if blocks:
-            gaps = []
-            for r in blocks:
-                if (
-                    r["headway_minutes"] < 1
-                    or type(r["headway_minutes"]) is not int
-                    or r["gap_count"] < settings.get("minimum_internal_gaps", 2)
-                    or r["end_time"] - r["start_time"] < settings.get("minimum_regime_minutes", 30)
-                    or r["end_time"] - r["start_time"] != r["headway_minutes"] * r["gap_count"]
-                ):
-                    failures.append("REGIME_UNIFORMITY_OR_MEANINGFULNESS")
-                gaps.extend([r["headway_minutes"]] * r["gap_count"])
-            actual = [
-                b - a
-                for a, b in zip(departures[direction], departures[direction][1:], strict=False)
-            ]
-            if (
-                gaps != actual
-                or sum(r["planned_departure_count"] for r in blocks) != len(departures[direction])
-                or blocks[0]["start_time"] != departures[direction][0]
-                or blocks[-1]["end_time"] != departures[direction][-1]
-                or any(
-                    a["end_time"] != b["start_time"]
-                    for a, b in zip(blocks, blocks[1:], strict=False)
-                )
-            ):
-                failures.append("REGIME_BOUNDARY_COVERAGE")
+    failures.extend(regime_failures(departures, regimes, settings))
     actual_jumps = [
         abs((c - b) - (b - a))
         for d in DIRECTIONS
@@ -609,6 +624,19 @@ def select_candidate(candidates, settings, baseline=None):
             if baseline is not None and baseline["quality"]["hard_constraints_pass"]
             else None
         )
+    if settings.get("directional_settlements", 1) > 1:
+        from .joint import local_key
+
+        incumbents = [c for c in feasible if c.get("verified_incumbent")]
+        if incumbents:
+            incumbent = min(incumbents, key=local_key)
+            feasible = [
+                c
+                for c in feasible
+                if (c["quality"]["waiting_minutes"] or 0)
+                <= (incumbent["quality"]["waiting_minutes"] or 0) + 1e-9
+                and local_key(c) <= local_key(incumbent)
+            ]
     protected = min(c["quality"]["maximum_protected_gap"] for c in feasible)
     feasible = [c for c in feasible if c["quality"]["maximum_protected_gap"] == protected]
     best_wait = min((c["quality"]["waiting_minutes"] or 0) for c in feasible)
@@ -621,6 +649,11 @@ def select_candidate(candidates, settings, baseline=None):
         for c in feasible
         if (c["quality"]["waiting_minutes"] or 0) <= best_wait + tolerance + 1e-9
     ]
+    if settings.get("directional_settlements", 1) > 1:
+        from .joint import local_key
+
+        local_best = min(local_key(c) for c in equivalent)
+        equivalent = [c for c in equivalent if local_key(c) == local_best]
     return min(
         equivalent,
         key=lambda c: (

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from math import sqrt
-from time import monotonic
+from time import perf_counter as monotonic
 
 from ortools.sat.python import cp_model
 
@@ -147,7 +147,7 @@ def revision_priority(direction, plan, name, changed, feedback):
     return min(priorities, default=fallback)
 
 
-def compile_plan(direction, plan, settings):
+def compile_plan(direction, plan, settings, *, deadline=None):
     """Shared pivots assign every gap to one whole-minute regime, with no transition gap."""
     minimum = settings.get("minimum_internal_gaps", 2)
     duration = direction["last"] - direction["first"]
@@ -194,6 +194,8 @@ def compile_plan(direction, plan, settings):
             "reason": "No settled integer rhythm found in this bounded plan family; revise allocation/boundary/count.",
         }
     selected = tuple(engine.value(h) for h in headways)
+    boundary = selected
+    previews = [selected]
     preview_evidence = {}
     if settings.get("compilation_lookahead", 0):
         # Local import breaks quality -> circulation -> planning's initialization cycle.
@@ -234,11 +236,15 @@ def compile_plan(direction, plan, settings):
             def on_solution_callback(self):
                 nonlocal best, selected
                 values = tuple(self.value(h) for h in headways)
+                previews.append(values)
                 score = rank(values)
                 if score < best:
                     best, selected = score, values
                 self.count += 1
-                if self.count >= settings["compilation_lookahead"]:
+                cap = settings["compilation_lookahead"] - (
+                    settings.get("directional_settlements", 1) > 1
+                )
+                if self.count >= max(0, cap):
                     self.stop_search()
 
         model.clear_objective()
@@ -249,7 +255,14 @@ def compile_plan(direction, plan, settings):
             settings.get("solver_work_limit", 0.2) - engine.response_proto.deterministic_time
         )
         enumeration_status = cp_model.UNKNOWN
-        if remaining > 0 and remaining_work > 0:
+        if (
+            remaining > 0
+            and remaining_work > 0
+            and not (
+                settings.get("directional_settlements", 1) > 1
+                and settings["compilation_lookahead"] <= 1
+            )
+        ):
             lookahead = solver(
                 settings | {"solver_seconds": remaining, "solver_work_limit": remaining_work}
             )
@@ -261,6 +274,39 @@ def compile_plan(direction, plan, settings):
             in (cp_model.OPTIMAL, cp_model.INFEASIBLE),
             "settlement_objective": "explicit protection violations, exact demand waiting, boundary fit",
         }
+    result = _compiled_settlement(direction, plan, selected)
+    result.update(
+        solver_optimal_settlement=status == cp_model.OPTIMAL and not preview_evidence,
+        **preview_evidence,
+    )
+    if settings.get("directional_settlements", 1) > 1:
+        from .joint import retain_settlements
+
+        boundary_times = _compiled_settlement(direction, plan, boundary)["departures"]
+        try:
+            result["settlements"] = retain_settlements(
+                direction,
+                [_compiled_settlement(direction, plan, v) for v in sorted(set(previews))],
+                boundary_times,
+                settings,
+                deadline,
+            )
+        except TimeoutError as error:
+            result.update(
+                status="SOLVER_LIMIT", reason=str(error), directional_scoring_complete=False
+            )
+            return result
+        result["retained_settlements"] = len(result["settlements"])
+        result["distinct_directional_vectors"] = len(set(previews))
+        if not result["settlements"]:
+            result.update(
+                status="NO_LEGAL_SETTLEMENT",
+                reason="No preview satisfies explicit protection; bounded search is incomplete.",
+            )
+    return result
+
+
+def _compiled_settlement(direction, plan, selected):
     departures = [direction["first"]]
     regimes = []
     settled_ends = []
@@ -289,6 +335,4 @@ def compile_plan(direction, plan, settings):
         "departures": departures,
         "regimes": regimes,
         "boundary_settlement": [end - p["end"] for end, p in zip(settled_ends, plan, strict=True)],
-        "solver_optimal_settlement": status == cp_model.OPTIMAL and not preview_evidence,
-        **preview_evidence,
     }
