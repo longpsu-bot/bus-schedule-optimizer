@@ -40,6 +40,7 @@ DEFAULTS = {
     "directional_settlements": 1,
     "pair_evaluation_budget": 160,
     "pairs_per_plan": 16,
+    "fleet_guided": False,
     "wait_absolute_tolerance": 0.10,
     "wait_relative_tolerance": 0.02,
     "wait_materiality_minutes": 0.05,
@@ -51,6 +52,8 @@ def _settings(settings):
     if settings is not None and not isinstance(settings, dict):
         raise ValueError("settings must be an object")
     active = DEFAULTS | (settings or {})
+    if type(active["fleet_guided"]) is not bool:
+        raise ValueError("fleet_guided must be boolean")
     if set(active) - (set(DEFAULTS) | {"maximum_transition_jump"}):
         raise ValueError("unknown planning setting")
     for key in ("candidate_budget", "minimum_internal_gaps", "maximum_regimes"):
@@ -66,6 +69,8 @@ def _settings(settings):
         integer(active[key], key, 1)
     if active["directional_settlements"] > 4:
         raise ValueError("directional_settlements must be <=4")
+    if active["fleet_guided"] and active["directional_settlements"] == 1:
+        raise ValueError("fleet_guided requires joint directional settlements")
     if active["pairs_per_plan"] > 16:
         raise ValueError("pairs_per_plan must be <=16")
     for key in ("solver_seconds", "solver_work_limit", "total_seconds"):
@@ -243,6 +248,39 @@ def run_bundle(
             candidates.append(candidate)
     solver_limited = baseline_incomplete
     quality_feedback = []
+    fleet_sources, fleet_plans = [], set()
+    fleet_evaluations = fleet_improvements = fleet_feasible = 0
+
+    def enqueue_fleet(candidate):
+        nonlocal generated_count
+        from .fleet_feedback import fleet_revisions
+
+        evidence, proposals = fleet_revisions(data, candidate, active, deadline=deadline)
+        fleet_sources.append({"candidate_id": candidate["id"], "evidence": evidence})
+        for proposal in proposals:
+            plan_key = json.dumps(proposal["plans"], sort_keys=True)
+            fleet_plans.add(plan_key)
+            generated.add(plan_key)
+            if plan_key in evaluated:
+                continue
+            generated_count += 1
+            proposal["sequence"] = generated_count
+            if (
+                plan_key not in pending
+                or "fleet_guidance" not in pending[plan_key]
+                or proposal["priority"] < pending[plan_key]["priority"]
+            ):
+                pending[plan_key] = proposal
+        keys = sorted(
+            [k for k, p in pending.items() if "fleet_guidance" in p],
+            key=lambda k: (pending[k]["priority"], pending[k]["sequence"], k),
+        )
+        for k in keys[2 * max_evaluations :]:
+            del pending[k]
+
+    if active["fleet_guided"]:
+        for candidate in incumbent_evidence:
+            enqueue_fleet(candidate)
     while pending:
         if (
             pair_limited
@@ -253,9 +291,20 @@ def run_bundle(
             break
         if initial_key in pending and not evaluated:
             key = initial_key
+        elif (
+            active["fleet_guided"]
+            and result["diagnostics"]["evaluations"] % 3 != 0
+            and any("fleet_guidance" in p for p in pending.values())
+        ):
+            key = min(
+                (k for k, p in pending.items() if "fleet_guidance" in p),
+                key=lambda k: (pending[k]["priority"], pending[k]["sequence"], k),
+            )
         else:
             available = {entry["direction"] for entry in pending.values()}
-            direction = min(available, key=lambda d: (direction_counts[d], DIRECTIONS.index(d)))
+            direction = min(
+                available, key=lambda d: (direction_counts[d], (*DIRECTIONS, "both").index(d))
+            )
             pool = [k for k, entry in pending.items() if entry["direction"] == direction]
             # Every third turn explores a less-used operation; other turns exploit measured feedback.
             diverse = direction_counts[direction] % 3 == 2
@@ -277,6 +326,7 @@ def run_bundle(
             direction_counts[entry["direction"]] += 1
             operation_counts[(entry["direction"], operation.split(":")[1])] += 1
         guided_count += entry["guided"]
+        fleet_evaluations += "fleet_guidance" in entry
         result["diagnostics"]["evaluations"] += 1
         index = result["diagnostics"]["evaluations"]
         feedback = {
@@ -287,7 +337,10 @@ def run_bundle(
             "demand_guided": entry["guided"],
             "revision_priority": list(entry["priority"]),
         }
+        if "fleet_guidance" in entry:
+            feedback["fleet_guidance"] = entry["fleet_guidance"]
         departures, regimes, directional = {}, [], {}
+        fleet_witness = None
         for direction in DIRECTIONS:
             remaining = deadline - monotonic()
             if remaining <= 0:
@@ -410,6 +463,14 @@ def run_bundle(
                 )
                 if joint:
                     record["candidate"] = candidate
+                if "fleet_guidance" in entry:
+                    fleet_feasible += quality["hard_constraints_pass"]
+                    parent_fleet = entry["fleet_guidance"]["parent_required_fleet"]
+                    fleet_improvements += (
+                        quality["required_fleet"] is not None
+                        and parent_fleet is not None
+                        and quality["required_fleet"] < parent_fleet
+                    )
                 pair_records.append(record)
                 solver_limited |= fleet["status"] in {"SOLVER_LIMIT", "MINIMUM_FLEET_UNPROVED"}
                 rejections.update(quality["failures"])
@@ -434,6 +495,16 @@ def run_bundle(
                 )
                 feedback.update({k: v for k, v in representative.items() if k != "candidate"})
                 quality = representative.get("quality")
+                fleet_witness = representative.get("candidate")
+                if fleet_witness is None:
+                    fleet_witness = next(
+                        (
+                            c
+                            for c in pair_cache.values()
+                            if c["id"] == representative.get("cached_candidate_id")
+                        ),
+                        None,
+                    )
                 if quality:
                     reason = (
                         "QUALITY"
@@ -447,14 +518,24 @@ def run_bundle(
                 feedback["pairs"] = pair_records
                 feedback["retained_pair_count"] = len(pairs)
         result["diagnostics"]["feedback"].append(feedback)
+        if active["fleet_guided"] and fleet_witness:
+            enqueue_fleet(fleet_witness)
         for direction in DIRECTIONS:
+            revision_base = (
+                [
+                    {k: v for k, v in block.items() if k != "headway_minutes"}
+                    for block in plans[direction]
+                ]
+                if active["fleet_guided"]
+                else plans[direction]
+            )
             evidence = (
                 [f for f in quality["service_feedback"] if f["direction"] == direction]
                 if quality
                 else reason
             )
             for name, changed in revise_plan(
-                data["directions"][direction], plans[direction], evidence, active
+                data["directions"][direction], revision_base, evidence, active
             ):
                 generated_count += 1
                 revised = plans | {direction: changed}
@@ -463,7 +544,7 @@ def run_bundle(
                 if key in evaluated:
                     continue
                 priority = revision_priority(
-                    data["directions"][direction], plans[direction], name, changed, evidence
+                    data["directions"][direction], revision_base, name, changed, evidence
                 )
                 if quality is None and direction not in departures:
                     priority = (4, -len(departures))
@@ -630,6 +711,15 @@ def run_bundle(
         ),
         global_optimality_proved=False,
     )
+    if active["fleet_guided"]:
+        result["diagnostics"].update(
+            fleet_feedback=fleet_sources,
+            fleet_guided_plans_generated=len(fleet_plans),
+            fleet_guided_evaluations=fleet_evaluations,
+            fleet_guided_feasible_candidates=fleet_feasible,
+            fleet_guided_fleet_improvements=fleet_improvements,
+            fleet_feedback_scope="Residual bridges rank regime revisions; fresh compilation and exact assignment decide feasibility.",
+        )
     if joint:
         selected = result["recommended"]
         result["diagnostics"]["joint_selection"] = {

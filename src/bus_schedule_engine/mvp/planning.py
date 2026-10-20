@@ -155,6 +155,11 @@ def compile_plan(direction, plan, settings, *, deadline=None):
         not plan
         or sum(p["gaps"] for p in plan) != direction["trip_count"] - 1
         or any(p["gaps"] < minimum for p in plan)
+        or any(
+            "headway_minutes" in p
+            and (type(p["headway_minutes"]) is not int or p["headway_minutes"] < 1)
+            for p in plan
+        )
     ):
         return {"status": "INVALID_PLAN", "reason": "gap totals/minimum internal rhythm contract"}
     model = cp_model.CpModel()
@@ -165,6 +170,8 @@ def compile_plan(direction, plan, settings, *, deadline=None):
     target_start = cursor
     for i, p in enumerate(plan):
         h = model.new_int_var(1, duration, f"h{i}")
+        if "headway_minutes" in p:
+            model.add(h == p["headway_minutes"])
         end = model.new_int_var(direction["first"], direction["last"], f"end{i}")
         model.add(end == cursor + h * p["gaps"])
         model.add(h * p["gaps"] >= settings.get("minimum_regime_minutes", 30))

@@ -252,3 +252,55 @@ def test_private_joint_route10_acceptance_and_incumbent_recovery(tmp_path, pairs
             )
     assert (tmp_path / "report_p50/vehicle_chains.json").is_file()
     assert (tmp_path / "report_p50/operational_review.html").is_file()
+
+
+def test_fleet_pilot_cli_requires_frozen_six_pair_joint_control(tmp_path):
+    for flags in (["--fleet-guided"], ["--fleet-guided", "--joint", "--pairs-per-plan", "16"]):
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).resolve().parents[1] / "scripts/run_route10_pilot.py"),
+                "--input",
+                str(tmp_path / "missing.xlsx"),
+                "--output-dir",
+                str(tmp_path / "out"),
+                *flags,
+            ],
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            text=True,
+        )
+        assert result.returncode == 2
+        assert "requires --joint and --pairs-per-plan 6" in result.stderr
+
+
+def test_private_fleet_guided_route10_acceptance(tmp_path):
+    from bus_schedule_engine.mvp.route10_fleet_pilot import run_fleet_pilot
+
+    path = os.environ.get("BUS_MVP5_ROUTE10_WORKBOOK")
+    if not path:
+        pytest.skip("private MVP-5 workbook not configured")
+    report = run_fleet_pilot(Path(path), tmp_path)
+    for row in report["scenarios"]:
+        control, guided = row["control"], row["guided"]
+        assert control["settings"] | {"fleet_guided": True} == guided["settings"]
+        diag = guided["diagnostics"]
+        assert diag["evaluations"] <= 25
+        assert diag["exact_pair_evaluations"] <= 160
+        assert row["audit"]["guided"]["exact_fleets_verified"] == diag["exact_pair_evaluations"]
+        assert diag["fleet_guided_evaluations"] > 0
+        for f in diag["feedback"]:
+            assert len(f.get("pairs", [])) <= 6
+        c = guided["recommended"]
+        if row["id"] == "report_p50":
+            assert c and c["quality"]["required_fleet"] <= 14
+            assert c["quality"]["waiting_minutes"] <= 9.441296
+        if c:
+            assert c["quality"]["hard_constraints_pass"]
+            if "B25" in row["id"]:
+                assert all(
+                    w["pass"] and w["maximum_allowed_gap"] == 25
+                    for w in c["quality"]["protected_windows"]
+                )
+        assert row["infeasibility_proof"] is None
+    assert (tmp_path / "fleet_report.json").is_file()

@@ -25,11 +25,20 @@ def main(argv=None):
         choices=(6, 16),
         help="Joint experiment pair allocation (default: 16; requires --joint)",
     )
+    parser.add_argument(
+        "--fleet-guided", action="store_true", help="Run MVP-6A against the frozen six-pair control"
+    )
     args = parser.parse_args(argv)
+    if args.fleet_guided and (not args.joint or args.pairs_per_plan != 6):
+        parser.error("--fleet-guided requires --joint and --pairs-per-plan 6")
     if args.pairs_per_plan is not None and not args.joint:
         parser.error("--pairs-per-plan requires --joint")
     try:
-        if args.joint:
+        if args.fleet_guided:
+            from bus_schedule_engine.mvp.route10_fleet_pilot import run_fleet_pilot
+
+            report = run_fleet_pilot(args.input, args.output_dir)
+        elif args.joint:
             from bus_schedule_engine.mvp.route10_joint_pilot import run_joint_pilot
 
             report = run_joint_pilot(
