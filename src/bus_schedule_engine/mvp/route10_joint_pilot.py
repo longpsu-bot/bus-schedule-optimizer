@@ -29,8 +29,9 @@ def retained_trials(result):
     ]
 
 
-def run_joint_pilot(path, output_dir):
+def run_joint_pilot(path, output_dir, *, pairs_per_plan=16):
     output_dir = Path(output_dir)
+    joint_settings = JOINT_SETTINGS | {"pairs_per_plan": pairs_per_plan}
     control = run_pilot(path, output_dir / "mvp5a_control")
     incumbent = control["scenarios"][0]["comparison"]["C"]
     if not incumbent or not incumbent["quality"]["hard_constraints_pass"]:
@@ -47,18 +48,19 @@ def run_joint_pilot(path, output_dir):
         "scenarios": [],
         "limitations": control["limitations"][:],
         "incumbent_origin": "Independent MVP-5A p50 rerun; no production timestamp fixture",
+        "joint_settings": joint_settings,
     }
     report["limitations"] = [
         s for s in report["limitations"] if not s.startswith("The compiler ranks")
     ]
     report["limitations"].append(
-        "Joint search retains at most four directional vectors per plan, 16 pairs per plan, 25 plans and 160 distinct exact pair evaluations, plus the separately disclosed baseline and independent acceptance validations. Unexamined directional and plan families remain; no global infeasibility or optimality proof exists."
+        f"Joint search retains at most four directional vectors per plan, {pairs_per_plan} pairs per plan, 25 plans and 160 distinct exact pair evaluations, plus the separately disclosed baseline and independent acceptance validations. Unexamined directional and plan families remain; no global infeasibility or optimality proof exists."
     )
     for old in control["scenarios"]:
         data = old["bundle"]
         seed = {k: incumbent[k] for k in ("departures", "regimes")}
         started = perf_counter()
-        result = run_bundle(data, JOINT_SETTINGS, incumbents=[seed])
+        result = run_bundle(data, joint_settings, incumbents=[seed])
         elapsed = perf_counter() - started
         trials = retained_trials(result)
         selected = result["recommended"]

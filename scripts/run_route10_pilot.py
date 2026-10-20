@@ -19,12 +19,22 @@ def main(argv=None):
     parser.add_argument(
         "--joint", action="store_true", help="Run MVP-5B plus unchanged MVP-5A control"
     )
+    parser.add_argument(
+        "--pairs-per-plan",
+        type=int,
+        choices=(6, 16),
+        help="Joint experiment pair allocation (default: 16; requires --joint)",
+    )
     args = parser.parse_args(argv)
+    if args.pairs_per_plan is not None and not args.joint:
+        parser.error("--pairs-per-plan requires --joint")
     try:
         if args.joint:
             from bus_schedule_engine.mvp.route10_joint_pilot import run_joint_pilot
 
-            report = run_joint_pilot(args.input, args.output_dir)
+            report = run_joint_pilot(
+                args.input, args.output_dir, pairs_per_plan=args.pairs_per_plan or 16
+            )
         else:
             report = run_pilot(args.input, args.output_dir)
     except (OSError, ValueError, KeyError) as error:

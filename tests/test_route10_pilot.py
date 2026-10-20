@@ -1,5 +1,7 @@
 import json
 import os
+import subprocess
+import sys
 from copy import deepcopy
 from pathlib import Path
 
@@ -193,23 +195,47 @@ def test_private_route10_pilot_independent_evaluation(tmp_path):
     )
 
 
-def test_private_joint_route10_acceptance_and_incumbent_recovery(tmp_path):
+def test_pilot_cli_pair_limit_requires_joint(tmp_path):
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(Path(__file__).resolve().parents[1] / "scripts/run_route10_pilot.py"),
+            "--input",
+            str(tmp_path / "missing.xlsx"),
+            "--output-dir",
+            str(tmp_path / "output"),
+            "--pairs-per-plan",
+            "6",
+        ],
+        capture_output=True,
+        stdin=subprocess.DEVNULL,
+        text=True,
+    )
+    assert result.returncode == 2
+    assert "requires --joint" in result.stderr
+    assert not (tmp_path / "output").exists()
+
+
+@pytest.mark.parametrize("pairs_per_plan", [16, 6])
+def test_private_joint_route10_acceptance_and_incumbent_recovery(tmp_path, pairs_per_plan):
     from bus_schedule_engine.mvp.route10_joint_pilot import run_joint_pilot
 
     path = os.environ.get("BUS_MVP5_ROUTE10_WORKBOOK")
     if not path:
         pytest.skip("private MVP-5 workbook not configured")
-    report = run_joint_pilot(Path(path), tmp_path)
+    report = run_joint_pilot(Path(path), tmp_path, pairs_per_plan=pairs_per_plan)
     primary = report["scenarios"][0]
     c = primary["joint"]["recommended"]
     assert c["quality"]["required_fleet"] <= 14
     assert c["quality"]["waiting_minutes"] <= 9.441296
     for row in report["scenarios"]:
+        assert row["joint"]["settings"]["pairs_per_plan"] == pairs_per_plan
         diag = row["joint"]["diagnostics"]
         assert diag["evaluations"] <= 25
         assert diag["exact_pair_evaluations"] <= 160
         assert row["infeasibility_proof"] is None
         assert len(row["trial_fleets"]) == diag["exact_pair_evaluations"]
+        assert all(len(f.get("pairs", [])) <= pairs_per_plan for f in diag["feedback"])
         assert row["revalidated_incumbent"]["quality"]["required_fleet"] == (
             15 if row["id"] == "report_p75" else 14
         )
