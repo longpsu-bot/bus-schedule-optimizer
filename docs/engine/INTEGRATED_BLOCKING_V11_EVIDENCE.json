@@ -1,0 +1,2334 @@
+{
+  "analytical_bound_in_solver": false,
+  "cases": {
+    "p50_480": {
+      "after": {
+        "constraint_sha256": "04a998ea405fe03a0717e4d597b017e27c40a1e43fe4659d9f6a38580b50c008",
+        "events": [
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 52,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "legacy_greedy",
+            "total_duty": 13591,
+            "witness_sha256": "e328d58db5e6b1ec6f4b7893edfcf82df2d529f8ed1cca71e68c07ec6f101000"
+          },
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 43,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "rest_aware_seed",
+            "total_duty": 14372,
+            "witness_sha256": "b50ecd4a022d9eeca1c7e45ac3a41f1a627985e996458fe4350b0c9a08ddd7f5"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": true,
+            "fleet": 43,
+            "fleet_improved": false,
+            "rank_improved": false,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 14372,
+            "witness_sha256": "b50ecd4a022d9eeca1c7e45ac3a41f1a627985e996458fe4350b0c9a08ddd7f5"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 42,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15384,
+            "witness_sha256": "cbcc1de9fb5a4f91752ade8b1e7f941e365db5eb1d9cea951043ec49c7c9b40c"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 41,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15446,
+            "witness_sha256": "5da434b7df8539dd70ab6df081c5c6f088f9c25c2c8e0dbe2e0ea0558f63e3c6"
+          }
+        ],
+        "final_witness_sha256": "5da434b7df8539dd70ab6df081c5c6f088f9c25c2c8e0dbe2e0ea0558f63e3c6",
+        "metrics": {
+          "absolute_gap": 15,
+          "coverage": {
+            "dinner": {
+              "covered_required": 11,
+              "required": 11
+            },
+            "general_rest": {
+              "covered_required": 24,
+              "required": 24
+            },
+            "lunch": {
+              "covered_required": 10,
+              "required": 10
+            }
+          },
+          "deterministic_seconds": 10.000004240061196,
+          "duties": 41,
+          "initial_AB": {
+            "A": 19,
+            "B": 22
+          },
+          "lower": 26,
+          "max_continuous_driving": 234,
+          "native_status": "FEASIBLE",
+          "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+          "upper": 41,
+          "wall_seconds": 16.140910599999188
+        },
+        "policy_sha256": "77abdfd8d23cae06e2e59e670552eecf2cc91804adc8fdb4716ba98f95521d4a",
+        "raw_record_sha256": "a6e755105fa7eae9d739948a3e3dbc735a9240109a5487998d829689d12df349",
+        "request_sha256": "f978d495a49b59e266872668103434f42c89561ab88037114569d1305c0aed8d",
+        "runtime_sha256": "73915725eb3410d9c8aca57861ce6ff0b5eea9549176cc1bd98e66cf2bd46c38",
+        "source_code_sha256": "0b7dddf6fb96b3d584c5c3822c08ed87958285e0d18d25ea062e97038edbd280"
+      },
+      "after_certified_gap": 13,
+      "after_certified_lower": 28,
+      "analytical_certificate": {
+        "denominator": 515,
+        "driving_workload": 11010,
+        "lower_bound": 28,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 88,
+        "numerator": 14070,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "before": {
+        "constraint_sha256": "04a998ea405fe03a0717e4d597b017e27c40a1e43fe4659d9f6a38580b50c008",
+        "events": [
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 52,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "legacy_greedy",
+            "total_duty": 13591,
+            "witness_sha256": "e328d58db5e6b1ec6f4b7893edfcf82df2d529f8ed1cca71e68c07ec6f101000"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": true,
+            "fleet": 52,
+            "fleet_improved": false,
+            "rank_improved": false,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 13591,
+            "witness_sha256": "e328d58db5e6b1ec6f4b7893edfcf82df2d529f8ed1cca71e68c07ec6f101000"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 51,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15400,
+            "witness_sha256": "1dd3ff4905e174e449e61b8f5c0102469340e589aa8669e4182274956fe5a21c"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 50,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15581,
+            "witness_sha256": "f5c7facb0da71314d999e8a5c969786105c612d471e2f3420dbf8fc3a86a26da"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 49,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15911,
+            "witness_sha256": "78d170faac5d4c6744e6a1649d0b1a30f595386e232b487c95d18460e264279c"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 48,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15945,
+            "witness_sha256": "249bd55569d872680f7fa461c86a63454e9067dd59f77ece97b36b10429421bd"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 47,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15745,
+            "witness_sha256": "2b02ebd677578399e56489dfc327376b09f0da1de0d5310fe5e5f7114dc63112"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 46,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15651,
+            "witness_sha256": "16a59a58bacbc844ac38c12020a1f6f55b4dad9c3ee0eed73b08498533778c72"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 45,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15383,
+            "witness_sha256": "8a833d814cec658caa1389bb2532f4c8752c3949b2349adce70e278cb31c60e1"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 44,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15605,
+            "witness_sha256": "3c6bd1547be61fc011b76bce47b5fc618c5549b6339ecdbd26ab9bcfa0703ac6"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 43,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15437,
+            "witness_sha256": "6016fe43d81662cda91f88c2f3234fb7b2f8115f9a2272ed64de5ad4f9456752"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 42,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15056,
+            "witness_sha256": "b34c4b4e4b4afd1a99e2593e4bf91aed86c7104fa2874dcafed18731b583a072"
+          },
+          {
+            "deterministic_seconds": 0.03999524999999863,
+            "first_cp_sat": false,
+            "fleet": 41,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 26.0,
+            "source": "cp_sat",
+            "total_duty": 15204,
+            "witness_sha256": "9172ce1c2f77a60344c84c9d4ea3ec28bd21b0a121930e9d75f2b69bc6d0fde8"
+          }
+        ],
+        "final_witness_sha256": "9172ce1c2f77a60344c84c9d4ea3ec28bd21b0a121930e9d75f2b69bc6d0fde8",
+        "metrics": {
+          "absolute_gap": 15,
+          "coverage": {
+            "dinner": {
+              "covered_required": 7,
+              "required": 7
+            },
+            "general_rest": {
+              "covered_required": 24,
+              "required": 24
+            },
+            "lunch": {
+              "covered_required": 14,
+              "required": 14
+            }
+          },
+          "deterministic_seconds": 10.000002244154777,
+          "duties": 41,
+          "initial_AB": {
+            "A": 20,
+            "B": 21
+          },
+          "lower": 26,
+          "max_continuous_driving": 234,
+          "native_status": "FEASIBLE",
+          "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+          "upper": 41,
+          "wall_seconds": 17.633104900000035
+        },
+        "policy_sha256": "77abdfd8d23cae06e2e59e670552eecf2cc91804adc8fdb4716ba98f95521d4a",
+        "raw_record_sha256": "2f7a0e0fce4dbf193980fc87c67b3733d66188fc25a56b404e6b61dca007690e",
+        "request_sha256": "f978d495a49b59e266872668103434f42c89561ab88037114569d1305c0aed8d",
+        "runtime_sha256": "73915725eb3410d9c8aca57861ce6ff0b5eea9549176cc1bd98e66cf2bd46c38",
+        "source_code_sha256": "d355ee0ff62264f1ee7719819f6d31c17fc8c710cf5832b72ac21dae97696f0d"
+      }
+    },
+    "p50_600": {
+      "after": {
+        "constraint_sha256": "cbd520b36a6196b1585485e69951bfd707dc4a605ac8ea99b7a305beb3e56561",
+        "events": [
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 52,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "legacy_greedy",
+            "total_duty": 13591,
+            "witness_sha256": "e328d58db5e6b1ec6f4b7893edfcf82df2d529f8ed1cca71e68c07ec6f101000"
+          },
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 41,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "rest_aware_seed",
+            "total_duty": 17354,
+            "witness_sha256": "0c0dcaf6f14d2eaf14d8ee91a1cb791372ca71bfdfa22090168d534d3fc8eda4"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": true,
+            "fleet": 41,
+            "fleet_improved": false,
+            "rank_improved": false,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 17354,
+            "witness_sha256": "0c0dcaf6f14d2eaf14d8ee91a1cb791372ca71bfdfa22090168d534d3fc8eda4"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 40,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 16791,
+            "witness_sha256": "a5b70d8ff1454cd480173aec0717c6f6e1c7eb79110c53ea89a70d8bfa58c68f"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 39,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 17141,
+            "witness_sha256": "f4e20b3f46de57084e3680e22e4c63d4d10d075f4db6411029f4033d310eb944"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 38,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 17021,
+            "witness_sha256": "af34199d9ed97eaf3d718b1e421dd4ba5d90b6be0171da87e225ab5dbde74528"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 37,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 16736,
+            "witness_sha256": "fabc3634c4ce5ffde7d9125a08b46f30a0ddfe3ee96ed91f807d63ee20186fb9"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 36,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 16685,
+            "witness_sha256": "f35d1c6f5e79ed22e06fb7cffc700f5b821edf18bb995ef5258f9a8c24b0abfc"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 35,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 16167,
+            "witness_sha256": "572a6f43dc79c0216bde3315c4d63378eff351068f795c82090bafee86cb9941"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 34,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 15742,
+            "witness_sha256": "62ecc8ac3c7eb926ae9c7d61adb51ab3c4d500f7bce288ec985988f5e14dfd35"
+          }
+        ],
+        "final_witness_sha256": "62ecc8ac3c7eb926ae9c7d61adb51ab3c4d500f7bce288ec985988f5e14dfd35",
+        "metrics": {
+          "absolute_gap": 13,
+          "coverage": {
+            "dinner": {
+              "covered_required": 7,
+              "required": 7
+            },
+            "general_rest": {
+              "covered_required": 23,
+              "required": 23
+            },
+            "lunch": {
+              "covered_required": 20,
+              "required": 20
+            }
+          },
+          "deterministic_seconds": 10.000046729235581,
+          "duties": 34,
+          "initial_AB": {
+            "A": 21,
+            "B": 13
+          },
+          "lower": 21,
+          "max_continuous_driving": 234,
+          "native_status": "FEASIBLE",
+          "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+          "upper": 34,
+          "wall_seconds": 24.417685999998866
+        },
+        "policy_sha256": "5739ccd283f68454b47351e80d73a9ffa6a2b99f065751337bed937fdfbb8486",
+        "raw_record_sha256": "6bfe935a05b33afbfd11d5c4c0eaaadff1d68ff38be60aaff2cd693a14cccf49",
+        "request_sha256": "de3078a255eae66b5555fd07d0e268c40daeb70af14d8e06bef15948ae4c767d",
+        "runtime_sha256": "73915725eb3410d9c8aca57861ce6ff0b5eea9549176cc1bd98e66cf2bd46c38",
+        "source_code_sha256": "0b7dddf6fb96b3d584c5c3822c08ed87958285e0d18d25ea062e97038edbd280"
+      },
+      "after_certified_gap": 11,
+      "after_certified_lower": 23,
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11010,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 88,
+        "numerator": 14070,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "before": {
+        "constraint_sha256": "cbd520b36a6196b1585485e69951bfd707dc4a605ac8ea99b7a305beb3e56561",
+        "events": [
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 52,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "legacy_greedy",
+            "total_duty": 13591,
+            "witness_sha256": "e328d58db5e6b1ec6f4b7893edfcf82df2d529f8ed1cca71e68c07ec6f101000"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": true,
+            "fleet": 52,
+            "fleet_improved": false,
+            "rank_improved": false,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 13591,
+            "witness_sha256": "c9c01dd127e11307ea1956e4dcc1122d8a564cc3affde86ff791ccafaa45dfb1"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 51,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 13666,
+            "witness_sha256": "e45229d6502dcf774ea37ec3c71fbcaec24def837a275b7f456062f1e25e5a3b"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 50,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 13866,
+            "witness_sha256": "7bffa4cb3443effb62641bd9b67718160a53912a5b66919288bfc4d8518d2d51"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 49,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 14360,
+            "witness_sha256": "b445eb0d203bd053f3d448661863c0b4759dfbefe6f6008718f3c1ba1f90ccbc"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 48,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 14406,
+            "witness_sha256": "764944cbea05f8ffe24c671e9089643e6fee7cf08729aa5cde6c5672f84b09d9"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 47,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 14657,
+            "witness_sha256": "617efee620ccb20a016507161bb441d722cecd840259d8c5a30927817833907b"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 46,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 14529,
+            "witness_sha256": "326c3b99b0750d89961984092690d735bb26c430148d33a2c0d11e8d8c99aec6"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 45,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 15143,
+            "witness_sha256": "e05db308151be9792dc74cad06fdddc566e7f24aae5f96eb9240010762c4158a"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 44,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 15351,
+            "witness_sha256": "22e5e8424f4cadeaf5dbf1d6880f223acbee205d090331abed08330482600846"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 43,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 15353,
+            "witness_sha256": "f4827714c91732dbec0457edb07160f51bcb4f9a9ed3dc65283598d42c5dd443"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 42,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 15534,
+            "witness_sha256": "e696d9a8d01b5085bd85f956f4b6fc21945533b6c80093c4af23f20b8b120193"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 41,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 16151,
+            "witness_sha256": "07f08ed29a2e864dce1538d8244f4ee95884642f4827a5a896c1153b1d3118ab"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 40,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 15913,
+            "witness_sha256": "cbc234e29b5f65922e2aa8d829d1e29d284876f036a09cd3332a47be9d2602d1"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 39,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 15963,
+            "witness_sha256": "2ddc594f5c2e3b50e6027bce322480c2252f512e31261a4a8eaf6a3740238192"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 38,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 15999,
+            "witness_sha256": "d5beaf9af7ce1dd4847c85ee26ad7443d7e11e762aade14c251ae3494b84f4ac"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 37,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 15891,
+            "witness_sha256": "06c5753f067951e23f62c9a72507a338cc93b778d499a239bfc44969b523b4b8"
+          },
+          {
+            "deterministic_seconds": 0.05705884399999612,
+            "first_cp_sat": false,
+            "fleet": 36,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 21.0,
+            "source": "cp_sat",
+            "total_duty": 15997,
+            "witness_sha256": "85df461b51c1914cd718ef68bc0cc99135bcfde5fba12acad0c31322e849c56e"
+          }
+        ],
+        "final_witness_sha256": "85df461b51c1914cd718ef68bc0cc99135bcfde5fba12acad0c31322e849c56e",
+        "metrics": {
+          "absolute_gap": 15,
+          "coverage": {
+            "dinner": {
+              "covered_required": 6,
+              "required": 6
+            },
+            "general_rest": {
+              "covered_required": 24,
+              "required": 24
+            },
+            "lunch": {
+              "covered_required": 20,
+              "required": 20
+            }
+          },
+          "deterministic_seconds": 10.004335202864077,
+          "duties": 36,
+          "initial_AB": {
+            "A": 20,
+            "B": 16
+          },
+          "lower": 21,
+          "max_continuous_driving": 234,
+          "native_status": "FEASIBLE",
+          "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+          "upper": 36,
+          "wall_seconds": 41.56841920000079
+        },
+        "policy_sha256": "5739ccd283f68454b47351e80d73a9ffa6a2b99f065751337bed937fdfbb8486",
+        "raw_record_sha256": "ae7fb31fc9ad44a232b244ad834a31173bbcb362242eb7b67062d03f22285a88",
+        "request_sha256": "de3078a255eae66b5555fd07d0e268c40daeb70af14d8e06bef15948ae4c767d",
+        "runtime_sha256": "73915725eb3410d9c8aca57861ce6ff0b5eea9549176cc1bd98e66cf2bd46c38",
+        "source_code_sha256": "d355ee0ff62264f1ee7719819f6d31c17fc8c710cf5832b72ac21dae97696f0d"
+      }
+    },
+    "p75_480": {
+      "after": {
+        "constraint_sha256": "09388be3b0305715ec42b146c187dd6b983590439d57b3b797122aab60a7957f",
+        "events": [
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 55,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "legacy_greedy",
+            "total_duty": 14404,
+            "witness_sha256": "629a89f0f178a628b64cc63e229897ddb4bce6aea655f7ee428a5cfbb8fed781"
+          },
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 43,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "rest_aware_seed",
+            "total_duty": 14619,
+            "witness_sha256": "2b7284ae4b1c18f181c3313793f2c28faed965483aa202cbe69bc784c36f549c"
+          },
+          {
+            "deterministic_seconds": 0.038405758999998284,
+            "first_cp_sat": true,
+            "fleet": 43,
+            "fleet_improved": false,
+            "rank_improved": false,
+            "solver_lower_bound": 27.0,
+            "source": "cp_sat",
+            "total_duty": 14619,
+            "witness_sha256": "2b7284ae4b1c18f181c3313793f2c28faed965483aa202cbe69bc784c36f549c"
+          },
+          {
+            "deterministic_seconds": 0.038405758999998284,
+            "first_cp_sat": false,
+            "fleet": 42,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 27.0,
+            "source": "cp_sat",
+            "total_duty": 14654,
+            "witness_sha256": "3174696b1c6a3bf5db379d9fc1f03be09087c3437488c89c49d834300d49a1f2"
+          }
+        ],
+        "final_witness_sha256": "3174696b1c6a3bf5db379d9fc1f03be09087c3437488c89c49d834300d49a1f2",
+        "metrics": {
+          "absolute_gap": 15,
+          "coverage": {
+            "dinner": {
+              "covered_required": 2,
+              "required": 2
+            },
+            "general_rest": {
+              "covered_required": 18,
+              "required": 18
+            },
+            "lunch": {
+              "covered_required": 13,
+              "required": 13
+            }
+          },
+          "deterministic_seconds": 10.00006915440672,
+          "duties": 42,
+          "initial_AB": {
+            "A": 25,
+            "B": 17
+          },
+          "lower": 27,
+          "max_continuous_driving": 236,
+          "native_status": "FEASIBLE",
+          "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+          "upper": 42,
+          "wall_seconds": 17.330639600000723
+        },
+        "policy_sha256": "abc2ed89a3bc2acf69b9306c7e4a7bc5b9b14c9b964515b2597d3810780e6a25",
+        "raw_record_sha256": "8d9390c8d5cb9df76d82e83b25560299062afc495f4797e36263b09584b509f5",
+        "request_sha256": "dd7a9630dcfce3e2e10d272b4ed0bcdf8e7ca1c763601e11c729b92172e600fe",
+        "runtime_sha256": "6dd2bb2107df02b9e08476382662c0cce36ec077db1efdea2f2f77fb775544c9",
+        "source_code_sha256": "0b7dddf6fb96b3d584c5c3822c08ed87958285e0d18d25ea062e97038edbd280"
+      },
+      "after_certified_gap": 13,
+      "after_certified_lower": 29,
+      "analytical_certificate": {
+        "denominator": 515,
+        "driving_workload": 11376,
+        "lower_bound": 29,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 89,
+        "numerator": 14436,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "before": {
+        "constraint_sha256": "09388be3b0305715ec42b146c187dd6b983590439d57b3b797122aab60a7957f",
+        "events": [
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 55,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "legacy_greedy",
+            "total_duty": 14404,
+            "witness_sha256": "629a89f0f178a628b64cc63e229897ddb4bce6aea655f7ee428a5cfbb8fed781"
+          },
+          {
+            "deterministic_seconds": 0.038405758999998284,
+            "first_cp_sat": true,
+            "fleet": 55,
+            "fleet_improved": false,
+            "rank_improved": false,
+            "solver_lower_bound": 27.0,
+            "source": "cp_sat",
+            "total_duty": 14404,
+            "witness_sha256": "629a89f0f178a628b64cc63e229897ddb4bce6aea655f7ee428a5cfbb8fed781"
+          },
+          {
+            "deterministic_seconds": 0.038405758999998284,
+            "first_cp_sat": false,
+            "fleet": 54,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 27.0,
+            "source": "cp_sat",
+            "total_duty": 14587,
+            "witness_sha256": "e801ab274819f7dfae7daaf71a128c3c5731812980e36d0cc64be1bbb21577be"
+          },
+          {
+            "deterministic_seconds": 0.038405758999998284,
+            "first_cp_sat": false,
+            "fleet": 52,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 27.0,
+            "source": "cp_sat",
+            "total_duty": 15176,
+            "witness_sha256": "209d4e59d053df4d5e7c6e7d7545e58ea5230c3026fa7451ab6f902739cdf425"
+          },
+          {
+            "deterministic_seconds": 0.038405758999998284,
+            "first_cp_sat": false,
+            "fleet": 51,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 27.0,
+            "source": "cp_sat",
+            "total_duty": 15003,
+            "witness_sha256": "0c93dfe96eb9d5b5ec8e938fd923117e038362793beacfbae004928a452190e3"
+          },
+          {
+            "deterministic_seconds": 0.038405758999998284,
+            "first_cp_sat": false,
+            "fleet": 50,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 27.0,
+            "source": "cp_sat",
+            "total_duty": 14788,
+            "witness_sha256": "6ceb00f474839da928ccb94440e858cf752fc0e58494a1c1cf473a91e9bf82fb"
+          },
+          {
+            "deterministic_seconds": 0.038405758999998284,
+            "first_cp_sat": false,
+            "fleet": 49,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 27.0,
+            "source": "cp_sat",
+            "total_duty": 14576,
+            "witness_sha256": "ec8716e65497605dd46bb34e837600fbe8b5b09ae5f369f115ec675b3a480f50"
+          },
+          {
+            "deterministic_seconds": 0.038405758999998284,
+            "first_cp_sat": false,
+            "fleet": 46,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 27.0,
+            "source": "cp_sat",
+            "total_duty": 14713,
+            "witness_sha256": "9ba71168cf70604a780154dcd8a2b2b16f73c168ff3cfa17f41da36fbb715078"
+          },
+          {
+            "deterministic_seconds": 0.038405758999998284,
+            "first_cp_sat": false,
+            "fleet": 45,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 27.0,
+            "source": "cp_sat",
+            "total_duty": 15945,
+            "witness_sha256": "f80ca4c685fd0e3ab2a36fdc89c6e0e5da1eb684e274d40d2fb97fcc10f6551d"
+          },
+          {
+            "deterministic_seconds": 0.038405758999998284,
+            "first_cp_sat": false,
+            "fleet": 44,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 27.0,
+            "source": "cp_sat",
+            "total_duty": 15658,
+            "witness_sha256": "053300616dee41d2893fd3e0d4c2eb8343a427a0411f142b7d9bc9bc02c8b96d"
+          }
+        ],
+        "final_witness_sha256": "053300616dee41d2893fd3e0d4c2eb8343a427a0411f142b7d9bc9bc02c8b96d",
+        "metrics": {
+          "absolute_gap": 17,
+          "coverage": {
+            "dinner": {
+              "covered_required": 8,
+              "required": 8
+            },
+            "general_rest": {
+              "covered_required": 20,
+              "required": 20
+            },
+            "lunch": {
+              "covered_required": 8,
+              "required": 8
+            }
+          },
+          "deterministic_seconds": 10.000002765413884,
+          "duties": 44,
+          "initial_AB": {
+            "A": 22,
+            "B": 22
+          },
+          "lower": 27,
+          "max_continuous_driving": 236,
+          "native_status": "FEASIBLE",
+          "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+          "upper": 44,
+          "wall_seconds": 15.621521200000643
+        },
+        "policy_sha256": "abc2ed89a3bc2acf69b9306c7e4a7bc5b9b14c9b964515b2597d3810780e6a25",
+        "raw_record_sha256": "96fb436983f2c55dd433f9a7fa5a75ebe4391de5c5a80620aeaac1b0e71c7603",
+        "request_sha256": "dd7a9630dcfce3e2e10d272b4ed0bcdf8e7ca1c763601e11c729b92172e600fe",
+        "runtime_sha256": "6dd2bb2107df02b9e08476382662c0cce36ec077db1efdea2f2f77fb775544c9",
+        "source_code_sha256": "d355ee0ff62264f1ee7719819f6d31c17fc8c710cf5832b72ac21dae97696f0d"
+      }
+    },
+    "p75_600": {
+      "after": {
+        "constraint_sha256": "b4fecd45cfda0b0f0fcf20dff9a5de06c3fa5f78097fc4c40e63ae5bbf71d22f",
+        "events": [
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 55,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "legacy_greedy",
+            "total_duty": 14404,
+            "witness_sha256": "629a89f0f178a628b64cc63e229897ddb4bce6aea655f7ee428a5cfbb8fed781"
+          },
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 43,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "rest_aware_seed",
+            "total_duty": 17429,
+            "witness_sha256": "57400e02a5c631903e0c48d5bab4eb10d8a2edf40446ab9a0aade27796bb6094"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": true,
+            "fleet": 43,
+            "fleet_improved": false,
+            "rank_improved": false,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 17429,
+            "witness_sha256": "57400e02a5c631903e0c48d5bab4eb10d8a2edf40446ab9a0aade27796bb6094"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 42,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 17592,
+            "witness_sha256": "7f25916cb00594c42e553e5e02bd4ecad3ecc8901bdfdeb801ab996b797b0811"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 41,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 17185,
+            "witness_sha256": "73d92ccfa96e0524f4acdf31a7f07f3c35e85f863e966a8f9190f2c46614e55a"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 40,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16794,
+            "witness_sha256": "95c425b6b70aa87c5f6530cad20981c1bfac2ae0ede7e2ff079cd8e5eafe4c9a"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 39,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16295,
+            "witness_sha256": "712dcb030f0217edc9dbe8aa5bef62da8f6a2eb4f786f2437b55eb7e896f8299"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 38,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16220,
+            "witness_sha256": "1f829fb608d11d9fdc1d9e59386ddc8ac52c9c4c3fdb6530e276c5b4b0d4c6e7"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 37,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16228,
+            "witness_sha256": "01e0b2ee8320b1100e5150e27def096b2a1eee11d79e967a2b2926dc006ddfce"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 36,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 15895,
+            "witness_sha256": "ef84b9e240a8729c229a189cc2c23710dce94973915ab6699b144b1e22d388cb"
+          }
+        ],
+        "final_witness_sha256": "ef84b9e240a8729c229a189cc2c23710dce94973915ab6699b144b1e22d388cb",
+        "metrics": {
+          "absolute_gap": 14,
+          "coverage": {
+            "dinner": {
+              "covered_required": 6,
+              "required": 6
+            },
+            "general_rest": {
+              "covered_required": 23,
+              "required": 23
+            },
+            "lunch": {
+              "covered_required": 17,
+              "required": 17
+            }
+          },
+          "deterministic_seconds": 10.00010258429664,
+          "duties": 36,
+          "initial_AB": {
+            "A": 21,
+            "B": 15
+          },
+          "lower": 22,
+          "max_continuous_driving": 236,
+          "native_status": "FEASIBLE",
+          "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+          "upper": 36,
+          "wall_seconds": 17.363326800001232
+        },
+        "policy_sha256": "33abc7f733b7f89d85486c3c5181b96ba2b0983325801a99a8ebacba9de6d164",
+        "raw_record_sha256": "6db0e28e861e1cd2a86b5989324a1a7df1156f83228584133894d745f72fd49a",
+        "request_sha256": "80627654f32a2a234a3e9f0e14c6d5ac7df93591d1bb71efa4fd7d4bdaed73b1",
+        "runtime_sha256": "6dd2bb2107df02b9e08476382662c0cce36ec077db1efdea2f2f77fb775544c9",
+        "source_code_sha256": "0b7dddf6fb96b3d584c5c3822c08ed87958285e0d18d25ea062e97038edbd280"
+      },
+      "after_certified_gap": 13,
+      "after_certified_lower": 23,
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11376,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 89,
+        "numerator": 14436,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "before": {
+        "constraint_sha256": "b4fecd45cfda0b0f0fcf20dff9a5de06c3fa5f78097fc4c40e63ae5bbf71d22f",
+        "events": [
+          {
+            "deterministic_seconds": 0,
+            "first_cp_sat": false,
+            "fleet": 55,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": null,
+            "source": "legacy_greedy",
+            "total_duty": 14404,
+            "witness_sha256": "629a89f0f178a628b64cc63e229897ddb4bce6aea655f7ee428a5cfbb8fed781"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": true,
+            "fleet": 55,
+            "fleet_improved": false,
+            "rank_improved": false,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 14404,
+            "witness_sha256": "2be5075d91601dbdbea848df88f00c63f8a1c2e669d3ddc28717dc891e0a3165"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 54,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 14932,
+            "witness_sha256": "093833dd12797040029bcd161397314bfb14f12f42e4ef80078e231ee28a4610"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 53,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16284,
+            "witness_sha256": "8516002c0b31f8b6c3b7d8b9eff2e934f25be531c565a23455416dc18fc45e89"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 51,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16412,
+            "witness_sha256": "d81e5e69e3a7338650861e721ac96d532af4ed50c76288d7cec95c6658fd018f"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 50,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16670,
+            "witness_sha256": "6a1ff39480b70c52e59d1600c0b66cbca92eb07a70f282bcfda1114ebdf1ccc5"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 49,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16655,
+            "witness_sha256": "3063ba6b6286cd83402f9daa09e9c58d15fe59289157a14d34b07116b0fb9cb7"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 48,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16652,
+            "witness_sha256": "6251fbafeca75e94bae1fe015e86eade32496297988d9fe72c964b40da8a2b99"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 47,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16643,
+            "witness_sha256": "9b3224c8b1a7379491ae02788a13d35b3656eb053ebc36cc0f08a44fe75b7f86"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 46,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16702,
+            "witness_sha256": "1d6ec587767d62e179fc3d24db14d64f8e859d810c1311337f4f1d4bd49c9c2e"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 45,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16558,
+            "witness_sha256": "3f03c93a52471e2f3730ebd6f54a34d89e20c4fea100aef8dc7c1c723ca9f3bc"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 44,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16282,
+            "witness_sha256": "0a0eafada1b69110c4925b10f310a191725a5cfa01af5195ead0ca9ac7231631"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 43,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16464,
+            "witness_sha256": "6862d552b1ca5e734f02432810b38d8dc0a80cfb0ac6e848463ac4b20badf612"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 42,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16885,
+            "witness_sha256": "a433cbfffb62c300af7054c1789172ddeb46144948b63ef74a77b25dbc699f6c"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 41,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16834,
+            "witness_sha256": "2fe83fcb7bb45d8f06b3818be0e014be3e5c681b9603567c77509d6551ff6883"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 40,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16796,
+            "witness_sha256": "896bcb2e3a00f612ddb77f5078db276888d6c421bd613a899bb93eae3934bd69"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 39,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 17285,
+            "witness_sha256": "fe6426a313084b121bf400c9cf221e306989fd3d340886cdd2d80226ae4f2dbc"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 38,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 17458,
+            "witness_sha256": "fcc596047984e26642e9f3a8cb0c55a239be9fe7cb571fdaf42de76ac351f5ad"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 37,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 17183,
+            "witness_sha256": "9e2ab112362b9f619c0c0365232fde09e2a7c060b86f942efd8f7cb5f30de282"
+          },
+          {
+            "deterministic_seconds": 0.05437236199999541,
+            "first_cp_sat": false,
+            "fleet": 36,
+            "fleet_improved": true,
+            "rank_improved": true,
+            "solver_lower_bound": 22.0,
+            "source": "cp_sat",
+            "total_duty": 16716,
+            "witness_sha256": "14e3595f8907bff00eb435da755a2e5a2aa2651fc657139d8717a8e74fcb150f"
+          }
+        ],
+        "final_witness_sha256": "14e3595f8907bff00eb435da755a2e5a2aa2651fc657139d8717a8e74fcb150f",
+        "metrics": {
+          "absolute_gap": 14,
+          "coverage": {
+            "dinner": {
+              "covered_required": 9,
+              "required": 9
+            },
+            "general_rest": {
+              "covered_required": 25,
+              "required": 25
+            },
+            "lunch": {
+              "covered_required": 20,
+              "required": 20
+            }
+          },
+          "deterministic_seconds": 10.00010558888312,
+          "duties": 36,
+          "initial_AB": {
+            "A": 21,
+            "B": 15
+          },
+          "lower": 22,
+          "max_continuous_driving": 235,
+          "native_status": "FEASIBLE",
+          "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+          "upper": 36,
+          "wall_seconds": 29.790736700000707
+        },
+        "policy_sha256": "33abc7f733b7f89d85486c3c5181b96ba2b0983325801a99a8ebacba9de6d164",
+        "raw_record_sha256": "75a3017cde4fe0aeea95b44ba77872b693a1c7fcf13f1f7aa4b9309521c7c817",
+        "request_sha256": "80627654f32a2a234a3e9f0e14c6d5ac7df93591d1bb71efa4fd7d4bdaed73b1",
+        "runtime_sha256": "6dd2bb2107df02b9e08476382662c0cce36ec077db1efdea2f2f77fb775544c9",
+        "source_code_sha256": "d355ee0ff62264f1ee7719819f6d31c17fc8c710cf5832b72ac21dae97696f0d"
+      }
+    }
+  },
+  "evidence_notes": [
+    "Native solver bounds are unchanged; analytical certificates apply retrospectively to the identical frozen feasible set.",
+    "First validated fallback remains the legacy seed. The corrected seed is the independently validated assignment used for CP-SAT hints.",
+    "Relaxed witnesses are upper bounds only for their own request; some incidentally pass the full request, which is recorded explicitly.",
+    "Initial A/B figures describe each selected witness; terminal components are not separately minimized."
+  ],
+  "frozen_artifacts_sha256": {
+    "C:\\Users\\HOME\\.codex\\worktrees\\mvp6a-fleet-guided\\New model\\outputs\\mvp6a_final\\fleet_report.json": "1029e84dc709a5918e213ba4529b1a133e07f3ad978de9c22cf6053381d22ce3",
+    "C:\\Users\\HOME\\Downloads\\Bus10_MienTay_DHQG_A.xlsx": "8dc42690961b381b78e9f0e6be5f95803290501926d58a78ddaa1a74a9b9060b",
+    "outputs\\integrated_v1_primary\\integrated_vehicle_crew_v1.json": "7a50f662e7c6cb4fe3a57c7b8d498227639e1716e544baaafa9b674f35035225",
+    "outputs\\integrated_v1_primary\\integrated_vehicle_crew_v1.xlsx": "0389d14f96c7229474cbee8250cdbe445139c039c49e6462aaf9af4e4533775e",
+    "outputs\\integrated_v1_primary\\p50_480.checkpoint.json": "d69fef73dd25b7fc0efebb25dbc8bbdba05e84b1e2df6f383a03d33b1e3fba60",
+    "outputs\\integrated_v1_primary\\p50_600.checkpoint.json": "2372be6327373c6f58f9f528192a91ca09deed214b5a379665d31d910ee0755c",
+    "outputs\\integrated_v1_primary\\p75_480.checkpoint.json": "408d40f76a10d1fe0a36684813d09fe483c596dc07bd1acd335c59eb229e6bcf",
+    "outputs\\integrated_v1_primary\\p75_600.checkpoint.json": "d36abd3eabda22c5334c78f9672973865d007d76721480256b4ab765ddd46894",
+    "outputs\\integrated_v1_primary\\summary.json": "14abc2cc890894c9a136daec72b42a160e922dbc947861789bb84867e0c5b115",
+    "outputs\\integrated_v1_primary\\verification.json": "a2741cdd8d43f141ec360e0dc41d9560c15e874c9567231e82f2bd583e7e0b40"
+  },
+  "relaxed_cases": [
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11010,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 88,
+        "numerator": 14070,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "d98468757999b243d9fae52a507ddfe1100dae6c4a349bae109c9ef686c4eb4d",
+      "full_policy_witness_failure": "B001: required lunch missing",
+      "label": "continuous_driving",
+      "metrics": {
+        "absolute_gap": 13,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 10.000059304940892,
+        "duties": 34,
+        "initial_AB": {
+          "A": 23,
+          "B": 11
+        },
+        "lower": 21,
+        "max_continuous_driving": 234,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 34,
+        "wall_seconds": 17.42409729999963
+      },
+      "raw_record_sha256": "2657da0a49eb306d761b9a6d216fe864391824b8c9c9e58ed1ecada639850a0b",
+      "record": "constraints600_p50_continuous_driving.json",
+      "relaxed": true,
+      "request_sha256": "a580169b3cd33df1dd8165b37a44bf98a423227e6d5060ab433389cab1fea245",
+      "runtime": "p50"
+    },
+    {
+      "analytical_certificate": null,
+      "final_witness_sha256": "77f916fe5156ceb842c0741d32222c51aed6f20e701fc660784b361c0e0acd6e",
+      "full_policy_witness_failure": "B001: required lunch missing",
+      "label": "elapsed_duty",
+      "metrics": {
+        "absolute_gap": 10,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 10.001166495464377,
+        "duties": 31,
+        "initial_AB": {
+          "A": 17,
+          "B": 14
+        },
+        "lower": 21,
+        "max_continuous_driving": 434,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 31,
+        "wall_seconds": 18.289389999999912
+      },
+      "raw_record_sha256": "c5fbb08d482dd74442378373944cb20a8f0359de6200065bda61aac56f8543ee",
+      "record": "constraints600_p50_elapsed_duty.json",
+      "relaxed": true,
+      "request_sha256": "e7e9ffced6832b94edb12acb63a72dca56ea441fb2872fb64d667e2fa57a3afa",
+      "runtime": "p50"
+    },
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11010,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 88,
+        "numerator": 14070,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "5dfbc5056dbe5b156699aa881c78009cf736fcf38ca0bf684d3b60a91136e252",
+      "full_policy_witness_failure": "B001: required lunch missing",
+      "label": "general_rest",
+      "metrics": {
+        "absolute_gap": 13,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 27,
+            "required": 27
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 10.000322122417323,
+        "duties": 34,
+        "initial_AB": {
+          "A": 17,
+          "B": 17
+        },
+        "lower": 21,
+        "max_continuous_driving": 234,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 34,
+        "wall_seconds": 20.844658299998628
+      },
+      "raw_record_sha256": "e4377bd8b1cfb2f955d9924954ec6136ae4e847e457e6d93969bf63d40042e72",
+      "record": "constraints600_p50_general_rest.json",
+      "relaxed": true,
+      "request_sha256": "af568799d60b243f7d26e28e1c5c35683f60e254dc43722058612b49be686cb3",
+      "runtime": "p50"
+    },
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11010,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 88,
+        "numerator": 14070,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "b9886591af5ca382932054f4ee7cebce7d94c6c442f194ba16cb4c9256ab3fce",
+      "full_policy_witness_failure": "B016: required dinner missing",
+      "label": "lunch",
+      "metrics": {
+        "absolute_gap": 15,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 27,
+            "required": 27
+          },
+          "lunch": {
+            "covered_required": 25,
+            "required": 25
+          }
+        },
+        "deterministic_seconds": 10.000726751208816,
+        "duties": 36,
+        "initial_AB": {
+          "A": 18,
+          "B": 18
+        },
+        "lower": 21,
+        "max_continuous_driving": 234,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 36,
+        "wall_seconds": 22.307829700001093
+      },
+      "raw_record_sha256": "d2000cb6e5ed7a71857837b70e539a7efe5cb82ef1cae83f8cc2871d13256efe",
+      "record": "constraints600_p50_lunch.json",
+      "relaxed": true,
+      "request_sha256": "e4a697c00e9492b6f22c3eb4b8e4eadd55ce37880636d509043a17ce8214abf1",
+      "runtime": "p50"
+    },
+    {
+      "analytical_certificate": null,
+      "final_witness_sha256": "5ea5cb37d3a8020f2237a50c2488aacd4e1aa0e23c96bf81576ad13b7983e55a",
+      "full_policy_witness_failure": "B001: duty 1059 exceeds limit",
+      "label": "technical_only",
+      "metrics": {
+        "absolute_gap": 0,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 0.08086382120000668,
+        "duties": 14,
+        "initial_AB": {
+          "A": 8,
+          "B": 6
+        },
+        "lower": 14,
+        "max_continuous_driving": 956,
+        "native_status": "OPTIMAL",
+        "status": "OPTIMAL_PROVEN",
+        "upper": 14,
+        "wall_seconds": 0.509001200000057
+      },
+      "raw_record_sha256": "8ea2e157c1ec8f3d9996411475cc9f3aaa0fa8ac52912b396adb88837e340d8c",
+      "record": "constraints600_p50_technical_only.json",
+      "relaxed": true,
+      "request_sha256": "e393c94e247bcbd9e28f8c86103ee2f25b5aa5f772be1eeac014542627345414",
+      "runtime": "p50"
+    },
+    {
+      "analytical_certificate": null,
+      "final_witness_sha256": "26eeca3c112a318843a67efef5116aed72321d11dc1c6599a34a7198ad5688ec",
+      "full_policy_witness_failure": "B001: duty 1053 exceeds limit",
+      "label": "terminal_tasks",
+      "metrics": {
+        "absolute_gap": 0,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 0.08147461660000799,
+        "duties": 16,
+        "initial_AB": {
+          "A": 9,
+          "B": 7
+        },
+        "lower": 16,
+        "max_continuous_driving": 859,
+        "native_status": "OPTIMAL",
+        "status": "OPTIMAL_PROVEN",
+        "upper": 16,
+        "wall_seconds": 0.5151986000000761
+      },
+      "raw_record_sha256": "140d0c1f31e50fd7d65ea6be8ae79b406c7771f1958b10e5d92aa4ecce40efc1",
+      "record": "constraints600_p50_terminal_tasks.json",
+      "relaxed": true,
+      "request_sha256": "2beccacc5a17686165ff11bb64e041d66630badba5c3c7770d4642c08b7ebeae",
+      "runtime": "p50"
+    },
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11010,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 88,
+        "numerator": 14070,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "b9886591af5ca382932054f4ee7cebce7d94c6c442f194ba16cb4c9256ab3fce",
+      "full_policy_witness_failure": "B016: required dinner missing",
+      "label": "without_dinner",
+      "metrics": {
+        "absolute_gap": 15,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 27,
+            "required": 27
+          },
+          "lunch": {
+            "covered_required": 25,
+            "required": 25
+          }
+        },
+        "deterministic_seconds": 10.000726751208816,
+        "duties": 36,
+        "initial_AB": {
+          "A": 18,
+          "B": 18
+        },
+        "lower": 21,
+        "max_continuous_driving": 234,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 36,
+        "wall_seconds": 19.722932099999525
+      },
+      "raw_record_sha256": "64de3367002201ec7e3413caf3486cbf7647cfe43b217c10762c2d2e28bd45d6",
+      "record": "constraints600_p50_without_dinner.json",
+      "relaxed": true,
+      "request_sha256": "e4a697c00e9492b6f22c3eb4b8e4eadd55ce37880636d509043a17ce8214abf1",
+      "runtime": "p50"
+    },
+    {
+      "analytical_certificate": null,
+      "final_witness_sha256": "6391010a893c32972b53067d543984cdfa97cc1ae41fcf5d60022d74e63a05c6",
+      "full_policy_witness_failure": "continuous driving limit exceeded",
+      "label": "without_driving",
+      "metrics": {
+        "absolute_gap": 12,
+        "coverage": {
+          "dinner": {
+            "covered_required": 12,
+            "required": 12
+          },
+          "general_rest": {
+            "covered_required": 26,
+            "required": 26
+          },
+          "lunch": {
+            "covered_required": 19,
+            "required": 19
+          }
+        },
+        "deterministic_seconds": 10.000001280622433,
+        "duties": 33,
+        "initial_AB": {
+          "A": 20,
+          "B": 13
+        },
+        "lower": 21,
+        "max_continuous_driving": 330,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 33,
+        "wall_seconds": 27.680916700001035
+      },
+      "raw_record_sha256": "e374a2323a29899afd8dec526e10d6ee6c4601602022f9b755d89b59927c024a",
+      "record": "constraints600_p50_without_driving.json",
+      "relaxed": true,
+      "request_sha256": "d024b72d8fdf6e7e59f854227c20defcaf6e10c224da723ca17f9fd5382abf7e",
+      "runtime": "p50"
+    },
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11010,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 88,
+        "numerator": 14070,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "d4b9c21a3c09c52ea657aec43dc6286d06dad167e78086a71e7135c057e2e67e",
+      "full_policy_witness_failure": null,
+      "label": "without_general_rest",
+      "metrics": {
+        "absolute_gap": 13,
+        "coverage": {
+          "dinner": {
+            "covered_required": 7,
+            "required": 7
+          },
+          "general_rest": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "lunch": {
+            "covered_required": 19,
+            "required": 19
+          }
+        },
+        "deterministic_seconds": 10.000082136802371,
+        "duties": 34,
+        "initial_AB": {
+          "A": 18,
+          "B": 16
+        },
+        "lower": 21,
+        "max_continuous_driving": 234,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 34,
+        "wall_seconds": 22.488549100000455
+      },
+      "raw_record_sha256": "9fa999636093797da522d0a5d4d91b8e1bfdf652ce2bb12ede1c9cbac41dc3a5",
+      "record": "constraints600_p50_without_general_rest.json",
+      "relaxed": true,
+      "request_sha256": "9f4d5763b1a0188a7ef68c3c8d025c4f67d691fe0143d491f1bf03236b2a5382",
+      "runtime": "p50"
+    },
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11010,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 88,
+        "numerator": 14070,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "756e2f590d23d6479376aafda07991cd1714a8039ffcf076e510fa66c3fcde78",
+      "full_policy_witness_failure": "B002: required lunch missing",
+      "label": "without_lunch",
+      "metrics": {
+        "absolute_gap": 14,
+        "coverage": {
+          "dinner": {
+            "covered_required": 7,
+            "required": 7
+          },
+          "general_rest": {
+            "covered_required": 23,
+            "required": 23
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 10.0001978994782,
+        "duties": 35,
+        "initial_AB": {
+          "A": 18,
+          "B": 17
+        },
+        "lower": 21,
+        "max_continuous_driving": 234,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 35,
+        "wall_seconds": 21.04314019999947
+      },
+      "raw_record_sha256": "8b5767f1c7792e75e48b796779ee0974a2eae9f823c0f979c3e69d418796030a",
+      "record": "constraints600_p50_without_lunch.json",
+      "relaxed": true,
+      "request_sha256": "723803c3b77e8157071d890e3bfb804ace9e117c290506d2a8fa27bc7d13cb1b",
+      "runtime": "p50"
+    },
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11376,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 89,
+        "numerator": 14436,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "b776a7fbc650f71ec58f35d8d39f455460379a4b7f39ca43c2d92b0c387f4253",
+      "full_policy_witness_failure": "B001: required lunch missing",
+      "label": "continuous_driving",
+      "metrics": {
+        "absolute_gap": 13,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 10.000178452028356,
+        "duties": 35,
+        "initial_AB": {
+          "A": 18,
+          "B": 17
+        },
+        "lower": 22,
+        "max_continuous_driving": 236,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 35,
+        "wall_seconds": 22.927192000001014
+      },
+      "raw_record_sha256": "8e35f7d85ad7c721742a53d26a26412fd2029aa7578a65e581eb28243d416b01",
+      "record": "constraints600_p75_continuous_driving.json",
+      "relaxed": true,
+      "request_sha256": "e29d924293f14cd67fb4defdc42feaac9c8e29bdf37f0e4f180e7554218a3b37",
+      "runtime": "p75"
+    },
+    {
+      "analytical_certificate": null,
+      "final_witness_sha256": "090a2b33d1398cc08934b3d8d52085b287d975851d34e2410bc1a01e7e314853",
+      "full_policy_witness_failure": "B001: required lunch missing",
+      "label": "elapsed_duty",
+      "metrics": {
+        "absolute_gap": 10,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 10.000043239679211,
+        "duties": 32,
+        "initial_AB": {
+          "A": 20,
+          "B": 12
+        },
+        "lower": 22,
+        "max_continuous_driving": 447,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 32,
+        "wall_seconds": 18.76248510000005
+      },
+      "raw_record_sha256": "9bdbca64ba361f394c0af139639bbdfaa00ebbb341659f151fd51306d2942762",
+      "record": "constraints600_p75_elapsed_duty.json",
+      "relaxed": true,
+      "request_sha256": "ca171d48202149c3c78ca9f8864613fb7794ac3635a994493fca2b6832eb74a2",
+      "runtime": "p75"
+    },
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11376,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 89,
+        "numerator": 14436,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "cbab5e06626d47a788e4869ef904617b6213c6f2017cbbe089c461fa9e8babbf",
+      "full_policy_witness_failure": "B002: required lunch missing",
+      "label": "general_rest",
+      "metrics": {
+        "absolute_gap": 13,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 24,
+            "required": 24
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 10.000049441471978,
+        "duties": 35,
+        "initial_AB": {
+          "A": 19,
+          "B": 16
+        },
+        "lower": 22,
+        "max_continuous_driving": 236,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 35,
+        "wall_seconds": 23.74127150000095
+      },
+      "raw_record_sha256": "9503f5cea91469fad89fe5585d8b8f5c12c76b84a3bfaa1e040f12c791c151a0",
+      "record": "constraints600_p75_general_rest.json",
+      "relaxed": true,
+      "request_sha256": "11777b6d9a024d1dd34ace9482a469df8f280ead18c5be813957fca7b1e41229",
+      "runtime": "p75"
+    },
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11376,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 89,
+        "numerator": 14436,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "e0fea67de3aabf957e685b51e9015130f4598647744ea50dc953cf4192468bb7",
+      "full_policy_witness_failure": "B018: required dinner missing",
+      "label": "lunch",
+      "metrics": {
+        "absolute_gap": 13,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 26,
+            "required": 26
+          },
+          "lunch": {
+            "covered_required": 18,
+            "required": 18
+          }
+        },
+        "deterministic_seconds": 10.000022884238415,
+        "duties": 35,
+        "initial_AB": {
+          "A": 16,
+          "B": 19
+        },
+        "lower": 22,
+        "max_continuous_driving": 236,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 35,
+        "wall_seconds": 20.650412200000574
+      },
+      "raw_record_sha256": "7b99f0d41c6b285f0a38a9171a370f39752e0c10c2fc75602b11711da60447af",
+      "record": "constraints600_p75_lunch.json",
+      "relaxed": true,
+      "request_sha256": "731dd7f0106e72af55df3263607a2594cc0cdd8ee123a2c09339013d1b7bbf14",
+      "runtime": "p75"
+    },
+    {
+      "analytical_certificate": null,
+      "final_witness_sha256": "ab0d2a762bbbccd16d27709f433bc1d42cdb79e39ad428dd665e8e338fd14782",
+      "full_policy_witness_failure": "B001: duty 994 exceeds limit",
+      "label": "technical_only",
+      "metrics": {
+        "absolute_gap": 0,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 0.07919352730000564,
+        "duties": 15,
+        "initial_AB": {
+          "A": 8,
+          "B": 7
+        },
+        "lower": 15,
+        "max_continuous_driving": 927,
+        "native_status": "OPTIMAL",
+        "status": "OPTIMAL_PROVEN",
+        "upper": 15,
+        "wall_seconds": 0.4393415999984427
+      },
+      "raw_record_sha256": "d5849df8535b023a2de84d88a6585ed5ea09a281365965bd9aae602dd8a029d1",
+      "record": "constraints600_p75_technical_only.json",
+      "relaxed": true,
+      "request_sha256": "16b39c7b632cd25c21841ef23ff7fba4feee9b81dc283e8376db697ad59e93d9",
+      "runtime": "p75"
+    },
+    {
+      "analytical_certificate": null,
+      "final_witness_sha256": "4c0aa144d70b19069e606ed3bca682edd3d2bd95a41c6ec8357c80333f3df67a",
+      "full_policy_witness_failure": "B001: duty 1054 exceeds limit",
+      "label": "terminal_tasks",
+      "metrics": {
+        "absolute_gap": 0,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 0.08103433260000784,
+        "duties": 16,
+        "initial_AB": {
+          "A": 9,
+          "B": 7
+        },
+        "lower": 16,
+        "max_continuous_driving": 881,
+        "native_status": "OPTIMAL",
+        "status": "OPTIMAL_PROVEN",
+        "upper": 16,
+        "wall_seconds": 0.4317979000006744
+      },
+      "raw_record_sha256": "f6f9de05b8fcdce92ea765653e1573a89fbd919ca07448fc74818e4dce74d270",
+      "record": "constraints600_p75_terminal_tasks.json",
+      "relaxed": true,
+      "request_sha256": "99cd8999e468505bb221d5ff80c6b6af9e384cb4632661cc54b8278b1a0bd495",
+      "runtime": "p75"
+    },
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11376,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 89,
+        "numerator": 14436,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "e0fea67de3aabf957e685b51e9015130f4598647744ea50dc953cf4192468bb7",
+      "full_policy_witness_failure": "B018: required dinner missing",
+      "label": "without_dinner",
+      "metrics": {
+        "absolute_gap": 13,
+        "coverage": {
+          "dinner": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "general_rest": {
+            "covered_required": 26,
+            "required": 26
+          },
+          "lunch": {
+            "covered_required": 18,
+            "required": 18
+          }
+        },
+        "deterministic_seconds": 10.000022884238415,
+        "duties": 35,
+        "initial_AB": {
+          "A": 16,
+          "B": 19
+        },
+        "lower": 22,
+        "max_continuous_driving": 236,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 35,
+        "wall_seconds": 20.810353699998814
+      },
+      "raw_record_sha256": "6c16d3c1af57913f980adafb1e196f7edc6645023825777aae17e77986112198",
+      "record": "constraints600_p75_without_dinner.json",
+      "relaxed": true,
+      "request_sha256": "731dd7f0106e72af55df3263607a2594cc0cdd8ee123a2c09339013d1b7bbf14",
+      "runtime": "p75"
+    },
+    {
+      "analytical_certificate": null,
+      "final_witness_sha256": "b0dff057249b0e8dab31be7ae439f024626cc6a64a34ed8ff75a912189c7e572",
+      "full_policy_witness_failure": "continuous driving limit exceeded",
+      "label": "without_driving",
+      "metrics": {
+        "absolute_gap": 13,
+        "coverage": {
+          "dinner": {
+            "covered_required": 8,
+            "required": 8
+          },
+          "general_rest": {
+            "covered_required": 23,
+            "required": 23
+          },
+          "lunch": {
+            "covered_required": 16,
+            "required": 16
+          }
+        },
+        "deterministic_seconds": 10.00001125380863,
+        "duties": 35,
+        "initial_AB": {
+          "A": 22,
+          "B": 13
+        },
+        "lower": 22,
+        "max_continuous_driving": 340,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 35,
+        "wall_seconds": 20.12904680000065
+      },
+      "raw_record_sha256": "610dc97bf330d15b357b74c7184b7a5935f6373381b6c2f83c3b9041ea28abe8",
+      "record": "constraints600_p75_without_driving.json",
+      "relaxed": true,
+      "request_sha256": "769f400645234c66dfd94d669fa7a4c0f7906f6948471311c85b7a343a659e47",
+      "runtime": "p75"
+    },
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11376,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 89,
+        "numerator": 14436,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "fcc8a88733a58dcfbf7e1ae9339ffaf494443c807c95cb51b3817b705b34f7a6",
+      "full_policy_witness_failure": null,
+      "label": "without_general_rest",
+      "metrics": {
+        "absolute_gap": 16,
+        "coverage": {
+          "dinner": {
+            "covered_required": 6,
+            "required": 6
+          },
+          "general_rest": {
+            "covered_required": 0,
+            "required": 0
+          },
+          "lunch": {
+            "covered_required": 21,
+            "required": 21
+          }
+        },
+        "deterministic_seconds": 10.00000465919336,
+        "duties": 38,
+        "initial_AB": {
+          "A": 20,
+          "B": 18
+        },
+        "lower": 22,
+        "max_continuous_driving": 236,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 38,
+        "wall_seconds": 17.248260400001527
+      },
+      "raw_record_sha256": "6d8448bf849675a5d2afba9cd9476f953bc7ad75d96dca00fcde23c83c1a2e49",
+      "record": "constraints600_p75_without_general_rest.json",
+      "relaxed": true,
+      "request_sha256": "02f944a9f300591fd7bcb9a5b4489acb82c9e791087c533c79ff1262dc6ae6ce",
+      "runtime": "p75"
+    },
+    {
+      "analytical_certificate": {
+        "denominator": 635,
+        "driving_workload": 11376,
+        "lower_bound": 23,
+        "maximum_trips_per_driving_segment": 2,
+        "minimum_driving_segments": 51,
+        "minimum_trip_runtime": 89,
+        "numerator": 14436,
+        "reset_minutes": 30,
+        "scope": "analytical necessary bound under this request; not a solver bound",
+        "trip_count": 102
+      },
+      "final_witness_sha256": "eed4adafd5574630178e6f34063ddbe88f0af0fdab17222ac13246a5124a70e6",
+      "full_policy_witness_failure": "B002: required lunch missing",
+      "label": "without_lunch",
+      "metrics": {
+        "absolute_gap": 12,
+        "coverage": {
+          "dinner": {
+            "covered_required": 4,
+            "required": 4
+          },
+          "general_rest": {
+            "covered_required": 21,
+            "required": 21
+          },
+          "lunch": {
+            "covered_required": 0,
+            "required": 0
+          }
+        },
+        "deterministic_seconds": 10.000008346854775,
+        "duties": 34,
+        "initial_AB": {
+          "A": 19,
+          "B": 15
+        },
+        "lower": 22,
+        "max_continuous_driving": 236,
+        "native_status": "FEASIBLE",
+        "status": "FEASIBLE_NOT_PROVEN_OPTIMAL",
+        "upper": 34,
+        "wall_seconds": 20.538582500001212
+      },
+      "raw_record_sha256": "62fd7ec2be4f8fb5a8851034c2b8d0139c84d8f11c2667373fc610567ab105ce",
+      "record": "constraints600_p75_without_lunch.json",
+      "relaxed": true,
+      "request_sha256": "d71febbc32e1344ca470991545426785154ace7fbe3f0b86f290d41465347fcf",
+      "runtime": "p75"
+    }
+  ],
+  "schema_version": "integrated_blocking_v11_gap_review",
+  "starting_sha": "98427b194d63a077f3e3ca7ac6e3d73cf98cf93f",
+  "verdict": "GAP_REDUCED"
+}

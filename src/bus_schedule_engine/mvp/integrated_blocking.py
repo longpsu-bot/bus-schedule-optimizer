@@ -178,6 +178,69 @@ def _greedy(r, trips, edges):
     return _witness(chains, trips, edges, crew["meals"]["windows"])
 
 
+def _rest_aware_seed(r, trips, edges):
+    """One bounded chronological pass; every extension must be a legal ended duty.
+
+    This deliberately does not search through temporarily unmet meal obligations.
+    All DAG edges remain available to CP-SAT, irrespective of seed choices.
+    """
+    crew = r["crew_policy"]
+    h, p = (r["terminal_policy"][k] for k in ("post", "pre"))
+    chains = []
+
+    def legal(chain):
+        start, end = trips[chain[0]]["departure"] - p, trips[chain[-1]]["arrival"] + h
+        span = end - start
+        if crew["duty"]["mode"] == "ENFORCED" and span > crew["duty"]["limit"]:
+            return False
+        if (
+            crew["total_driving"]["mode"] == "ENFORCED"
+            and sum(trips[i]["runtime"] for i in chain) > crew["total_driving"]["limit"]
+        ):
+            return False
+        gaps = [edges[i, j] for i, j in zip(chain, chain[1:], strict=False)]
+        continuous = 0
+        for k, i in enumerate(chain):
+            if k and gaps[k - 1][1] - gaps[k - 1][0] >= crew["driving"]["reset_minutes"]:
+                continuous = 0
+            continuous += trips[i]["runtime"]
+            if crew["driving"]["mode"] == "ENFORCED" and continuous > crew["driving"]["limit"]:
+                return False
+        general = crew["general_rest"]
+        if (
+            general["mode"] == "ENFORCED"
+            and span >= general["duty_threshold"]
+            and not any(right - left >= general["minutes"] for left, right in gaps)
+        ):
+            return False
+        for meal in crew["meals"]["windows"]:
+            overlap = max(0, min(end, meal["end"]) - max(start, meal["start"]))
+            required = meal["mode"] == "ENFORCED" and (
+                overlap > 0
+                if crew["meals"]["eligibility"] == "DUTY_INTERSECTS_WINDOW"
+                else span >= crew["meals"]["duty_threshold"]
+                and overlap >= crew["meals"]["overlap_threshold"]
+            )
+            if required and not any(
+                min(right, meal["end"]) - max(left, meal["start"]) >= meal["minutes"]
+                for left, right in gaps
+            ):
+                return False
+        return True
+
+    for j in range(len(trips)):
+        choices = [
+            (trips[chain[0]]["departure"], k)
+            for k, chain in enumerate(chains)
+            if (chain[-1], j) in edges and legal([*chain, j])
+        ]
+        if choices:
+            chains[min(choices)[1]].append(j)
+        else:
+            chains.append([j])
+    return _witness(chains, trips, edges, crew["meals"]["windows"])
+
+
 def solve_integrated(request, *, incumbent=None, checkpoint=None, cancelled=None):
     """Return only independently verified upper bounds; preserve them at any cutoff."""
     began = perf_counter()
@@ -332,6 +395,11 @@ def solve_integrated(request, *, incumbent=None, checkpoint=None, cancelled=None
     # Strict-window rules/stock may invalidate this heuristic; validation gates the bound.
     with suppress(ValueError):
         retain(_greedy(r, trips, edges))
+    # Preserve V1's incumbent cutoff exactly; the new heuristic only supplies hints
+    # and a validated fallback, never a tighter constraint on the complete model.
+    model_upper = len(best[1]) if best else None
+    with suppress(ValueError):
+        retain(_rest_aware_seed(r, trips, edges))
     if _memory_mb() > r["search"]["memory_mb"]:
         return finish("process memory ceiling before model construction")
     model = cp_model.CpModel()
@@ -432,8 +500,9 @@ def solve_integrated(request, *, incumbent=None, checkpoint=None, cancelled=None
     if r["resource_cap"] is not None:
         model.add(r["resource_cap"]["limit"] >= K)
     model.minimize(K)
+    if model_upper is not None:
+        model.add(model_upper >= K)
     if best:
-        model.add(len(best[1]) >= K)
         by_id = {t["trip_id"]: i for i, t in enumerate(trips)}
         selected = {
             (by_id[a], by_id[b])

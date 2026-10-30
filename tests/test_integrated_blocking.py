@@ -7,7 +7,89 @@ from copy import deepcopy
 import pytest
 from test_integrated_blocking_validation import blocks, request, rest
 
+from bus_schedule_engine.mvp import integrated_blocking
+from bus_schedule_engine.mvp.input import runtime_at
 from bus_schedule_engine.mvp.integrated_blocking import solve_integrated
+from bus_schedule_engine.mvp.integrated_blocking_validation import validate_assignment
+
+
+def seed_inputs(r):
+    trips = []
+    for raw in r["timetable"]["trips"]:
+        runtime = runtime_at(
+            {"runtime_periods": r["runtime_scenario"]["directions"][raw["direction"]]},
+            raw["departure"],
+        )
+        trips.append(dict(raw, runtime=runtime, arrival=raw["departure"] + runtime))
+    trips.sort(key=lambda t: (t["departure"], t["trip_id"]))
+    tasks = r["terminal_policy"]
+    edges = {}
+    for i, t in enumerate(trips):
+        left = (
+            t["arrival"]
+            + tasks["post"]
+            + tasks["technical"]
+            + r["recovery_policy"]["reserve_by_arriving_trip"][t["trip_id"]]
+        )
+        for j, u in enumerate(trips):
+            right = u["departure"] - tasks["pre"]
+            if (
+                t["direction"] != u["direction"]
+                and t["departure"] < u["departure"]
+                and left <= right
+            ):
+                edges[i, j] = left, right
+    return trips, edges
+
+
+def test_rest_aware_seed_uses_long_legal_duty_and_matches_exact_oracle():
+    clocks = [("outbound", 480, 660), ("inbound", 705, 885)]
+    r = request(clocks, meals=True, general=True, driving=True)
+    trips, edges = seed_inputs(r)
+    frozen = deepcopy((r, trips, edges))
+    assert len(integrated_blocking._greedy(r, trips, edges)) == 2
+    seed = integrated_blocking._rest_aware_seed(r, trips, edges)
+    assert len(seed) == oracle(clocks, r) == 1
+    checked = validate_assignment(r, seed)
+    duty = checked["blocks"][0]
+    assert duty["total_driving"] == 360
+    assert duty["max_continuous_driving"] == 180
+    assert duty["duty_span"] == 415
+    assert duty["general_rest"]["required"] and duty["general_rest"]["covered"]
+    assert duty["meals"]["lunch"]["required"] and duty["meals"]["lunch"]["covered"]
+    assert (r, trips, edges) == frozen
+
+
+@pytest.mark.parametrize("gap,want", [(29, 2), (30, 1)])
+def test_rest_aware_seed_requires_continuous_protected_reset(gap, want):
+    r = request(
+        [("outbound", 480, 660), ("inbound", 675 + gap, 855 + gap)],
+        driving=True,
+        general=True,
+        meals=True,
+    )
+    trips, edges = seed_inputs(r)
+    seed = integrated_blocking._rest_aware_seed(r, trips, edges)
+    assert len(seed) == want
+    assert validate_assignment(r, seed)["validator_pass"]
+
+
+def test_rest_aware_seed_does_not_apply_disabled_thresholds():
+    clocks = [("outbound", 60, 180), ("inbound", 195, 315), ("outbound", 330, 450)]
+    r = request(clocks)
+    trips, edges = seed_inputs(r)
+    seed = integrated_blocking._rest_aware_seed(r, trips, edges)
+    assert len(seed) == oracle(clocks, r) == 1
+    assert validate_assignment(r, seed)["validator_pass"]
+
+
+def test_rest_aware_seed_obeys_independent_total_driving_cap():
+    r = request([("outbound", 480, 660), ("inbound", 705, 885)], driving=True)
+    r["crew_policy"]["total_driving"].update(mode="ENFORCED", limit=300)
+    trips, edges = seed_inputs(r)
+    seed = integrated_blocking._rest_aware_seed(r, trips, edges)
+    assert len(seed) == 2
+    assert validate_assignment(r, seed)["validator_pass"]
 
 
 def oracle(clocks, r):
