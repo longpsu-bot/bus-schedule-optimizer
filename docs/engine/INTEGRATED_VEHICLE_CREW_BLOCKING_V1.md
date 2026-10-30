@@ -1,6 +1,6 @@
 # Integrated vehicle and crew blocking V1
 
-**Design verdict:** `DESIGN_READY_FOR_PO_REVIEW`, subject to the independent review record in section 12. This is a specification, not a solved rest-compliant Route 10 assignment or an operational approval.
+**Design verdict:** `CONDITIONALLY_APPROVED_FOR_IMPLEMENTATION` by the Product Owner on 30 October 2026, with the endpoint and general-rest corrections recorded here. Mathematical feasibility and operational approval remain separate.
 
 **Evidence baseline:** `818b997d1726858e322e1bbb1420d3b03d979f78`, branch `feat/mvp5-route10-engine-pilot`. Review date: 29 October 2026. Scope: one fixed two-direction timetable, two terminals, one fixed driver/attendant team per vehicle for its entire daily block. No vehicle reuse by a second team, relief, deadheading, depot movement, timetable generation, production-score changes, GIS or new application platform.
 
@@ -44,12 +44,13 @@ Use a separate, versioned `integrated_blocking_v1` request. The adapter reads th
 | `timetable.trips` | Unique stable IDs, direction, integer departure minutes and source pointer. Identity is `(direction, ordinal)` with frozen departures; reject duplicates, missing trips or changed departure digest. |
 | `terminals` | Exactly A and B; outbound A to B, inbound B to A. No travel arcs except scheduled passenger trips. |
 | `runtime_scenario` | Exactly one named p50 or p75 profile per run, full directional half-open departure-time partitions, positive integer runtimes and provenance. Recompute arrival from departure/profile; ignore solver-supplied arrival claims. |
-| `terminal_policy` | Technical q=5, post-arrival h=5, predeparture p=5 minutes at both terminals. All are separate, sequential, on-duty allowances, including technical and post work after the final trip and pre work before the first. They are not measured standards. |
+| `terminal_policy` | Technical q=5 on internal connections only, post-arrival h=5 after every trip including the final trip, predeparture p=5 before every trip including the first. These are separate sequential on-duty allowances, not measured standards. Final tasks are explicitly h only; no final technical turnaround is charged. |
 | `recovery_policy` | Explicit runtime basis and complete nonnegative `reserve_by_arriving_trip` values, including explicit zeros. A trip's scalar rho_i applies identically to every chosen internal successor. No reserve is charged after a block's final trip. Reject successor-dependent reserve and final-arrival reserve as unsupported in V1. Use rho=0 when that traffic stress is already in the chosen runtime. Extra residual reserve requires a separate source/reason. |
 | `crew_policy.assignment` | Exactly one fixed synchronized driver/attendant team per block, no relief, cross-vehicle sharing or reuse of a completed vehicle by a new crew. Both roles remain on duty through intermediate waiting. Task durations are elapsed team time, not two serial copies for two people. |
 | `crew_policy.duty_limit_minutes` | Enabled positive integer, 480 or 600 in separate primary runs. Limit is elapsed first-preparation to final-post-task span, including waiting, recovery and meals; no split-duty subtraction. These are sensitivity assumptions, not legal certificates. |
-| `crew_policy.driving` | Separate positive-integer total-driving limit or explicit `DISABLED_EXPERIMENTAL`; separate positive-integer continuous-driving limit C_max and qualifying reset length beta>0. Proposed sensitivity: C_max=240, beta=30 minutes. These values and the reset definition require PO/operator agreement; they are not inferred from a five-minute stop. |
+| `crew_policy.driving` | Separate positive-integer total-driving limit or explicit `DISABLED_EXPERIMENTAL`; separate positive-integer continuous-driving limit C_max and qualifying reset length beta>0. Selected experimental sensitivity: C_max=240, beta=30 minutes. These values and the reset definition have PO approval for experimentation and require operator verification; they are not inferred from a five-minute stop. |
 | `crew_policy.meals` | Lunch [660,840), dinner [1020,1200), each positive integer B=30 continuous minutes; explicitly selected eligibility mode and nonnegative integer thresholds (section 3). Required for both synchronized crew roles under the experimental team policy. |
+| `crew_policy.general_rest` | Independently enforced for elapsed duty >=360: at least one selected uninterrupted protected rest >=30 minutes between assigned trips. A qualifying selected meal may discharge it; count the rest union once. Explicit disabled mode is only for labelled synthetic isolation tests. |
 | `stock` | `RESOURCE_SIZING_UNCONFIRMED` (no numerical terminal caps), `EXPERIMENTAL_CAPS` with integers N_A/N_B, or `CONFIRMED_CAPS` with values and source/date. In all modes a block's vehicle starts at its origin terminal before its duty begins. |
 | `resource_cap` | Explicit optional total K ceiling, with authority and purpose; absence means size resources. Do not inherit `bundle.fleet_ceiling=14` as an integrated limit. |
 | `search` | Fixed solver version/seed, one worker, deterministic work limit, emergency wall limit, cancellation and memory/model-size limits; section 8. |
@@ -57,6 +58,8 @@ Use a separate, versioned `integrated_blocking_v1` request. The adapter reads th
 | Optional `distance_km`, `commercial_km`, costs | Nonnegative finite trip/direction values, units, measurement basis, source and date. Preserve distinct meanings of cự ly and km vận doanh. Do not infer a round trip, empty running or money from an absent value. |
 
 Times are half-open intervals on one model-day axis; arrivals may exceed 24:00 and must not wrap modulo 1440. P0 has whole-minute precision. V1 rejects fractional-minute inputs rather than rounding them into feasibility; a future exact shared integer scale would need an explicit contract change. Equal-time completion then departure is allowed only if every allowance has finished. Report horizon starts no later than the earliest predeparture task and ends after all final duties. Before/after duty, a vehicle still exists at its terminal but its crew is off duty. No pre-duty or post-duty interval is an internal meal.
+
+V1 integer inputs are bounded above by 2147483647. This matches the native random-seed range and keeps all 102-trip derived clocks/workload sums within signed 64-bit solver arithmetic; reject oversized values before model construction.
 
 Every rule has an explicit `ENFORCED` or `DISABLED_EXPERIMENTAL` mode. The latter is supported for synthetic isolation tests and labelled relaxations only: omit that rule's variables/constraints and report `CREW_RULES_DISABLED`, never integrated crew compliance. A test may disable an individual meal window; primary Route 10 runs enforce duty, both meals and the chosen continuous-driving policy. Missing fields do not disable anything. Durations, reserves and technical/post/pre tasks are finite integers with the positivity/nonnegativity bounds above; windows are ordered, nonoverlapping and long enough for B. Stock values are nonnegative integers; an enabled resource cap is a positive integer. Reject booleans, fractional/nonfinite values, beta=0, C_max=0, unsupported modes and incomplete reserve maps before model construction.
 
@@ -70,7 +73,7 @@ For a path P=(i_1,...,i_k), with departure d_i, runtime r_i and arrival a_i=d_i+
 
 ```text
 S(P) = d_first - p
-E(P) = a_last + q + h
+E(P) = a_last + h                  explicitly declared final tasks only
 D(P) = E(P) - S(P)                  elapsed duty
 V(P) = sum(r_i for i in P)          driving exposure
 ```
@@ -88,7 +91,7 @@ For meal m with window [L_m,U_m), define overlap O_m(P)=max(0,min(E(P),U_m)-max(
 | `DUTY_INTERSECTS_WINDOW` | O_m(P)>0 | Reproduces the existing conservative screen, including a duty ending at 11:01 that owes lunch despite having only one minute in the window. A singleton can consequently be impossible even with unlimited buses. |
 | Proposed `SUSTAINED_WINDOW_DUTY` | D(P)>=D_min **and** O_m(P)>=O_min,m | Based on sustained duty rather than trivial overlap. Proposed experimental D_min=360, O_min,lunch=O_min,dinner=60 minutes. Early-finish/late-start duties can be exempt; a 12:00–20:00 duty requires both meals. Thresholds are policy choices, with explicit inclusive boundaries. |
 
-Recommend the second mode for the V1 experiment, and retain the first as a named sensitivity. **PO must select the predicate and thresholds before a run is described as authoritative.** The proposed rule does not claim to encode all working-time break entitlements. For example, a long duty outside both meal windows may need another statutory/operator break. The current specification can model general protected driving-reset rests, but a separate general work-break entitlement is unsupported until explicitly specified. Unknown entitlement policy blocks an operational certificate.
+The PO selected `SUSTAINED_WINDOW_DUTY`, D_min=360 and both O_min=60 for this experiment. Independently, every duty >=360 minutes requires one selected continuous protected rest >=30 minutes, including duties outside meal windows. A selected lunch or dinner may satisfy both requirements. These are declared experimental assumptions; applicable labour/transport rules, night work and operator policy remain unverified and satisfaction does not establish statutory compliance.
 
 A required meal must occur between assigned trips, wholly inside its window, after all post-arrival/technical/recovery commitments and before predeparture work. Ending a duty early is a legitimate modelling choice; pretending an off-duty interval is a meal inside that duty is not. Report exemptions and exact duty/overlap values so the PO can see threshold effects. Optional meals may be selected, but cannot discharge another window's requirement.
 
@@ -106,7 +109,7 @@ gap = q + h + rho_i + protected_rest_union + other_free_wait + p
 
 All terms on the last line are nonnegative and disjoint physical durations. A meal is one labelled component of protected rest. A meal may also *qualify* as a driving reset: this is one physical rest with two policy consequences, counted once in the interval ledger. It cannot simultaneously be terminal work or committed recovery. Residual free waiting remains on duty and does not reset driving unless explicitly selected as protected rest under the agreed policy. No unavailable attendant/driver or substitute is assumed to cover terminal tasks during a meal.
 
-Reserve is defined only for internal connections and depends on the arriving trip, not its successor. Final duty closes at a_last+q+h with no extra reserve. An operator requirement for successor-dependent recovery or recovery after the last arrival requires a later contract/formulation revision; it cannot be silently represented by the current rho_i or E(P).
+Reserve is defined only for internal connections and depends on the arriving trip, not its successor. Final duty closes at a_last+h with no technical turnaround or extra reserve. An operator requirement for successor-dependent recovery or recovery after the last arrival requires a later contract/formulation revision; it cannot be silently represented by the current rho_i or E(P).
 
 Example: arrival 11:00, next departure 11:45, q/h/p=5 each and rho=0 gives free [11:10,11:40), exactly one 30-minute lunch. Adding rho=5 leaves 25 minutes and invalidates that lunch. Several 10/15-minute opportunities do not sum to one meal.
 
@@ -156,10 +159,10 @@ If each fixed driver can drive no more than its elapsed H-minute duty, K*H>=W gi
 |---|---:|---:|
 | p50 driving only, W=11010 | ceil(11010/480)=**23** | ceil(11010/600)=**19** |
 | p75 driving only, W=11376 | **24** | **19** |
-| p50, also count all q/h/p in duty | ceil((11010+102*15)/480)=**27** | ceil(12540/600)=**21** |
-| p75, also count all q/h/p in duty | ceil(12906/480)=**27** | ceil(12906/600)=**22** |
+| p50, internal q and every-trip h/p | ceil(12540/485)=**26** | ceil(12540/605)=**21** |
+| p75, internal q and every-trip h/p | ceil(12906/485)=**27** | ceil(12906/605)=**22** |
 
-The stronger task-inclusive bounds follow because every trip contributes its driving plus 15 disjoint on-duty minutes, even at block boundaries. They depend on the explicitly serial task assumption; changing overlap/task treatment requires recomputation. Meals, recovery and other waiting can increase required resources further. No row proves a feasible assignment with its stated fleet. In particular, **19 or 23 buses/teams cannot be the p50 integrated optimum under this specification's task and elapsed-duty assumptions**, although they remain correct weaker driving-only bounds.
+For n=102 and K distinct blocks, there are n-K internal technical turnarounds and n post/pre tasks. Minimum workload excluding idle is W+102*15-5K. Therefore K*H >= W+1530-5K and K >= ceil((W+1530)/(H+5)). These necessary bounds are not feasible fleet certificates. Meals, recovery and waiting can increase resource requirements further. Nineteen or 23 buses/teams cannot meet the p50 task/duty assumptions.
 
 Bounds available from declared input alone include total workload, maximum simultaneous driving occupancy, and terminal stock-prefix necessary conditions. Matching/min-cut additionally certifies the complete compatibility graph's path minimum. Duty-based workload bounds require H and its meaning; task-inclusive bounds require task accounting; meal/reset bounds require eligibility and reset policy; a stock infeasibility conclusion requires actual or explicitly hypothetical caps. There is no unconditional numerical crew lower bound from departure clocks alone without runtimes and a working-condition model.
 
@@ -242,11 +245,11 @@ Let S_i be duty start and V_i cumulative driving through trip i. Use bounded int
 ```text
 s_i=1  => S_i=d_i-p, V_i=r_i
 x_ij=1 => S_j=S_i, V_j=V_i+r_j
-t_i=1  => (a_i+q+h)-S_i <= H
+t_i=1  => (a_i+h)-S_i <= H
 t_i=1  => V_i <= V_max              if enabled
 ```
 
-At a path end i, E_i=a_i+q+h is known; evaluate the chosen meal eligibility predicate using S_i/E_i. Duty feasibility may also be imposed at every prefix because the path's final end can only be later. Do not reject a prefix merely because its required meal has not happened yet while a future eligible gap can still satisfy it.
+At a path end i, E_i=a_i+h is known; evaluate meal and general-rest eligibility using S_i/E_i. Duty feasibility may also be imposed at every prefix because the path's final end can only be later. Do not reject a prefix merely because a required rest has not happened yet while a future eligible gap can still satisfy it.
 
 ### 6.3 Continuous meal coverage
 
@@ -272,7 +275,7 @@ The binary domain allows at most one meal of each type per path. No summing shor
 
 ### 6.4 Continuous driving is a separate resource
 
-Under the proposed experimental reset policy, a **selected uninterrupted protected rest** of at least beta minutes at a terminal resets driving accumulation. The break need not be in a meal window; a selected meal qualifies if its duration reaches beta. General free waiting is not automatically a reset.
+Under the selected experimental reset policy, a **selected uninterrupted protected rest** of at least beta minutes at a terminal resets driving accumulation. The break need not be in a meal window; a selected meal qualifies if its duration reaches beta. General free waiting is not automatically a reset.
 
 For each edge let A_e^R=[U_e-L_e>=beta], with beta>0. Binary z_e chooses a reset; z_e<=x_e and z_e<=A_e^R. If selected, reserve witness `[L_e,L_e+beta)` as protected rest. It may overlap a selected meal because both are the same permissible rest activity; report the union once. When B>=beta enforce z_e>=b_em for each meal. The fixed nonoverlapping meal windows mean meals alone cannot create an unmodelled longer continuous union in this V1 policy.
 
@@ -287,7 +290,15 @@ x_ij=1 and z_ij=1        => C_j=r_j
 
 Driving during one trip is monotone, so checking arrivals suffices when rests occur only between trips. A reset affects exposure, not duty start, total driving, terminal inventory or mandatory meal coverage. Other definitions (elapsed work since a break, split resets, five-minute stops, role-dependent duties) are unsupported hard-policy modes until explicitly designed. Continuous **work** exposure is reported from actual activity intervals, separately from this driving accumulator; no work limit is silently substituted for C_max.
 
-### 6.5 Objective and formulation guarantee
+### 6.5 Independent general protected rest
+
+For each selected edge, allow a general-rest witness [L_e,L_e+30) if F_e has at least 30 continuous minutes. Propagate a binary prefix OR of qualifying selected protected intervals (general rest, meal or reset). At each path end, elapsed duty >=360 implies this prefix is true. Do not impose that implication on unfinished prefixes. Meals qualify only when their uninterrupted duration >=30; reset intervals qualify only when their actual uninterrupted duration >=30. Overlapping labels describe one physical rest union, never additive elapsed time. The primary experiment uses B=beta=general-rest length=30, so one selected meal/reset/general interval can have all three consequences. Distinct synthetic lengths must retain the same union semantics.
+
+### 6.6 Whole-free-interval dominance used by the implementation
+
+On each selected connection the implementation explicitly protects the entire free interval F_e. Labelled meals remain their own window-contained subintervals of that same physical rest. This is a completeness-preserving specialization: extend any originally feasible selected rest to F_e. No task, reserve, departure, duty boundary, eligibility or stock changes, and driving resets/general coverage can only improve. Conversely F_e is itself an allowed protected rest. Thus the feasible path set is unchanged under V1's absence of competing flexible work, rest cost, hard continuous-work limits and residual-recovery secondary objectives. Reset/general opportunity indicators become constants of each edge; coverage still propagates only over selected edges. The ledger counts the rest union once. Reported protected minutes and work-exposure proxies reflect this explicit longer-rest choice; residual free waiting is zero on these connections. This selection is an experimental scheduling commitment, not evidence of observed rest or operational permission.
+
+### 6.7 Objective and formulation guarantee
 
 Minimize K subject to **all** constraints. The requested hierarchy is a hierarchy of obligations and reporting: (1) exact coverage/physical/team feasibility, (2) mandatory duty/meal/rest rules, (3) declared recovery/tasks, (4) minimum feasible resource count, (5) operating quality/cost supported by evidence. Items 1–3 all define the feasible set. No weighted penalty buys permission to violate them.
 
@@ -340,7 +351,7 @@ For every selected block, independently:
 
 1. Reconcile trip IDs/departure digest and assert exactly-once coverage of all 102 trips, one vehicle/team per nonempty block, no vehicle or person reused across blocks.
 2. Recompute runtime by direction/departure, arrivals, terminal positions and every chronological connection. Rebuild technical, post, reserve and pre intervals. Reject even a one-minute shortfall; never shift departures to repair it.
-3. Compute first-pre/final-post duty boundaries, elapsed span, total driving and role activities. Recompute eligibility from actual S/E and require every mandatory meal at its proper terminal/window, continuous length>=30, contained in one free interval.
+3. Compute first-pre/final-post duty boundaries, elapsed span, total driving and role activities. Recompute eligibility from actual S/E and require every mandatory meal at its proper terminal/window, continuous length>=30, contained in one free interval. Independently, D>=360 requires at least one selected uninterrupted protected rest >=30 even outside both meal windows; a qualifying meal counts once toward both rules.
 4. Reconstruct the **union** of protected rests, verify reset qualification, and accumulate driving trip by trip between them. Recompute reported maximum continuous driving and continuous work separately. Work/recovery intervals must never overlap protected rest. Required meals remain separate labelled intervals even if one long protected rest covers both windows.
 5. Count starts at A/B, test optional stock/total caps, and reconstruct the physical ledger through all initial/arrival/readiness/departure/final events. Late starts were already present initially. Check both nonnegative terminal inventory and constant total physical vehicles. Finished vehicles cannot become another block.
 6. Compare every reported metric to the reconstruction and verify that all assumptions appear in the report. Keep offending trip/edge/window/role IDs and computed shortfall. An invalid witness is never a feasible upper bound.
@@ -361,14 +372,17 @@ Synthetic clocks below are minutes from midnight; `O d->a` means outbound A->B, 
 | T6 right terminal, too late | O 600->660 followed by I 674->734 | Physical destination matches but readiness is 675: no edge. K*=2 with stock at both origins. At departure 675 the edge exists and K*=1. |
 | T7 p50 versus p75 | O dep600, runtime50=60/runtime75=70; I dep675, runtime=60 in both | p50 K*=1; p75 K*=2. A p50 fixed-chain witness fails under p75; reassignment with another initial B vehicle succeeds. No doubled traffic margin. |
 | T8 initial stock | O 480->500 and I 480->500 | K*=2 with N_A=N_B=1. N_A=2,N_B=0 is infeasible despite the same total; no repositioning. |
-| T9 proved duty infeasibility | One O 600->1080; H=480; driving/rest rules off | Single duty spans 495 minutes including endpoint tasks. No assignment exists even with unlimited vehicles. |
+| T9 proved duty infeasibility | One O 600->1080; H=480; driving/rest rules off | Single duty spans 490 minutes including endpoint pre/post tasks. No assignment exists even with unlimited vehicles. |
 | T10 bounded unproved search | T2, valid K=2 incumbent retained and exact crew-disabled matching bound L=1; force cutoff before integrated search proves a bound | `FEASIBLE_NOT_PROVEN_OPTIMAL`, L=1/U=2. The test harness knows the optimum from independent enumeration; the interrupted solver has not certified it. A second cutoff before any witness gives `SEARCH_INCOMPLETE`. Never label the forced cutoff infeasible. |
 | T11 continuous driving separate | O 480->580, I 595->695, O 710->810; C=240, beta=30 | H permits one block but no reset gap exists: one-block exposure=300, so K>=2. [trip1,trip2] has exposure 200; [trip3] has 100, giving K*=2. A five-minute turnaround cannot reset the one-block exposure. |
 | T12 reserve/rest boundary | O 600->660, I 705->765, prescribed one block; intersection lunch | rho=0 gives lunch 670–700; rho=5 leaves [675,700), so reject. Verify neither meals nor reserve consume the same minutes. |
 | T13 eligibility thresholds | Directly evaluate sustained mode at D=359/360 and meal overlap=59/60 | Required iff both inclusive thresholds hold. A duty ending at L or starting at U has zero intersection. Strict mode with overlap=1 differs visibly. |
 | T14 caps and incomplete columns | T2 with K_cap=1; compare complete small oracle to a deliberately incomplete pool | Complete problem infeasible at cap1; without cap K*=2. Removing valid columns may produce restricted infeasibility, which must not become global `INFEASIBLE_PROVEN`. |
-| T15 reserve input scope/final boundary | Same arriving trip supplied with two different successor reserve requirements, or any requested final-arrival reserve | Reject unsupported policy input with `BLOCKED_INPUT_AUTHORITY`. For a supported singleton O 600->660 and rho_i=20, duty still ends at 670 because no internal connection exists; no final 20-minute reserve is invented. |
+| T15 reserve input scope/final boundary | Same arriving trip supplied with two different successor reserve requirements, or any requested final-arrival reserve | Reject unsupported policy input with `BLOCKED_INPUT_AUTHORITY`. For a supported singleton O 600->660 and rho_i=20, duty ends at 665 because no internal connection exists; neither final reserve nor final technical turnaround is invented. |
 | T16 explicit modes/positive reset | Missing rule mode, beta=0, C_max=0, nonfinite/fractional reserve, or negative eligibility threshold | Reject before model construction. Explicitly disabling a rule omits only its variables/constraints and emits `CREW_RULES_DISABLED`; re-enabling it restores the known T2/T11 outcomes. |
+| T17 final turnaround boundary | Singleton O 600->1070, H=480, driving/general/meals disabled | Span is exactly 480 (pre5+drive470+post5), feasible with K=1. Charging final q would incorrectly reject it. |
+| T18 general rest outside meals | O 60->180, I 195->315, O 330->450, H=600, general rest enforced, meals disabled | Unique one-block chain has no 30-minute free interval and D=400. K=1 fails; two short blocks are feasible. Long duty outside meal windows is not exempt from general rest. |
+| T19 shared physical rest | O 480->660, I 705->885, H=600, continuous limit240, lunch/general enabled, dinner disabled | One block with protected [670,700) and lunch [670,700) has duty415 and maximum driving180. One physical 30-minute interval satisfies lunch, general rest and driving reset; the ledger must count 30, not 60 or 90. |
 
 Additional mandatory validator mutation tests: duplicate/omitted trip, wrong bus/team identity, fabricated arrival, same-direction continuation, overlapping meal/task, reset outside free time, dinner counted as lunch, late-start vehicle materialized at a terminal, reused finished vehicle, missing policy authority, fractional time and negative/nonfinite duration. Test half-open equality, last runtime-period inclusion and final-task inclusion. Exhaustive enumeration on tiny graphs must independently reconstruct intervals/eligibility and agree with the compact model when it claims an optimum. Tests must not simply mirror its reified constraints.
 
@@ -381,8 +395,8 @@ Excel remains the primary planning interface. A new, separately named `integrate
 | Table | Required columns |
 |---|---|
 | **Timetable** | trip ID, direction/A-B terminals, unchanged departure, scenario arrival/runtime, bus ID, team/driver/attendant IDs, scenario/policy IDs and source pointer |
-| **VehicleCrewDuties** | block/bus/team IDs, ordered trip IDs, initial/final terminal, duty start/end/span, total/max continuous driving, continuous work exposure, per-connection dwell/tasks/reserve, lunch/dinner requirement and selected intervals/terminal, reset intervals, other waiting, remaining uncommitted recovery |
-| **FeasibilityReport** | declared scenario/policies/authority, solve status/proof scope/stop reason, K vehicles/teams and individual role counts, stock required/available by terminal, L/U/gaps, witness validation, violations/shortfalls, assumptions and unresolved operator evidence |
+| **VehicleCrewDuties** | block/bus/team IDs, ordered trip IDs, initial/final terminal, duty start/end/span, total/max continuous driving, continuous work exposure, per-connection dwell/tasks/reserve, lunch/dinner requirement and selected intervals/terminal, general-rest required/qualifying intervals/coverage, reset intervals, other waiting, remaining uncommitted recovery |
+| **FeasibilityReport** | declared scenario/policies/authority, solve status/proof scope/stop reason, K vehicles/teams and individual role counts, stock required/available by terminal, L/U/gaps, lunch/dinner/general-rest coverage, witness validation, violations/shortfalls, assumptions and unresolved operator evidence |
 
 Use linked detail rows for multiple gaps/breaks rather than comma-separated clocks as the only evidence. Remaining recovery is the residual interval budget after work and the **union** of selected rests, not the whole dwell. For p75, distinguish embedded traffic stress from any separately sourced reserve. Missing arrival/assignment or no incumbent stays blank with a reason; never fabricate a timetable. Optional distances include source/unit columns. Cost columns are absent or explicitly unknown until verified rates exist. A failure report may show violated proposed assignments for diagnosis, clearly excluded from feasible solutions.
 
@@ -394,16 +408,16 @@ Keep existing `departures`, stable `trip_id`, `vehicle_id`, `chains`, `required_
 | `mvp/integrated_blocking_validation.py` | Independent reconstruction and all duty/rest/stock checks; does not import the solver's mathematical helpers. |
 | `mvp/integrated_blocking_report.py` | Three-table XLSX plus JSON, using installed openpyxl and existing privacy/provenance conventions. |
 
-Future entry point can be one thin CLI alongside existing scripts, reading the pinned frozen evidence and separate policy file. No UI page is required. Implementation sequence, **not authorized by this design-only milestone**:
+Entry point is one thin CLI alongside existing scripts, reading pinned frozen evidence and the explicitly frozen policy. No UI page is required. Implementation sequence authorized by the PO's conditional implementation request:
 
-1. PO resolves section 13 choices and supplies/labels authority. Freeze request/result/witness examples and tiny cases; implement input validation and the independent validator first, testing hand-constructed valid/invalid assignments.
+1. PO choices are frozen by the conditional implementation request; authority remains experimental and externally unverified. Freeze request/result/witness examples and tiny cases; implement input validation and the independent validator first, testing hand-constructed valid/invalid assignments.
 2. Implement only the compact model and deterministic checkpoint/status contract. Compare crew-disabled cases to existing matching and small integrated cases to exhaustive independent oracles. Do not replace existing fleet code.
 3. Add the three Excel tables/JSON and provenance, write one thin CLI, and verify round-trip values/unchanged P0 clocks with source/output collision guards. Keep private inputs/generated evidence ignored.
 4. Run the four declared Route 10 scenarios within fixed budgets, validate incumbents, publish actual bounds/gaps, run relevant regression tests, then obtain another independent technical review. Changing timetable optimization is a later separately approved project.
 
 ## 12. Verification and independent review record
 
-Evidence recomputation on Python 3.12.14 / OR-Tools 9.15.6755: source/frozen SHA checks, workbook-derived p50/p75 bundle equality, P0 digest/counts, all four fresh exact covers and separate maximum-flow audits, explicit graph edge counts and equal matching/min-cut capacities, p50/p75 workloads and task-inclusive workload arithmetic. No integrated solver has been implemented or run.
+Historical design-baseline evidence on Python 3.12.14 / OR-Tools 9.15.6755: source/frozen SHA checks, workbook-derived p50/p75 bundle equality, P0 digest/counts, all four fresh exact covers and separate maximum-flow audits, explicit graph edge counts and equal matching/min-cut capacities, p50/p75 workloads and task-inclusive workload arithmetic. No integrated solver existed at that design baseline. The subsequently authorized implementation, corrected arithmetic, four primary runs and independent review are recorded in [the V1 results](INTEGRATED_BLOCKING_V1_RESULTS.md).
 
 Existing verification command, with the SHA-checked private workbook and frozen evidence configured via `BUS_MVP5_ROUTE10_WORKBOOK` and `BUS_CREW_FROZEN_EVIDENCE`, `PYTHONPATH=src`, `PYTHONUTF8=1` and `OPENPYXL_LXML=False`:
 
@@ -422,12 +436,12 @@ The reproduction snippet in section 4.1 was executed successfully. Separate hand
 | Decision | Why it changes the mathematics |
 |---|---|
 | Meal eligibility | Strict intersection versus sustained duty, including exact thresholds, changes which paths exist and can even invalidate all partitions of a compulsory trip. |
-| Duty metric and endpoint task accounting | Confirm elapsed H including meals/waiting and separate serial q/h/p, or provide a different sourced definition. The 27/21 stronger bounds depend on these assumptions. |
-| Driving reset/limits and general break entitlements | Select C_max/beta and what protected rest qualifies; confirm whether additional daily/continuous-work breaks are mandatory. Meals and a duty limit do not define driving compliance. |
+| Duty metric and endpoint task accounting | PO selected elapsed H=480/600 including meals/waiting; q only internally, h after every arrival and p before every departure. Corrected p50 bounds are 26/21; p75 27/22. |
+| Driving reset/limits and general break entitlements | PO selected C_max=240, beta=30 and general protected rest30 for D>=360 as independent experimental rules. Additional applicable operator/legal rules remain external evidence. |
 | Resource sizing versus hard availability | Unknown stock permits conditional sizing; confirmed A/B caps or a hard resource ceiling change feasibility. Eight/six is an experimental split, not confirmed authority. |
 | Runtime and residual reserve | p50 versus p75 defines different arrivals/workloads. Any extra reserve beyond p75 needs an independent basis; p50 reserve diagnostics do not establish full-duty robustness. |
 | Synchronized roles and terminal work | Confirm a driver plus attendant per vehicle, both available through duty, and no other competing terminal work. Different role duties/availability invalidate the earliest-rest reduction. |
 
 These choices do not prevent delivery of a complete conditional mathematical specification. They must be explicit before future implementation acceptance or an operational verdict. Operational date, applicable rules, parking and actual people/vehicle availability remain additional evidence for deployment; this document makes no legal-compliance or monetary-savings claim.
 
-Stop after independent review, necessary specification corrections and a documentation-only commit/push to the existing pilot branch, with a fresh clean-worktree/HEAD/remote check. PR #63 remains Draft and unmerged on its existing source branch; do not create another PR. Final design verdict is `DESIGN_READY_FOR_PO_REVIEW` only after the review finds no unresolved material mathematical/completeness issue; otherwise `DESIGN_BLOCKED` names the blocker. Neither verdict asserts that a feasible rest-compliant P0 assignment has already been found.
+Stop after fixed-timetable blocking, independent technical review, tests and four reproducible primary experiments. Commit/push only validated changes to the existing pilot branch. Do not modify, open or merge PR #63. Do not feed results into ServiceRegime planning. Report actual validated assignments and proof bounds with a final implementation verdict; neither mathematical optimality nor feasibility implies operational approval.
